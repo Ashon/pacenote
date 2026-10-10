@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { missingScopes, REQUIRED_BOT_SCOPES } from '../src/tools/check-slack.js'
+import {
+  missingScopes,
+  OPTIONAL_BOT_SCOPES,
+  REQUIRED_BOT_SCOPES,
+} from '../src/tools/check-slack.js'
 
 /** Reads the oauth_config.scopes.bot list from the manifest. */
 function manifestBotScopes(): string[] {
@@ -20,8 +24,10 @@ function manifestBotScopes(): string[] {
 }
 
 describe('REQUIRED_BOT_SCOPES', () => {
-  it('matches the manifest', () => {
-    expect([...REQUIRED_BOT_SCOPES].sort()).toEqual(manifestBotScopes().sort())
+  it('matches the manifest, with the optional ones', () => {
+    expect([...REQUIRED_BOT_SCOPES, ...OPTIONAL_BOT_SCOPES].sort()).toEqual(
+      manifestBotScopes().sort()
+    )
   })
 
   it('finds missing scopes', () => {

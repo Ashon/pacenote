@@ -25,7 +25,8 @@ brew install --cask pacenote
 
 1. Slack app: https://api.slack.com/apps -> Create New App -> From an app manifest ->
    paste `slack-app-manifest.yaml`. For an existing app, only match the scopes and events below.
-   - Bot Token Scopes: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `files:write`, `users:read`
+   - Bot Token Scopes: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `files:write`, `users:read`,
+     and `reactions:write` (without it Pace posts "Working on it..." instead of reacting to the mention with 👀)
    - Event Subscriptions > bot events: `app_mention`
    - Turn on Socket Mode
 2. Basic Information -> App-Level Tokens: create a token with `connections:write` -> `SLACK_APP_TOKEN`
@@ -54,9 +55,10 @@ and if it is still alive it exits with "Pace is already running".
 
 Restart handling:
 
-- Mentions in progress are recorded in `PACENOTE_DATA_DIR/inflight.json`. After a restart the bot resumes each one once in the same placeholder
-  message ("I restarted, so I'm picking this up again..."). Requests already resumed once or older than 30 minutes are replaced with
-  "I couldn't finish this: I restarted and the request was cut off. Please mention me again."
+- Mentions in progress are recorded in `PACENOTE_DATA_DIR/inflight.json`. After a restart the bot resumes each one once; the 👀 stays on
+  the mention meanwhile (without `reactions:write`, the placeholder says "I restarted, so I'm picking this up again...").
+  Requests already resumed once or older than 30 minutes get "I couldn't finish this: I restarted and the request was cut
+  off. Please mention me again."
 - On a shutdown signal (SIGINT, SIGTERM) it stops taking new events and waits up to 20 seconds for requests in progress.
 - At startup it deletes attachment/output temp directories (`PACENOTE_DATA_DIR/attachments/*`) older than 1 hour.
 

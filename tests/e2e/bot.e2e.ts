@@ -41,10 +41,18 @@ describe('bot on its own Slack app', () => {
     })
     const [reply] = await world.answered(ops.id, root)
 
-    // The placeholder is edited into the answer, in Slack mrkdwn.
-    expect(reply!.edits).toEqual(['Working on it... (`claude@host`)'])
+    // 👀 on the mention while it works, then the answer as a new reply in
+    // Slack mrkdwn, and the reaction comes off.
+    expect(reply!.edits).toEqual([])
     expect(reply!.text).toBe(
       '*Healthy*. See <https://runbook.example.com|the runbook>.'
+    )
+    expect(
+      slack.callsTo('reactions.add').map((call) => call.args)
+    ).toMatchObject([{ channel: ops.id, timestamp: ts, name: 'eyes' }])
+    await eventually(
+      'the reaction to come off',
+      () => slack.message(ops.id, ts)?.reactions?.length === 0
     )
     const [call] = world.claudeCalls()
     expect(call!.request).toBe('check web-01')
@@ -67,14 +75,30 @@ describe('bot on its own Slack app', () => {
         conversationLabel: '#ops',
         thread: root,
         message: ts,
-        placeholder: reply!.ts,
         userId: alice.id,
         userName: 'alice',
       },
     })
+    expect(run!.origin.placeholder).toBeUndefined()
     expect(run!.origin.permalink).toBe(
-      `${slack.url}/archives/${ops.id}/p${reply!.ts.replace('.', '')}?thread_ts=${root}&cid=${ops.id}`
+      `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}?thread_ts=${root}&cid=${ops.id}`
     )
+  })
+
+  it('posts "Working on it..." and edits it into the answer when the app cannot react', async () => {
+    world = await World.create([{ match: 'web-01', answer: 'Healthy.' }])
+    const { slack, ops, alice } = world
+    slack.scopes = slack.scopes.filter((scope) => scope !== 'reactions:write')
+    await world.startBot()
+
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> check web-01`,
+    })
+    const [reply] = await world.answered(ops.id, ts)
+    expect(reply!.edits).toEqual(['Working on it... (`claude@host`)'])
+    expect(reply!.text).toBe('Healthy.')
   })
 
   it("answers outside a thread in a new thread, with the channel's last messages as context", async () => {
@@ -333,7 +357,7 @@ describe('bot on its own Slack app', () => {
     expect(bot.output).toContain('waiting for in-progress requests')
   })
 
-  it('resumes an answer cut off by a crash in the same message', async () => {
+  it('resumes an answer cut off by a crash', async () => {
     world = await World.create([
       { match: 'crash', answer: 'Survived.', delayMs: 3_000 },
     ])
@@ -351,13 +375,18 @@ describe('bot on its own Slack app', () => {
     )
     await first.kill()
 
+    // The 👀 stays on the mention across the restart, and nothing is posted
+    // until the answer.
+    expect(slack.message(ops.id, ts)?.reactions).toEqual(['eyes'])
+    expect(slack.replies(ops.id, ts)).toEqual([])
+
     await world.startBot()
-    const [reply] = await world.answered(ops.id, ts)
-    expect(reply!.text).toBe('Survived.')
-    expect(reply!.edits).toEqual([
-      'Working on it... (`claude@host`)',
-      "I restarted, so I'm picking this up again... (`claude@host`)",
-    ])
+    const replies = await world.answered(ops.id, ts)
+    expect(replies.map((reply) => reply.text)).toEqual(['Survived.'])
+    await eventually(
+      'the reaction to come off',
+      () => slack.message(ops.id, ts)?.reactions?.length === 0
+    )
     const run = await eventually('the resumed run', () =>
       world!.runs().find((r) => r.status === 'succeeded')
     )

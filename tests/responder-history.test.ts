@@ -12,22 +12,39 @@ import { InflightStore } from '../src/mention/inflight.js'
 import { MentionResponder } from '../src/mention/responder.js'
 import type { Directory } from '../src/messengers/slack/directory.js'
 import { SlackMessenger } from '../src/messengers/slack/messenger.js'
-import type { Mention, Messenger, Upload } from '../src/messengers/types.js'
+import {
+  mentionKey,
+  type Mark,
+  type Mention,
+  type Messenger,
+  type Upload,
+} from '../src/messengers/types.js'
 import type { Reasoner, ReasonRequest } from '../src/reasoners/types.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-responder-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 function setup(complete: (request: ReasonRequest) => Promise<string>) {
-  const updates: string[] = []
+  const posts: string[] = []
+  const reactions: string[] = []
   const client = {
     chat: {
-      postMessage: async () => ({ ok: true, ts: '1791453237.582449' }),
-      update: async ({ text }: { text: string }) => {
-        updates.push(text)
+      postMessage: async ({ text }: { text: string }) => {
+        posts.push(text)
+        return { ok: true, ts: '1791453237.582449' }
+      },
+      update: async () => ({ ok: true }),
+      postEphemeral: async () => ({ ok: true }),
+    },
+    reactions: {
+      add: async ({ name }: { name: string }) => {
+        reactions.push(`+${name}`)
         return { ok: true }
       },
-      postEphemeral: async () => ({ ok: true }),
+      remove: async ({ name }: { name: string }) => {
+        reactions.push(`-${name}`)
+        return { ok: true }
+      },
     },
     conversations: {
       replies: async () => ({
@@ -89,7 +106,12 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
     inflight: new InflightStore(path.join(root, 'inflight.json')),
     history,
   })
-  return { responder, updates, reader: new HistoryReader(history.root) }
+  return {
+    responder,
+    posts,
+    reactions,
+    reader: new HistoryReader(history.root),
+  }
 }
 
 const mention = (ts: string): Mention =>
@@ -105,7 +127,7 @@ const mention = (ts: string): Mention =>
 
 describe('mention run history', () => {
   it('records the request, context, prompt, tool steps, and answer, and marks the run succeeded', async () => {
-    const { responder, updates, reader } = setup(async (request) => {
+    const { responder, posts, reactions, reader } = setup(async (request) => {
       request.onEvent?.({
         kind: 'tool',
         id: 'item_1',
@@ -146,14 +168,17 @@ describe('mention run history', () => {
       conversationLabel: '#ops',
       userName: 'alice',
     })
+    // Marked with 👀 instead of a placeholder, so the run links to the mention.
+    expect(run.origin.placeholder).toBeUndefined()
     expect(run.origin.permalink).toBe(
-      'https://example.slack.com/archives/C0OPS/p1791453237582449?thread_ts=1791443475.275049&cid=C0OPS'
+      'https://example.slack.com/archives/C0OPS/p1791443490000200?thread_ts=1791443475.275049&cid=C0OPS'
     )
     expect(run.events[0]).toMatchObject({
       status: 'completed',
       result: 'up 3 days',
     })
-    expect(updates.at(-1)).toBe('It is *healthy*.')
+    expect(posts).toEqual(['It is *healthy*.'])
+    expect(reactions).toEqual(['+eyes', '-eyes'])
   })
 
   it('records a failed run with the error when the reasoner fails', async () => {
@@ -232,6 +257,21 @@ class MemoryMessenger implements Messenger {
   }
 }
 
+/** A messenger that can react, like Slack with reactions:write */
+class MarkingMessenger extends MemoryMessenger {
+  readonly marks: string[] = []
+  canMark = true
+
+  async mark(_mention: Mention, mark: Mark) {
+    if (!this.canMark) return false
+    this.marks.push(`+${mark}`)
+    return true
+  }
+  async unmark(_mention: Mention, mark: Mark) {
+    this.marks.push(`-${mark}`)
+  }
+}
+
 describe('answering through any messenger', () => {
   const base = (messenger: MemoryMessenger, answer = 'short') =>
     new MentionResponder({
@@ -296,5 +336,117 @@ describe('answering through any messenger', () => {
     await responder.handle({ ...mention })
     expect(await responder.drain(5_000)).toBe(true)
     expect(messenger.updates).toEqual(['short'])
+  })
+})
+
+describe('marking a mention instead of posting a placeholder', () => {
+  const responder = (
+    messenger: MemoryMessenger,
+    options: {
+      answer?: () => Promise<string>
+      slowAfterMs?: number
+      inflight?: InflightStore
+    } = {}
+  ) =>
+    new MentionResponder({
+      config: loadConfig({
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+      }),
+      messengers: [messenger],
+      reasoner: {
+        backend: 'claude',
+        sandbox: 'host',
+        canReadFiles: false,
+        mcpServerNames: [],
+        complete: options.answer ?? (async () => 'a'.repeat(25)),
+      },
+      log: createLogger('error'),
+      extractPdfText: async () => '',
+      slowAfterMs: options.slowAfterMs,
+      inflight: options.inflight,
+    })
+  const ask = (): Mention => ({
+    messenger: 'slack',
+    conversation: 'room-1',
+    message: `${Math.random()}`,
+    thread: 't1',
+    inThread: true,
+    userId: 'u1',
+    text: 'hi',
+    files: [],
+  })
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+  it('reacts, answers in new replies, and takes the reaction off', async () => {
+    const messenger = new MarkingMessenger()
+    const bot = responder(messenger)
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.updates).toEqual([])
+    expect(messenger.marks).toEqual(['+working', '-working'])
+  })
+
+  it('adds the slow mark once the answer takes long', async () => {
+    const messenger = new MarkingMessenger()
+    const bot = responder(messenger, {
+      slowAfterMs: 20,
+      answer: async () => {
+        await sleep(150)
+        return 'done'
+      },
+    })
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual(['done'])
+    expect(messenger.marks).toEqual(['+working', '+slow', '-working', '-slow'])
+  })
+
+  it('says a failure in a reply and takes the reaction off', async () => {
+    const messenger = new MarkingMessenger()
+    const bot = responder(messenger, {
+      answer: async () => {
+        throw new Error('quota exceeded')
+      },
+    })
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    // The test messenger keeps the first 20 characters of a one-line message.
+    expect(messenger.posts).toEqual(["I couldn't produce a"])
+    expect(messenger.updates).toEqual([])
+    expect(messenger.marks).toEqual(['+working', '-working'])
+  })
+
+  it('posts a placeholder when it cannot react', async () => {
+    const messenger = new MarkingMessenger()
+    messenger.canMark = false
+    const bot = responder(messenger)
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts[0]).toMatch(/^Working on it\.\.\./)
+    expect(messenger.updates).toEqual(['a'.repeat(20)])
+    expect(messenger.marks).toEqual([])
+  })
+
+  it('resumes a marked mention after a restart, answering in a new reply', async () => {
+    const inflight = new InflightStore(path.join(root, 'marked.json'))
+    const mention = ask()
+    inflight.upsert({
+      key: mentionKey(mention),
+      mention,
+      label: 'room-1',
+      attempts: 1,
+      startedAt: Date.now(),
+    })
+    const messenger = new MarkingMessenger()
+    const bot = responder(messenger, { inflight })
+    await bot.resumePending()
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.updates).toEqual([])
+    // The 👀 from before the restart is still there; marking again is a no-op.
+    expect(messenger.marks).toEqual(['+working', '-working'])
+    expect(inflight.list()).toEqual([])
   })
 })

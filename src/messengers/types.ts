@@ -1,10 +1,10 @@
 /**
  * What the bot needs from a chat app (Slack today). A messenger turns the app's
  * events into Mentions and carries out the answer's side: reading the
- * conversation, fetching attached files, posting, editing and uploading. The
- * mention pipeline (src/mention) works only through this interface, so a new
- * chat app is a new adapter in src/messengers/<id> (with its id in ids.ts) and
- * nothing in the pipeline changes.
+ * conversation, fetching attached files, reacting, posting, editing and
+ * uploading. The mention pipeline (src/mention) works only through this
+ * interface, so a new chat app is a new adapter in src/messengers/<id> (with
+ * its id in ids.ts) and nothing in the pipeline changes.
  *
  * Everything in a Mention is plain JSON, since an interrupted mention is stored
  * (inflight.json) and resumed after a restart.
@@ -107,6 +107,12 @@ export interface Upload {
   title: string
 }
 
+/**
+ * A reaction the bot puts on a mention while it works on it: working (Slack:
+ * 👀) from the start, slow (⏳) once it takes long
+ */
+export type Mark = 'working' | 'slow'
+
 /** How answers read in this messenger, for the system prompt */
 export interface MessengerProfile {
   /** "Slack": the bot "answers mentions in Slack public channels" */
@@ -154,6 +160,15 @@ export interface Messenger {
   post(mention: Mention, text: string): Promise<string>
   update(mention: Mention, message: string, text: string): Promise<void>
   upload(mention: Mention, files: Upload[]): Promise<void>
+  /**
+   * Puts a reaction on the mention: the quiet way to say the bot has it, with
+   * no message in the conversation and no notification. False when it could
+   * not (Slack: the app lacks reactions:write); the pipeline then posts a
+   * placeholder message instead, as it does for a messenger without mark.
+   */
+  mark?(mention: Mention, mark: Mark): Promise<boolean>
+  /** Takes the reaction off again; never fails */
+  unmark?(mention: Mention, mark: Mark): Promise<void>
 
   /**
    * The model's Markdown in the messenger's markup, split into messages that

@@ -131,6 +131,13 @@ describe('hub policy', () => {
     )
     expect(ok('chat.update', { channel: 'C1', ts: '300.1' })).toBe(true)
 
+    // Reactions go only on the mentions routed to the desktop.
+    const react = { channel: 'C1', timestamp: '200.1', name: 'eyes' }
+    expect(ok('reactions.add', react)).toBe(true)
+    expect(ok('reactions.remove', react)).toBe(true)
+    expect(ok('reactions.add', { ...react, timestamp: '100.1' })).toBe(false)
+    expect(ok('reactions.add', { ...react, channel: 'C2' })).toBe(false)
+
     // Files in the thread can be read; others cannot.
     expect(ok('files.info', { file: 'F1' })).toBe(true)
     expect(ok('files.info', { file: 'F9' })).toBe(false)

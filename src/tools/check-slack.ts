@@ -4,6 +4,7 @@ import { checkSlackTokens } from '../messengers/slack/check.js'
 
 export {
   missingScopes,
+  OPTIONAL_BOT_SCOPES,
   REQUIRED_BOT_SCOPES,
 } from '../messengers/slack/check.js'
 

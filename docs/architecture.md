@@ -23,9 +23,9 @@ More: [How it works](how-it-works.md), [Reasoner sandbox](sandbox.md), [Ops tool
 
 ## One mention
 
-A mention is checked (allowed users, public channels), answered with a placeholder at once, and reasoned with the
-thread and its attachments as context. Each step goes into the run history as it happens, diagram blocks are rendered,
-and the answer replaces the placeholder. A restart resumes an unfinished answer once, in the same message.
+A mention is checked (allowed users, public channels), marked with 👀 at once, and reasoned with the thread and its
+attachments as context. Each step goes into the run history as it happens, diagram blocks are rendered, and the answer
+comes as a new reply. A restart resumes an unfinished answer once, with the 👀 still on the mention.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/mention-flow-dark.svg">

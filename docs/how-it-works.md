@@ -6,19 +6,24 @@ What happens between a mention and its answer: context, attachments, diagrams an
 @bot mention in a public channel
   -> messenger adapter (Slack: Bolt, Socket Mode or the team hub, app_mention event) -> Mention
   -> check allowed users / public channel
-  -> Pace posts "Working on it..." in the thread
+  -> Pace reacts to the mention with 👀 (and ⏳ after 90 seconds)
   -> collect thread context (the whole thread, or the last 10 messages outside a thread)
   -> Reasoner: claude -p or codex exec (a disposable container when REASONER_SANDBOX=docker)
-  -> replace "Working on it..." with the answer (long answers continue in more messages)
+  -> post the answer as a new reply (long answers continue in more messages), and take the reactions off
 ```
+
+- While Pace works, the thread gets nothing from it but the reaction, so people talking in the thread are not
+  interrupted, and the answer arrives as a new reply at the bottom, which notifies them. (An edited message would not.)
+- A Slack app without the `reactions:write` scope (created from an older manifest) gets the earlier behavior: Pace posts
+  "Working on it..." and edits it into the answer. Settings > Messengers > Slack > Check connection says when the
+  scope is missing; add it to the app and reinstall it.
 
 - A mention inside a thread also passes the bot's earlier answers as context, so it continues from them.
 - With `MENTION_ALLOWED_USERS` set, the bot answers only those users. Anyone else gets a message only they
   can see (ephemeral): "I only answer specific people here."
 - It does not answer in private channels or DMs.
 - It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it replies that it is busy.
-- On failure it replaces the placeholder message with "I couldn't produce an answer." The channel is public, so error
-  details go only to the log.
+- On failure it replies "I couldn't produce an answer." The channel is public, so error details go only to the log.
 
 ## Attachments
 Files attached to the mention and to the thread are downloaded with the bot token (`files:read`) and passed along. Attachments

@@ -4,6 +4,7 @@ import type { Logger } from '../../logger.js'
 import type {
   ContextMessage,
   Download,
+  Mark,
   Mention,
   MessageFile,
   Messenger,
@@ -36,6 +37,11 @@ const ROOT_CONTEXT_MESSAGES = 10
 const THREAD_CONTEXT_MESSAGES = 100
 /** Files looked up again with files.info per request */
 const MAX_FILE_LOOKUPS = 10
+/** The reactions Pace puts on a mention while it works on it */
+const REACTIONS: Record<Mark, string> = {
+  working: 'eyes',
+  slow: 'hourglass_flowing_sand',
+}
 
 export interface SlackMessengerOptions {
   client: WebClient
@@ -65,6 +71,8 @@ export class SlackMessenger implements Messenger {
     public: true,
   }
   readonly allowedUsers: readonly string[]
+  /** Reaction errors already logged, so each shows once */
+  private readonly reactionWarnings = new Set<string>()
 
   constructor(private readonly options: SlackMessengerOptions) {
     this.allowedUsers = options.allowedUsers
@@ -234,6 +242,47 @@ export class SlackMessenger implements Messenger {
     })
   }
 
+  async mark(mention: Mention, mark: Mark): Promise<boolean> {
+    try {
+      await this.options.client.reactions.add({
+        channel: mention.conversation,
+        timestamp: mention.message,
+        name: REACTIONS[mark],
+      })
+      return true
+    } catch (err) {
+      const error = slackError(err)
+      // Still there from before a restart
+      if (error === 'already_reacted') return true
+      this.warnReaction(
+        error,
+        error === 'missing_scope'
+          ? 'The Slack app lacks reactions:write, so Pace posts "Working on it..." instead of reacting with 👀. Add the scope (slack-app-manifest.yaml) and reinstall the app.'
+          : error === 'method_not_allowed_by_hub'
+            ? 'The team hub does not relay reactions yet, so Pace posts "Working on it..." instead of reacting with 👀. Update the hub.'
+            : `Could not react to a mention (${error}); posting "Working on it..." instead.`
+      )
+      return false
+    }
+  }
+
+  async unmark(mention: Mention, mark: Mark): Promise<void> {
+    await this.options.client.reactions
+      .remove({
+        channel: mention.conversation,
+        timestamp: mention.message,
+        name: REACTIONS[mark],
+      })
+      .catch((err: unknown) => {
+        const error = slackError(err)
+        if (error !== 'no_reaction')
+          this.warnReaction(
+            `remove:${error}`,
+            `Could not take a reaction off a mention (${error}).`
+          )
+      })
+  }
+
   render(markdown: string): string[] {
     return chunkText(toSlackMrkdwn(markdown), SLACK_CHUNK_LIMIT)
   }
@@ -250,6 +299,12 @@ export class SlackMessenger implements Messenger {
       : undefined
   }
 
+  private warnReaction(key: string, message: string): void {
+    if (this.reactionWarnings.has(key)) return
+    this.reactionWarnings.add(key)
+    this.options.log.warn(message)
+  }
+
   private author(
     userId: string | undefined,
     names: Map<string, string>
@@ -258,4 +313,10 @@ export class SlackMessenger implements Messenger {
     const bot = userId === this.options.botUserId ? ' (bot)' : ''
     return `@${names.get(userId) ?? userId}${bot}`
   }
+}
+
+/** The error code of a failed Web API call (missing_scope), or its message */
+function slackError(err: unknown): string {
+  const code = (err as { data?: { error?: unknown } }).data?.error
+  return typeof code === 'string' ? code : (err as Error).message
 }

@@ -1,8 +1,9 @@
 /**
  * What a desktop may do with the hub's Slack token. A desktop gets a grant for
  * each mention routed to it (that channel and thread), and its Slack calls must
- * stay inside one: read that thread, post and edit in it, read and upload its
- * files. Calls the bot does not make are refused. (docs/team-hub.md)
+ * stay inside one: read that thread, post and edit in it, react to the
+ * mentions, read and upload its files. Calls the bot does not make are
+ * refused. (docs/team-hub.md)
  *
  * Arguments arrive as the Slack client sends them (form fields, nested values
  * as JSON strings).
@@ -28,6 +29,8 @@ export interface Grant {
   thread: string
   /** The member who mentioned the bot (the desktop's owner) */
   user: string
+  /** The mentions routed in the thread, which the desktop may react to */
+  mentions: Set<string>
   /** Messages the desktop posted in the thread, which it may edit */
   messages: Set<string>
   /** Files seen in the thread: id -> url_private_download */
@@ -79,6 +82,7 @@ export class Grants {
         channel: event.channel,
         thread,
         user: event.user ?? '',
+        mentions: new Set(),
         messages: new Set(),
         files: new Map(),
         expiresAt: 0,
@@ -86,6 +90,7 @@ export class Grants {
       this.grants.push(grant)
     }
     grant.expiresAt = this.now() + GRANT_TTL_MS
+    grant.mentions.add(event.ts)
     this.addFiles(grant, event.files)
     return grant
   }
@@ -147,6 +152,14 @@ export class Grants {
         const ts = args.ts ?? ''
         const grant = this.live().find(
           (g) => g.channel === args.channel && g.messages.has(ts)
+        )
+        return grant ? allow : deny('message_not_granted')
+      }
+      case 'reactions.add':
+      case 'reactions.remove': {
+        const ts = args.timestamp ?? ''
+        const grant = this.live().find(
+          (g) => g.channel === args.channel && g.mentions.has(ts)
         )
         return grant ? allow : deny('message_not_granted')
       }

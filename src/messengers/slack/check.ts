@@ -1,8 +1,8 @@
 import { slackApiBase } from './api.js'
 
 /**
- * Must match oauth_config.scopes.bot in slack-app-manifest.yaml.
- * (tests/slack-check.test.ts)
+ * With OPTIONAL_BOT_SCOPES, must match oauth_config.scopes.bot in
+ * slack-app-manifest.yaml. (tests/slack-check.test.ts)
  */
 export const REQUIRED_BOT_SCOPES = [
   'app_mentions:read',
@@ -13,6 +13,12 @@ export const REQUIRED_BOT_SCOPES = [
   'files:write',
   'users:read',
 ] as const
+
+/**
+ * Scopes the bot works without, a little worse: without reactions:write it
+ * posts "Working on it..." instead of reacting to the mention with 👀
+ */
+export const OPTIONAL_BOT_SCOPES = ['reactions:write'] as const
 
 export function missingScopes(
   required: readonly string[],
@@ -96,10 +102,15 @@ export async function checkSlackTokens(
         .map((scope) => scope.trim())
         .filter(Boolean)
       const missing = missingScopes(REQUIRED_BOT_SCOPES, granted)
+      const optional = missingScopes(OPTIONAL_BOT_SCOPES, granted)
       items.push({
         label: 'Bot scopes',
         ok: missing.length === 0,
-        detail: missing.length ? `Missing: ${missing.join(', ')}` : undefined,
+        detail: missing.length
+          ? `Missing: ${missing.join(', ')}`
+          : optional.length
+            ? `Missing ${optional.join(', ')}: Pace posts "Working on it..." instead of reacting with 👀. Add it from the manifest and reinstall the app.`
+            : undefined,
       })
     }
   } catch (err) {

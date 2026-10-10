@@ -131,7 +131,9 @@ describe('team hub', () => {
     expect(new Set(slack.calls.map((call) => call.token))).toEqual(
       new Set([slack.botToken, slack.appToken])
     )
-    expect(slack.callsTo('chat.update')).toHaveLength(1)
+    // The hub relays the 👀 on the mention, and the answer is a new reply.
+    expect(slack.callsTo('reactions.add')).toHaveLength(1)
+    expect(slack.callsTo('chat.update')).toHaveLength(0)
     // The answer is posted before the run record is closed, so wait for the
     // record.
     const run = await eventually('the finished run', () =>

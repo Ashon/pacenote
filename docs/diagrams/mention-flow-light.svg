@@ -37,9 +37,9 @@
 <rect x="330" y="138" width="150" height="68" rx="12" fill="#eef6f2"/>
 <circle cx="350" cy="158" r="11" fill="url(#mark)"/>
 <text x="350" y="162" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
-<text x="368" y="163" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10211c" text-anchor="start">Working on it...</text>
-<text x="344" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The placeholder,</text>
-<text x="344" y="197" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">posted first</text>
+<text x="368" y="163" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10211c" text-anchor="start">React 👀</text>
+<text x="344" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">On the mention: no</text>
+<text x="344" y="197" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">message, no ping</text>
 <rect x="330" y="262" width="150" height="68" rx="12" fill="#eef6f2"/>
 <circle cx="350" cy="282" r="11" fill="url(#mark)"/>
 <text x="350" y="286" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
@@ -68,8 +68,8 @@
 <circle cx="1020" cy="158" r="11" fill="url(#mark)"/>
 <text x="1020" y="162" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">8</text>
 <text x="1038" y="163" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10211c" text-anchor="start">Answer</text>
-<text x="1014" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Edits the placeholder</text>
-<text x="1014" y="197" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">and uploads images</text>
+<text x="1014" y="182" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">A new reply that</text>
+<text x="1014" y="197" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">pings; 👀 comes off</text>
 <path d="M235 206 L235 262" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
 <path d="M310 296 L320 296 L320 172 L330 172" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
 <path d="M405 206 L405 262" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
@@ -85,14 +85,14 @@
 <rect x="322" y="512" width="266" height="100" rx="14" fill="#ffffff" filter="url(#shadow)"/>
 <rect x="338" y="532" width="6" height="60" rx="3" fill="#d42f34"/>
 <text x="354" y="546" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">The reasoner fails</text>
-<text x="354" y="566" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">"I couldn't produce an answer." in</text>
-<text x="354" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">the placeholder; the cause stays</text>
-<text x="354" y="598" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">in the log.</text>
+<text x="354" y="566" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">"I couldn't produce an answer." as</text>
+<text x="354" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">a reply; the cause stays in the</text>
+<text x="354" y="598" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">log.</text>
 <rect x="604" y="512" width="266" height="100" rx="14" fill="#ffffff" filter="url(#shadow)"/>
 <rect x="620" y="532" width="6" height="60" rx="3" fill="#be7100"/>
 <text x="636" y="546" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Pace restarts</text>
-<text x="636" y="566" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">inflight.json resumes it once in</text>
-<text x="636" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">the same message: "I restarted..."</text>
+<text x="636" y="566" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">inflight.json resumes it once; the</text>
+<text x="636" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">👀 stays on the mention meanwhile.</text>
 <rect x="886" y="512" width="266" height="100" rx="14" fill="#ffffff" filter="url(#shadow)"/>
 <rect x="902" y="532" width="6" height="60" rx="3" fill="#029a92"/>
 <text x="918" y="546" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Too many at once</text>

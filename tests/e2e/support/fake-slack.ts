@@ -7,7 +7,10 @@ import {
 } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { WebSocket, WebSocketServer } from 'ws'
-import { REQUIRED_BOT_SCOPES } from '../../../src/messengers/slack/check.js'
+import {
+  OPTIONAL_BOT_SCOPES,
+  REQUIRED_BOT_SCOPES,
+} from '../../../src/messengers/slack/check.js'
 
 /**
  * A Slack workspace on this computer for end-to-end tests: the Web API the bot
@@ -50,6 +53,8 @@ export interface FakeMessage {
   files?: Record<string, unknown>[]
   /** Earlier texts, for messages the bot edited (chat.update) */
   edits: string[]
+  /** The bot's reactions on the message now (reactions.add, .remove) */
+  reactions?: string[]
 }
 
 export interface ApiCall {
@@ -84,6 +89,8 @@ export class FakeSlack {
   readonly uploads: UploadRecord[] = []
   /** Makes auth.test fail with this error, as for a revoked token */
   authError?: string
+  /** The bot token's scopes: all of the manifest's, unless a test drops some */
+  scopes: string[] = [...REQUIRED_BOT_SCOPES, ...OPTIONAL_BOT_SCOPES]
 
   private readonly users = new Map<string, FakeUser>()
   private readonly channels = new Map<string, FakeChannel>()
@@ -250,6 +257,11 @@ export class FakeSlack {
     )
   }
 
+  /** One message, with the bot's reactions on it */
+  message(channel: string, ts: string): FakeMessage | undefined {
+    return this.messages.get(channel)?.find((m) => m.ts === ts)
+  }
+
   /** The bot's messages in a thread */
   replies(channel: string, ts: string): FakeMessage[] {
     return this.thread(channel, ts).filter((m) => m.user === this.botUserId)
@@ -387,7 +399,7 @@ export class FakeSlack {
             user_id: this.botUserId,
             bot_id: BOT_ID,
           },
-          headers: { 'x-oauth-scopes': REQUIRED_BOT_SCOPES.join(',') },
+          headers: { 'x-oauth-scopes': this.scopes.join(',') },
         }
       case 'bots.info':
         return ok({
@@ -449,6 +461,25 @@ export class FakeSlack {
         message.text = args.text ?? ''
         return ok({ channel: args.channel, ts: args.ts })
       }
+      case 'reactions.add':
+      case 'reactions.remove': {
+        if (!this.scopes.includes('reactions:write'))
+          return fail('missing_scope')
+        const message = this.messages
+          .get(args.channel ?? '')
+          ?.find((m) => m.ts === args.timestamp)
+        if (!message) return fail('message_not_found')
+        const reactions = message.reactions ?? []
+        const has = reactions.includes(args.name ?? '')
+        if (method === 'reactions.add') {
+          if (has) return fail('already_reacted')
+          message.reactions = [...reactions, args.name ?? '']
+        } else {
+          if (!has) return fail('no_reaction')
+          message.reactions = reactions.filter((name) => name !== args.name)
+        }
+        return ok()
+      }
       case 'chat.postEphemeral':
         this.ephemerals.push({
           channel: args.channel ?? '',
@@ -492,10 +523,15 @@ export class FakeSlack {
   }
 }
 
-/** A message as the Web API returns it (without the test's own edit history) */
+/**
+ * A message as the Web API returns it (without the test's own edit history and
+ * reaction list)
+ */
 function wire(message: FakeMessage): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(message).filter(([key]) => key !== 'edits')
+    Object.entries(message).filter(
+      ([key]) => key !== 'edits' && key !== 'reactions'
+    )
   )
 }
 

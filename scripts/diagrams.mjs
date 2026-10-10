@@ -251,7 +251,7 @@ function architecture(c) {
     mono: false,
   })
   c.item(56, 288, 188, 'Socket Mode', 'Events over a WebSocket')
-  c.item(56, 344, 188, 'Web API', 'Replies, edits, files')
+  c.item(56, 344, 188, 'Web API', 'Replies, reactions, files')
 
   // The Mac. Pace's layers, in the order a mention goes through them.
   c.card(320, 120, 410, 526, {
@@ -274,7 +274,7 @@ function architecture(c) {
     c.item(352, 214 + i * 52, 346, name, help)
   )
   c.chip(352, 426, 'claude@docker', { width: 108 })
-  c.chip(468, 426, 'Working on it...', { tone: 'running', width: 112 })
+  c.chip(468, 426, '👀 on the mention', { tone: 'running', width: 124 })
   c.item(
     336,
     474,
@@ -582,8 +582,8 @@ function mentionFlow(c) {
       n: '3',
       lane: 0,
       x: 330,
-      title: 'Working on it...',
-      help: ['The placeholder,', 'posted first'],
+      title: 'React 👀',
+      help: ['On the mention: no', 'message, no ping'],
     },
     {
       n: '4',
@@ -618,7 +618,7 @@ function mentionFlow(c) {
       lane: 0,
       x: 1000,
       title: 'Answer',
-      help: ['Edits the placeholder', 'and uploads images'],
+      help: ['A new reply that', 'pings; 👀 comes off'],
     },
   ]
   const laneY = [138, 262, 398]
@@ -670,12 +670,12 @@ function mentionFlow(c) {
     {
       tone: 'failed',
       title: 'The reasoner fails',
-      help: '"I couldn\'t produce an answer." in the placeholder; the cause stays in the log.',
+      help: '"I couldn\'t produce an answer." as a reply; the cause stays in the log.',
     },
     {
       tone: 'interrupted',
       title: 'Pace restarts',
-      help: 'inflight.json resumes it once in the same message: "I restarted..."',
+      help: 'inflight.json resumes it once; the 👀 stays on the mention meanwhile.',
     },
     {
       tone: 'running',

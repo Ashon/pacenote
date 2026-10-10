@@ -19,7 +19,10 @@ import {
   SETTING_GROUPS,
   setupSettingsRoute,
 } from '../src/settings/fields.js'
-import { checkSlackTokens } from '../src/messengers/slack/check.js'
+import {
+  checkSlackTokens,
+  REQUIRED_BOT_SCOPES,
+} from '../src/messengers/slack/check.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-settings-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -214,5 +217,24 @@ describe('connection check', () => {
     expect(await checkSlackTokens({ botToken: 'xoxb-1' })).toEqual([
       expect.objectContaining({ ok: false }),
     ])
+  })
+
+  it('passes without reactions:write, and says what it changes', async () => {
+    const fetchImpl = (async () =>
+      new Response(
+        JSON.stringify({ ok: true, user: 'pace', user_id: 'U0V', team: 'T' }),
+        { headers: { 'x-oauth-scopes': REQUIRED_BOT_SCOPES.join(',') } }
+      )) as typeof fetch
+    const items = await checkSlackTokens(
+      { botToken: 'xoxb-1', appToken: 'xapp-1-A0APP-zz' },
+      fetchImpl
+    )
+    expect(items[1]).toEqual({
+      label: 'Bot scopes',
+      ok: true,
+      detail: expect.stringContaining(
+        'Missing reactions:write: Pace posts "Working on it..."'
+      ),
+    })
   })
 })
