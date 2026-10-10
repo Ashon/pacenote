@@ -24,7 +24,10 @@ export interface BotStatus {
   mcp?: string[]
   diagrams?: boolean
   history?: boolean
-  /** Problems found at startup, such as sandbox checks */
+  /**
+   * What does not work as it should: sandbox checks (repeated while it runs),
+   * a Slack scope the app lacks, diagram rendering
+   */
   problems: string[]
   requests: { active: number; handled: number; lastAt?: string }
   /**

@@ -65,6 +65,8 @@ async function main(): Promise<void> {
       log.error(err.message)
       process.exit(1)
     },
+    // Comes only once mentions are answered, after allProblems is set up.
+    onProblems: () => status.update({ problems: allProblems() }),
   })
   const { messenger, bot } = connection
   /**
@@ -83,6 +85,7 @@ async function main(): Promise<void> {
   // follows a proxy that is started or stopped later.
   const allProblems = () => [
     ...sandboxHealth.current.map((problem) => `Sandbox: ${problem}`),
+    ...connection.problems(),
     ...problems,
   ]
   const sandboxHealth = new SandboxHealth(

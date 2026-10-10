@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs'
+import type { WebClient } from '@slack/web-api'
 import { describe, expect, it } from 'vitest'
+import { createLogger } from '../src/logger.js'
+import type { Directory } from '../src/messengers/slack/directory.js'
+import { SlackMessenger } from '../src/messengers/slack/messenger.js'
+import type { Mention } from '../src/messengers/types.js'
 import {
   missingScopes,
   OPTIONAL_BOT_SCOPES,
@@ -32,5 +37,82 @@ describe('REQUIRED_BOT_SCOPES', () => {
 
   it('finds missing scopes', () => {
     expect(missingScopes(['a', 'b', 'c'], ['b'])).toEqual(['a', 'c'])
+  })
+})
+
+describe('reactions:write in the status', () => {
+  const mention: Mention = {
+    messenger: 'slack',
+    conversation: 'C1',
+    message: '1.0',
+    thread: '1.0',
+    inThread: false,
+    userId: 'U1',
+    text: '<@U0PACE> hi',
+    files: [],
+  }
+  const messenger = (
+    add: () => Promise<unknown>,
+    options: { scopes?: string[]; onProblems?: () => void } = {}
+  ) =>
+    new SlackMessenger({
+      client: { reactions: { add } } as unknown as WebClient,
+      directory: {} as Directory,
+      botUserId: 'U0PACE',
+      files: { token: 'xoxb-1' },
+      allowedUsers: [],
+      log: createLogger('error'),
+      ...options,
+    })
+  const slackError = (error: string) =>
+    Object.assign(new Error(`An API error occurred: ${error}`), {
+      data: { ok: false, error },
+    })
+
+  it('reports the missing scope from the scopes Slack gave at startup', () => {
+    const without = messenger(async () => ({ ok: true }), {
+      scopes: [...REQUIRED_BOT_SCOPES],
+    })
+    expect(without.problems).toEqual([
+      expect.stringContaining('the app lacks reactions:write'),
+    ])
+    const granted = messenger(async () => ({ ok: true }), {
+      scopes: [...REQUIRED_BOT_SCOPES, ...OPTIONAL_BOT_SCOPES],
+    })
+    expect(granted.problems).toEqual([])
+    // Through the team hub, Slack's scopes do not come along.
+    expect(messenger(async () => ({ ok: true })).problems).toEqual([])
+  })
+
+  it('reports it when a reaction fails, and clears it once one works', async () => {
+    let scoped = false
+    let changes = 0
+    const slack = messenger(
+      async () => {
+        if (!scoped) throw slackError('missing_scope')
+        return { ok: true }
+      },
+      { onProblems: () => (changes += 1) }
+    )
+    expect(await slack.mark(mention, 'working')).toBe(false)
+    expect(slack.problems).toEqual([
+      expect.stringContaining('Add the scope (slack-app-manifest.yaml)'),
+    ])
+    expect(await slack.mark(mention, 'working')).toBe(false)
+    expect(changes).toBe(1)
+
+    // The app was reinstalled with the scope while Pace kept running.
+    scoped = true
+    expect(await slack.mark(mention, 'working')).toBe(true)
+    expect(slack.problems).toEqual([])
+    expect(changes).toBe(2)
+  })
+
+  it('says when the team hub does not relay reactions', async () => {
+    const slack = messenger(async () => {
+      throw slackError('method_not_allowed_by_hub')
+    })
+    expect(await slack.mark(mention, 'working')).toBe(false)
+    expect(slack.problems).toEqual([expect.stringContaining('Update the hub')])
   })
 })

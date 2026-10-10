@@ -42,6 +42,16 @@ const REACTIONS: Record<Mark, string> = {
   working: 'eyes',
   slow: 'hourglass_flowing_sand',
 }
+/**
+ * Why reactions fail, by error, as the status shows it: until they work, Pace
+ * posts a placeholder instead
+ */
+const REACTION_PROBLEMS: Record<string, string> = {
+  missing_scope:
+    'Slack: the app lacks reactions:write, so Pace posts "Working on it..." instead of reacting with 👀. Add the scope (slack-app-manifest.yaml) and reinstall the app.',
+  method_not_allowed_by_hub:
+    'Slack: the team hub does not relay reactions yet, so Pace posts "Working on it..." instead of reacting with 👀. Update the hub.',
+}
 
 export interface SlackMessengerOptions {
   client: WebClient
@@ -54,6 +64,10 @@ export interface SlackMessengerOptions {
   workspaceUrl?: string
   files: SlackFileAccess
   allowedUsers: readonly string[]
+  /** The bot token's scopes, when Slack said (auth.test) */
+  scopes?: readonly string[]
+  /** Called when problems changes */
+  onProblems?: () => void
   log: Logger
   fetchImpl?: typeof fetch
 }
@@ -73,9 +87,21 @@ export class SlackMessenger implements Messenger {
   readonly allowedUsers: readonly string[]
   /** Reaction errors already logged, so each shows once */
   private readonly reactionWarnings = new Set<string>()
+  /** Why reactions do not work, until one does */
+  private reactionProblem: string | undefined
 
   constructor(private readonly options: SlackMessengerOptions) {
     this.allowedUsers = options.allowedUsers
+    if (options.scopes && !options.scopes.includes('reactions:write'))
+      this.reactionProblem = REACTION_PROBLEMS.missing_scope
+  }
+
+  /**
+   * What does not work as it should, for the status: a scope the app lacks,
+   * found at startup or when a reaction fails
+   */
+  get problems(): string[] {
+    return this.reactionProblem ? [this.reactionProblem] : []
   }
 
   /**
@@ -249,18 +275,18 @@ export class SlackMessenger implements Messenger {
         timestamp: mention.message,
         name: REACTIONS[mark],
       })
+      this.setReactionProblem(undefined)
       return true
     } catch (err) {
       const error = slackError(err)
       // Still there from before a restart
       if (error === 'already_reacted') return true
+      const problem = REACTION_PROBLEMS[error]
+      if (problem) this.setReactionProblem(problem)
       this.warnReaction(
         error,
-        error === 'missing_scope'
-          ? 'The Slack app lacks reactions:write, so Pace posts "Working on it..." instead of reacting with 👀. Add the scope (slack-app-manifest.yaml) and reinstall the app.'
-          : error === 'method_not_allowed_by_hub'
-            ? 'The team hub does not relay reactions yet, so Pace posts "Working on it..." instead of reacting with 👀. Update the hub.'
-            : `Could not react to a mention (${error}); posting "Working on it..." instead.`
+        problem ??
+          `Could not react to a mention (${error}); posting "Working on it..." instead.`
       )
       return false
     }
@@ -297,6 +323,12 @@ export class SlackMessenger implements Messenger {
           mention.thread
         )
       : undefined
+  }
+
+  private setReactionProblem(problem: string | undefined): void {
+    if (problem === this.reactionProblem) return
+    this.reactionProblem = problem
+    this.options.onProblems?.()
   }
 
   private warnReaction(key: string, message: string): void {

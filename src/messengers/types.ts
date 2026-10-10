@@ -189,6 +189,11 @@ export interface MessengerConnection {
   readonly messenger: Messenger
   /** Who the bot is there, for the status file */
   readonly bot: { user: string; userId: string; team: string }
+  /**
+   * What does not work as it should, for the status file (Slack: a scope the
+   * app lacks)
+   */
+  problems(): string[]
   start(onMention: (mention: Mention) => Promise<void>): Promise<void>
   stop(): Promise<void>
 }

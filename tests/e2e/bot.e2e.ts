@@ -80,6 +80,7 @@ describe('bot on its own Slack app', () => {
       },
     })
     expect(run!.origin.placeholder).toBeUndefined()
+    expect(world.status()?.problems).toEqual([])
     expect(run!.origin.permalink).toBe(
       `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}?thread_ts=${root}&cid=${ops.id}`
     )
@@ -99,6 +100,10 @@ describe('bot on its own Slack app', () => {
     const [reply] = await world.answered(ops.id, ts)
     expect(reply!.edits).toEqual(['Working on it... (`claude@host`)'])
     expect(reply!.text).toBe('Healthy.')
+    // The status bar says why, from the scopes Slack gave at startup.
+    expect(world.status()?.problems).toEqual([
+      expect.stringContaining('the app lacks reactions:write'),
+    ])
   })
 
   it("answers outside a thread in a new thread, with the channel's last messages as context", async () => {
