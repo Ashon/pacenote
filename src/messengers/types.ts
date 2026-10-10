@@ -159,6 +159,12 @@ export interface Messenger {
   /** Posts to the mention's thread and returns the new message's ID */
   post(mention: Mention, text: string): Promise<string>
   update(mention: Mention, message: string, text: string): Promise<void>
+  /**
+   * Deletes a message the bot posted (the placeholder, once the answer is
+   * posted below it). False when it could not. Without it, the placeholder is
+   * edited into the answer.
+   */
+  remove?(mention: Mention, message: string): Promise<boolean>
   upload(mention: Mention, files: Upload[]): Promise<void>
   /**
    * Puts a reaction on the mention: the quiet way to say the bot has it, with
@@ -190,10 +196,11 @@ export interface MessengerConnection {
   /** Who the bot is there, for the status file */
   readonly bot: { user: string; userId: string; team: string }
   /**
-   * What does not work as it should, for the status file (Slack: a scope the
-   * app lacks)
+   * What works in a reduced way and why, for the status file (Slack: without
+   * reactions:write, a placeholder instead of 👀). Not a fault, so the status
+   * bar does not count it.
    */
-  problems(): string[]
+  limits(): string[]
   start(onMention: (mention: Mention) => Promise<void>): Promise<void>
   stop(): Promise<void>
 }

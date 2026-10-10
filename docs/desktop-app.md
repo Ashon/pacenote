@@ -147,7 +147,8 @@ Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
 Status and logs:
 
 - The bot writes its status (Socket Mode connection state and reconnect count, bot account, reasoner backend, requests in progress and handled,
-  sandbox check problems) to `PACENOTE_DATA_DIR/bot.json`. The app reads it the same way no matter who started the bot.
+  sandbox check problems, and limits of the setup such as a Slack app without `reactions:write`) to `PACENOTE_DATA_DIR/bot.json`.
+  The status bar counts the problems; the limits show only on the Pace screen. The app reads it the same way no matter who started the bot.
 - Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`)
   Bolt and Socket Mode client logs go through the same logger, with the scopes `pacenote:socket` and `pacenote:bolt`.
   Connects, reconnects, disconnects and received events (envelope, retry count) are logged.

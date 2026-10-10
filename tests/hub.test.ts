@@ -122,7 +122,7 @@ describe('hub policy', () => {
     expect(ok('conversations.list', {})).toBe(false)
     expect(ok('chat.delete', { channel: 'C1', ts: '100.1' })).toBe(false)
 
-    // Only messages the desktop posted can be edited.
+    // Only messages the desktop posted can be edited or deleted.
     expect(ok('chat.update', { channel: 'C1', ts: '300.1' })).toBe(false)
     grants.observe(
       'chat.postMessage',
@@ -130,6 +130,7 @@ describe('hub policy', () => {
       { ok: true, ts: '300.1' }
     )
     expect(ok('chat.update', { channel: 'C1', ts: '300.1' })).toBe(true)
+    expect(ok('chat.delete', { channel: 'C1', ts: '300.1' })).toBe(true)
 
     // Reactions go only on the mentions routed to the desktop.
     const react = { channel: 'C1', timestamp: '200.1', name: 'eyes' }

@@ -10,7 +10,7 @@ Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSo
 - The Slack tokens live only on the hub. Desktops never get one: their Slack Web API calls, file downloads and uploads go
   through the hub (`/api/*`, `/files`, `/upload`), which makes them with the bot token.
 - The hub allows a desktop only what the thread routed to it needs (`src/hub/policy.ts`): read that thread (and the few
-  messages before a mention outside a thread), post in it, edit what it posted, react to the mention, read its files,
+  messages before a mention outside a thread), post in it, edit or delete what it posted, react to the mention, read its files,
   and upload into it, for 2 hours after the mention. Other calls are refused with errors like `thread_not_granted` or `method_not_allowed_by_hub`.
 - Routing: a mention goes to the desktop of the member who wrote it. Members without a paired desktop, or whose desktop is
   offline, get a message only they can see that says so.

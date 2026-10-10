@@ -65,8 +65,7 @@ async function main(): Promise<void> {
       log.error(err.message)
       process.exit(1)
     },
-    // Comes only once mentions are answered, after allProblems is set up.
-    onProblems: () => status.update({ problems: allProblems() }),
+    onLimits: () => status.update({ limits: connection.limits() }),
   })
   const { messenger, bot } = connection
   /**
@@ -85,7 +84,6 @@ async function main(): Promise<void> {
   // follows a proxy that is started or stopped later.
   const allProblems = () => [
     ...sandboxHealth.current.map((problem) => `Sandbox: ${problem}`),
-    ...connection.problems(),
     ...problems,
   ]
   const sandboxHealth = new SandboxHealth(
@@ -152,6 +150,7 @@ async function main(): Promise<void> {
     diagrams: renderer !== undefined,
     history: history !== undefined,
     problems: allProblems(),
+    limits: connection.limits(),
   })
   await connection.start((mention) => responder.handle(mention))
   status.update({ state: 'running' })

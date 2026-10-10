@@ -26,9 +26,14 @@ export interface BotStatus {
   history?: boolean
   /**
    * What does not work as it should: sandbox checks (repeated while it runs),
-   * a Slack scope the app lacks, diagram rendering
+   * diagram rendering. The status bar counts them.
    */
   problems: string[]
+  /**
+   * What works in a reduced way by setup, such as a Slack app without
+   * reactions:write. Shown on the Pace screen, not counted as problems.
+   */
+  limits?: string[]
   requests: { active: number; handled: number; lastAt?: string }
   /**
    * Config fingerprint at startup (config.ts configFingerprint). A change means

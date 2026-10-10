@@ -257,10 +257,15 @@ class MemoryMessenger implements Messenger {
   }
 }
 
-/** A messenger that can react, like Slack with reactions:write */
+/**
+ * A messenger that can react and delete its messages, like Slack (with
+ * reactions:write)
+ */
 class MarkingMessenger extends MemoryMessenger {
   readonly marks: string[] = []
+  readonly removed: string[] = []
   canMark = true
+  canRemove = true
 
   async mark(_mention: Mention, mark: Mark) {
     if (!this.canMark) return false
@@ -269,6 +274,11 @@ class MarkingMessenger extends MemoryMessenger {
   }
   async unmark(_mention: Mention, mark: Mark) {
     this.marks.push(`-${mark}`)
+  }
+  async remove(_mention: Mention, message: string) {
+    if (!this.canRemove) return false
+    this.removed.push(message)
+    return true
   }
 }
 
@@ -418,15 +428,28 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.marks).toEqual(['+working', '-working'])
   })
 
-  it('posts a placeholder when it cannot react', async () => {
+  it('posts a placeholder when it cannot react, answers below it, and deletes it', async () => {
     const messenger = new MarkingMessenger()
     messenger.canMark = false
     const bot = responder(messenger)
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
     expect(messenger.posts[0]).toMatch(/^Working on it\.\.\./)
-    expect(messenger.updates).toEqual(['a'.repeat(20)])
+    expect(messenger.posts.slice(1)).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.updates).toEqual([])
+    expect(messenger.removed).toEqual(['p1'])
     expect(messenger.marks).toEqual([])
+  })
+
+  it('points the placeholder to the answer when it cannot delete it', async () => {
+    const messenger = new MarkingMessenger()
+    messenger.canMark = false
+    messenger.canRemove = false
+    const bot = responder(messenger)
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts.slice(1)).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.updates).toEqual(['Answered below.'])
   })
 
   it('resumes a marked mention after a restart, answering in a new reply', async () => {

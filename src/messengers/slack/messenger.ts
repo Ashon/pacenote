@@ -43,14 +43,14 @@ const REACTIONS: Record<Mark, string> = {
   slow: 'hourglass_flowing_sand',
 }
 /**
- * Why reactions fail, by error, as the status shows it: until they work, Pace
- * posts a placeholder instead
+ * Why reactions do not work, by error, as the status shows it. Pace posts a
+ * placeholder instead, which works, so these are limits rather than faults.
  */
-const REACTION_PROBLEMS: Record<string, string> = {
+const REACTION_LIMITS: Record<string, string> = {
   missing_scope:
-    'Slack: the app lacks reactions:write, so Pace posts "Working on it..." instead of reacting with 👀. Add the scope (slack-app-manifest.yaml) and reinstall the app.',
+    'Slack: the app does not have reactions:write, so Pace posts "Working on it..." while it works instead of reacting with 👀. Adding the scope (slack-app-manifest.yaml) and reinstalling the app turns reactions on.',
   method_not_allowed_by_hub:
-    'Slack: the team hub does not relay reactions yet, so Pace posts "Working on it..." instead of reacting with 👀. Update the hub.',
+    'Slack: the team hub does not relay reactions, so Pace posts "Working on it..." while it works instead of reacting with 👀. Updating the hub turns reactions on.',
 }
 
 export interface SlackMessengerOptions {
@@ -66,8 +66,8 @@ export interface SlackMessengerOptions {
   allowedUsers: readonly string[]
   /** The bot token's scopes, when Slack said (auth.test) */
   scopes?: readonly string[]
-  /** Called when problems changes */
-  onProblems?: () => void
+  /** Called when limits changes */
+  onLimits?: () => void
   log: Logger
   fetchImpl?: typeof fetch
 }
@@ -88,20 +88,20 @@ export class SlackMessenger implements Messenger {
   /** Reaction errors already logged, so each shows once */
   private readonly reactionWarnings = new Set<string>()
   /** Why reactions do not work, until one does */
-  private reactionProblem: string | undefined
+  private reactionLimit: string | undefined
 
   constructor(private readonly options: SlackMessengerOptions) {
     this.allowedUsers = options.allowedUsers
     if (options.scopes && !options.scopes.includes('reactions:write'))
-      this.reactionProblem = REACTION_PROBLEMS.missing_scope
+      this.reactionLimit = REACTION_LIMITS.missing_scope
   }
 
   /**
-   * What does not work as it should, for the status: a scope the app lacks,
+   * What works in a reduced way, for the status: reactions without the scope,
    * found at startup or when a reaction fails
    */
-  get problems(): string[] {
-    return this.reactionProblem ? [this.reactionProblem] : []
+  get limits(): string[] {
+    return this.reactionLimit ? [this.reactionLimit] : []
   }
 
   /**
@@ -256,6 +256,21 @@ export class SlackMessenger implements Messenger {
     })
   }
 
+  async remove(mention: Mention, message: string): Promise<boolean> {
+    try {
+      await this.options.client.chat.delete({
+        channel: mention.conversation,
+        ts: message,
+      })
+      return true
+    } catch (err) {
+      this.options.log.warn(
+        `Could not delete the placeholder message (${slackError(err)}).`
+      )
+      return false
+    }
+  }
+
   async upload(mention: Mention, files: Upload[]): Promise<void> {
     await this.options.client.files.uploadV2({
       channel_id: mention.conversation,
@@ -275,17 +290,17 @@ export class SlackMessenger implements Messenger {
         timestamp: mention.message,
         name: REACTIONS[mark],
       })
-      this.setReactionProblem(undefined)
+      this.setReactionLimit(undefined)
       return true
     } catch (err) {
       const error = slackError(err)
       // Still there from before a restart
       if (error === 'already_reacted') return true
-      const problem = REACTION_PROBLEMS[error]
-      if (problem) this.setReactionProblem(problem)
+      const limit = REACTION_LIMITS[error]
+      if (limit) this.setReactionLimit(limit)
       this.warnReaction(
         error,
-        problem ??
+        limit ??
           `Could not react to a mention (${error}); posting "Working on it..." instead.`
       )
       return false
@@ -325,10 +340,10 @@ export class SlackMessenger implements Messenger {
       : undefined
   }
 
-  private setReactionProblem(problem: string | undefined): void {
-    if (problem === this.reactionProblem) return
-    this.reactionProblem = problem
-    this.options.onProblems?.()
+  private setReactionLimit(limit: string | undefined): void {
+    if (limit === this.reactionLimit) return
+    this.reactionLimit = limit
+    this.options.onLimits?.()
   }
 
   private warnReaction(key: string, message: string): void {

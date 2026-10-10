@@ -86,6 +86,8 @@ export class FakeSlack {
   readonly team = { id: 'T0E2E', name: 'e2e' }
   readonly calls: ApiCall[] = []
   readonly ephemerals: Ephemeral[] = []
+  /** Messages the bot deleted (chat.delete), as they were */
+  readonly deleted: FakeMessage[] = []
   readonly uploads: UploadRecord[] = []
   /** Makes auth.test fail with this error, as for a revoked token */
   authError?: string
@@ -479,6 +481,13 @@ export class FakeSlack {
           message.reactions = reactions.filter((name) => name !== args.name)
         }
         return ok()
+      }
+      case 'chat.delete': {
+        const list = this.messages.get(args.channel ?? '') ?? []
+        const index = list.findIndex((m) => m.ts === args.ts)
+        if (index < 0) return fail('message_not_found')
+        this.deleted.push(...list.splice(index, 1))
+        return ok({ channel: args.channel, ts: args.ts })
       }
       case 'chat.postEphemeral':
         this.ephemerals.push({

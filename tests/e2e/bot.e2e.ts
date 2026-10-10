@@ -80,13 +80,13 @@ describe('bot on its own Slack app', () => {
       },
     })
     expect(run!.origin.placeholder).toBeUndefined()
-    expect(world.status()?.problems).toEqual([])
+    expect(world.status()).toMatchObject({ problems: [], limits: [] })
     expect(run!.origin.permalink).toBe(
       `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}?thread_ts=${root}&cid=${ops.id}`
     )
   })
 
-  it('posts "Working on it..." and edits it into the answer when the app cannot react', async () => {
+  it('posts "Working on it..." when the app cannot react, and deletes it once answered', async () => {
     world = await World.create([{ match: 'web-01', answer: 'Healthy.' }])
     const { slack, ops, alice } = world
     slack.scopes = slack.scopes.filter((scope) => scope !== 'reactions:write')
@@ -97,13 +97,20 @@ describe('bot on its own Slack app', () => {
       user: alice.id,
       text: `<@${slack.botUserId}> check web-01`,
     })
-    const [reply] = await world.answered(ops.id, ts)
-    expect(reply!.edits).toEqual(['Working on it... (`claude@host`)'])
-    expect(reply!.text).toBe('Healthy.')
-    // The status bar says why, from the scopes Slack gave at startup.
-    expect(world.status()?.problems).toEqual([
-      expect.stringContaining('the app lacks reactions:write'),
+    // The answer is still a new reply that notifies, and the placeholder goes.
+    const replies = await world.answered(ops.id, ts)
+    expect(replies.map((reply) => [reply.text, reply.edits])).toEqual([
+      ['Healthy.', []],
     ])
+    expect(slack.deleted.map((message) => message.text)).toEqual([
+      'Working on it... (`claude@host`)',
+    ])
+    // The Pace screen says why, from the scopes Slack gave at startup; it is a
+    // limit, not a problem the status bar counts.
+    expect(world.status()).toMatchObject({
+      problems: [],
+      limits: [expect.stringContaining('does not have reactions:write')],
+    })
   })
 
   it("answers outside a thread in a new thread, with the channel's last messages as context", async () => {

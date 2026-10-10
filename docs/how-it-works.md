@@ -14,9 +14,10 @@ What happens between a mention and its answer: context, attachments, diagrams an
 
 - While Pace works, the thread gets nothing from it but the reaction, so people talking in the thread are not
   interrupted, and the answer arrives as a new reply at the bottom, which notifies them. (An edited message would not.)
-- A Slack app without the `reactions:write` scope (created from an older manifest) gets the earlier behavior: Pace posts
-  "Working on it..." and edits it into the answer. Settings > Messengers > Slack > Check connection says when the
-  scope is missing; add it to the app and reinstall it.
+- A Slack app without the `reactions:write` scope (created from an older manifest, or not approved in the workspace)
+  gets a "Working on it..." message instead of the reaction. The answer still comes as a new reply that notifies, and the
+  placeholder is deleted once it is posted. The Pace screen and Settings > Messengers > Slack > Check connection say the
+  scope is missing; it is a limit, not a fault, so the status bar does not count it.
 
 - A mention inside a thread also passes the bot's earlier answers as context, so it continues from them.
 - With `MENTION_ALLOWED_USERS` set, the bot answers only those users. Anyone else gets a message only they

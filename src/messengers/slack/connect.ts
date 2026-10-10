@@ -87,8 +87,8 @@ export interface SlackConnectOptions {
    * cannot go on
    */
   onFatal: (err: Error) => void
-  /** Called when the connection's problems() changes */
-  onProblems?: () => void
+  /** Called when the connection's limits() changes */
+  onLimits?: () => void
 }
 
 /**
@@ -146,7 +146,7 @@ export async function connectSlack(
     files: slackFileAccess(slack),
     allowedUsers: config.mention.allowedUserIds,
     scopes: auth.response_metadata?.scopes,
-    onProblems: options.onProblems,
+    onLimits: options.onLimits,
     log: log.child('slack'),
   })
 
@@ -157,7 +157,7 @@ export async function connectSlack(
       userId: botUserId,
       team: auth.team ?? '',
     },
-    problems: () => messenger.problems,
+    limits: () => messenger.limits,
     async start(onMention) {
       app.event('app_mention', async ({ event }) => {
         const mention = SlackMessenger.mention(event)

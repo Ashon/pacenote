@@ -40,7 +40,7 @@ describe('REQUIRED_BOT_SCOPES', () => {
   })
 })
 
-describe('reactions:write in the status', () => {
+describe('reactions:write as a limit in the status', () => {
   const mention: Mention = {
     messenger: 'slack',
     conversation: 'C1',
@@ -53,7 +53,7 @@ describe('reactions:write in the status', () => {
   }
   const messenger = (
     add: () => Promise<unknown>,
-    options: { scopes?: string[]; onProblems?: () => void } = {}
+    options: { scopes?: string[]; onLimits?: () => void } = {}
   ) =>
     new SlackMessenger({
       client: { reactions: { add } } as unknown as WebClient,
@@ -73,15 +73,15 @@ describe('reactions:write in the status', () => {
     const without = messenger(async () => ({ ok: true }), {
       scopes: [...REQUIRED_BOT_SCOPES],
     })
-    expect(without.problems).toEqual([
-      expect.stringContaining('the app lacks reactions:write'),
+    expect(without.limits).toEqual([
+      expect.stringContaining('the app does not have reactions:write'),
     ])
     const granted = messenger(async () => ({ ok: true }), {
       scopes: [...REQUIRED_BOT_SCOPES, ...OPTIONAL_BOT_SCOPES],
     })
-    expect(granted.problems).toEqual([])
+    expect(granted.limits).toEqual([])
     // Through the team hub, Slack's scopes do not come along.
-    expect(messenger(async () => ({ ok: true })).problems).toEqual([])
+    expect(messenger(async () => ({ ok: true })).limits).toEqual([])
   })
 
   it('reports it when a reaction fails, and clears it once one works', async () => {
@@ -92,11 +92,11 @@ describe('reactions:write in the status', () => {
         if (!scoped) throw slackError('missing_scope')
         return { ok: true }
       },
-      { onProblems: () => (changes += 1) }
+      { onLimits: () => (changes += 1) }
     )
     expect(await slack.mark(mention, 'working')).toBe(false)
-    expect(slack.problems).toEqual([
-      expect.stringContaining('Add the scope (slack-app-manifest.yaml)'),
+    expect(slack.limits).toEqual([
+      expect.stringContaining('Adding the scope (slack-app-manifest.yaml)'),
     ])
     expect(await slack.mark(mention, 'working')).toBe(false)
     expect(changes).toBe(1)
@@ -104,7 +104,7 @@ describe('reactions:write in the status', () => {
     // The app was reinstalled with the scope while Pace kept running.
     scoped = true
     expect(await slack.mark(mention, 'working')).toBe(true)
-    expect(slack.problems).toEqual([])
+    expect(slack.limits).toEqual([])
     expect(changes).toBe(2)
   })
 
@@ -113,6 +113,6 @@ describe('reactions:write in the status', () => {
       throw slackError('method_not_allowed_by_hub')
     })
     expect(await slack.mark(mention, 'working')).toBe(false)
-    expect(slack.problems).toEqual([expect.stringContaining('Update the hub')])
+    expect(slack.limits).toEqual([expect.stringContaining('Updating the hub')])
   })
 })

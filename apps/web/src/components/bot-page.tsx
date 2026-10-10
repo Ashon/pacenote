@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Hammer,
   Inbox,
+  Info as InfoIcon,
   Play,
   RotateCw,
   Search,
@@ -123,6 +124,20 @@ export function BotPage() {
                 >
                   <TriangleAlert className="mt-px size-3.5 shrink-0" />
                   {problem}
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* Limits of the setup, not faults: quiet, and only here. */}
+          {status?.limits && status.limits.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {status.limits.map((limit) => (
+                <li
+                  key={limit}
+                  className="flex items-start gap-1.5 text-xs text-muted-foreground"
+                >
+                  <InfoIcon className="mt-px size-3.5 shrink-0" />
+                  {limit}
                 </li>
               ))}
             </ul>

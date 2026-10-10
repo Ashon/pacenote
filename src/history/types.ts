@@ -78,8 +78,13 @@ export interface RunOrigin {
   thread: string
   /** The mention's message ID */
   message: string
-  /** The bot's answer message, which first said it was working */
+  /**
+   * The placeholder message that said Pace was working, when it posted one
+   * (no reaction). It is deleted once the answer is posted; older versions
+   * edited the answer into it.
+   */
   placeholder?: string
+  /** The mention in the messenger (older runs: the placeholder) */
   permalink?: string
   userId: string
   userName?: string

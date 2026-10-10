@@ -107,7 +107,7 @@ interface Figure {
  * long) instead of a message, so a thread where people are talking gets
  * nothing from Pace until the answer, which comes as a new reply and notifies.
  * A messenger that cannot react gets a placeholder message ("Working on
- * it..."), edited into the answer.
+ * it..."), deleted once the answer is posted below it.
  */
 export class MentionResponder {
   private readonly limiter: ConcurrencyLimiter
@@ -345,9 +345,12 @@ export class MentionResponder {
         answer,
         attachmentsDir
       )
-      const [first = '', ...rest] = messenger.render(text)
-      await this.reply(messenger, mention, placeholder, first)
-      for (const chunk of rest) await messenger.post(mention, chunk)
+      await this.deliver(
+        messenger,
+        mention,
+        placeholder,
+        messenger.render(text)
+      )
       const generated = await this.shrinkImages(
         await collectGeneratedImages(outputDir),
         attachmentsDir
@@ -369,12 +372,9 @@ export class MentionResponder {
       const reason = /timed out/.test((err as Error).message)
         ? 'The request timed out.'
         : 'An error occurred while processing the request.'
-      await this.reply(
-        messenger,
-        mention,
-        placeholder,
-        say(`I couldn't produce an answer. ${reason}`)
-      ).catch(() => undefined)
+      await this.deliver(messenger, mention, placeholder, [
+        say(`I couldn't produce an answer. ${reason}`),
+      ]).catch(() => undefined)
     } finally {
       clearTimeout(slow)
       await slowing
@@ -430,14 +430,11 @@ export class MentionResponder {
         log.warn(
           `Giving up on interrupted request ${entry.key} (${entry.attempts} ${entry.attempts === 1 ? 'attempt' : 'attempts'})`
         )
-        await this.reply(
-          messenger,
-          entry.mention,
-          entry.placeholder,
+        await this.deliver(messenger, entry.mention, entry.placeholder, [
           messenger.render(
             "I couldn't finish this: I restarted and the request was cut off. Please mention me again."
-          )[0] ?? ''
-        ).catch(() => undefined)
+          )[0] ?? '',
+        ]).catch(() => undefined)
         if (!entry.placeholder) await this.clearMarks(messenger, entry.mention)
         continue
       }
@@ -503,10 +500,8 @@ export class MentionResponder {
           thread: mention.thread,
           message: mention.message,
           placeholder,
-          permalink: messenger.permalink(
-            mention,
-            placeholder ?? mention.message
-          ),
+          // The mention itself: a placeholder is deleted once answered.
+          permalink: messenger.permalink(mention, mention.message),
           userId: mention.userId,
           userName: request.userName,
         },
@@ -524,17 +519,35 @@ export class MentionResponder {
   }
 
   /**
-   * Text where the answer goes: into the placeholder message, or as a new
-   * reply when the mention was marked instead
+   * Posts the answer (or a failure) where it notifies: as new replies at the
+   * bottom of the thread. A placeholder goes afterwards; a messenger that
+   * cannot delete messages gets it edited into the first reply instead, and one
+   * that fails to leaves it pointing below.
    */
-  private async reply(
+  private async deliver(
     messenger: Messenger,
     mention: Mention,
     placeholder: string | undefined,
-    text: string
+    chunks: string[]
   ): Promise<void> {
-    if (placeholder) await messenger.update(mention, placeholder, text)
-    else await messenger.post(mention, text)
+    const [first = '', ...rest] = chunks
+    if (placeholder && !messenger.remove)
+      await messenger.update(mention, placeholder, first)
+    else await messenger.post(mention, first)
+    for (const chunk of rest) await messenger.post(mention, chunk)
+    if (
+      placeholder &&
+      messenger.remove &&
+      !(await messenger.remove(mention, placeholder).catch(() => false))
+    ) {
+      await messenger
+        .update(
+          mention,
+          placeholder,
+          messenger.render('Answered below.')[0] ?? ''
+        )
+        .catch(() => undefined)
+    }
   }
 
   /** Takes the marks off a mention that will not be answered after all */
