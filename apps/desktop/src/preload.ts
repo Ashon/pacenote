@@ -35,14 +35,20 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     openDataDir: () => ipcRenderer.invoke('pacenote:settings:open-data-dir'),
     historyMcp: () => ipcRenderer.invoke('pacenote:settings:history-mcp'),
   },
-  // Your tasks: the list, Collect now (the bot does it), and your decisions
+  // Your tasks: the list and your decisions (AI tools add them over MCP)
   tasks: {
     list: () => ipcRenderer.invoke('pacenote:tasks:list'),
-    collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
     decide: (id: string, decision: unknown) =>
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     leaveOut: (label: string) =>
       ipcRenderer.invoke('pacenote:tasks:leave-out', label),
+  },
+  // Pacenote's MCP server in Claude Code and Codex: added with their own CLIs
+  mcp: {
+    status: () => ipcRenderer.invoke('pacenote:mcp:status'),
+    connect: (id: string) => ipcRenderer.invoke('pacenote:mcp:connect', id),
+    disconnect: (id: string) =>
+      ipcRenderer.invoke('pacenote:mcp:disconnect', id),
   },
   // Team hub pairing. The token stays in the main process; these return { error
   // } on failure.

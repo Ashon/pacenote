@@ -51,10 +51,9 @@ export function Sidebar({
 }) {
   // Open tasks, beside Tasks
   const tasks = useTasks().data
-  const openTasks =
-    tasks?.settings.on && tasks.settings.hasToken
-      ? tasks.tasks.filter((task) => task.status === 'open').length
-      : 0
+  const openTasks = tasks?.settings.on
+    ? tasks.tasks.filter((task) => task.status === 'open').length
+    : 0
   const item = (props: Item) => (
     <NavItem
       key={props.section}

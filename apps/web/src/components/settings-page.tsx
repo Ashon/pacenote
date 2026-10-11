@@ -56,7 +56,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { botControl, useSandbox, useSupervisor } from '@/lib/desktop'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
-import { CodeBlock } from './code-block'
+import { McpConnections } from './mcp-connections'
 import { PaceSpinner } from './pace-spinner'
 import {
   AllowlistCard,
@@ -647,11 +647,21 @@ export function SettingsPage() {
         {integration('ssh')}
       </>
     ),
-    tasks: <>{card('tasks')}</>,
+    tasks: (
+      <>
+        {card('tasks', {
+          after: valueOf('TASKS') === 'on' && (
+            <McpConnections about="Claude Code and Codex reach your tasks through Pacenote's MCP server. With a Slack connector of their own, they can then collect them: in Claude Code, run /mcp__pacenote__collect_tasks." />
+          ),
+        })}
+      </>
+    ),
     logs: (
       <>
         {card('history', {
-          after: valueOf('HISTORY_SHARE') === 'on' && <HistoryShare />,
+          after: valueOf('HISTORY_SHARE') === 'on' && (
+            <McpConnections about="Claude Code and Codex read the history through Pacenote's MCP server: recent runs, a search, and one run with its steps and answer." />
+          ),
         })}
         {card('logs')}
       </>
@@ -959,51 +969,6 @@ function NavItem({
     </button>
   )
 }
-
-/**
- * How to add Pacenote's MCP server to an AI tool, with this app's own paths.
- * Shown while sharing is on; the tool reads the history only while it stays on.
- */
-function HistoryShare() {
-  const [launch, setLaunch] =
-    useState<Awaited<ReturnType<DesktopSettings['historyMcp']>>>()
-  useEffect(() => {
-    void window.pacenoteDesktop?.settings.historyMcp().then(setLaunch)
-  }, [])
-  if (!launch) return null
-  const env = Object.entries(launch.env)
-  const shell = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
-  const claude = [
-    'claude mcp add pacenote --scope user',
-    ...env.map(([key, value]) => `--env ${key}=${value}`),
-    '--',
-    shell(launch.command),
-    ...launch.args.map(shell),
-  ].join(' ')
-  const codex = [
-    '[mcp_servers.pacenote]',
-    `command = ${JSON.stringify(launch.command)}`,
-    `args = ${JSON.stringify(launch.args)}`,
-    `env = { ${env.map(([key, value]) => `${key} = ${JSON.stringify(value)}`).join(', ')} }`,
-  ].join('\n')
-  return (
-    <div className="space-y-3 border-t border-border px-4 py-3">
-      <p className="text-xs text-muted-foreground">
-        Add Pacenote to the tool once. It can then look up recent runs, search
-        them, and read one with its steps and answer.
-      </p>
-      {!launch.ready && (
-        <p className="text-xs text-status-interrupted">
-          The server is not built yet: run pnpm bundle in the repository.
-        </p>
-      )}
-      <CodeBlock label="Claude Code: run in a terminal" code={claude} />
-      <CodeBlock label="Codex: add to ~/.codex/config.toml" code={codex} />
-    </div>
-  )
-}
-
-type DesktopSettings = NonNullable<Window['pacenoteDesktop']>['settings']
 
 function SubHeading({
   title,

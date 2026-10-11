@@ -1,53 +1,62 @@
 # Your tasks from Slack
 
-Pacenote can gather what people ask of you in Slack, and what you said you would do, into a short list on the Tasks
-screen, so you do not keep it in your head or scroll back for it. It is off by default. The plan and the reasons behind it
-are in [the proposal](proposals/personal-tasks.md).
+Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Tasks screen, so
+you do not keep it in your head or scroll back for it. Claude Code or Codex collects the tasks with its own Slack connector
+and adds them through Pacenote's MCP server; Pacenote holds no Slack token for this. It is off by default. The plan and the
+reasons behind it are in [the proposal](proposals/personal-tasks.md).
 
 ## Turning it on
 
-1. On [api.slack.com/apps](https://api.slack.com/apps), open your Pacenote app > OAuth & Permissions > User Token Scopes, and
-   add `channels:history`, `groups:history`, `channels:read`, `groups:read` and `users:read`. To include DMs, also add
-   `im:history`, `im:read`, `mpim:history` and `mpim:read`.
-2. Reinstall the app to your workspace, and copy the **User OAuth Token** (`xoxp-...`).
-3. In Pacenote, Settings > Tasks: turn on "Gather my tasks from Slack" and save the token. DMs stay out unless you turn on
-   "Also read DMs and group DMs".
-4. On the Tasks screen, choose **Collect now**.
+1. In Pacenote, Settings > Tasks: turn on "Let AI tools add my tasks". DMs stay out unless you turn on "Count DMs and group
+   DMs"; "Leave out channels" skips the ones you list.
+2. Add Pacenote to Claude Code or Codex as an MCP server: Settings > Tasks lists both, whether each has Pacenote and reaches
+   it, with an Add button that runs the tool's own CLI ([details](history-mcp.md#adding-it-to-a-tool)). The Tasks screen
+   offers the same while neither has it.
+3. Make sure the tool has a Slack connector: in Claude Code, the Slack connector of your claude.ai account.
+4. Collect: in Claude Code, run `/mcp__pacenote__collect_tasks`. In Codex, ask it to collect your tasks with Pacenote's
+   collect_context tool. The Tasks screen has a button that copies the command.
 
-The main manifest has no user scopes, so a setup that does not use tasks never asks for them. Tasks work with your own Slack
-app; through a [team hub](team-hub.md) they are not available yet. The settings apply at the next collection, without
-restarting Pace.
+The settings apply at once, without restarting Pace.
 
-## What Pace reads, and where it goes
+## How a collection goes
 
-- The conversations you are in: public and private channels, and DMs and group DMs when that is on. Channels in "Leave out
-  channels" are skipped.
-- The first collection reads the last 7 days; later ones read what is new since. Pace keeps on this Mac only the messages
-  that mention you, threads you took part in whose last word is not yours, what someone said in a DM after your last
-  message, and your own messages that say you will do something.
-- Those messages go to your reasoner (claude or codex), with no tools, in one request, to pick out the tasks. The user
-  token stays in the bot process on this Mac; it never reaches the reasoner or the sandbox.
-- Tasks are kept in `PACENOTE_DATA_DIR/tasks.json`, and your decisions in `tasks-decisions.json`.
+- The tool calls `collect_context`: the rules, the channels to leave out, whether DMs count, since when to read (the last
+  collection, or the last 7 days the first time), and the open tasks to check.
+- With its Slack tools, read only, it looks for messages that mention you, threads you took part in whose last word is not
+  yours, what someone said in a DM after your last message (when DMs count), and your own messages saying you will do
+  something.
+- It closes open tasks you answered in the thread, or whose message got a check mark (`close_task`), and adds what it found
+  (`add_tasks`), each with the permalink of its message. A message is never a task twice, and messages from channels left
+  out, or DMs while they do not count, are skipped whatever the tool sends.
+- The messages go to the tool's model, as anything the tool reads does. Pacenote keeps the tasks in
+  `PACENOTE_DATA_DIR/tasks.json` and your decisions in `tasks-decisions.json`.
 
 ## The list
 
 - **Precision first.** A task is something someone asked you by name (or in a DM), or something you said you would do. An
-  `@here`, "someone should look at this", or anything Pace is not sure about is a **Maybe**: it stays under its own tab, out
-  of the list and `my_tasks`, until you keep it.
+  `@here`, "someone should look at this", or anything the tool is not sure about is a **Maybe**: it stays under its own tab,
+  out of the list and `my_tasks`, until you keep it.
 - **Done** and **Dismiss** are one click. Dismiss can say why: not for me, already done, not worth it. After three "not for
   me" from the same channel, the screen offers to leave that channel out.
-- A task **closes by itself** at the next collection when you replied in its thread after it (or answered in the DM), or
-  when its message got a check mark. Done shows them, and Reopen brings one back.
+- Closed tasks show under Done with why, and Reopen brings one back.
 - Open tasks fade after 7 days and drop after 14; done, dismissed and closed ones are kept 14 days.
-- Under Done, the screen shows how many of the tasks you settled you dismissed. Above about 30%, Pace is picking too
+- Under Done, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked too
   loosely.
 
-## In Claude Code and Codex
+## The MCP tools
 
-With Settings > History & logs > Share with AI tools on, the `my_tasks` tool of [Pacenote's MCP server](history-mcp.md)
-lists your open tasks with who asked, where, a due hint, why it is a task, and a Slack link. Maybes are left out.
+| Tool | What it does |
+| --- | --- |
+| `collect_context` | The rules, what to leave out, since when, and the open tasks |
+| `add_tasks` | Adds tasks, each from one Slack message (its permalink), and marks the collection finished |
+| `close_task` | Closes an open task: you replied, it got a check mark, or it was settled some other way |
+| `my_tasks` | Your open tasks, with who asked, where, a due hint, why, and a link; Maybes are left out |
+| `collect_tasks` (prompt) | The steps of a collection, as a slash command in Claude Code |
+
+They answer only while "Let AI tools add my tasks" is on, read on every call, and are separate from sharing the run
+history.
 
 ## Not yet
 
-Collecting on a schedule, a daily summary in your DM with Pace, the team hub, and adding a task by mentioning Pace are the
-next phases of [the proposal](proposals/personal-tasks.md).
+Collecting on a schedule (from Pacenote, running the tool with Slack read tools only), a daily summary in your DM with Pace,
+and adding a task by mentioning Pace are the next phases of [the proposal](proposals/personal-tasks.md).

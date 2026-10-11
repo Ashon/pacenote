@@ -5,11 +5,28 @@ answer. With **Settings > History & logs > Share with AI tools** on, the other A
 anything else that speaks MCP) can read that history through Pacenote's MCP server, and pick up where Pace left off: "what did
 Pace find about web-01 this morning?", or the background of a draft PR Pace opened.
 
-Pacenote only offers its own history. Which tools use it is up to you, and you add it to each tool yourself.
+Pacenote only offers its own history. Which tools use it is up to you: Pacenote adds itself to a tool only when you click
+Add for that tool.
 
 ## Adding it to a tool
 
-Turn on **Share with AI tools**. The same settings card then shows the commands, filled in with the paths of the app you are
+Turn on **Share with AI tools** (or, for your tasks, Settings > Tasks > Let AI tools add my tasks). The same settings card then
+lists Claude Code and Codex, each with its state and one button:
+
+| State | What it means | Button |
+| --- | --- | --- |
+| Not added | The tool does not have Pacenote | Add |
+| Connected | The tool has this app's server, and it answers | Remove |
+| Runs another Pacenote | The tool has a server from a moved app or a dev build | Use this app |
+| Does not reach Pacenote | The tool has this app's server, but it does not start or answer | Add again |
+| Not installed | The tool's CLI is not on the PATH | |
+
+The buttons run the tools' own CLIs: `claude mcp add-json --scope user` (after `claude mcp remove`, since Claude Code does not
+replace a server of the same name) and `codex mcp add`, so every project has the server. To check, Pacenote asks Claude Code
+(`claude mcp get pacenote`, which starts the server), and for Codex starts the server Codex has registered and lists its tools
+over MCP. Check again runs them once more.
+
+To add it by hand instead, **Add it by hand** under the list shows the commands, filled in with the paths of the app you are
 running:
 
 ```sh
@@ -37,9 +54,9 @@ when it needs it (stdio, no port). Pacenote does not need to be running.
 | `recent_runs` | The latest runs, newest first: id, status, when, channel, requester, the request, the reasoner, how many tools it used. `limit` (default 10, at most 50), `status` |
 | `search_runs` | Runs whose request, channel, requester, answer or error contains `query`. `status`, `since` (ISO 8601), `limit` |
 | `get_run` | One run in full: the request and its Slack link, each tool call and command with its result (cut to 1500 characters), the answer or error (and its cause, such as `auth` or `limit`), outputs, token use. `include_prompt` adds the prompt Pace sent to the reasoner |
-| `my_tasks` | Your open tasks gathered from Slack (see [Your tasks from Slack](tasks.md)): what to do, who asked, where, a due hint, why it is a task, a Slack link. Maybes are left out, and it answers that tasks are off while they are. `limit` (default 20, at most 50) |
+| `collect_context`, `add_tasks`, `close_task`, `my_tasks` | Your tasks from Slack, collected by the tool with its own Slack connector: see [Your tasks from Slack](tasks.md). These answer only while Settings > Tasks > Let AI tools add my tasks is on, separately from sharing the run history, and `add_tasks` and `close_task` write |
 
-All four are read-only. The history is the one the desktop app shows (`PACENOTE_DATA_DIR`, by default `~/.pacenote`).
+The run tools are read-only. The history is the one the desktop app shows (`PACENOTE_DATA_DIR`, by default `~/.pacenote`).
 
 ## Privacy and safety
 

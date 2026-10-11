@@ -19,9 +19,6 @@ import { RECHECK_SANDBOX, SandboxHealth } from './runtime/sandbox-health.js'
 import { BotStatusFile, LOG_FILE } from './runtime/status.js'
 import { botLockDirs } from './settings/home.js'
 import { loadEnv } from './settings/load-env.js'
-import { envFilePath } from './settings/paths.js'
-import { TasksService } from './tasks/service.js'
-import { COLLECT_TASKS, readTasksSettings } from './tasks/settings.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -139,18 +136,6 @@ async function main(): Promise<void> {
   pruneHistory()
   setInterval(pruneHistory, 6 * 60 * 60_000).unref()
 
-  // Your tasks: read Slack with your user token and ask a reasoner with no
-  // tools which messages are tasks for you, when the app says Collect now.
-  const tasks = new TasksService({
-    dataDir: config.dataDir,
-    timezone: config.timezone,
-    slackApiUrl: config.slack.kind === 'app' ? config.slack.apiUrl : undefined,
-    reasoner: createReasoner({ ...config.reasoner, mcpServers: [] }, sandbox),
-    settings: () => readTasksSettings(process.env, envFilePath()),
-    onStatus: (next) => status.update({ tasks: next }),
-    log: log.child('tasks'),
-  })
-
   const responder = new MentionResponder({
     config,
     messengers: [messenger],
@@ -176,7 +161,6 @@ async function main(): Promise<void> {
     history: history !== undefined,
     problems: allProblems(),
     limits: connection.limits(),
-    tasks: tasks.status,
   })
   // A claude credential the API rejects (cut short, revoked) shows in the
   // status at once, not only when a mention fails on it.
@@ -197,7 +181,6 @@ async function main(): Promise<void> {
     const type = (event.data as { type?: string } | undefined)?.type
     if (type === RECHECK_SANDBOX && sandbox.kind === 'docker')
       void sandboxHealth.check()
-    if (type === COLLECT_TASKS) void tasks.collect()
   })
   await responder.resumePending()
   const allowed = config.mention.allowedUserIds

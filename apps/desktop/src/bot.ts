@@ -11,7 +11,6 @@ import path from 'node:path'
 import { parseEnv } from 'node:util'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import { RECHECK_SANDBOX } from '../../../src/runtime/sandbox-health.js'
-import { COLLECT_TASKS } from '../../../src/tasks/settings.js'
 import { readRunningBot } from '../../../src/runtime/status.js'
 import { botLockDirs } from '../../../src/settings/home.js'
 import { setupProblem, startFailureProblem } from './bot-readiness.js'
@@ -53,16 +52,6 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
    */
   recheckSandbox(): void {
     this.child?.postMessage({ type: RECHECK_SANDBOX })
-  }
-
-  /**
-   * Asks the running bot to collect your tasks now. False when this app is not
-   * the one running it.
-   */
-  collectTasks(): boolean {
-    if (!this.child || this.state.phase !== 'running') return false
-    this.child.postMessage({ type: COLLECT_TASKS })
-    return true
   }
 
   private child?: UtilityProcess

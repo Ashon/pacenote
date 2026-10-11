@@ -1,10 +1,10 @@
 import type { DismissReason, TaskView } from '@src/tasks/types'
 import {
+  Check,
   CircleCheck,
+  Copy,
   ExternalLink,
-  RefreshCw,
   Settings,
-  TriangleAlert,
   Undo2,
   X,
 } from 'lucide-react'
@@ -13,11 +13,11 @@ import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useBotStatus } from '@/lib/api'
 import { formatRelative } from '@/lib/format'
+import { useMcpClients } from '@/lib/mcp-clients'
 import { useDecide, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
-import { PaceSpinner } from './pace-spinner'
+import { McpClientRows } from './mcp-connections'
 
 type Tab = 'open' | 'maybe' | 'done'
 
@@ -35,7 +35,11 @@ const SETTLED_LABEL: Record<string, string> = {
   'not-worth-it': 'Dismissed: not worth it',
   replied: 'Closed: you replied in the thread',
   checked: 'Closed: marked with a check',
+  resolved: 'Closed: settled in Slack',
 }
+
+/** Claude Code's slash command for Pacenote's collect_tasks prompt */
+const COLLECT_COMMAND = '/mcp__pacenote__collect_tasks'
 
 /** The leave-out offers you turned down, per channel, in this browser */
 const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
@@ -50,18 +54,16 @@ function declinedOffers(): string[] {
 
 /**
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): the
- * open ones, the Maybes kept aside, and what is settled. Pace collects when you
- * choose Collect now; Done and Dismiss are one click.
+ * open ones, the Maybes kept aside, and what is settled. An AI tool with a
+ * Slack connector collects them through Pacenote's MCP server; Done and
+ * Dismiss are one click.
  */
 export function TasksPage() {
   const bridge = window.pacenoteDesktop?.tasks
   const tasks = useTasks()
-  const bot = useBotStatus()
   const decide = useDecide()
   const [tab, setTab] = useState<Tab>('open')
-  const [notice, setNotice] = useState<string>()
   const [declined, setDeclined] = useState(declinedOffers)
-  const status = bot.data?.alive ? bot.data.status?.tasks : undefined
   const data = tasks.data
 
   if (!bridge)
@@ -73,18 +75,10 @@ export function TasksPage() {
       </Page>
     )
   if (!data) return <Page />
-  if (data.settings.hub)
+  if (!data.settings.on)
     return (
       <Page>
-        <p className="mt-6 text-sm text-muted-foreground">
-          Tasks work with your own Slack app for now, not through the team hub.
-        </p>
-      </Page>
-    )
-  if (!data.settings.on || !data.settings.hasToken)
-    return (
-      <Page>
-        <Setup on={data.settings.on} />
+        <Setup />
       </Page>
     )
 
@@ -96,17 +90,11 @@ export function TasksPage() {
       (a, b) => Date.parse(b.settledAt ?? '') - Date.parse(a.settledAt ?? '')
     )
   const shown = tab === 'open' ? open : tab === 'maybe' ? maybe : settled
-  const collecting = status?.state === 'collecting'
   const offer =
     data.leaveOut && !declined.includes(data.leaveOut.conversation)
       ? data.leaveOut
       : undefined
 
-  const collect = async () => {
-    setNotice(undefined)
-    const res = await bridge.collect()
-    if ('error' in res) setNotice(res.error)
-  }
   const decline = (conversation: string) => {
     const next = [...declined, conversation]
     setDeclined(next)
@@ -126,21 +114,13 @@ export function TasksPage() {
             ` · collected ${formatRelative(data.collectedAt)}`}
         </>
       }
-      action={
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={collecting}
-          onClick={() => void collect()}
-        >
-          {collecting ? <PaceSpinner className="size-4" /> : <RefreshCw />}
-          {collecting ? (status?.detail ?? 'Collecting') : 'Collect now'}
-        </Button>
-      }
+      action={<CopyCommand />}
     >
-      {(notice ?? status?.error) && (
-        <Banner tone="warn">{notice ?? status?.error}</Banner>
-      )}
+      <p className="mt-1 text-sm text-muted-foreground">
+        To collect, ask Claude Code or Codex, with its Slack connector. In
+        Claude Code, run {COLLECT_COMMAND}.
+      </p>
+      <NotConnected />
       {offer && (
         <Banner tone="note">
           <span className="flex-1">
@@ -187,8 +167,8 @@ export function TasksPage() {
         <p className="border-t border-border py-8 text-sm text-muted-foreground">
           {tab === 'open'
             ? data.collectedAt
-              ? 'Nothing open. Collect now reads what is new since the last time.'
-              : 'Nothing yet. Collect now reads the last 7 days of the conversations you are in.'
+              ? 'Nothing open. The next collection reads what is new since this one.'
+              : 'Nothing yet. A first collection reads the last 7 days.'
             : tab === 'maybe'
               ? 'No Maybes.'
               : 'Nothing settled in the last 14 days.'}
@@ -230,50 +210,76 @@ function Page({
   )
 }
 
-function Banner({
-  tone,
-  children,
-}: {
-  tone: 'warn' | 'note'
-  children: React.ReactNode
-}) {
+function Banner({ children }: { tone: 'note'; children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        'mt-4 flex items-center gap-3 rounded-xl px-4 py-3 text-sm',
-        tone === 'warn'
-          ? 'bg-status-interrupted/10 text-status-interrupted'
-          : 'bg-card-accent'
-      )}
-    >
-      {tone === 'warn' && <TriangleAlert className="size-4 shrink-0" />}
+    <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-sm">
       {children}
     </div>
   )
 }
 
-/** What tasks read and where the text goes, before they are turned on */
-function Setup({ on }: { on: boolean }) {
+/** Neither tool has Pacenote's MCP server: add it from here */
+function NotConnected() {
+  const clients = useMcpClients()
+  if (
+    !clients.data ||
+    clients.data.some((client) => client.state === 'connected')
+  )
+    return null
+  return (
+    <div className="mt-4 rounded-xl bg-card-accent px-4 py-3 text-sm">
+      <p>
+        Claude Code and Codex do not reach Pacenote yet, so they cannot add
+        tasks here.
+      </p>
+      <McpClientRows className="mt-2" />
+    </div>
+  )
+}
+
+/** Copies the collect command for Claude Code */
+function CopyCommand() {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={() => {
+        void navigator.clipboard.writeText(COLLECT_COMMAND).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        })
+      }}
+    >
+      {copied ? <Check /> : <Copy />}
+      {copied ? 'Copied' : 'Copy the collect command'}
+    </Button>
+  )
+}
+
+/** How tasks are collected, and what it takes, before they are turned on */
+function Setup() {
   return (
     <div className="mt-2">
       <p className="text-sm text-muted-foreground">
-        Pace reads the conversations you are in for what people ask of you and
-        what you said you would do, and keeps a short list here. Nothing is
-        posted anywhere.
+        Claude Code or Codex reads Slack with its own Slack connector and adds
+        what people asked of you, and what you said you would do, to a short
+        list here. Pacenote holds no Slack token for this, and nothing is posted
+        anywhere.
       </p>
       <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
-        <SetupPart title="What Pace reads">
-          Messages that mention you and threads you took part in, in the public
-          and private channels you are in, the last 7 days. DMs only if you turn
-          them on.
-        </SetupPart>
-        <SetupPart title="Where the text goes">
-          The kept messages go to your reasoner (claude or codex) to pick out
-          the tasks. Your Slack token stays on this Mac.
-        </SetupPart>
         <SetupPart title="What it needs">
-          A Slack user token from your Pacenote app, with read scopes. Settings
-          &gt; Tasks says which, and where to get it.
+          Claude Code or Codex with a Slack connector, and Pacenote added to it
+          as an MCP server: Settings &gt; Tasks adds it in one click.
+        </SetupPart>
+        <SetupPart title="What is read">
+          Messages that mention you, threads you took part in, and what you said
+          you would do, since the last collection; DMs only if you count them.
+          The tool reads them with its own Slack access.
+        </SetupPart>
+        <SetupPart title="How to collect">
+          In Claude Code, run {COLLECT_COMMAND}. Pacenote gives the tool its
+          rules: precision first, and anything unsure is a Maybe.
         </SetupPart>
       </div>
       <Button
@@ -281,7 +287,7 @@ function Setup({ on }: { on: boolean }) {
         onClick={() => (window.location.hash = '#/settings/tasks')}
       >
         <Settings />
-        {on ? 'Add the Slack user token' : 'Turn on in Settings'}
+        Turn on in Settings
       </Button>
     </div>
   )

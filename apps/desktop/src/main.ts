@@ -28,10 +28,12 @@ import { BotSupervisor, type SupervisorState } from './bot.js'
 import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
+import { isMcpClientId } from '../../../src/history/mcp-clients.js'
 import { decide, tasksView } from '../../../src/tasks/store.js'
 import type { TaskDecision } from '../../../src/tasks/types.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
+import { McpClients } from './mcp-clients.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 
@@ -149,6 +151,22 @@ const claudeToken = new ClaudeTokenSetup({
   verify: (token) =>
     checkClaudeCredential({ oauthToken: token }, { fresh: true }),
 })
+
+/**
+ * How AI tools launch Pacenote's MCP server: this app's own binary as Node,
+ * with the bundled server. ready: the bundle exists (dev runs need pnpm bundle)
+ */
+function mcpLaunch() {
+  return {
+    command: process.execPath,
+    args: [paths.historyMcp],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+    ready: existsSync(paths.historyMcp),
+  }
+}
+
+/** Adds the MCP server to Claude Code and Codex, and checks they reach it */
+const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
 
 /** Sandbox status, allowed domains, apply jobs */
 const sandbox = new SandboxService({
@@ -398,15 +416,13 @@ function registerBotIpc(): void {
     if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
   })
 
-  // Your tasks: the bot collects them; the app shows them and keeps your
-  // decisions (tasks-decisions.json, which only the app writes).
+  // Your tasks: AI tools add them through the MCP server; the app shows them
+  // and keeps your decisions (tasks-decisions.json, which only the app writes).
   const tasksSettings = () => {
     const env = settings.effectiveEnv()
     return {
       on: env.TASKS === 'on',
-      hasToken: Boolean(env.SLACK_USER_TOKEN?.trim()),
       dms: env.TASKS_DMS === 'on',
-      hub: env.SLACK_CONNECTION === 'hub',
       exclude: (env.TASKS_EXCLUDE_CHANNELS ?? '')
         .split(',')
         .map((part) => part.trim())
@@ -417,12 +433,6 @@ function registerBotIpc(): void {
     if (!fromMainWindow(event)) return null
     const current = tasksSettings()
     return { settings: current, ...tasksView(dataDir, current.exclude) }
-  })
-  ipcMain.handle('pacenote:tasks:collect', (event) => {
-    if (!fromMainWindow(event)) return { error: 'Not allowed.' }
-    return supervisor?.collectTasks()
-      ? { ok: true }
-      : { error: 'Start Pace first: it does the collecting.' }
   })
   ipcMain.handle(
     'pacenote:tasks:decide',
@@ -517,16 +527,21 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:settings:reveal-env', (event) => {
     if (fromMainWindow(event)) shell.showItemInFolder(envFile)
   })
-  // How AI tools launch the run history's MCP server: this app's own binary as
-  // Node, with the bundled server. The settings screen turns it into commands.
+  // The settings screen turns the launch into commands to add it by hand.
   ipcMain.handle('pacenote:settings:history-mcp', (event) =>
-    fromMainWindow(event)
-      ? {
-          command: process.execPath,
-          args: [paths.historyMcp],
-          env: { ELECTRON_RUN_AS_NODE: '1' },
-          ready: existsSync(paths.historyMcp),
-        }
+    fromMainWindow(event) ? mcpLaunch() : undefined
+  )
+  ipcMain.handle('pacenote:mcp:status', (event) =>
+    fromMainWindow(event) ? mcpClients.status() : []
+  )
+  ipcMain.handle('pacenote:mcp:connect', (event, id: unknown) =>
+    fromMainWindow(event) && isMcpClientId(id)
+      ? mcpClients.connect(id)
+      : undefined
+  )
+  ipcMain.handle('pacenote:mcp:disconnect', (event, id: unknown) =>
+    fromMainWindow(event) && isMcpClientId(id)
+      ? mcpClients.disconnect(id)
       : undefined
   )
   ipcMain.handle('pacenote:sandbox:status', (event) =>

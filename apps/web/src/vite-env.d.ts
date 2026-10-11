@@ -14,6 +14,7 @@ import type {
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type { TaskDecision, TasksView } from '@src/tasks/types'
+import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
   SandboxJob,
@@ -59,8 +60,8 @@ declare global {
         revealEnv(): Promise<void>
         openDataDir(): Promise<void>
         /**
-         * How AI tools launch the run history's MCP server. ready: the bundled
-         * server exists (dev runs need pnpm bundle)
+         * How AI tools launch Pacenote's MCP server. ready: the bundled server
+         * exists (dev runs need pnpm bundle)
          */
         historyMcp(): Promise<
           | {
@@ -76,22 +77,25 @@ declare global {
       tasks: {
         list(): Promise<
           | (TasksView & {
-              settings: {
-                on: boolean
-                hasToken: boolean
-                dms: boolean
-                hub: boolean
-                exclude: string[]
-              }
+              settings: { on: boolean; dms: boolean; exclude: string[] }
             })
           | null
         >
-        collect(): Promise<{ ok: true } | { error: string }>
         decide(
           id: string,
           decision: Omit<TaskDecision, 'at'> | null
         ): Promise<void>
         leaveOut(label: string): Promise<SettingsIssue[]>
+      }
+      /**
+       * Pacenote's MCP server in Claude Code and Codex. connect adds this
+       * app's server (in place of another), disconnect takes it out; both
+       * return the tool's status after the change.
+       */
+      mcp: {
+        status(): Promise<McpClientStatus[]>
+        connect(id: McpClientId): Promise<McpClientStatus | undefined>
+        disconnect(id: McpClientId): Promise<McpClientStatus | undefined>
       }
       /** Team hub pairing. Each call returns { error } instead of throwing. */
       hub: {

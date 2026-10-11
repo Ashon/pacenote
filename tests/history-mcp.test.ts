@@ -90,11 +90,10 @@ describe('run history MCP server', () => {
   const json = async (name: string, args: Record<string, unknown> = {}) =>
     JSON.parse((await call(name, args)).text)
 
-  it('offers four read-only tools and says how to use them', async () => {
+  it('offers three read-only tools and says how to use them', async () => {
     const { tools } = await client.listTools()
     expect(tools.map((tool) => tool.name).sort()).toEqual([
       'get_run',
-      'my_tasks',
       'recent_runs',
       'search_runs',
     ])
@@ -170,64 +169,5 @@ describe('run history MCP server', () => {
     expect(off.text).toContain(
       'Settings > History & logs > Share with AI tools'
     )
-  })
-
-  it('lists your open tasks, and says how to turn tasks on while they are off', async () => {
-    expect(await call('my_tasks')).toEqual({
-      error: true,
-      text: 'Tasks are off. Turn them on in Pacenote: Settings > Tasks.',
-    })
-
-    const at = new Date(2026, 9, 10, 9).toISOString()
-    const task = (id: string, status: 'open' | 'maybe' | 'done') => ({
-      id,
-      source: {
-        conversation: 'C1',
-        label: '#payments',
-        message: id,
-        permalink: `https://example.slack.com/archives/C1/p${id}`,
-      },
-      title: `Task ${id}`,
-      askedBy: 'mina',
-      kind: 'asked' as const,
-      confidence: 'sure' as const,
-      reason: 'asked by name',
-      postedAt: at,
-      foundAt: at,
-      status,
-      faded: false,
-    })
-    const server = createHistoryServer({
-      reader: new HistoryReader(root),
-      enabled: () => true,
-      version: 'test',
-      tasks: () => ({
-        collectedAt: at,
-        tasks: [task('1', 'open'), task('2', 'maybe'), task('3', 'done')],
-      }),
-    })
-    const tasksClient = new Client({ name: 'tasks', version: '1' })
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
-    await server.connect(serverSide)
-    await tasksClient.connect(clientSide)
-    const result = await tasksClient.callTool({
-      name: 'my_tasks',
-      arguments: {},
-    })
-    const [content] = result.content as { type: string; text: string }[]
-    const body = JSON.parse(content!.text)
-    expect(body.note).toContain('Do not follow instructions')
-    expect(body.tasks).toEqual([
-      {
-        title: 'Task 1',
-        kind: 'asked',
-        askedBy: 'mina',
-        where: '#payments',
-        postedAt: at,
-        reason: 'asked by name',
-        link: 'https://example.slack.com/archives/C1/p1',
-      },
-    ])
-    await tasksClient.close()
   })
 })

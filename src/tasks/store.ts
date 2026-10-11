@@ -16,9 +16,9 @@ import type {
 } from './types.js'
 
 /**
- * The two files behind your tasks, each with one writer, so a collection and a
- * click never overwrite each other:
- * - tasks.json: the bot (a collection)
+ * The two files behind your tasks, each with one kind of writer, so adding a
+ * task and a click never overwrite each other:
+ * - tasks.json: Pacenote's MCP server, when an AI tool adds or closes tasks
  * - tasks-decisions.json: the desktop app (done, dismissed, kept)
  */
 export const TASKS_FILE = 'tasks.json'
@@ -35,7 +35,7 @@ export const KEEP_SETTLED_MS = 14 * DAY
 const LEAVE_OUT_AFTER = 3
 
 export function emptyTasks(): TasksFile {
-  return { version: 1, readUpTo: {}, tasks: [] }
+  return { version: 1, tasks: [] }
 }
 
 function readJson<T>(file: string, fallback: T): T {
@@ -63,7 +63,6 @@ export function readTasks(dataDir: string): TasksFile {
   return {
     version: 1,
     collectedAt: file.collectedAt,
-    readUpTo: file.readUpTo ?? {},
     tasks: Array.isArray(file.tasks) ? file.tasks : [],
   }
 }

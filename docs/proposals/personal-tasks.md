@@ -1,6 +1,7 @@
 # Proposal: your own tasks, gathered from Slack
 
-Status: phase 0 in progress (plan finalized 2026-10-11). Storyboard: the "Pacenote personal tasks storyboard" canvas.
+Status: phase 0 shipped in v0.4.0 with a Slack user token, and moved to the AI tool's Slack connector in v0.4.1 (2026-10-11).
+Storyboard: the "Pacenote personal tasks storyboard" canvas.
 
 ## Why
 
@@ -11,13 +12,21 @@ have to keep it in their head or scroll back to find it.
 
 ## What it does
 
-1. **Collect.** With a Slack user token, read the last 7 days (later: only what is new) of the conversations you are in,
-   and keep on this Mac the messages that mention you and the threads you took part in, plus your DMs if you turn them on.
-2. **Extract.** Hand those messages to the reasoner (claude or codex), with no tools, to pick out what is a task for you:
-   who asked, what, any hint of a due date, why it is a task, and how sure it is. It answers in JSON.
-3. **Keep.** Store tasks in `PACENOTE_DATA_DIR/tasks.json`, one per source message, so a message is never a task twice.
-4. **Show.** A Tasks screen in the app and an MCP tool for Claude Code and Codex; later, a short summary Pace sends you
-   in a DM.
+1. **Collect.** Claude Code or Codex reads Slack with its own Slack connector: since the last collection (the last 7 days
+   the first time), the messages that mention you, threads you took part in, your DMs if they count, and what you said you
+   would do. It decides which are tasks, by the rules Pacenote gives it.
+2. **Keep.** It adds them through Pacenote's MCP server (`add_tasks`), keyed by the message's permalink, so a message is
+   never a task twice, and closes the ones you answered (`close_task`).
+3. **Show.** The Tasks screen in the app, and `my_tasks` for the tools; later, a short summary Pace sends you in a DM.
+
+## Why the connector, not a token of Pacenote's (v0.4.1)
+
+v0.4.0 read Slack with a user token of Pacenote's own: user scopes added to the Slack app, a reinstall, the token copied
+into Settings, and Pacenote's own code for reading history, filtering and asking the reasoner. The tools people already use
+have a Slack connector with their own authorization, so the reading moved there: Pacenote keeps the list and the rules,
+holds no Slack token for this, and has much less code. The trade-off: a collection runs when the tool runs (a slash
+command, or later a schedule), and it needs a workspace that allows the tool's Slack connector. Saving a user token
+automatically (Slack's PKCE flow with a localhost redirect) was set aside: turning on PKCE cannot be undone for the app.
 
 ## Decided
 
@@ -25,8 +34,8 @@ have to keep it in their head or scroll back to find it.
 | --- | --- |
 | Where to look | Public and private channels you are in, by default. DMs and group DMs only when you turn them on. Channels can be left out. |
 | Where tasks show | The Tasks screen and the `my_tasks` MCP tool; the daily DM summary in phase 1 |
-| How to read Slack | Conversation history of the conversations you are in (`users.conversations`, `conversations.history`, `conversations.replies`), filtered on this Mac. Slack search (`search:read`) is not used: matching a mention in a query is not documented, it returns one match for messages close together, and Enterprise Grid may restrict it. |
-| When to collect | Phase 0: when you choose Collect now |
+| How to read Slack | The AI tool's own Slack connector, read only (v0.4.1). v0.4.0 read conversation history with a user token of Pacenote's. |
+| When to collect | When you run the collect command in the tool (`/mcp__pacenote__collect_tasks` in Claude Code) |
 | Precision | When unsure, it is a Maybe, not a task (below) |
 
 ## Precision first
@@ -49,43 +58,35 @@ first lever is picking fewer, better tasks; Dismiss is the safety net.
 
 ## Design
 
-**Slack app.** The user token comes from the same Pacenote app with user scopes added (the main manifest stays without
-them, so a setup that does not use tasks never asks for them): `channels:read`, `groups:read`, `channels:history`,
-`groups:history`, `users:read`; for the DM option also `im:read`, `im:history`, `mpim:read`, `mpim:history`.
-Reinstalling the app shows a User OAuth Token (`xoxp-`), saved as `SLACK_USER_TOKEN` like the other secrets.
+**MCP.** On Pacenote's MCP server, behind Settings > Tasks > Let AI tools add my tasks (separate from sharing the run
+history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks), `add_tasks`,
+`close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash command. `add_tasks` holds the
+settings whatever the tool sends: it skips messages from channels left out and DMs while they do not count.
 
-**Where things run.** Collect now goes from the app to the bot process, which reads Slack with the user token and asks
-its reasoner, with no MCP tools, to pick the tasks. The user token never reaches the reasoner or the sandbox. The
-reasoner gets only the kept messages, with the same rule as attachments: content is data, not instructions.
-
-**Files.** The bot writes `tasks.json` (the tasks, where each collection left off); the app writes your decisions (done,
-dismissed with a reason, kept) to `tasks-decisions.json`. Each file has one writer, so a collection and a click never
-overwrite each other. A task: `{ id, source { conversation, label, message, thread, permalink }, title, askedBy, kind:
-asked | promised, due?, confidence: sure | maybe, reason, foundAt, closed? { at, why: replied | checked } }`.
+**Files.** The MCP server writes `tasks.json`; the app writes your decisions (done, dismissed with a reason, kept) to
+`tasks-decisions.json`. A task: `{ id, source { conversation, label, message, thread, permalink }, title, askedBy, kind:
+asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundAt, addedBy?, closed? { at, why: replied |
+checked | resolved } }`.
 
 **Keeping.** Open tasks fade after 7 days and drop after 14; done and dismissed ones are kept 14 days.
 
-**MCP.** `my_tasks` (open tasks with links, reasons and due hints) on the existing MCP server, read-only, behind the same
-"Share with AI tools" switch and only while tasks are on.
-
 ## Risks
 
-- **Trust boundary.** Pace reads only threads it is mentioned in today, in public channels, with a bot token. A user token
-  sees everything you can see. Tasks stay off by default, and the screen that turns them on spells out the reach.
-- **Where the text goes.** Extraction sends the kept messages, DMs included when that is on, to the reasoner's provider.
+- **Trust boundary.** The tool's Slack connector sees what you can see, and also has tools that write (send, react). The
+  collect prompt tells it to read only, and a scheduled collection from Pacenote (phase 1) must allow only read tools.
+- **Where the text goes.** The messages go to the tool's model, as anything the tool reads does.
 - **Noise.** Precision first, Maybe, closing by itself, the dismiss rate.
-- **Quota and rate limits.** One reasoner request per collection; history reads are paced for Slack's limits, and later
-  collections read only what is new.
-- **Workspace policy.** Some workspaces restrict user tokens or these scopes; tasks then stay off, and the screen says why.
-- **Team hub.** Each member would need their own user token, which means an OAuth flow on the hub. Personal setups first.
+- **Workspace policy.** Some workspaces do not allow the tool's Slack connector; tasks then cannot be collected.
+- **Writes from AI tools.** `add_tasks` and `close_task` are the MCP server's first writes; they touch only the task list,
+  and stay closed until you turn tasks on.
 
 ## Phases
 
 | Phase | Scope |
 | --- | --- |
-| 0 | Collect now, the last 7 days then only what is new, precision first with Maybe, closing by itself, Done and Dismiss with reasons, the leave-out offer, the dismiss rate, the Tasks screen, `my_tasks` |
-| 1 | Collecting on a schedule, the daily DM summary, the dismiss rate in Overview |
-| 2 | Team hub support, sending tasks to Linear, Jira or Reminders, Slack search where it works |
+| 0 | The MCP tools and the collect prompt, precision first with Maybe, closing, Done and Dismiss with reasons, the leave-out offer, the dismiss rate, the Tasks screen |
+| 1 | Collecting from Pacenote on a schedule (the tool run headless with Slack read tools only), the daily DM summary, the dismiss rate in Overview |
+| 2 | Sending tasks to Linear, Jira or Reminders |
 
 ## Still open (phase 1)
 

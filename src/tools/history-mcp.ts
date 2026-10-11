@@ -8,13 +8,13 @@ import { defaultHome } from '../settings/home.js'
 import { loadEnv } from '../settings/load-env.js'
 import { envFilePath } from '../settings/paths.js'
 import { readTasksSettings } from '../tasks/settings.js'
-import { tasksView } from '../tasks/store.js'
 
 /**
  * Pacenote's run history over MCP (stdio), for AI tools on this Mac. They
- * launch it themselves; Settings > History & logs shows the command, which
- * runs this bundle with the app's own Node (ELECTRON_RUN_AS_NODE=1), so no
- * Node install is needed. In the repository: pnpm mcp.
+ * launch it themselves; Settings adds it to Claude Code and Codex (or shows
+ * the command), running this bundle with the app's own Node
+ * (ELECTRON_RUN_AS_NODE=1), so no Node install is needed. In the repository:
+ * pnpm mcp.
  * - The history is the one the desktop app shows: PACENOTE_DATA_DIR, or the
  *   home (~/.pacenote).
  * - Sharing (HISTORY_SHARE) is read from the config file on every call, so the
@@ -32,9 +32,9 @@ const server = createHistoryServer({
   enabled: () =>
     (launched ?? readEnvValues(readEnvFile(envFile)).HISTORY_SHARE) === 'on',
   version: process.env.PACENOTE_VERSION ?? 'dev',
-  tasks: () => {
-    const settings = readTasksSettings(process.env, envFile)
-    return settings.on ? tasksView(data, settings.exclude) : undefined
+  tasks: {
+    dataDir: data,
+    settings: () => readTasksSettings(process.env, envFile),
   },
 })
 await server.connect(new StdioServerTransport())

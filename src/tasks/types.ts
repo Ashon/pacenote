@@ -1,8 +1,9 @@
 /**
- * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md). The
- * bot writes tasks.json (src/tasks/store.ts); the desktop app writes your
- * decisions to tasks-decisions.json. Plain data, so the UI and the MCP server
- * read the same shapes.
+ * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): AI
+ * tools with a Slack connector add them through Pacenote's MCP server, which
+ * writes tasks.json (src/tasks/store.ts); the desktop app writes your decisions
+ * to tasks-decisions.json. Plain data, so the UI and the MCP server read the
+ * same shapes.
  */
 
 /** asked: someone asked you; promised: you said you would */
@@ -39,21 +40,21 @@ export interface Task {
   reason: string
   /** When the source message was posted (ISO) */
   postedAt: string
-  /** When a collection found it (ISO) */
+  /** When it was added (ISO) */
   foundAt: string
+  /** The AI tool that added it ("claude-code") */
+  addedBy?: string
   /**
-   * Closed by itself: you replied in its thread after it, or its message got a
-   * check mark
+   * Closed by itself: you replied in its thread after it, its message got a
+   * check mark, or it was resolved in Slack some other way
    */
-  closed?: { at: string; why: 'replied' | 'checked' }
+  closed?: { at: string; why: 'replied' | 'checked' | 'resolved' }
 }
 
 export interface TasksFile {
   version: 1
-  /** When the last collection finished (ISO) */
+  /** When an AI tool last finished collecting (ISO) */
   collectedAt?: string
-  /** Per conversation, the newest message read so far (Slack ts) */
-  readUpTo: Record<string, string>
   tasks: Task[]
 }
 
@@ -90,20 +91,4 @@ export interface TasksView {
    * A channel you kept dismissing as not for you, to offer leaving it out
    */
   leaveOut?: { conversation: string; label: string; count: number }
-}
-
-/**
- * Collecting, as the bot status reports it (BotStatus.tasks); the screen shows
- * the progress
- */
-export interface TasksStatus {
-  /** off: no user token, or not available with this connection */
-  state: 'off' | 'idle' | 'collecting'
-  /** Why it is off, or what it is doing */
-  detail?: string
-  /** collecting: reading, picking */
-  step?: 'reading' | 'picking'
-  collectedAt?: string
-  /** The last collection failed */
-  error?: string
 }
