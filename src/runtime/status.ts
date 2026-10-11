@@ -65,9 +65,8 @@ export class BotStatusFile {
    * If another bot is alive, waits up to waitMs for it to exit. (Time for the
    * previous process to finish in-progress requests on a pnpm dev restart) If
    * it is still alive, throws BotAlreadyRunningError. otherDirs are also
-   * checked for a running bot (both default homes, so an old Verda or Orbly and
-   * a new Pacenote never connect at the same time), but the status file is
-   * written only to dataDir.
+   * checked for a running bot (the default home, when the data folder is set
+   * elsewhere), but the status file is written only to dataDir.
    */
   static async acquire(
     dataDir: string,

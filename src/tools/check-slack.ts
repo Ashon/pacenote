@@ -13,7 +13,7 @@ export {
  * no messages.
  */
 async function main(): Promise<void> {
-  for (const warning of loadEnv()) console.warn(`WARN ${warning}`)
+  loadEnv()
   const items = await checkSlackTokens({
     botToken: process.env.SLACK_BOT_TOKEN,
     appToken: process.env.SLACK_APP_TOKEN,

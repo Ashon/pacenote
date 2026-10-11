@@ -135,9 +135,6 @@ describe('release', () => {
     expect(cask).toContain('REPLACE_SHA256_ARM64')
     expect(cask).toContain('REPLACE_SHA256_X64')
     expect(cask).toContain('Pacenote-v#{version}-macos-#{arch}.app.zip')
-    // Users of the earlier names are told which home stays in use
-    expect(cask).toContain(
-      'Coming from Orbly or Verda: Pacenote keeps using ~/.orbly or ~/.verda until you move it to ~/.pacenote.'
-    )
+    expect(cask).toContain('Config and run history are in ~/.pacenote')
   })
 })

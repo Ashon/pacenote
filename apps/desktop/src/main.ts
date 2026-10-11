@@ -22,13 +22,7 @@ import { HistoryReader } from '../../../src/history/reader.js'
 import { handleLocalApi } from '../../../src/local-api.js'
 import { readBotStatus } from '../../../src/runtime/status.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
-import {
-  applyLegacyEnv,
-  defaultHome,
-  envNames,
-  legacyHomeWarning,
-  warnOnce,
-} from '../../../src/settings/legacy.js'
+import { defaultHome } from '../../../src/settings/home.js'
 import { envFilePath } from '../../../src/settings/paths.js'
 import { BotSupervisor, type SupervisorState } from './bot.js'
 import { SandboxService } from './sandbox.js'
@@ -48,11 +42,6 @@ import { SettingsStore } from './settings.js'
  * - Closing the window hides it to the tray and the bot keeps running. Quitting
  *   the app lets the bot finish active requests and then stops it.
  */
-// Variables from before the renames (ORBLY_*, VERDA_*) are read as PACENOTE_*,
-// with a warning. This runs before anything reads them.
-warnOnce(applyLegacyEnv(process.env), (message) =>
-  console.warn(`[pacenote-desktop] ${message}`)
-)
 const distDir = path.dirname(fileURLToPath(import.meta.url))
 /**
  * Dev runs use the repository build output; the packaged app (Pacenote.app)
@@ -190,35 +179,25 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 /**
- * Resolved from the environment variable, then PACENOTE_DATA_DIR (or
- * ORBLY_DATA_DIR, VERDA_DATA_DIR from before the renames) in the settings file,
- * then the default home (~/.pacenote, or ~/.orbly or ~/.verda while it does not
- * exist).
+ * Resolved from the environment variable, then PACENOTE_DATA_DIR in the
+ * settings file, then the default home (~/.pacenote).
  */
 function resolveDataDir(): string {
-  let value = process.env.PACENOTE_DATA_DIR
+  const key = 'PACENOTE_DATA_DIR'
+  let value = process.env[key]
   if (!value) {
     try {
-      const lines = readFileSync(envFile, 'utf8').split('\n')
-      for (const key of envNames('DATA_DIR')) {
-        value = lines
-          .find((l) => l.startsWith(`${key}=`))
-          ?.slice(key.length + 1)
-          .trim()
-          .replace(/^["']|["']$/g, '')
-        if (value) break
-      }
+      value = readFileSync(envFile, 'utf8')
+        .split('\n')
+        .find((l) => l.startsWith(`${key}=`))
+        ?.slice(key.length + 1)
+        .trim()
+        .replace(/^["']|["']$/g, '')
     } catch {
       // Without .env, the default is used.
     }
   }
-  if (!value) {
-    warnOnce(
-      [legacyHomeWarning()].filter((m): m is string => m !== undefined),
-      (m) => console.warn(`[pacenote-desktop] ${m}`)
-    )
-    return defaultHome()
-  }
+  if (!value) return defaultHome()
   return path.resolve(
     value === '~' || value.startsWith('~/')
       ? path.join(homedir(), value.slice(1))

@@ -8,12 +8,6 @@ import { loadBrokerEnv } from '../sandbox/env.js'
 import { writeKubeconfig } from '../sandbox/kubeconfig.js'
 import { prepareBrokerFiles } from '../sandbox/prepare.js'
 import { readEnvFile, readEnvValues } from '../settings/env-file.js'
-import {
-  applyLegacyEnv,
-  envValue,
-  legacyHomeWarning,
-  warnOnce,
-} from '../settings/legacy.js'
 import { allowlistPath, envFilePath, pacenoteHome } from '../settings/paths.js'
 
 /**
@@ -81,29 +75,20 @@ export function planJob(kind: JobKind, ctx: JobContext): JobStep[] {
 }
 
 /**
- * Overlays the current environment variables on the config file values and maps
- * the names from before the renames (ORBLY_*, VERDA_* -> PACENOTE_*, reported
- * through warn). PACENOTE_HOME is always passed resolved, so compose uses the
- * same location as the app even when it is still ~/.orbly or ~/.verda.
+ * Overlays the current environment variables on the config file values.
+ * PACENOTE_HOME is always passed resolved, so compose uses the same location as
+ * the app.
  */
 export function jobEnv(
   base: NodeJS.ProcessEnv,
-  envFile: string,
-  warn: (message: string) => void = () => {}
+  envFile: string
 ): NodeJS.ProcessEnv {
   const fromFile = readEnvValues(readEnvFile(envFile))
   const merged: NodeJS.ProcessEnv = { ...fromFile }
   for (const [key, value] of Object.entries(base)) {
     if (value !== undefined) merged[key] = value
   }
-  const home = base.HOME || homedir()
-  warnOnce(
-    [legacyHomeWarning(base, home), ...applyLegacyEnv(merged)].filter(
-      (message): message is string => message !== undefined
-    ),
-    warn
-  )
-  merged.PACENOTE_HOME = pacenoteHome(base, home)
+  merged.PACENOTE_HOME = pacenoteHome(base, base.HOME || homedir())
   return merged
 }
 
@@ -140,12 +125,10 @@ async function main(): Promise<void> {
     throw new Error(`Usage: sandbox-job <${JOB_KINDS.join('|')}> [--dry-run]`)
   const dryRun = flags.includes('--dry-run')
   const sandboxDir = path.resolve(
-    envValue(process.env, 'SANDBOX_DIR') || 'sandbox'
+    process.env.PACENOTE_SANDBOX_DIR?.trim() || 'sandbox'
   )
   const envFile = envFilePath()
-  const env = jobEnv(process.env, envFile, (message) =>
-    console.warn(`WARN ${message}`)
-  )
+  const env = jobEnv(process.env, envFile)
   const log = (line: string) => console.log(line)
   const steps = planJob(kind as JobKind, {
     sandboxDir,

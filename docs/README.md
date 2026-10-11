@@ -12,6 +12,5 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
   read what Pace did
 - [Installation](installation.md): Homebrew in detail, running from source, restarts and the run lock
 - [Desktop app](desktop-app.md): the app's screens, bot management, settings, sandbox controls, packaging
-- [Migrating](migrating.md): moving from Orbly or Verda
 - [Development](development.md): checks, end-to-end tests and coverage, adding a messenger
 - [Releases](releases): release notes

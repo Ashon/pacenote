@@ -25,20 +25,10 @@ import { redactSecrets } from './redact.js'
  */
 
 export const BRANCH_PREFIX = 'pacenote/'
-/**
- * Branches made before the renames (Orbly, Verda). Still recognized as the
- * agent's own, but never created.
- */
-export const LEGACY_BRANCH_PREFIXES = ['orbly/', 'verda/']
 
-/**
- * Whether a branch is one the agent made: pacenote/*, or orbly/* and verda/*
- * from before the renames
- */
+/** Whether a branch is one the agent made (pacenote/*) */
 export function isAgentBranch(branch: string): boolean {
-  return [BRANCH_PREFIX, ...LEGACY_BRANCH_PREFIXES].some((prefix) =>
-    branch.startsWith(prefix)
-  )
+  return branch.startsWith(BRANCH_PREFIX)
 }
 const MAX_WRITE_BYTES = 512 * 1024
 const MAX_CHANGED_FILES = 50

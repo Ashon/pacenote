@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { handleLocalApi } from '../../src/local-api'
 import { HistoryReader } from '../../src/history/reader'
-import { defaultHome, envValue } from '../../src/settings/legacy'
+import { defaultHome } from '../../src/settings/home'
 
 /**
  * The dev server also reads real history through the same /api as the desktop
@@ -17,9 +17,8 @@ function historyApi(): Plugin {
   return {
     name: 'pacenote-history-api',
     configureServer(server) {
-      // PACENOTE_DATA_DIR (or ORBLY_DATA_DIR, VERDA_DATA_DIR from before the
-      // renames), else the default home
-      const raw = envValue(process.env, 'DATA_DIR') ?? defaultHome()
+      // PACENOTE_DATA_DIR, else the default home
+      const raw = process.env.PACENOTE_DATA_DIR?.trim() || defaultHome()
       const root = raw.startsWith('~')
         ? path.join(homedir(), raw.slice(1))
         : raw

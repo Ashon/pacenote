@@ -12,7 +12,7 @@ import { parseEnv } from 'node:util'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import { RECHECK_SANDBOX } from '../../../src/runtime/sandbox-health.js'
 import { readRunningBot } from '../../../src/runtime/status.js'
-import { botLockDirs } from '../../../src/settings/legacy.js'
+import { botLockDirs } from '../../../src/settings/home.js'
 import { setupProblem, startFailureProblem } from './bot-readiness.js'
 import type { SupervisorState } from '../../../src/runtime/types.js'
 
@@ -322,8 +322,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
    * elsewhere is external
    */
   private refreshExternal(): void {
-    // A bot in the other default home (an old Verda or Orbly, before migrating)
-    // also counts as running elsewhere.
+    // A bot in the default home, when this data folder is elsewhere, also
+    // counts as running elsewhere.
     const view = readRunningBot(botLockDirs(this.options.dataDir))
     if (this.child) {
       const ours = view.alive && view.status?.pid === this.child.pid

@@ -50,61 +50,6 @@ describe('InflightStore', () => {
     expect(store.list().map((e) => e.key)).toEqual(['C1:1.0'])
   })
 
-  it('reads entries written before messengers existed as Slack mentions', () => {
-    const file = path.join(dir, 'v02.json')
-    writeFileSync(
-      file,
-      JSON.stringify([
-        {
-          key: 'C1:2.0',
-          event: {
-            channel: 'C1',
-            ts: '2.0',
-            thread_ts: '1.0',
-            user: 'U1',
-            text: '<@UBOT> check',
-            files: [
-              {
-                id: 'F1',
-                name: 'app.log',
-                mimetype: 'text/plain',
-                url_private_download: 'u',
-              },
-            ],
-          },
-          threadTs: '1.0',
-          label: '#ops',
-          placeholderTs: '2.1',
-          runId: 'r1',
-          attempts: 1,
-          startedAt: 5,
-        },
-      ])
-    )
-    expect(new InflightStore(file).list()).toEqual([
-      {
-        key: 'slack:C1:2.0',
-        mention: {
-          messenger: 'slack',
-          conversation: 'C1',
-          message: '2.0',
-          thread: '1.0',
-          inThread: true,
-          userId: 'U1',
-          text: '<@UBOT> check',
-          files: [
-            expect.objectContaining({ id: 'F1', name: 'app.log', handle: 'u' }),
-          ],
-        },
-        label: '#ops',
-        placeholder: '2.1',
-        runId: 'r1',
-        attempts: 1,
-        startedAt: 5,
-      },
-    ])
-  })
-
   it('treats a corrupt file as an empty list', () => {
     const file = path.join(dir, 'broken.json')
     writeFileSync(file, '{not json')

@@ -6,8 +6,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
-import { toMessageFile, type SlackFileRef } from '../messengers/slack/files.js'
-import { mentionKey, type Mention } from '../messengers/types.js'
+import type { Mention } from '../messengers/types.js'
 
 /**
  * Record of in-progress mentions. When a bot restart (deploy, tsx watch, crash)
@@ -30,49 +29,6 @@ export interface InflightEntry {
   /** Number of times processing has started so far */
   attempts: number
   startedAt: number
-}
-
-/** An entry as written before messengers existed (Slack only, through v0.2) */
-interface SlackEntry {
-  key: string
-  event: {
-    channel: string
-    ts: string
-    thread_ts?: string
-    user: string
-    text: string
-    files?: unknown[]
-  }
-  threadTs: string
-  label: string
-  placeholderTs: string
-  runId?: string
-  attempts: number
-  startedAt: number
-}
-
-function fromSlackEntry({
-  event,
-  threadTs,
-  placeholderTs,
-  ...rest
-}: SlackEntry): InflightEntry {
-  const mention: Mention = {
-    messenger: 'slack',
-    conversation: event.channel,
-    message: event.ts,
-    thread: threadTs,
-    inThread: Boolean(event.thread_ts),
-    userId: event.user,
-    text: event.text,
-    files: ((event.files ?? []) as SlackFileRef[]).map(toMessageFile),
-  }
-  return {
-    ...rest,
-    key: mentionKey(mention),
-    mention,
-    placeholder: placeholderTs,
-  }
 }
 
 /**
@@ -101,10 +57,7 @@ export class InflightStore {
     if (!existsSync(this.file)) return []
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as unknown
-      if (!Array.isArray(parsed)) return []
-      return (parsed as (InflightEntry | SlackEntry)[]).map((entry) =>
-        'event' in entry ? fromSlackEntry(entry) : entry
-      )
+      return Array.isArray(parsed) ? (parsed as InflightEntry[]) : []
     } catch {
       return []
     }

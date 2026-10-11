@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createHistoryServer } from '../history/mcp.js'
 import { HistoryReader } from '../history/reader.js'
 import { readEnvFile, readEnvValues } from '../settings/env-file.js'
-import { defaultHome } from '../settings/legacy.js'
+import { defaultHome } from '../settings/home.js'
 import { loadEnv } from '../settings/load-env.js'
 import { envFilePath } from '../settings/paths.js'
 
@@ -22,7 +22,7 @@ import { envFilePath } from '../settings/paths.js'
  */
 const launched = process.env.HISTORY_SHARE
 const envFile = envFilePath()
-for (const warning of loadEnv()) console.error(`[pacenote-mcp] ${warning}`)
+loadEnv()
 
 const server = createHistoryServer({
   reader: new HistoryReader(dataDir(process.env.PACENOTE_DATA_DIR)),

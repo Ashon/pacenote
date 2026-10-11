@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
-import { defaultHome } from './settings/legacy.js'
+import { defaultHome } from './settings/home.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
 import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
@@ -146,7 +146,7 @@ export const EnvSchema = z.object({
 
   /**
    * Where run history, bot status, and logs live. The desktop app reads it.
-   * Defaults to the home (~/.orbly, or ~/.verda before migrating)
+   * Defaults to the home (~/.pacenote)
    */
   PACENOTE_DATA_DIR: z.string().optional(),
   /** Run history (PACENOTE_DATA_DIR/runs) */

@@ -181,7 +181,7 @@ Other:
 - The query API is served only inside the app at `pacenote://app/api/*`, with no open port. Bot control uses preload IPC only.
   The dev server (`apps/web` Vite) listens only on 127.0.0.1 and attaches the same query API read-only.
 - The data location is taken from the `PACENOTE_DATA_DIR` environment variable, then `PACENOTE_DATA_DIR` in the config file, then the
-  default home (`~/.pacenote`, or `~/.orbly` or `~/.verda` while `~/.pacenote` does not exist; see [Migrating from Orbly or Verda](migrating.md)).
+  default home (`~/.pacenote`).
 - App icon: `assets/pacenote-icon.svg` is the source. After editing it, `pnpm --filter @pacenote/desktop icon` (macOS swift) redraws
   the same shape on the macOS icon grid (an 824 body in 1024, shadow, highlight) as `assets/pacenote-icon.png`.
   Development runs use the PNG as the Dock icon as is, so this does the system's processing by hand.

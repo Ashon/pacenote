@@ -14,7 +14,7 @@ seat for your team's Slack: mention `@Pace` in a public channel, and Pace reads 
 local `claude` or `codex` CLI on your machine, keeps only what matters now, and answers in the same thread.
 
 Two names, two roles: **Pacenote** is the project and the app; **Pace** is who you talk to, the Slack bot and the
-voice of the app. (Formerly Orbly and Verda: see [Migrating](docs/migrating.md).)
+voice of the app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
@@ -65,7 +65,6 @@ upgrades and uninstalls. To run from source instead, see [Installation](docs/ins
 | [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: Claude Code, Codex and other tools on your Mac reading what Pace did |
 | [Installation](docs/installation.md) | Homebrew in detail, running from source, restarts and the run lock |
 | [Desktop app](docs/desktop-app.md) | The app's screens, bot management, settings, sandbox controls, packaging |
-| [Migrating](docs/migrating.md) | Moving from Orbly or Verda |
 | [Development](docs/development.md) | Checks, end-to-end tests and coverage, adding a messenger |
 | [Releases](docs/releases) | Release notes |
 

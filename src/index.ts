@@ -17,7 +17,7 @@ import type { Sandbox } from './sandbox/runtime.js'
 import { DiagramRenderer } from './render/diagrams.js'
 import { RECHECK_SANDBOX, SandboxHealth } from './runtime/sandbox-health.js'
 import { BotStatusFile, LOG_FILE } from './runtime/status.js'
-import { botLockDirs, warnOnce } from './settings/legacy.js'
+import { botLockDirs } from './settings/home.js'
 import { loadEnv } from './settings/load-env.js'
 
 /**
@@ -40,9 +40,7 @@ let startupLog: Logger | undefined
 let running = false
 
 async function main(): Promise<void> {
-  // The settings file and the names from before the renames (ORBLY_*, VERDA_*,
-  // ~/.orbly, ~/.verda); warnings go to the log below.
-  const envWarnings = loadEnv()
+  loadEnv()
   const config = loadConfig()
   // Logs to PACENOTE_DATA_DIR/logs/bot.log as well as the console. The desktop
   // app shows this file.
@@ -51,7 +49,6 @@ async function main(): Promise<void> {
     fileSink(path.join(config.dataDir, LOG_FILE)),
   ])
   startupLog = log
-  warnOnce(envWarnings, (message) => log.warn(message))
   const status = await BotStatusFile.acquire(
     config.dataDir,
     process.env.PACENOTE_MANAGED_BY === 'desktop' ? 'desktop' : 'terminal',

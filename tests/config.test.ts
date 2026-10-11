@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { checkConfig, loadConfig } from '../src/config.js'
-import { defaultHome } from '../src/settings/legacy.js'
+import { defaultHome } from '../src/settings/home.js'
 
 const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-ws-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -24,8 +24,7 @@ describe('loadConfig', () => {
       concurrency: 2,
     })
     expect(config.render).toMatchObject({ enabled: true, generatedMaxPx: 512 })
-    // The default home: ~/.pacenote, or ~/.orbly or ~/.verda before migrating
-    // (tests/legacy.test.ts)
+    // The default home: ~/.pacenote (tests/home.test.ts)
     expect(config.dataDir).toBe(defaultHome())
     expect(config.history).toEqual({ retentionDays: 30 })
     expect(loadConfig({ ...env, HISTORY: 'off' }).history).toBeUndefined()
