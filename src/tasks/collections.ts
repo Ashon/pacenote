@@ -1,17 +1,17 @@
 import path from 'node:path'
-import { readJson, writeJson } from './store.js'
+import type { CollectionRunRecord } from '../history/types.js'
+import { runUsage } from '../history/usage.js'
+import { readJson } from './store.js'
 import type { CollectionRecord } from './types.js'
 
 /**
- * The collections the desktop app ran, oldest first: how each ended, how many
- * Slack lookups it made and the tokens it spent. Only the app writes it.
+ * The log the desktop app kept of its collections before they became runs in
+ * the history (v0.4.4 and v0.4.5): still read for the days it covers, no longer
+ * written.
  */
 export const COLLECTIONS_FILE = 'tasks-collections.json'
 
 const DAY = 24 * 60 * 60 * 1000
-/** Kept for this long, so the Overview's 14 days always have them */
-const KEEP_MS = 90 * DAY
-const KEEP_MAX = 1000
 
 export function readCollections(dataDir: string): CollectionRecord[] {
   const file = readJson<{ collections?: unknown }>(
@@ -25,27 +25,57 @@ export function readCollections(dataDir: string): CollectionRecord[] {
     : []
 }
 
-/** Logs a finished collection and drops the ones past keeping */
-export function addCollection(
-  dataDir: string,
-  entry: CollectionRecord,
-  now = new Date()
-): void {
-  const since = now.getTime() - KEEP_MS
-  const collections = [...readCollections(dataDir), entry]
-    .filter((item) => Date.parse(item.startedAt) >= since)
-    .slice(-KEEP_MAX)
-  writeJson(path.join(dataDir, COLLECTIONS_FILE), { version: 1, collections })
+/** A collection's run as Recent collections lists it; none while it runs */
+export function collectionRow(
+  run: CollectionRunRecord
+): CollectionRecord | undefined {
+  if (run.status === 'running') return undefined
+  const usage = runUsage(run.events)
+  const row = {
+    at: run.finishedAt ?? run.updatedAt,
+    startedAt: run.startedAt,
+    trigger: run.trigger,
+    runId: run.id,
+    reads: run.reads ?? 0,
+    ...(usage ? { usage } : {}),
+  }
+  return run.found
+    ? { ...row, ok: true, ...run.found }
+    : {
+        ...row,
+        ok: false,
+        error: run.error ?? 'The collection stopped before it finished.',
+      }
 }
 
-/** The last days' collections, newest first, for the Tasks screen */
+/** Finished collections, newest first: the runs, then the old log's */
+function allCollections(
+  dataDir: string,
+  runs: CollectionRunRecord[]
+): CollectionRecord[] {
+  return [
+    ...runs.flatMap((run) => collectionRow(run) ?? []),
+    ...readCollections(dataDir),
+  ].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
+}
+
+/** The last days' collections, newest first, for the Todo screen */
 export function recentCollections(
   dataDir: string,
+  runs: CollectionRunRecord[],
   now = new Date(),
   days = 7
 ): CollectionRecord[] {
   const since = now.getTime() - days * DAY
-  return readCollections(dataDir)
-    .filter((entry) => Date.parse(entry.startedAt) >= since)
-    .reverse()
+  return allCollections(dataDir, runs).filter(
+    (entry) => Date.parse(entry.startedAt) >= since
+  )
+}
+
+/** How the newest collection ended, so the screen has it when the app starts */
+export function latestCollection(
+  dataDir: string,
+  runs: CollectionRunRecord[]
+): CollectionRecord | undefined {
+  return allCollections(dataDir, runs)[0]
 }

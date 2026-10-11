@@ -13,8 +13,8 @@ import {
 } from '../src/history/usage.js'
 import { claudeLineToEvents } from '../src/reasoners/claude.js'
 import {
-  addCollection,
   COLLECTIONS_FILE,
+  latestCollection,
   readCollections,
   recentCollections,
 } from '../src/tasks/collections.js'
@@ -127,6 +127,13 @@ describe('token stats', () => {
       ...extra,
     }) as CollectionRecord
 
+  /** The log the app kept before collections were runs */
+  const writeLog = (dir: string, collections: CollectionRecord[]) =>
+    writeFileSync(
+      path.join(dir, COLLECTIONS_FILE),
+      JSON.stringify({ version: 1, collections })
+    )
+
   it('counts tokens per day, mentions and collections apart', () => {
     const store = new HistoryStore(root)
     const init = {
@@ -155,30 +162,49 @@ describe('token stats', () => {
       .start(init, new Date(2026, 9, 11, 9))
       .finish('failed', {}, new Date(2026, 9, 11, 9, 1))
 
-    addCollection(
-      root,
-      collection(new Date(2026, 9, 11, 10), {
-        usage: usage({ input: 2000, cacheRead: 9000, cacheWrite: 500 }),
+    // Collections are runs the app writes...
+    const collected = store.startCollection(
+      { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+      new Date(2026, 9, 11, 10)
+    )
+    collected.event({
+      kind: 'usage',
+      at: AT,
+      inputTokens: 2000,
+      cacheReadTokens: 9000,
+      cacheWriteTokens: 500,
+    })
+    collected.finish(
+      'succeeded',
+      { reads: 20, found: { added: 2, maybe: 1, skipped: 0 } },
+      new Date(2026, 9, 11, 10, 1)
+    )
+    store
+      .startCollection(
+        { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+        new Date(2026, 9, 11, 11)
+      )
+      .finish('interrupted', { error: 'Stopped.' }, new Date(2026, 9, 11, 11))
+    // ... and the log the app kept before still counts, inside the 14 days.
+    writeLog(root, [
+      collection(new Date(2026, 9, 9, 10), {
+        added: 1,
+        maybe: 0,
+        usage: usage({ output: 100 }),
       }),
-      now
-    )
-    addCollection(
-      root,
-      collection(new Date(2026, 9, 11, 11), {
-        ok: false,
-        error: 'Stopped.',
-      } as Partial<CollectionRecord>),
-      now
-    )
-    // Outside the 14 days
-    addCollection(
-      root,
       collection(new Date(2026, 8, 1, 10), { usage: usage({ input: 1 }) }),
-      now
-    )
+    ])
 
-    const { tokens } = new HistoryReader(root).stats(now)
+    const { tokens, total, byStatus } = new HistoryReader(root).stats(now)
+    // The run figures are the answers'.
+    expect(total).toBe(2)
+    expect(byStatus).toMatchObject({ succeeded: 1, failed: 1, interrupted: 0 })
     expect(tokens.daily).toHaveLength(14)
+    expect(tokens.daily.at(-3)).toEqual({
+      day: '2026-10-09',
+      mentions: usage({}),
+      collections: usage({ output: 100 }),
+    })
     expect(tokens.daily.at(-2)).toEqual({
       day: '2026-10-10',
       mentions: usage({ input: 4000, cacheRead: 30_000, output: 600 }),
@@ -194,28 +220,76 @@ describe('token stats', () => {
       usage: usage({ input: 4000, cacheRead: 30_000, output: 600 }),
     })
     expect(tokens.collections).toEqual({
-      count: 2,
-      found: 3,
-      usage: usage({ input: 2000, cacheRead: 9000, cacheWrite: 500 }),
+      count: 3,
+      found: 4,
+      usage: usage({
+        input: 2000,
+        cacheRead: 9000,
+        cacheWrite: 500,
+        output: 100,
+      }),
     })
   })
 
-  it('keeps 90 days of collections and lists the last 7 newest first', () => {
+  it('lists the last 7 days of collections newest first, runs and the old log', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-collections-'))
     try {
       expect(readCollections(dir)).toEqual([])
-      addCollection(dir, collection(new Date(2026, 6, 1), {}), now)
-      addCollection(dir, collection(new Date(2026, 9, 1), {}), now)
-      addCollection(dir, collection(new Date(2026, 9, 10), {}), now)
-      addCollection(dir, collection(new Date(2026, 9, 11), {}), now)
-      // The one from July is past 90 days by the second write.
-      expect(readCollections(dir)).toHaveLength(3)
-      expect(
-        recentCollections(dir, now).map((entry) => entry.startedAt)
-      ).toEqual([
-        new Date(2026, 9, 11).toISOString(),
-        new Date(2026, 9, 10).toISOString(),
+      const store = new HistoryStore(dir)
+      const backend = { reasoner: 'claude', sandbox: 'host' }
+      const done = store.startCollection(
+        { trigger: 'now', backend },
+        new Date(2026, 9, 11, 9)
+      )
+      done.event({ kind: 'usage', at: AT, inputTokens: 300, outputTokens: 50 })
+      done.finish(
+        'succeeded',
+        { reads: 12, found: { added: 1, maybe: 0, skipped: 2 } },
+        new Date(2026, 9, 11, 9, 1)
+      )
+      store
+        .startCollection({ trigger: 'now', backend }, new Date(2026, 9, 10, 9))
+        .finish(
+          'failed',
+          { reads: 0, error: 'Claude Code has no Slack connector.' },
+          new Date(2026, 9, 10, 9)
+        )
+      // Still running: not a row yet
+      store.startCollection(
+        { trigger: 'now', backend },
+        new Date(2026, 9, 11, 17)
+      )
+      writeLog(dir, [
+        collection(new Date(2026, 9, 9), {}),
+        collection(new Date(2026, 9, 1), {}),
       ])
+
+      const runs = new HistoryReader(dir).collections(new Date(2026, 9, 4))
+      expect(runs).toHaveLength(3)
+      const rows = recentCollections(dir, runs, now)
+      expect(rows.map((row) => row.startedAt)).toEqual([
+        new Date(2026, 9, 11, 9).toISOString(),
+        new Date(2026, 9, 10, 9).toISOString(),
+        new Date(2026, 9, 9).toISOString(),
+      ])
+      expect(rows[0]).toMatchObject({
+        ok: true,
+        added: 1,
+        maybe: 0,
+        skipped: 2,
+        reads: 12,
+        trigger: 'now',
+        runId: done.id,
+        usage: usage({ input: 300, output: 50 }),
+      })
+      expect(rows[1]).toMatchObject({
+        ok: false,
+        error: 'Claude Code has no Slack connector.',
+      })
+      // The old log's have no run to open.
+      expect(rows[2]!.runId).toBeUndefined()
+      expect(latestCollection(dir, runs)?.runId).toBe(done.id)
+
       writeFileSync(path.join(dir, COLLECTIONS_FILE), 'not json')
       expect(readCollections(dir)).toEqual([])
     } finally {

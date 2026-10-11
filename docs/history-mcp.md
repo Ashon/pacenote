@@ -49,6 +49,9 @@ when it needs it (stdio, no port). Pacenote does not need to be running.
 
 ## Tools
 
+The run tools return Pace's answers to mentions. The task collections the app keeps in the run history stay out: they read
+your own Slack.
+
 | Tool | What it returns |
 | --- | --- |
 | `recent_runs` | The latest runs, newest first: id, status, when, channel, requester, the request, the reasoner, how many tools it used. `limit` (default 10, at most 50), `status` |

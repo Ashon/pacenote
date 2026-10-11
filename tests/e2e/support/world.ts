@@ -140,7 +140,9 @@ export class World {
 
   runs(): RunRecord[] {
     const reader = new HistoryReader(this.home)
-    return reader.list().map((summary) => reader.get(summary.id)!)
+    return reader
+      .list({ kind: 'mention' })
+      .map((summary) => reader.get(summary.id) as RunRecord)
   }
 
   claudeCalls(): ClaudeCall[] {

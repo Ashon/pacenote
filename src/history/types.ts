@@ -3,8 +3,9 @@ import type { MessengerId } from '../messengers/ids.js'
 import type { TokenUsage } from './usage.js'
 
 /**
- * Pacenote run history format. The bot writes it and the desktop app reads it.
- * (apps/web imports only the types) Location:
+ * Pacenote run history format. The bot writes the answers to mentions, the
+ * desktop app writes the task collections it runs (CollectionRunRecord), and
+ * the desktop app reads both. (apps/web imports only the types) Location:
  * <PACENOTE_DATA_DIR>/runs/<YYYY-MM-DD>/<run id>/run.json, outputs in
  * artifacts/ in the same directory. normalizeRunRecord reads older versions in
  * the current shape:
@@ -99,8 +100,11 @@ export interface RunOrigin {
   userName?: string
 }
 
+/** An answer to a mention */
 export interface RunRecord {
   version: number
+  /** Older records have none: every run was a mention */
+  kind?: 'mention'
   id: string
   status: RunStatus
   attempts: number
@@ -122,23 +126,67 @@ export interface RunRecord {
   cause?: FailureCause
 }
 
+/** What a run is: an answer to a mention, or a task collection */
+export type RunKind = 'mention' | 'collection'
+
+/**
+ * A task collection the desktop app ran, kept as a run beside the answers. Its
+ * tool calls stay, but not what the Slack connector returned nor the model's
+ * own words, which quote your messages; Pacenote's own tools (the rules,
+ * add_tasks, close_task) keep their arguments and answers.
+ */
+export interface CollectionRunRecord {
+  version: number
+  kind: 'collection'
+  id: string
+  status: RunStatus
+  attempts: number
+  startedAt: string
+  updatedAt: string
+  finishedAt?: string
+  durationMs?: number
+  /** How it started: Collect now on the Todo screen */
+  trigger: 'now'
+  backend: { reasoner: string; sandbox: string; model?: string }
+  events: RunEvent[]
+  /** Slack lookups it made */
+  reads?: number
+  /** What add_tasks kept, once it answered */
+  found?: { added: number; maybe: number; skipped: number }
+  error?: string
+}
+
+/** Any run in the history */
+export type HistoryRecord = RunRecord | CollectionRunRecord
+
+export const isCollection = (
+  record: HistoryRecord
+): record is CollectionRunRecord => record.kind === 'collection'
+
 /** Summary for the list screen */
 export interface RunSummary {
   id: string
+  kind: RunKind
   status: RunStatus
   startedAt: string
   durationMs?: number
-  messenger: MessengerId
+  /** Mentions only */
+  messenger?: MessengerId
+  /** Where a mention came from ("#ops"), or how a collection started */
   conversationLabel: string
   userName?: string
+  /** A mention's request, or what a collection did */
   request: string
   reasoner: string
   toolCalls: number
+  /** Slack lookups (collections) */
+  reads?: number
   outputs: number
   attempts: number
 }
 
 export interface RunQuery {
+  kind?: RunKind
   status?: RunStatus
   /** Text to search for in the request, conversation, user, and answer */
   q?: string
@@ -171,9 +219,25 @@ export interface TokenStats {
   collections: { count: number; found: number; usage: TokenUsage }
 }
 
-export function summarize(run: RunRecord): RunSummary {
+export function summarize(run: HistoryRecord): RunSummary {
+  if (isCollection(run))
+    return {
+      id: run.id,
+      kind: 'collection',
+      status: run.status,
+      startedAt: run.startedAt,
+      durationMs: run.durationMs,
+      conversationLabel: TRIGGER_LABEL[run.trigger],
+      request: collectionTitle(run),
+      reasoner: `${run.backend.reasoner}@${run.backend.sandbox}`,
+      toolCalls: run.events.filter((e) => e.kind === 'tool').length,
+      reads: run.reads ?? 0,
+      outputs: 0,
+      attempts: run.attempts,
+    }
   return {
     id: run.id,
+    kind: 'mention',
     status: run.status,
     startedAt: run.startedAt,
     durationMs: run.durationMs,
@@ -193,6 +257,33 @@ export function summarize(run: RunRecord): RunSummary {
   }
 }
 
+export const TRIGGER_LABEL: Record<CollectionRunRecord['trigger'], string> = {
+  now: 'Collect now',
+}
+
+/**
+ * What a collection did, as its title: "Added 2 tasks and 1 Maybe", "Nothing
+ * new to add", or why it stopped
+ */
+export function collectionTitle(run: CollectionRunRecord): string {
+  if (run.status === 'running') return 'Collecting'
+  if (run.found) {
+    const { added, maybe } = run.found
+    const parts = [
+      added && `${added} ${added === 1 ? 'task' : 'tasks'}`,
+      maybe && `${maybe} ${maybe === 1 ? 'Maybe' : 'Maybes'}`,
+    ].filter(Boolean)
+    return parts.length ? `Added ${parts.join(' and ')}` : 'Nothing new to add'
+  }
+  // The first sentence of why it stopped
+  const line = run.error?.trim().split('\n')[0] ?? ''
+  const reason = (/^(.+?[.!?])(\s|$)/.exec(line)?.[1] ?? line).replace(
+    /[.!?]$/,
+    ''
+  )
+  return reason || 'Stopped before it finished'
+}
+
 /** A version 1 record's Slack fields */
 interface SlackOrigin {
   channel: string
@@ -205,8 +296,18 @@ interface SlackOrigin {
   userName?: string
 }
 
+/** Any run.json as read from disk, in the current shape */
+export function normalizeHistoryRecord(
+  raw: HistoryRecord | (Omit<RunRecord, 'origin'> & { slack: SlackOrigin })
+): HistoryRecord {
+  return 'kind' in raw && raw.kind === 'collection'
+    ? raw
+    : normalizeRunRecord(raw as RunRecord)
+}
+
 /**
- * A run.json as read from disk, in the current shape whatever version wrote it
+ * A mention's run.json as read from disk, in the current shape whatever version
+ * wrote it
  */
 export function normalizeRunRecord(
   raw: RunRecord | (Omit<RunRecord, 'origin'> & { slack: SlackOrigin })

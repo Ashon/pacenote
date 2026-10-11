@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.js'
 import { HistoryReader } from '../src/history/reader.js'
 import { HistoryStore } from '../src/history/recorder.js'
+import type { RunRecord } from '../src/history/types.js'
 import { createLogger } from '../src/logger.js'
 import { InflightStore } from '../src/mention/inflight.js'
 import { MentionResponder } from '../src/mention/responder.js'
@@ -158,7 +159,7 @@ describe('mention run history', () => {
       toolCalls: 1,
       userName: 'alice',
     })
-    const run = reader.get(summary!.id)!
+    const run = reader.get(summary!.id) as RunRecord
     expect(run.request).toBe('check the status of web-01')
     expect(run.context.messages).toBe(2)
     expect(run.answer).toBe('It is *healthy*.')

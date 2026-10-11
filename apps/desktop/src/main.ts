@@ -19,6 +19,7 @@ import {
   Tray,
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
+import { HistoryStore } from '../../../src/history/recorder.js'
 import { handleLocalApi } from '../../../src/local-api.js'
 import { readBotStatus } from '../../../src/runtime/status.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
@@ -30,8 +31,7 @@ import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
 import {
-  addCollection,
-  readCollections,
+  latestCollection,
   recentCollections,
 } from '../../../src/tasks/collections.js'
 import { decide, tasksView } from '../../../src/tasks/store.js'
@@ -39,7 +39,7 @@ import type { TaskDecision } from '../../../src/tasks/types.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
-import { TaskCollector } from './task-collector.js'
+import { recordCollection, TaskCollector } from './task-collector.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 
@@ -69,6 +69,16 @@ const webDevUrl = app.isPackaged ? undefined : process.env.PACENOTE_WEB_DEV_URL
 const captureFile = process.env.PACENOTE_DESKTOP_CAPTURE
 const dataDir = resolveDataDir()
 const reader = new HistoryReader(dataDir)
+/**
+ * The app writes the task collections it runs into the run history (the bot
+ * writes its answers). A collection left running when the app last quit ended
+ * with it.
+ */
+const history = new HistoryStore(dataDir)
+history.interruptStale(new Set(), new Date(), 'collection')
+/** The last days' collection runs, newest first */
+const collectionRuns = (days: number) =>
+  reader.collections(new Date(Date.now() - days * 86_400_000))
 /**
  * With PACENOTE_DESKTOP_BOT=off the app does not manage the bot and only shows
  * history. Screen captures leave the bot alone. (PACENOTE_DESKTOP_BOT=on
@@ -182,8 +192,8 @@ const taskCollector = new TaskCollector({
   },
   toolPath,
   cwd: dataDir,
-  record: (entry) => addCollection(dataDir, entry),
-  last: readCollections(dataDir).at(-1),
+  recorder: (startedAt) => recordCollection(history, startedAt),
+  last: latestCollection(dataDir, collectionRuns(90)),
 })
 
 /** Sandbox status, allowed domains, apply jobs */
@@ -453,7 +463,7 @@ function registerBotIpc(): void {
     return {
       settings: current,
       collect: taskCollector.state,
-      collections: recentCollections(dataDir),
+      collections: recentCollections(dataDir, collectionRuns(7)),
       ...tasksView(dataDir, current.exclude),
     }
   })

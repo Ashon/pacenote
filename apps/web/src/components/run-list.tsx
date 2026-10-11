@@ -1,5 +1,5 @@
-import type { RunStatus, RunSummary } from '@history/types'
-import { ImageIcon, Wrench } from 'lucide-react'
+import type { RunKind, RunStatus, RunSummary } from '@history/types'
+import { AtSign, ImageIcon, ListChecks, Search, Wrench } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRuns } from '@/lib/api'
@@ -11,6 +11,12 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StatusDot } from './status'
+
+const KINDS: { value?: RunKind; label: string }[] = [
+  { label: 'All' },
+  { value: 'mention', label: 'Mentions' },
+  { value: 'collection', label: 'Task collections' },
+]
 
 const FILTERS: { value?: RunStatus; label: string }[] = [
   { label: 'All' },
@@ -32,7 +38,11 @@ function groupByDay(runs: RunSummary[]): { day: string; runs: RunSummary[] }[] {
   return groups
 }
 
-/** Run list column. The search query comes from the top bar (SearchField). */
+/**
+ * Run list column: every job Pacenote ran, answers to mentions and task
+ * collections, each saying what it was. The search query comes from the top
+ * bar (SearchField).
+ */
 export function RunList({
   q,
   selectedId,
@@ -42,41 +52,26 @@ export function RunList({
   selectedId?: string
   onSelect: (id: string) => void
 }) {
+  const [kind, setKind] = useState<RunKind>()
   const [status, setStatus] = useState<RunStatus>()
   const query = useDeferredValue(q)
-  const runs = useRuns({ status, q: query })
+  const runs = useRuns({ kind, status, q: query })
 
   return (
     <aside className="flex h-full w-full flex-col">
-      {/* The filter adapts to the column, which the viewer can resize: five
-          buttons when they fit, a select when not. */}
-      <div className="@container px-3 pt-4 pb-2">
-        <label className="flex h-7 items-center gap-1.5 rounded-lg bg-muted px-2.5 text-xs text-muted-foreground @min-[295px]:hidden">
-          Status
-          <select
-            value={status ?? ''}
-            onChange={(e) =>
-              setStatus((e.target.value || undefined) as RunStatus | undefined)
-            }
-            className="min-w-0 flex-1 bg-transparent font-medium text-foreground outline-none"
-          >
-            {FILTERS.map((filter) => (
-              <option key={filter.label} value={filter.value ?? ''}>
-                {filter.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {/* Status filter: one-line segmented control */}
-        <div className="hidden rounded-lg bg-muted p-0.5 @min-[295px]:flex">
-          {FILTERS.map((filter) => (
+      {/* What kind of job on top, the state as a select under it */}
+      <div className="space-y-2 px-3 pt-4 pb-2">
+        <div role="radiogroup" className="flex rounded-lg bg-muted p-0.5">
+          {KINDS.map((filter) => (
             <button
               key={filter.label}
               type="button"
-              onClick={() => setStatus(filter.value)}
+              role="radio"
+              aria-checked={kind === filter.value}
+              onClick={() => setKind(filter.value)}
               className={cn(
                 'h-6 flex-auto rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-colors',
-                status === filter.value
+                kind === filter.value
                   ? 'bg-card text-foreground shadow-xs dark:bg-selected'
                   : 'text-muted-foreground hover:text-foreground'
               )}
@@ -85,6 +80,22 @@ export function RunList({
             </button>
           ))}
         </div>
+        <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-xs text-muted-foreground">
+          Status
+          <select
+            value={status ?? ''}
+            onChange={(e) =>
+              setStatus((e.target.value || undefined) as RunStatus | undefined)
+            }
+            className="bg-transparent font-medium text-foreground outline-none"
+          >
+            {FILTERS.map((filter) => (
+              <option key={filter.label} value={filter.value ?? ''}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2 pb-3">
@@ -110,7 +121,9 @@ export function RunList({
             <p className="px-3 py-10 text-center text-sm text-muted-foreground">
               {q || status
                 ? 'No runs match the filters.'
-                : 'Pace has not answered any mentions yet.'}
+                : kind === 'collection'
+                  ? 'No task collections yet. Collect now on the Todo screen runs one.'
+                  : 'Pace has not answered any mentions yet.'}
             </p>
           )}
           {runs.isError && (
@@ -125,9 +138,10 @@ export function RunList({
 }
 
 /**
- * One-line summary: status, request (up to two lines), channel and time,
- * tool/image counts and duration. The requester is shown in the detail view and
- * the tooltip.
+ * One job: status, what it was about (a mention's request, a collection's
+ * outcome; up to two lines), its kind with where it came from and when, and
+ * its counts and duration. A mention's requester is shown in the detail view
+ * and the tooltip.
  */
 function RunListItem({
   run,
@@ -140,6 +154,7 @@ function RunListItem({
   selected: boolean
   onSelect: () => void
 }) {
+  const collection = run.kind === 'collection'
   return (
     <button
       type="button"
@@ -159,8 +174,21 @@ function RunListItem({
             <span className="text-muted-foreground">(empty request)</span>
           )}
         </span>
-        <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="truncate">{run.conversationLabel}</span>
+        <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground [&_svg]:size-3 [&_svg]:shrink-0">
+          {/* What it was: a mention from a channel, or a task collection */}
+          {collection ? (
+            <>
+              <ListChecks />
+              <span className="truncate font-medium text-foreground/70">
+                Task collection
+              </span>
+            </>
+          ) : (
+            <>
+              <AtSign aria-label="Mention" />
+              <span className="truncate">{run.conversationLabel}</span>
+            </>
+          )}
           <span className="shrink-0 text-muted-foreground/60">·</span>
           <span className="shrink-0 tabular-nums">
             {today
@@ -168,15 +196,21 @@ function RunListItem({
               : formatHourMinute(run.startedAt)}
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2 tabular-nums">
-            {run.toolCalls > 0 && (
+            {collection && (
               <span className="flex items-center gap-0.5">
-                <Wrench className="size-3" />
+                <Search />
+                {run.reads ?? 0}
+              </span>
+            )}
+            {!collection && run.toolCalls > 0 && (
+              <span className="flex items-center gap-0.5">
+                <Wrench />
                 {run.toolCalls}
               </span>
             )}
             {run.outputs > 0 && (
               <span className="flex items-center gap-0.5">
-                <ImageIcon className="size-3" />
+                <ImageIcon />
                 {run.outputs}
               </span>
             )}

@@ -11,15 +11,17 @@ import {
   RUNS_DIR,
 } from './layout.js'
 import {
-  normalizeRunRecord,
+  isCollection,
+  normalizeHistoryRecord,
   summarize,
+  type CollectionRunRecord,
+  type HistoryRecord,
   type RunQuery,
-  type RunRecord,
   type RunStats,
   type RunStatus,
   type RunSummary,
 } from './types.js'
-import { addUsage, NO_USAGE, runUsage } from './usage.js'
+import { addUsage, NO_USAGE, runUsage, type TokenUsage } from './usage.js'
 
 /**
  * Reads run history. Used by the desktop app. Uses the cache when a file has
@@ -28,7 +30,7 @@ import { addUsage, NO_USAGE, runUsage } from './usage.js'
 export class HistoryReader {
   private readonly cache = new Map<
     string,
-    { mtimeMs: number; record: RunRecord }
+    { mtimeMs: number; record: HistoryRecord }
   >()
 
   constructor(readonly root: string) {}
@@ -38,6 +40,7 @@ export class HistoryReader {
     const q = query.q?.trim().toLowerCase()
     const result: RunSummary[] = []
     for (const record of this.records()) {
+      if (query.kind && (record.kind ?? 'mention') !== query.kind) continue
       if (query.status && record.status !== query.status) continue
       if (q && !matches(record, q)) continue
       result.push(summarize(record))
@@ -46,7 +49,20 @@ export class HistoryReader {
     return result
   }
 
-  get(id: string): RunRecord | undefined {
+  /** Task collection runs started since, newest first */
+  collections(since: Date): CollectionRunRecord[] {
+    const from = since.getTime()
+    const firstDay = dayDirFor(since)
+    const result: CollectionRunRecord[] = []
+    for (const record of this.records()) {
+      if ((dayOf(record.id) ?? '') < firstDay) break
+      if (isCollection(record) && Date.parse(record.startedAt) >= from)
+        result.push(record)
+    }
+    return result
+  }
+
+  get(id: string): HistoryRecord | undefined {
     const dir = this.runDir(id)
     return dir ? this.load(path.join(dir, RUN_FILE)) : undefined
   }
@@ -87,7 +103,39 @@ export class HistoryReader {
     let total = 0
     let durationSum = 0
     let durationCount = 0
+    // Collections the app logged before they were runs
+    // (tasks-collections.json, no longer written): read until they age out.
+    const collections = { count: 0, found: 0, usage: NO_USAGE }
+    const addCollection = (
+      startedAt: string,
+      found: number,
+      usage: TokenUsage | undefined
+    ) => {
+      const tokenDay = tokenDays.get(dayDirFor(new Date(startedAt)))
+      if (!tokenDay) return
+      collections.count += 1
+      collections.found += found
+      if (!usage) return
+      tokenDay.collections = addUsage(tokenDay.collections, usage)
+      collections.usage = addUsage(collections.usage, usage)
+    }
+    for (const entry of readCollections(this.root))
+      addCollection(
+        entry.startedAt,
+        entry.ok ? entry.added + entry.maybe : 0,
+        entry.usage
+      )
     for (const record of this.records()) {
+      // The run figures (status, days, duration, tools) are the answers';
+      // collections count only toward tokens.
+      if (isCollection(record)) {
+        addCollection(
+          record.startedAt,
+          record.found ? record.found.added + record.found.maybe : 0,
+          runUsage(record.events)
+        )
+        continue
+      }
       total += 1
       byStatus[record.status] += 1
       const day = daily.get(dayOf(record.id) ?? '')
@@ -112,16 +160,6 @@ export class HistoryReader {
         tools.set(name, (tools.get(name) ?? 0) + 1)
       }
     }
-    const collections = { count: 0, found: 0, usage: NO_USAGE }
-    for (const entry of readCollections(this.root)) {
-      const tokenDay = tokenDays.get(dayDirFor(new Date(entry.startedAt)))
-      if (!tokenDay) continue
-      collections.count += 1
-      if (entry.ok) collections.found += entry.added + entry.maybe
-      if (!entry.usage) continue
-      tokenDay.collections = addUsage(tokenDay.collections, entry.usage)
-      collections.usage = addUsage(collections.usage, entry.usage)
-    }
     return {
       total,
       byStatus,
@@ -142,7 +180,7 @@ export class HistoryReader {
   }
 
   /** Newest runs first */
-  private *records(): Generator<RunRecord> {
+  private *records(): Generator<HistoryRecord> {
     const runsDir = path.join(this.root, RUNS_DIR)
     if (!existsSync(runsDir)) return
     const days = readdirSync(runsDir).filter(isDayDir).sort().reverse()
@@ -158,13 +196,13 @@ export class HistoryReader {
     }
   }
 
-  private load(file: string): RunRecord | undefined {
+  private load(file: string): HistoryRecord | undefined {
     try {
       const { mtimeMs } = statSync(file)
       const cached = this.cache.get(file)
       if (cached?.mtimeMs === mtimeMs) return cached.record
-      const record = normalizeRunRecord(
-        JSON.parse(readFileSync(file, 'utf8')) as RunRecord
+      const record = normalizeHistoryRecord(
+        JSON.parse(readFileSync(file, 'utf8')) as HistoryRecord
       )
       this.cache.set(file, { mtimeMs, record })
       return record
@@ -179,7 +217,11 @@ export class HistoryReader {
   }
 }
 
-function matches(record: RunRecord, q: string): boolean {
+function matches(record: HistoryRecord, q: string): boolean {
+  if (isCollection(record))
+    return [summarize(record).request, record.error ?? '', record.id].some(
+      (value) => value.toLowerCase().includes(q)
+    )
   return [
     record.request,
     record.origin.conversationLabel,

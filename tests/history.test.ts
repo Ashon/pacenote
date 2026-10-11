@@ -218,7 +218,7 @@ describe('run history', () => {
       outputs: 1,
       reasoner: 'codex@docker',
     })
-    expect(reader.get(run.id)?.answer).toBe('OK')
+    expect((reader.get(run.id) as RunRecord | undefined)?.answer).toBe('OK')
     expect(reader.artifactPath(run.id, 'figure-1.png')).toBe(
       path.join(run.dir, 'artifacts', 'figure-1.png')
     )

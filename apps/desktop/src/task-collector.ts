@@ -1,15 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
+import type { HistoryStore } from '../../../src/history/recorder.js'
+import type { RunEvent } from '../../../src/history/types.js'
 import {
   claudeResultUsage,
   type TokenUsage,
 } from '../../../src/history/usage.js'
-import type {
-  CollectionRecord,
-  CollectOutcome,
-  TasksCollect,
-} from '../../../src/tasks/types.js'
+import { claudeLineToEvents } from '../../../src/reasoners/claude.js'
+import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
 
 const SLACK = 'mcp__claude_ai_Slack__'
 /** The Slack connector's tools a collection may use: reading only */
@@ -44,6 +43,7 @@ const ADD_TASKS = 'mcp__pacenote__add_tasks'
 const TIMEOUT_MS = 10 * 60_000
 const NO_SLACK =
   "Claude Code has no Slack connector. Connect Slack in claude.ai's Settings > Connectors, then collect again."
+const STOPPED = 'Stopped.'
 const SIGNED_OUT =
   'Claude Code is not signed in. Run claude in a terminal and sign in, then collect again.'
 
@@ -218,10 +218,90 @@ function firstLine(text: string | undefined): string {
 }
 
 /**
- * Collect now on the Tasks screen: runs one collection at a time in Claude
+ * A collection's output as run history steps, keeping what is yours out: the
+ * model's own words (they quote your messages) are left out, and so are what a
+ * claude.ai connector's tools were asked and returned. Its tool calls stay
+ * (which tool, when, how long); Pacenote's own tools keep their arguments and
+ * answers.
+ */
+export class CollectionEvents {
+  private readonly connectorCalls = new Set<string>()
+
+  from(line: string, at?: string): RunEvent[] {
+    const kept: RunEvent[] = []
+    for (const event of claudeLineToEvents(line, at)) {
+      if (event.kind === 'message' || event.kind === 'reasoning') continue
+      if (event.kind !== 'tool') {
+        kept.push(event)
+        continue
+      }
+      if (event.server.startsWith('claude_ai_'))
+        this.connectorCalls.add(event.id)
+      if (!this.connectorCalls.has(event.id)) {
+        kept.push(event)
+        continue
+      }
+      kept.push({
+        kind: 'tool',
+        id: event.id,
+        at: event.at,
+        server: event.server,
+        tool: event.tool,
+        status: event.status,
+        finishedAt: event.finishedAt,
+      })
+    }
+    return kept
+  }
+}
+
+/** Where a collection's run goes, as it runs (the run history in the app) */
+export interface CollectionRecorder {
+  event(event: RunEvent): void
+  finish(outcome: CollectOutcome): void
+}
+
+/**
+ * A collection's run in the history: Claude Code on this Mac, started by
+ * Collect now. It ends succeeded when add_tasks answered, interrupted when
+ * stopped, failed otherwise.
+ */
+export function recordCollection(
+  history: Pick<HistoryStore, 'startCollection'>,
+  startedAt: Date
+): CollectionRecorder {
+  const run = history.startCollection(
+    { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+    startedAt
+  )
+  return {
+    event: (event) => run.event(event),
+    finish: (outcome) =>
+      run.finish(
+        outcome.ok
+          ? 'succeeded'
+          : outcome.error === STOPPED
+            ? 'interrupted'
+            : 'failed',
+        outcome.ok
+          ? {
+              reads: outcome.reads,
+              found: {
+                added: outcome.added,
+                maybe: outcome.maybe,
+                skipped: outcome.skipped,
+              },
+            }
+          : { reads: outcome.reads, error: outcome.error },
+        new Date(outcome.at)
+      ),
+  }
+}
+
+/**
+ * Collect now on the Todo screen: runs one collection at a time in Claude
  * Code (collectCommand) and keeps its progress and how the last one ended, for
- * the screen to show. Each finished collection goes to record (the log in the
- * data folder).
+ * the screen to show. Each collection is recorded as a run as it goes.
  */
 export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
   private child?: ChildProcess
@@ -238,9 +318,9 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       toolPath: () => string
       /** Where Claude Code runs: the data folder, with no project settings */
       cwd: string
-      /** Keeps a finished collection (src/tasks/collections.ts) */
-      record?: (entry: CollectionRecord) => void
-      /** How the last one ended, from the log, so the screen has it at start */
+      /** Starts the run that records a collection */
+      recorder?: (startedAt: Date) => CollectionRecorder
+      /** How the last one ended, from the history, so the screen has it */
       last?: CollectOutcome
       /** For tests: the command in place of claude */
       command?: [string, string[]]
@@ -269,6 +349,10 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     const stream = new CollectStream()
     const startedAt = this.now()
     this.set({ last: this.current.last, running: { startedAt, reads: 0 } })
+    const steps = new CollectionEvents()
+    const recorder = this.keep(() =>
+      this.options.recorder?.(new Date(startedAt))
+    )
 
     return new Promise((resolve) => {
       let settled = false
@@ -282,11 +366,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         this.child = undefined
         const last = stream.outcome(this.now(), fallback)
         this.set({ last })
-        try {
-          this.options.record?.({ ...last, startedAt, trigger: 'now' })
-        } catch {
-          // A collection the log could not keep still ends as it did.
-        }
+        this.keep(() => recorder?.finish(last))
         resolve(last)
       }
       const [command, args] =
@@ -320,8 +400,12 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         let end: number
         while ((end = buffer.indexOf('\n')) >= 0) {
           const before = stream.reads
-          stream.push(buffer.slice(0, end))
+          const line = buffer.slice(0, end)
+          stream.push(line)
           buffer = buffer.slice(end + 1)
+          if (recorder)
+            for (const step of steps.from(line, this.now()))
+              this.keep(() => recorder.event(step))
           const running = this.current.running
           if (stream.reads !== before && running)
             this.set({
@@ -331,10 +415,15 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         }
       })
       child.on('close', (code) => {
-        if (buffer) stream.push(buffer)
+        if (buffer) {
+          stream.push(buffer)
+          if (recorder)
+            for (const step of steps.from(buffer, this.now()))
+              this.keep(() => recorder.event(step))
+        }
         finish(
           this.cancelled
-            ? 'Stopped.'
+            ? STOPPED
             : code !== 0 && !stream.ended
               ? firstLine(stderr) || `claude exited with code ${code}.`
               : undefined
@@ -347,6 +436,15 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     if (!this.child) return
     this.cancelled = true
     this.child.kill('SIGTERM')
+  }
+
+  /** History that cannot be written never stops a collection */
+  private keep<T>(write: () => T): T | undefined {
+    try {
+      return write()
+    } catch {
+      return undefined
+    }
   }
 
   private set(state: TasksCollect): void {

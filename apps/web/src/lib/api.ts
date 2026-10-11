@@ -1,5 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import type { RunRecord, RunStats, RunStatus, RunSummary } from '@history/types'
+import type {
+  HistoryRecord,
+  RunKind,
+  RunStats,
+  RunStatus,
+  RunSummary,
+} from '@history/types'
 import type { BotStatusView, LogLine } from '@runtime/types'
 
 /**
@@ -16,16 +22,23 @@ export const artifactUrl = (id: string, file: string) =>
   `/api/runs/${encodeURIComponent(id)}/artifacts/${encodeURIComponent(file)}`
 
 export interface RunFilter {
+  kind?: RunKind
   status?: RunStatus
   q?: string
 }
 
 export function useRuns(filter: RunFilter) {
   const params = new URLSearchParams()
+  if (filter.kind) params.set('kind', filter.kind)
   if (filter.status) params.set('status', filter.status)
   if (filter.q?.trim()) params.set('q', filter.q.trim())
   return useQuery({
-    queryKey: ['runs', filter.status ?? '', filter.q?.trim() ?? ''],
+    queryKey: [
+      'runs',
+      filter.kind ?? '',
+      filter.status ?? '',
+      filter.q?.trim() ?? '',
+    ],
     queryFn: () => getJson<RunSummary[]>(`/api/runs?${params}`),
     placeholderData: keepPreviousData,
     refetchInterval: 3_000,
@@ -35,7 +48,8 @@ export function useRuns(filter: RunFilter) {
 export function useRun(id: string | undefined) {
   return useQuery({
     queryKey: ['run', id],
-    queryFn: () => getJson<RunRecord>(`/api/runs/${encodeURIComponent(id!)}`),
+    queryFn: () =>
+      getJson<HistoryRecord>(`/api/runs/${encodeURIComponent(id!)}`),
     enabled: Boolean(id),
     refetchInterval: (query) =>
       query.state.data?.status === 'running' ? 1_500 : false,

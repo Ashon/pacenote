@@ -81,9 +81,11 @@ export async function handleLocalApi(
 
   if (parts.length === 1) {
     const status = url.searchParams.get('status') as RunStatus | null
+    const kind = url.searchParams.get('kind')
     const limit = Number(url.searchParams.get('limit') ?? '') || undefined
     return json(
       reader.list({
+        kind: kind === 'mention' || kind === 'collection' ? kind : undefined,
         status: status && STATUSES.has(status) ? status : undefined,
         q: url.searchParams.get('q') ?? undefined,
         limit,

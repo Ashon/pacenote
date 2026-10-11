@@ -6,6 +6,7 @@ import type {
   TasksCollect,
 } from '@src/tasks/types'
 import {
+  ChevronRight,
   CircleCheck,
   ExternalLink,
   History,
@@ -294,7 +295,8 @@ const RECENT_SHOWN = 10
 
 /**
  * The collections the app ran in the last 7 days: when, how each ended, and
- * the new tokens it spent (the Overview has them per day)
+ * the new tokens it spent (the Overview has them per day). A row opens the
+ * collection's run in Runs; the old log's rows have none.
  */
 function RecentCollections({
   collections,
@@ -325,39 +327,38 @@ function RecentCollections({
       </div>
       <ul className="mt-4 text-[13px]">
         {collections.slice(0, RECENT_SHOWN).map((entry, index) => (
-          <li
-            key={entry.startedAt}
-            className="grid grid-cols-[7.25rem_6.75rem_minmax(0,1fr)_11rem] items-center gap-x-4 border-t border-border py-2.5"
-          >
-            <span className="font-medium tabular-nums">
-              {formatShortDay(entry.startedAt)}{' '}
-              {formatHourMinute(entry.startedAt)}
-            </span>
-            <span>
-              <Badge variant="outline">{TRIGGER_LABEL[entry.trigger]}</Badge>
-            </span>
-            <span
-              title={collectionNote(entry)}
-              className={cn(
-                'truncate text-xs',
-                entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
-              )}
-            >
-              {collectionNote(entry)}
-            </span>
-            <span className="flex items-center justify-end gap-2.5 text-xs">
-              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
-                {spent[index]! > 0 && (
-                  <span
-                    className="block h-full min-w-1.5 rounded-full bg-chart-4"
-                    style={{ width: `${(spent[index]! / max) * 100}%` }}
-                  />
+          <li key={entry.startedAt} className="border-t border-border">
+            <CollectionRow entry={entry}>
+              <span className="font-medium tabular-nums">
+                {formatShortDay(entry.startedAt)}{' '}
+                {formatHourMinute(entry.startedAt)}
+              </span>
+              <span>
+                <Badge variant="outline">{TRIGGER_LABEL[entry.trigger]}</Badge>
+              </span>
+              <span
+                title={collectionNote(entry)}
+                className={cn(
+                  'truncate text-xs',
+                  entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
                 )}
+              >
+                {collectionNote(entry)}
               </span>
-              <span className="w-16 text-right font-medium tabular-nums">
-                {spent[index] ? `${formatTokens(spent[index]!)} new` : '-'}
+              <span className="flex items-center justify-end gap-2.5 text-xs">
+                <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
+                  {spent[index]! > 0 && (
+                    <span
+                      className="block h-full min-w-1.5 rounded-full bg-chart-4"
+                      style={{ width: `${(spent[index]! / max) * 100}%` }}
+                    />
+                  )}
+                </span>
+                <span className="w-16 text-right font-medium tabular-nums">
+                  {spent[index] ? `${formatTokens(spent[index]!)} new` : '-'}
+                </span>
               </span>
-            </span>
+            </CollectionRow>
           </li>
         ))}
       </ul>
@@ -367,6 +368,39 @@ function RecentCollections({
         </p>
       )}
     </section>
+  )
+}
+
+const ROW =
+  'grid grid-cols-[7.25rem_6.75rem_minmax(0,1fr)_11rem_1rem] items-center gap-x-4 py-2.5'
+
+/** A collection's row: a link to its run when it has one */
+function CollectionRow({
+  entry,
+  children,
+}: {
+  entry: CollectionRecord
+  children: React.ReactNode
+}) {
+  if (!entry.runId)
+    return (
+      <div className={ROW}>
+        {children}
+        <span />
+      </div>
+    )
+  return (
+    <a
+      href={`#/runs/${entry.runId}`}
+      title="Open this collection's run"
+      className={cn(
+        ROW,
+        'group -mx-2 rounded-lg px-2 transition-colors hover:bg-selected/50'
+      )}
+    >
+      {children}
+      <ChevronRight className="size-4 text-muted-foreground/50 group-hover:text-foreground" />
+    </a>
   )
 }
 

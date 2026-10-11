@@ -22,9 +22,12 @@ import {
   RUNS_DIR,
 } from './layout.js'
 import {
-  normalizeRunRecord,
+  normalizeHistoryRecord,
   RUN_RECORD_VERSION,
+  type CollectionRunRecord,
+  type HistoryRecord,
   type RunEvent,
+  type RunKind,
   type RunRecord,
   type RunStatus,
 } from './types.js'
@@ -46,7 +49,12 @@ const clip = (text: string, max: number) =>
 
 export type RunInit = Pick<RunRecord, 'origin' | 'request' | 'backend'>
 
-/** Writes run history files. Used only in the bot process. */
+export type CollectionInit = Pick<CollectionRunRecord, 'trigger' | 'backend'>
+
+/**
+ * Writes run history files: the bot writes the answers to mentions, the desktop
+ * app the task collections it runs. Each leaves the other's runs alone.
+ */
 export class HistoryStore {
   constructor(
     readonly root: string,
@@ -75,19 +83,44 @@ export class HistoryStore {
     return handle
   }
 
-  /** Reopens an existing record when resuming after a restart. */
+  /** A task collection's run, written by the desktop app */
+  startCollection(
+    init: CollectionInit,
+    now = new Date()
+  ): RunHandle<CollectionRunRecord> {
+    const id = runIdFor(now, randomBytes(3).toString('hex'))
+    const at = now.toISOString()
+    const record: CollectionRunRecord = {
+      version: RUN_RECORD_VERSION,
+      kind: 'collection',
+      id,
+      status: 'running',
+      attempts: 1,
+      startedAt: at,
+      updatedAt: at,
+      ...init,
+      events: [],
+    }
+    const handle = new RunHandle(record, this.runDir(id)!, this.log)
+    handle.flush()
+    return handle
+  }
+
+  /** Reopens an answer's record when resuming after a restart. */
   reopen(id: string): RunHandle | undefined {
     const record = this.read(id)
-    if (!record) return undefined
+    if (!record || record.kind === 'collection') return undefined
     return new RunHandle(record, this.runDir(id)!, this.log)
   }
 
-  read(id: string): RunRecord | undefined {
+  read(id: string): HistoryRecord | undefined {
     const dir = this.runDir(id)
     if (!dir) return undefined
     try {
-      return normalizeRunRecord(
-        JSON.parse(readFileSync(path.join(dir, RUN_FILE), 'utf8')) as RunRecord
+      return normalizeHistoryRecord(
+        JSON.parse(
+          readFileSync(path.join(dir, RUN_FILE), 'utf8')
+        ) as HistoryRecord
       )
     } catch {
       return undefined
@@ -95,11 +128,17 @@ export class HistoryStore {
   }
 
   /**
-   * At startup, marks runs still left running that will not be resumed as
-   * interrupted. Ids in keep belong to runs that will be resumed, so they are
+   * At startup, marks runs of a kind still left running that will not be
+   * resumed as interrupted: the bot its answers, the desktop app its
+   * collections. Ids in keep belong to runs that will be resumed, so they are
    * left alone.
    */
-  interruptStale(keep: ReadonlySet<string>, now = new Date()): number {
+  interruptStale(
+    keep: ReadonlySet<string>,
+    now = new Date(),
+    kind: RunKind = 'mention'
+  ): number {
+    const who = kind === 'mention' ? 'the bot' : 'the app'
     let count = 0
     for (const day of this.days().slice(0, 7)) {
       const dayDir = path.join(this.root, RUNS_DIR, day)
@@ -107,15 +146,22 @@ export class HistoryStore {
         if (keep.has(id)) continue
         const record = this.read(id)
         if (record?.status !== 'running') continue
-        const handle = new RunHandle(record, path.join(dayDir, id), this.log)
+        if ((record.kind ?? 'mention') !== kind) continue
+        const handle = new RunHandle<HistoryRecord>(
+          record,
+          path.join(dayDir, id),
+          this.log
+        )
         handle.event({
           kind: 'note',
           at: now.toISOString(),
-          text: 'Interrupted because the bot restarted',
+          text: `Interrupted because ${who} restarted`,
         })
         handle.finish(
           'interrupted',
-          { error: 'Interrupted by bot restart' },
+          {
+            error: `Interrupted by ${kind === 'mention' ? 'bot' : 'app'} restart`,
+          },
           now
         )
         count += 1
@@ -159,7 +205,7 @@ export class HistoryStore {
  * The record of one run. Batches changes briefly, then rewrites run.json in
  * full.
  */
-export class RunHandle {
+export class RunHandle<R extends HistoryRecord = RunRecord> {
   private timer?: NodeJS.Timeout
   private dropped = false
   /**
@@ -169,7 +215,7 @@ export class RunHandle {
   private idPrefix: string
 
   constructor(
-    readonly record: RunRecord,
+    readonly record: R,
     readonly dir: string,
     private readonly log?: Logger
   ) {
@@ -195,12 +241,12 @@ export class RunHandle {
     })
   }
 
-  patch(fields: Partial<Omit<RunRecord, 'id' | 'version' | 'events'>>): void {
+  patch(fields: Partial<Omit<R, 'id' | 'version' | 'events'>>): void {
     Object.assign(this.record, fields)
     this.schedule()
   }
 
-  setPrompt(system: string, user: string): void {
+  setPrompt(this: RunHandle<RunRecord>, system: string, user: string): void {
     this.patch({
       prompt: { system, user: clip(user, MAX_PROMPT_CHARS) },
     })
@@ -274,7 +320,7 @@ export class RunHandle {
 
   finish(
     status: Exclude<RunStatus, 'running'>,
-    fields: Partial<RunRecord> = {},
+    fields: Partial<R> = {},
     now = new Date()
   ): void {
     Object.assign(this.record, fields)

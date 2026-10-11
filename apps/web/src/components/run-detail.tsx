@@ -1,12 +1,8 @@
-import type { RunRecord } from '@history/types'
-import {
-  newTokens,
-  runUsage,
-  totalTokens,
-  type TokenUsage,
-} from '@history/usage'
+import { isCollection, type RunRecord } from '@history/types'
+import { newTokens, runUsage } from '@history/usage'
 import { MESSENGER_NAMES } from '@src/messengers/ids'
 import {
+  AtSign,
   Coins,
   Cpu,
   ExternalLink,
@@ -16,22 +12,15 @@ import {
   Timer,
   Wrench,
 } from 'lucide-react'
-import { Fragment } from 'react'
-import type * as React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip } from '@/components/ui/tooltip'
 import { artifactUrl, useRun } from '@/lib/api'
-import {
-  formatDateTime,
-  formatDuration,
-  formatNumber,
-  formatTokens,
-} from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
 import { CodeBlock } from './code-block'
+import { CollectionDetail } from './collection-detail'
+import { Empty, Fact, UsageTip } from './run-facts'
 import { StatusBadge } from './status'
 import { Timeline } from './timeline'
 
@@ -45,6 +34,7 @@ export function RunDetail({ id }: { id: string }) {
     )
   }
   if (!run) return null
+  if (isCollection(run)) return <CollectionDetail key={run.id} run={run} />
   return (
     <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
       <RunHeader run={run} />
@@ -97,6 +87,10 @@ function RunHeader({ run }: { run: RunRecord }) {
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <StatusBadge status={run.status} />
+          <Badge variant="secondary">
+            <AtSign />
+            Mention
+          </Badge>
           {run.attempts > 1 && (
             <Badge variant="secondary">{run.attempts} attempts</Badge>
           )}
@@ -197,91 +191,6 @@ function RunFacts({ run }: { run: RunRecord }) {
   )
 }
 
-function Fact({
-  icon,
-  label,
-  value,
-  hint,
-  tip,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-  hint?: string
-  /** More on hover over the value */
-  tip?: React.ReactNode
-}) {
-  const shown = (
-    <div className="mt-1 truncate text-sm font-semibold tabular-nums">
-      {value}
-    </div>
-  )
-  return (
-    <div className="min-w-0 px-4 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[40rem]:[&:nth-child(3)]:border-l-0 @max-[40rem]:[&:nth-child(3)]:pl-0">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
-        {icon}
-        <span className="truncate">{label}</span>
-      </div>
-      {tip ? <Tooltip content={tip}>{shown}</Tooltip> : shown}
-      {hint && (
-        <div className="truncate text-[11px] text-muted-foreground">{hint}</div>
-      )}
-    </div>
-  )
-}
-
-/**
- * A run's tokens in their four parts, with the total and the cached share.
- * The cost, when claude reported one, is at API prices: what the run would
- * cost with an API key.
- */
-function UsageTip({
-  usage,
-  cacheWrite,
-}: {
-  usage: TokenUsage
-  /** The reasoner reports cache writes (claude does, codex does not) */
-  cacheWrite: boolean
-}) {
-  const total = totalTokens(usage)
-  const rows: [string, string][] = [
-    ['New input', formatNumber(usage.input)],
-    ['Cache read', formatNumber(usage.cacheRead)],
-    ['Cache write', cacheWrite ? formatNumber(usage.cacheWrite) : '-'],
-    ['Output', formatNumber(usage.output)],
-  ]
-  return (
-    <div className="w-48 tabular-nums">
-      <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5">
-        {rows.map(([name, count]) => (
-          <Fragment key={name}>
-            <span className={cn(count === '-' && 'opacity-65')}>{name}</span>
-            <span
-              className={cn(
-                'text-right font-medium',
-                count === '-' && 'opacity-65'
-              )}
-            >
-              {count}
-            </span>
-          </Fragment>
-        ))}
-      </div>
-      <div className="mt-1.5 flex justify-between border-t border-background/15 pt-1.5 opacity-65">
-        <span>{formatNumber(total)} in total</span>
-        {total > 0 && (
-          <span>{Math.round((usage.cacheRead / total) * 100)}% cached</span>
-        )}
-      </div>
-      {usage.costUsd !== undefined && usage.costUsd > 0 && (
-        <div className="mt-0.5 opacity-65">
-          ${usage.costUsd.toFixed(3)} at API prices
-        </div>
-      )}
-    </div>
-  )
-}
-
 const ATTACHMENT_STATUS = {
   read: { label: 'Read', className: 'text-status-succeeded' },
   skipped: { label: 'Skipped', className: 'text-status-interrupted' },
@@ -334,13 +243,5 @@ function Attachments({ run }: { run: RunRecord }) {
         )
       })}
     </ul>
-  )
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="py-16 text-center text-sm text-muted-foreground">
-      {children}
-    </p>
   )
 }

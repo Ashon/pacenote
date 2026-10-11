@@ -58,6 +58,10 @@ Layout:
 - The top bar holds the run search (Cmd+K focuses it, Esc clears it). Typing a search opens Runs.
 - Runs shows the run list and the selected run side by side. The line between them can be dragged, and a double-click resets it.
   When the window is too narrow for both, Runs shows the list, and a picked run with a way back to it.
+- Runs lists every job Pacenote ran: answers to mentions and task collections. Each item says which it is, a mention with
+  its request and a collection with what it did ("Added 2 tasks and 1 Maybe"); the list filters by kind and by state. A
+  collection's detail has no chat: what it added, closed and left out, its lookups in Slack (which tool, when, how long;
+  what Slack returned is not kept), the rules Pacenote gave it, and the record.
 - The window can be as narrow as 600 pixels. Narrow screens stack their rows, and Settings shows its sections as icons.
 
 Bot management:
@@ -178,7 +182,7 @@ Run history:
 - Records contain thread context and attachment contents, so they stay local.
 - Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
   which are most of the input and cost far less.
-- UI: run list (status filter, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for
+- UI: run list (kind and status filters, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for
   mentions and task collections), run detail ("Timeline" of the work in the order request -> tool calls -> answer -> outputs,
   where Pace's mark looks around while it works and stays as the answer's avatar; "Attachments", "Prompt", raw "JSON"; the
   Tokens figure breaks down on hover). Runs in progress are reread every 1.5 seconds.

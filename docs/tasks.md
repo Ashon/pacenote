@@ -25,10 +25,14 @@ Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the c
   project`, in Pacenote's data folder), and the only built-in tool is ToolSearch. Pacenote passes its own MCP server, so it
   does not need to be added to Claude Code.
 - One collection runs at a time, for at most 10 minutes; Stop ends it.
-- When it ends, the screen says what it added, the new tokens it spent and how many Slack lookups it made. The app keeps
-  each collection it runs in `PACENOTE_DATA_DIR/tasks-collections.json` for 90 days: under the list, **Recent
-  collections** shows the last 7 days, and the Overview counts their tokens per day. A collection run from inside your
-  own AI tool spends that tool's tokens, so Pacenote does not see them.
+- When it ends, the screen says what it added, the new tokens it spent and how many Slack lookups it made. Each collection
+  the app runs is a run in the run history, beside the answers, and is kept as long as they are: under the list,
+  **Recent collections** shows the last 7 days and opens a collection's run in Runs, and the Overview counts their tokens
+  per day. A collection's run keeps its tool calls (which tool, when, how long), what Pacenote's own tools were given and
+  answered, and the tokens; not what Slack returned or the model's own words, which quote your messages. The run history
+  MCP leaves collections out. (v0.4.4 and v0.4.5 kept a log in `PACENOTE_DATA_DIR/tasks-collections.json`, which is still
+  read and no longer written.) A collection run from inside your own AI tool spends that tool's tokens, so Pacenote does
+  not see them.
 
 ### Collecting from inside your AI tool
 

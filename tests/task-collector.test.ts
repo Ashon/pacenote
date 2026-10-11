@@ -6,6 +6,8 @@ import {
   SLACK_WRITE_TOOLS,
   TaskCollector,
 } from '../apps/desktop/src/task-collector.js'
+import type { RunEvent } from '../src/history/types.js'
+import type { CollectOutcome } from '../src/tasks/types.js'
 
 const LAUNCH = {
   command: '/Applications/Pacenote.app/Contents/MacOS/Pacenote',
@@ -178,12 +180,20 @@ describe('collecting from the app with Claude Code', () => {
 
   it('runs one collection at a time, with its progress and how it ended', async () => {
     const changes: unknown[] = []
-    const logged: unknown[] = []
+    const started: Date[] = []
+    const steps: RunEvent[] = []
+    const ended: CollectOutcome[] = []
     const collector = new TaskCollector({
       launch: () => LAUNCH,
       toolPath: () => process.env.PATH ?? '',
       cwd: process.cwd(),
-      record: (entry) => logged.push(entry),
+      recorder: (startedAt) => {
+        started.push(startedAt)
+        return {
+          event: (step) => steps.push(step),
+          finish: (outcome) => ended.push(outcome),
+        }
+      },
       command: fake([
         init(),
         toolUse('2', 'mcp__claude_ai_Slack__slack_read_channel'),
@@ -213,10 +223,16 @@ describe('collecting from the app with Claude Code', () => {
       reads: 1,
     })
     expect(collector.state).toEqual({ last })
-    // The log gets the finished collection, not the one turned away.
-    expect(logged).toEqual([
-      { ...last, startedAt: '2026-10-11T05:00:00.000Z', trigger: 'now' },
+    // One run for the collection, none for the one turned away: its steps
+    // as they came, and how it ended.
+    expect(started).toEqual([new Date('2026-10-11T05:00:00.000Z')])
+    expect(steps.map((step) => step.kind)).toEqual([
+      'tool',
+      'tool',
+      'tool',
+      'usage',
     ])
+    expect(ended).toEqual([last])
     expect(changes).toContainEqual({
       last: undefined,
       running: { startedAt: '2026-10-11T05:00:00.000Z', reads: 1 },

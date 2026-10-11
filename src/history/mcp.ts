@@ -4,7 +4,13 @@ import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
 import { registerTaskTools, type TaskToolsOptions } from '../tasks/mcp.js'
 import type { HistoryReader } from './reader.js'
-import type { RunEvent, RunRecord, RunSummary, StepStatus } from './types.js'
+import {
+  isCollection,
+  type RunEvent,
+  type RunRecord,
+  type RunSummary,
+  type StepStatus,
+} from './types.js'
 import { runUsage } from './usage.js'
 
 /**
@@ -78,7 +84,9 @@ export function createHistoryServer({
     },
     ({ limit, status }) =>
       respond(enabled, () => ({
-        runs: reader.list({ status, limit: limit ?? 10 }).map(summary),
+        runs: reader
+          .list({ kind: 'mention', status, limit: limit ?? 10 })
+          .map(summary),
       }))
   )
 
@@ -111,7 +119,7 @@ export function createHistoryServer({
         if (from !== undefined && Number.isNaN(from))
           throw new Error(`since is not a date: ${since}`)
         const runs = reader
-          .list({ q: query, status, limit: 1000 })
+          .list({ kind: 'mention', q: query, status, limit: 1000 })
           .filter(
             (run) => from === undefined || Date.parse(run.startedAt) >= from
           )
@@ -141,8 +149,10 @@ export function createHistoryServer({
     },
     ({ id, include_prompt }) =>
       respond(enabled, () => {
+        // Task collections stay out: they read your own Slack.
         const record = reader.get(id)
-        if (!record) throw new Error(`No run with id ${id}`)
+        if (!record || isCollection(record))
+          throw new Error(`No run with id ${id}`)
         return { run: detail(record, include_prompt ?? false) }
       })
   )

@@ -2,9 +2,9 @@
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): AI
  * tools with a Slack connector add them through Pacenote's MCP server, which
  * writes tasks.json (src/tasks/store.ts); the desktop app writes your decisions
- * to tasks-decisions.json, and keeps a log of the collections it runs in
- * tasks-collections.json (src/tasks/collections.ts). Plain data, so the UI and
- * the MCP server read the same shapes.
+ * to tasks-decisions.json, and records the collections it runs as runs in the
+ * run history (src/tasks/collections.ts reads them for the Todo screen). Plain
+ * data, so the UI and the MCP server read the same shapes.
  */
 
 import type { TokenUsage } from '../history/usage.js'
@@ -108,12 +108,15 @@ export type CollectOutcome = (
 }
 
 /**
- * A collection in the log the app keeps (tasks-collections.json). Collect now
- * is the only way the app starts one.
+ * A collection the app ran, as Recent collections lists it: from its run in
+ * the history, or from the log the app kept before (tasks-collections.json).
+ * Collect now is the only way the app starts one.
  */
 export type CollectionRecord = CollectOutcome & {
   startedAt: string
   trigger: 'now'
+  /** Its run in the history (none for the old log's) */
+  runId?: string
 }
 
 /**

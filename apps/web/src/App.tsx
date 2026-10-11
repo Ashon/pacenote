@@ -293,8 +293,8 @@ function RunsPage({
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <MousePointerClick className="size-5" strokeWidth={1.75} />
-            Pick a run to see what Pace was asked, each step it took, and its
-            answer.
+            Pick a run to see what it did: what Pace was asked and how it
+            answered, or what a collection found.
           </div>
         )}
       </div>
