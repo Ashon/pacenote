@@ -32,6 +32,7 @@ import { envFilePath } from '../../../src/settings/paths.js'
 import { BotSupervisor, type SupervisorState } from './bot.js'
 import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
+import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
@@ -152,6 +153,8 @@ const hubPairing = new HubPairing(settings)
 const claudeToken = new ClaudeTokenSetup({
   toolPath: () => toolPath(),
   save: (token) => settings.save({ SANDBOX_CLAUDE_OAUTH_TOKEN: token }),
+  verify: (token) =>
+    checkClaudeCredential({ oauthToken: token }, { fresh: true }),
 })
 
 /** Sandbox status, allowed domains, apply jobs */

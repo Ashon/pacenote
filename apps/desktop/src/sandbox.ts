@@ -1,3 +1,4 @@
+import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
@@ -74,6 +75,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
       dataDir: this.options.dataDir,
       env: this.options.env,
       run: commandRunner(this.commandEnv, this.options.dataDir),
+      checkCredential: (credential) => checkClaudeCredential(credential),
     })
   }
 

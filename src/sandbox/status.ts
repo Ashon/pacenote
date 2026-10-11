@@ -1,3 +1,4 @@
+import type { ClaudeCredential, CredentialState } from './claude-credential.js'
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -300,6 +301,13 @@ export async function collectSandboxStatus(options: {
   env: NodeJS.ProcessEnv
   run: Run
   home?: string
+  /**
+   * Asks the API whether the claude credential works (the desktop app passes
+   * checkClaudeCredential); without it, only whether one is set
+   */
+  checkCredential?: (
+    credential: ClaudeCredential
+  ) => Promise<CredentialState | undefined>
 }): Promise<SandboxStatus> {
   const { sandboxDir, run } = options
   const home = options.home ?? homedir()
@@ -438,10 +446,22 @@ export async function collectSandboxStatus(options: {
     const set = Boolean(
       values.SANDBOX_CLAUDE_OAUTH_TOKEN || values.SANDBOX_ANTHROPIC_API_KEY
     )
+    const state = set
+      ? await options.checkCredential?.({
+          oauthToken: values.SANDBOX_CLAUDE_OAUTH_TOKEN || undefined,
+          apiKey: values.SANDBOX_ANTHROPIC_API_KEY || undefined,
+        })
+      : undefined
     status.checks.push({
       label: 'Sandbox claude token',
-      ok: set,
-      detail: set ? 'Set' : 'SANDBOX_CLAUDE_OAUTH_TOKEN required',
+      ok: set && state !== 'rejected',
+      detail: !set
+        ? 'SANDBOX_CLAUDE_OAUTH_TOKEN required'
+        : state === 'accepted'
+          ? 'Set, and Claude accepts it'
+          : state === 'rejected'
+            ? 'Claude rejects it: get a new token in Reasoner login'
+            : 'Set',
     })
   }
   // Checks only configured features. For empty features the broker starts

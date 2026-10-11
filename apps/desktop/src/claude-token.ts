@@ -1,4 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process'
+import type { CredentialState } from '../../../src/sandbox/claude-credential.js'
 import type { SettingsIssue } from '../../../src/settings/fields.js'
 
 /**
@@ -12,7 +13,9 @@ const AFTER_TOKEN = /Store this token|Use this token/
 /** Columns of the terminal setup-token runs in (stty cols in run()) */
 const COLUMNS = 1000
 
-export type ClaudeTokenResult = { ok: true } | { ok: false; error: string }
+/** credential: what the API said about the saved token, when it was asked */
+export type ClaudeTokenResult =
+  { ok: true; credential?: CredentialState } | { ok: false; error: string }
 
 /* eslint-disable no-control-regex --
    terminal escape sequences are control characters by definition */
@@ -148,6 +151,8 @@ export class ClaudeTokenSetup {
        */
       toolPath: () => string
       save: (token: string) => SettingsIssue[]
+      /** Asks the API whether the saved token works */
+      verify?: (token: string) => Promise<CredentialState | undefined>
       platform?: NodeJS.Platform
       /**
        * For tests: the command in place of script(1) running claude setup-token
@@ -208,16 +213,23 @@ export class ClaudeTokenSetup {
           }),
         TIMEOUT_MS
       )
+      let saved = false
       const save = (token: string) => {
+        if (saved) return
+        saved = true
         const issues = this.options.save(token)
-        finish(
-          issues.length > 0
-            ? {
-                ok: false,
-                error: issues.map((issue) => issue.message).join(' '),
-              }
-            : { ok: true }
-        )
+        if (issues.length > 0)
+          return finish({
+            ok: false,
+            error: issues.map((issue) => issue.message).join(' '),
+          })
+        // Done with the command; asking the API about the token takes a moment.
+        this.child?.kill('SIGTERM')
+        void (this.options.verify?.(token) ?? Promise.resolve(undefined))
+          .catch(() => undefined)
+          .then((credential) =>
+            finish(credential ? { ok: true, credential } : { ok: true })
+          )
       }
       const onData = (chunk: Buffer) => {
         output += chunk.toString('utf8')
@@ -233,7 +245,7 @@ export class ClaudeTokenSetup {
         })
       )
       child.on('close', (code) => {
-        if (settled) return
+        if (settled || saved) return
         if (this.cancelled) return finish({ ok: false, error: 'Cancelled.' })
         // The token was the last thing it printed.
         const token = findClaudeToken(output, true)

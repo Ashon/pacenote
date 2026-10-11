@@ -565,11 +565,15 @@ export function SettingsPage() {
                   hasToken={Boolean(
                     view.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
                   )}
-                  onSaved={() => {
+                  onRejected={load}
+                  onSaved={(credential) => {
                     load()
                     setNotice({
                       tone: 'warn',
-                      text: 'Saved a new claude token. Restart Pace to use it.',
+                      text:
+                        credential === 'accepted'
+                          ? 'Saved a new claude token, and Claude accepts it. Restart Pace to use it.'
+                          : 'Saved a new claude token (Claude could not be reached to check it). Restart Pace to use it.',
                       restart: true,
                     })
                   }}
@@ -1204,10 +1208,14 @@ function credentialsHelp(reasoner: string): string {
 function ClaudeTokenSetup({
   hasToken,
   onSaved,
+  onRejected,
 }: {
   /** A token is already saved; the action then replaces it */
   hasToken: boolean
-  onSaved: () => void
+  /** Saved, and what the API said about it (not rejected) */
+  onSaved: (credential?: 'accepted' | 'unknown') => void
+  /** Saved, but the API rejected it: the saved values changed all the same */
+  onRejected: () => void
 }) {
   const bridge = window.pacenoteDesktop?.sandbox
   const [state, setState] = useState<
@@ -1221,8 +1229,18 @@ function ClaudeTokenSetup({
     setState({ step: 'waiting' })
     void bridge.claudeToken().then((res) => {
       if (res.ok) {
-        setState({ step: 'idle' })
-        onSaved()
+        const { credential } = res
+        if (credential === 'rejected') {
+          onRejected()
+          setState({
+            step: 'error',
+            message:
+              'Saved the new token, but Claude rejects it. Try again, or run claude setup-token in a terminal and paste the token above.',
+          })
+        } else {
+          setState({ step: 'idle' })
+          onSaved(credential)
+        }
       } else
         setState(
           res.error === 'Cancelled.'

@@ -78,6 +78,33 @@ describe('claude setup-token for the sandbox', () => {
     expect(save).toHaveBeenCalledWith(RECORDED_TOKEN)
   })
 
+  it('asks the API about the saved token, and says what it answered', async () => {
+    const recorded = new URL(
+      'fixtures/claude-setup-token-2.1.296.txt',
+      import.meta.url
+    ).pathname
+    const run = (credential: 'accepted' | 'rejected' | undefined) => {
+      const verify = vi.fn(async () => credential)
+      const setup = new ClaudeTokenSetup({
+        toolPath: () => process.env.PATH ?? '',
+        save: () => [],
+        verify,
+        platform: 'darwin',
+        command: ['/bin/cat', [recorded]],
+      })
+      return { result: setup.run(), verify }
+    }
+    const accepted = run('accepted')
+    expect(await accepted.result).toEqual({ ok: true, credential: 'accepted' })
+    expect(accepted.verify).toHaveBeenCalledWith(RECORDED_TOKEN)
+    expect(await run('rejected').result).toEqual({
+      ok: true,
+      credential: 'rejected',
+    })
+    // The API could not be asked: saved all the same
+    expect(await run(undefined).result).toEqual({ ok: true })
+  })
+
   it('reports why it ended without a token, and stops when cancelled', async () => {
     const save = vi.fn(() => [])
     const ended = new ClaudeTokenSetup({

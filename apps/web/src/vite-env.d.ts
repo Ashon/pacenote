@@ -96,7 +96,10 @@ declare global {
          * Runs claude setup-token and saves its token as
          * SANDBOX_CLAUDE_OAUTH_TOKEN
          */
-        claudeToken(): Promise<{ ok: true } | { ok: false; error: string }>
+        claudeToken(): Promise<
+          | { ok: true; credential?: 'accepted' | 'rejected' | 'unknown' }
+          | { ok: false; error: string }
+        >
         cancelClaudeToken(): Promise<void>
         onJob(callback: (job: SandboxJob) => void): () => void
       }

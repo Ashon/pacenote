@@ -3,7 +3,12 @@ import { configFingerprint, loadConfig } from './config.js'
 import { HistoryStore } from './history/recorder.js'
 import { consoleSink, createLogger, fileSink, type Logger } from './logger.js'
 import { InflightStore } from './mention/inflight.js'
+import { failureAdvice } from './mention/failure.js'
 import { MentionResponder } from './mention/responder.js'
+import {
+  checkClaudeCredential,
+  claudeCredential,
+} from './sandbox/claude-credential.js'
 import { connectSlack } from './messengers/slack/connect.js'
 import { createReasoner } from './reasoners/cli.js'
 import { DockerSandbox } from './sandbox/docker.js'
@@ -160,6 +165,16 @@ async function main(): Promise<void> {
     problems: allProblems(),
     limits: connection.limits(),
   })
+  // A claude credential the API rejects (cut short, revoked) shows in the
+  // status at once, not only when a mention fails on it.
+  if (sandbox.kind === 'docker' && reasoner.backend === 'claude')
+    void checkClaudeCredential(
+      claudeCredential(config.reasoner.auth?.env ?? {})
+    ).then((state) => {
+      if (state !== 'rejected' || reasonerProblem) return
+      reasonerProblem = `${failureAdvice('auth', 'claude', 'docker')?.text} (checked at startup)`
+      status.update({ problems: allProblems() })
+    })
   await connection.start((mention) => responder.handle(mention))
   status.update({ state: 'running' })
   running = true
