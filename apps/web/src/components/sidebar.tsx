@@ -109,20 +109,24 @@ function NavItem({
   compact,
   onClick,
 }: Item & {
-  /** Shown beside the label when above zero */
+  /**
+   * Shown when above zero: a tinted badge beside the label, or a solid one on
+   * the icon's corner in the compact sidebar
+   */
   count: number
   current: boolean
   compact: boolean
   onClick: () => void
 }) {
+  const name = count > 0 ? `${label} (${count})` : label
   const button = (
     <button
       type="button"
-      aria-label={compact ? label : undefined}
+      aria-label={compact ? name : undefined}
       aria-current={current ? 'page' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-9 items-center gap-2.5 rounded-xl px-[11px] text-[13.5px] transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'relative flex h-9 items-center gap-2.5 rounded-xl px-[11px] text-[13.5px] transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
         compact && 'w-10',
         current
           ? 'bg-selected font-semibold text-foreground'
@@ -135,14 +139,25 @@ function NavItem({
       />
       {!compact && label}
       {!compact && count > 0 && (
-        <span className="ml-auto text-xs font-semibold text-primary tabular-nums">
+        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-primary tabular-nums">
+          {count}
+        </span>
+      )}
+      {compact && count > 0 && (
+        <span
+          aria-hidden
+          className={cn(
+            'absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums ring-2',
+            current ? 'ring-selected' : 'ring-sidebar'
+          )}
+        >
           {count}
         </span>
       )}
     </button>
   )
   return compact ? (
-    <Tooltip content={label} side="right">
+    <Tooltip content={name} side="right">
       {button}
     </Tooltip>
   ) : (
