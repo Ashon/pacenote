@@ -1,4 +1,6 @@
+import type { BotStatusView, SupervisorState } from '@runtime/types'
 import { setupSettingsRoute } from '@src/settings/fields'
+import type { TasksCollect } from '@src/tasks/types'
 import { Clock, Cpu, FolderOpen, Plug, TriangleAlert } from 'lucide-react'
 import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -24,12 +26,35 @@ export function StatusBar({
 }) {
   const { data } = useBotStatus()
   const supervisor = useSupervisor()
-  const { tone, label } = describeBot(data, supervisor)
-  const status = data?.alive ? data.status : undefined
-  const active = status?.requests.active ?? 0
   // A collection keeps running when you leave the Tasks screen; this is where
   // it still shows. (the sidebar already keeps the tasks query fresh)
   const collecting = useTasks().data?.collect.running
+  return (
+    <StatusBarView
+      bot={data}
+      supervisor={supervisor}
+      collecting={collecting}
+      onOpenRoute={onOpenRoute}
+    />
+  )
+}
+
+/** The footer from what it shows, so the Debug page can show it in any state */
+export function StatusBarView({
+  bot: data,
+  supervisor,
+  collecting,
+  onOpenRoute,
+}: {
+  bot?: BotStatusView
+  supervisor?: SupervisorState
+  /** The task collection running, if one is */
+  collecting?: TasksCollect['running']
+  onOpenRoute: (route: string) => void
+}) {
+  const { tone, label } = describeBot(data, supervisor)
+  const status = data?.alive ? data.status : undefined
+  const active = status?.requests.active ?? 0
   const problems = status?.problems ?? []
   const tools = [
     ...(status?.mcp ?? []),
@@ -47,7 +72,7 @@ export function StatusBar({
         tip={setup ? 'Open Settings to set up Pace' : "Pace's status and logs"}
         onClick={
           setup
-            ? () => onOpenRoute(setupSettingsRoute(supervisor.issues))
+            ? () => onOpenRoute(setupSettingsRoute(supervisor?.issues))
             : openBot
         }
       >

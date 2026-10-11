@@ -16,9 +16,10 @@ folder and single-instance lock, so they start next to an installed Pacenote. Th
 same config and data folder (`~/.pacenote`), so the bot lock still keeps a single bot running.
 
 These runs also have a Debug section above Settings, for things to look at in motion (Pace's spinner at each size, with speed,
-pause, a scrubber and the frame rate, and loads of a few lengths that end with the mark easing back into the logo). Its code is only in builds made for development: `pnpm desktop` builds the UI with
-`VITE_PACENOTE_DEBUG=1`, and the Vite dev server always includes it. `pnpm desktop:build` and `pnpm package:mac`, which
-release builds use, leave it out.
+pause, a scrubber and the frame rate, and loads of a few lengths that end with the mark easing back into the logo) and the
+status bar in made-up states (Pace's state, requests, a task collection, check issues, narrower windows). Its code is only
+in builds made for development: `pnpm desktop` builds the UI with `VITE_PACENOTE_DEBUG=1`, and the Vite dev server always
+includes it. `pnpm desktop:build` and `pnpm package:mac`, which release builds use, leave it out.
 
 Packaging:
 
