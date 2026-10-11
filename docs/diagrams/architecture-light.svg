@@ -11,7 +11,7 @@
 <text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">Pacenote</text>
 <rect x="16" y="56" width="1168" height="744" rx="20" fill="#ffffff" filter="url(#lift)"/>
 <text x="48" y="106" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#10211c" text-anchor="start">Architecture</text>
-<text x="174.48000000000002" y="106" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">One person's setup</text>
+<text x="170.69440000000003" y="106" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">One person's setup</text>
 <text x="48" y="130" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">Pace answers your mentions on your Mac, and reasons each answer in a disposable sandbox.</text>
 <path d="M48 152.5H1152" stroke="#d8e5df" stroke-width="1"/>
 <rect x="48" y="176" width="216" height="242" rx="20" fill="#f1f8f5"/>
@@ -50,11 +50,11 @@
 <path d="M376 406.5H740" stroke="#d8e5df" stroke-width="1"/>
 <text x="376" y="426" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">sandbox/docker</text>
 <text x="376" y="443" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Sandbox: a container per request, or the host</text>
-<rect x="376" y="462" width="105" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="376" y="462" width="113" height="20" rx="6" fill="#e2f1ea"/>
 <g transform="translate(383 466) scale(0.5)" color="#0e3629" fill="none" stroke="#0e3629" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></g>
 <text x="399" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">claude@docker</text>
-<rect x="487.5" y="462.5" width="104" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
-<text x="493.5" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">👀 on the mention</text>
+<rect x="495.5" y="462.5" width="113" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
+<text x="501.5" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">👀 on the mention</text>
 <text x="360" y="528" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Desktop app</text>
 <text x="360" y="545" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Overview, Todo, Runs, Settings; keeps Pace running</text>
 <path d="M360 554.5H756" stroke="#d8e5df" stroke-width="1"/>
@@ -77,14 +77,14 @@
 <text x="1136" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="end">pacenote-* containers</text>
 <path d="M860 222.5H1136" stroke="#d8e5df" stroke-width="1"/>
 <text x="860" y="242" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Every container</text>
-<rect x="860" y="252" width="82" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="860" y="252" width="89" height="20" rx="6" fill="#e2f1ea"/>
 <text x="866.5" y="266" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">read-only root</text>
-<rect x="948" y="252" width="85" height="20" rx="6" fill="#e2f1ea"/>
-<text x="954.5" y="266" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">no capabilities</text>
-<rect x="860" y="278" width="94" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="955" y="252" width="92" height="20" rx="6" fill="#e2f1ea"/>
+<text x="961.5" y="266" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">no capabilities</text>
+<rect x="860" y="278" width="103" height="20" rx="6" fill="#e2f1ea"/>
 <text x="866.5" y="292" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">internal network</text>
-<rect x="960" y="278" width="103" height="20" rx="6" fill="#e2f1ea"/>
-<text x="966.5" y="292" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">removed after use</text>
+<rect x="969" y="278" width="113" height="20" rx="6" fill="#e2f1ea"/>
+<text x="975.5" y="292" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">removed after use</text>
 <path d="M860 314.5H1136" stroke="#d8e5df" stroke-width="1"/>
 <text x="860" y="334" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">renderer</text>
 <text x="860" y="351" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Diagrams to PNG, no network</text>
@@ -99,34 +99,34 @@
 <text x="1079" y="425" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#4f665e" text-anchor="start">MCP</text>
 <text x="860" y="450" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">egress-proxy</text>
 <text x="860" y="467" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Allowed domains only</text>
-<rect x="860" y="480" width="101" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="860" y="480" width="110" height="20" rx="6" fill="#e2f1ea"/>
 <text x="866.5" y="494" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">api.anthropic.com</text>
-<rect x="860" y="506" width="75" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="860" y="506" width="81" height="20" rx="6" fill="#e2f1ea"/>
 <text x="866.5" y="520" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">chatgpt.com</text>
 <text x="860" y="546" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">and your allowlist</text>
 <text x="1014" y="450" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">ops-broker</text>
 <text x="1014" y="467" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Credentials stay here</text>
-<rect x="1014" y="480" width="65" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="1014" y="480" width="71" height="20" rx="6" fill="#e2f1ea"/>
 <text x="1020.5" y="494" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">SSH hosts</text>
-<rect x="1014" y="506" width="84" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="1014" y="506" width="91" height="20" rx="6" fill="#e2f1ea"/>
 <text x="1020.5" y="520" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">k8s, read-only</text>
-<rect x="1014" y="532" width="46" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="1014" y="532" width="50" height="20" rx="6" fill="#e2f1ea"/>
 <text x="1020.5" y="546" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">GitHub</text>
-<rect x="1066" y="532" width="33" height="20" rx="6" fill="#e2f1ea"/>
-<text x="1072.5" y="546" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">Jira</text>
-<rect x="1014" y="558" width="85" height="20" rx="6" fill="#e2f1ea"/>
+<rect x="1070" y="532" width="35" height="20" rx="6" fill="#e2f1ea"/>
+<text x="1076.5" y="546" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">Jira</text>
+<rect x="1014" y="558" width="93" height="20" rx="6" fill="#e2f1ea"/>
 <text x="1020.5" y="572" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">work directory</text>
 <path d="M264 285 L358 285" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
-<rect x="272.5" y="262" width="55" height="19" rx="9.5" fill="#ffffff"/>
+<rect x="270.5" y="262" width="59" height="19" rx="9.5" fill="#ffffff"/>
 <text x="300" y="276" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">mention</text>
 <path d="M360 297 L320 297 Q312 297 312 305 L312 375 Q312 383 304 383 L264 383" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
-<rect x="286" y="332" width="52" height="19" rx="9.5" fill="#ffffff"/>
+<rect x="284" y="332" width="56" height="19" rx="9.5" fill="#ffffff"/>
 <text x="312" y="346" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">answer</text>
 <path d="M756 337 L852 337" fill="none" stroke="#a7b3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
-<rect x="778" y="327" width="60" height="19" rx="9.5" fill="#ffffff"/>
+<rect x="776.5" y="327" width="63" height="19" rx="9.5" fill="#ffffff"/>
 <text x="808" y="341" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#4f665e" text-anchor="middle">diagrams</text>
 <path d="M756 429 L800 429 Q808 429 808 421 L808 391 Q808 383 816 383 L852 383" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
-<rect x="773.5" y="396" width="69" height="19" rx="9.5" fill="#ffffff"/>
+<rect x="771.5" y="396" width="73" height="19" rx="9.5" fill="#ffffff"/>
 <text x="808" y="410" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">docker run</text>
 <path d="M48 700.5H1152" stroke="#d8e5df" stroke-width="1"/>
 <g transform="translate(48 725) scale(0.5833333333333334)" color="#4f665e" fill="none" stroke="#4f665e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></g>

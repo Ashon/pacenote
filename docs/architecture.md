@@ -1,7 +1,8 @@
 # Architecture
 
 How Pacenote is put together, in six pictures. The diagrams are drawn by `scripts/diagrams.mjs`
-(`pnpm docs:diagrams`) in the desktop app's look, with a light and a dark variant.
+(`pnpm docs:diagrams`) in the desktop app's look, with a light and a dark variant; the colors and icons are read from the
+app, so drawing them again keeps them in step with it.
 
 ## The pieces
 
@@ -24,9 +25,10 @@ More: [How it works](how-it-works.md), [Reasoner sandbox](sandbox.md), [Ops tool
 
 ## One mention
 
-A mention is checked (allowed users, public channels), marked with 👀 at once, and reasoned with the thread and its
-attachments as context. Each step goes into the run history as it happens, diagram blocks are rendered, and the answer
-comes as a new reply. A restart resumes an unfinished answer once, with the 👀 still on the mention.
+A mention is checked (allowed users, public channels), marked with 👀 at once (and ⏳ after 90 seconds), and reasoned
+with the thread and its attachments as context, while the app keeps the Mac awake. Each step goes into the run history as
+it happens, diagram blocks are rendered, and the answer comes as a new reply. A restart resumes an unfinished answer
+once, with the 👀 still on the mention.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/mention-flow-dark.svg">
@@ -65,8 +67,8 @@ More: [Team hub](team-hub.md).
 
 Three interfaces keep the mention pipeline apart from everything it could be swapped for:
 
-- **Messenger** (`src/messengers/types.ts`): the chat app. Mentions come in through it and answers, edits and images go
-  out. Slack is the adapter today.
+- **Messenger** (`src/messengers/types.ts`): the chat app. Mentions come in through it, and answers, edits, images,
+  reactions on the mention and notes for the asker alone go out. Slack is the adapter today.
 - **Reasoner** (`src/reasoners/types.ts`): the model. The pipeline asks for one answer and gets progress steps along
   the way. Each CLI is a `CliAdapter` (`claude.ts`, `codex.ts`) that says how to call it, what it may read, and how to
   read what it prints; one runner (`cli.ts`) runs any adapter.
@@ -86,7 +88,8 @@ Three interfaces keep the mention pipeline apart from everything it could be swa
 
 The mention pipeline (`src/mention`) talks to chat apps only through the `Messenger` interface
 (`src/messengers/types.ts`); Slack is its first adapter. Models are reached through `src/reasoners` and run in
-`src/sandbox`, as above.
+`src/sandbox`, as above. Your tasks (`src/tasks`) and the run history (`src/history`) are offered to AI tools by the MCP
+server in `src/tools/history-mcp.ts`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/code-layout-dark.svg">

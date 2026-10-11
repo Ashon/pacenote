@@ -1,95 +1,103 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="628" viewBox="0 0 1200 628" role="img" aria-label="Pacenote team hub">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="608" viewBox="0 0 1200 608" role="img" aria-label="Pacenote team hub">
 <title>Pacenote team hub</title>
 <defs>
-  <linearGradient id="mark" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#01ab78"/><stop offset="0.46" stop-color="#1fc289"/><stop offset="1" stop-color="#48c89c"/></linearGradient>
-  <linearGradient id="mark-big" gradientUnits="userSpaceOnUse" x1="54" y1="314" x2="458" y2="198"><stop offset="0" stop-color="#01ab78"/><stop offset="0.46" stop-color="#1fc289"/><stop offset="1" stop-color="#48c89c"/></linearGradient>
-  <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#01ab78"/><stop offset="1" stop-color="#1fc289"/></linearGradient>
-  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#0f2a20" flood-opacity="0.08"/></filter>
-  <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="#8aa199" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
-  <marker id="arrow-main" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="#007c5c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="54" y1="314" x2="458" y2="198"><stop offset="0" stop-color="#01ab78"/><stop offset="0.46" stop-color="#1fc289"/><stop offset="1" stop-color="#48c89c"/></linearGradient>
+  <filter id="lift" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="1" stdDeviation="0.5" flood-color="#1e332b" flood-opacity="0.05"/><feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#1e332b" flood-opacity="0.07"/></filter>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="#a7b3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  <marker id="arrow-main" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="#007c5c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
 </defs>
-<rect width="1200" height="628" rx="28" fill="#f5faf8"/>
-<g transform="translate(36.359223300970875 30.359223300970875) scale(0.07281553398058252)"><path d="M273.1 92.9A164 164 0 1 0 419.1 238.9" fill="none" stroke="url(#mark-big)" stroke-width="84" stroke-linecap="round"/><circle cx="372" cy="140" r="42" fill="url(#mark-big)"/></g>
-<text x="84" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="url(#wordmark)" text-anchor="start">Pacenote</text>
-<text x="188" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="22" font-weight="600" fill="#10211c" text-anchor="start">team hub</text>
-<text x="84" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">A team shares one Slack app. Each member's own Mac answers that member's mentions.</text>
-<rect x="40" y="120" width="250" height="250" rx="18" fill="#ffffff" filter="url(#shadow)"/>
-<text x="58" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">Slack</text>
-<text x="58" y="169" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="start">One app for the workspace</text>
-<rect x="56" y="176" width="218" height="46" rx="12" fill="#eef6f2"/>
-<text x="68" y="195" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">@Pace  status of web-01</text>
-<text x="68" y="212" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">alice asks</text>
-<rect x="56" y="232" width="218" height="46" rx="12" fill="#eef6f2"/>
-<text x="68" y="251" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">@Pace  draft the PR</text>
-<text x="68" y="268" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">bob asks</text>
-<rect x="56" y="288" width="218" height="46" rx="12" fill="#eef6f2"/>
-<text x="68" y="307" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">@Pace  connect K7Q2-9DMX</text>
-<text x="68" y="324" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Pairing a desktop</text>
-<rect x="360" y="120" width="380" height="250" rx="18" fill="#ffffff" filter="url(#shadow)"/>
-<text x="378" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">Team hub</text>
-<text x="378" y="169" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="start">deploy/hub: a container on a server, behind HTTPS</text>
-<rect x="376" y="176" width="348" height="46" rx="12" fill="#eef6f2"/>
-<text x="388" y="195" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">Holds the Slack tokens</text>
-<text x="388" y="212" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Socket Mode in, Web API out; desktops never get them</text>
-<rect x="376" y="232" width="348" height="46" rx="12" fill="#eef6f2"/>
-<text x="388" y="251" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">Routes by who asked</text>
-<text x="388" y="268" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">A mention goes to that member's paired desktop</text>
-<rect x="376" y="288" width="348" height="46" rx="12" fill="#eef6f2"/>
-<text x="388" y="307" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">Calls only within a grant</text>
-<text x="388" y="324" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Each desktop may touch only the threads routed to it</text>
-<rect x="376" y="344" width="100" height="20" rx="10" fill="#d9f6e8" fill-opacity="1"/>
-<text x="426" y="358" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#003e2a" text-anchor="middle">pacenote-hub</text>
-<rect x="484" y="344" width="124" height="20" rx="10" fill="#d9f6e8" fill-opacity="1"/>
-<text x="546" y="358" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#003e2a" text-anchor="middle">token hashes only</text>
-<rect x="810" y="120" width="350" height="116" rx="18" fill="#e7fff4" filter="url(#shadow)"/>
-<text x="828" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">alice's Mac</text>
-<text x="828" y="169" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="start">Their own claude login and sandbox</text>
-<rect x="828" y="190" width="100" height="20" rx="10" fill="#d9f6e8" fill-opacity="1"/>
-<text x="878" y="204" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#003e2a" text-anchor="middle">Pacenote.app</text>
-<rect x="936" y="190" width="136" height="20" rx="10" fill="#029a92" fill-opacity="0.14"/>
-<text x="1004" y="204" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#029a92" text-anchor="middle">Pace answers here</text>
-<rect x="810" y="250" width="350" height="116" rx="18" fill="#e7fff4" filter="url(#shadow)"/>
-<text x="828" y="280" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">bob's Mac</text>
-<text x="828" y="299" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="start">Their own codex login and sandbox</text>
-<rect x="828" y="320" width="100" height="20" rx="10" fill="#d9f6e8" fill-opacity="1"/>
-<text x="878" y="334" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#003e2a" text-anchor="middle">Pacenote.app</text>
-<rect x="936" y="320" width="136" height="20" rx="10" fill="#029a92" fill-opacity="0.14"/>
-<text x="1004" y="334" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#029a92" text-anchor="middle">Pace answers here</text>
-<path d="M290 245 L360 245" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
-<rect x="283.5" y="215" width="83" height="19" rx="9.5" fill="#f5faf8"/>
-<text x="325" y="229" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">Socket Mode</text>
-<path d="M740 200 L810 178" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
-<path d="M740 290 L810 308" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
-<text x="775" y="252" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">WebSocket</text>
-<text x="775" y="266" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="400" fill="#4f665e" text-anchor="middle">per desktop</text>
-<rect x="40" y="400" width="1120" height="196" rx="18" fill="#ffffff" filter="url(#shadow)"/>
-<text x="58" y="430" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">Pairing a desktop</text>
-<text x="58" y="449" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="start">Once per member; pairing again replaces the earlier desktop</text>
-<rect x="56" y="460" width="258" height="120" rx="12" fill="#eef6f2"/>
-<circle cx="78" cy="484" r="11" fill="url(#mark)"/>
-<text x="78" y="488" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
-<text x="98" y="489" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Connect</text>
-<text x="70" y="516" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Settings &gt; Messengers &gt; Slack &gt; Team</text>
-<text x="70" y="533" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">hub: enter the hub URL. The app makes</text>
-<text x="70" y="550" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">a token and sends only its hash.</text>
-<rect x="330" y="460" width="258" height="120" rx="12" fill="#eef6f2"/>
-<circle cx="352" cy="484" r="11" fill="url(#mark)"/>
-<text x="352" y="488" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
-<text x="372" y="489" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">A code</text>
-<text x="344" y="516" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The hub answers with a short code that</text>
-<text x="344" y="533" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">expires; the app shows it.</text>
-<rect x="604" y="460" width="258" height="120" rx="12" fill="#eef6f2"/>
-<circle cx="626" cy="484" r="11" fill="url(#mark)"/>
-<text x="626" y="488" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
-<text x="646" y="489" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">In Slack</text>
-<text x="618" y="516" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The member mentions @Pace connect</text>
-<text x="618" y="533" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">&lt;code&gt;, so the hub learns who is</text>
-<text x="618" y="550" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">pairing.</text>
-<rect x="878" y="460" width="258" height="120" rx="12" fill="#eef6f2"/>
-<circle cx="900" cy="484" r="11" fill="url(#mark)"/>
-<text x="900" y="488" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
-<text x="920" y="489" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Confirm</text>
-<text x="892" y="516" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The app shows the Slack name it bound</text>
-<text x="892" y="533" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">to; confirming stores the token in</text>
-<text x="892" y="550" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">~/.pacenote/.env.</text>
+<rect width="1200" height="608" rx="24" fill="#f1f9f5"/>
+<g transform="translate(21.33009708737864 14.330097087378642) scale(0.05339805825242718)"><path d="M273.1 92.9A164 164 0 1 0 419.1 238.9" fill="none" stroke="url(#mark)" stroke-width="84" stroke-linecap="round"/><circle cx="372" cy="140" r="42" fill="url(#mark)"/></g>
+<text x="56" y="33" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#10211c" text-anchor="start">Pacenote</text>
+<rect x="16" y="56" width="1168" height="536" rx="20" fill="#ffffff" filter="url(#lift)"/>
+<text x="48" y="106" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#10211c" text-anchor="start">Team hub</text>
+<text x="147.95428" y="106" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">One Slack app for a team</text>
+<text x="48" y="130" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#4f665e" text-anchor="start">A team shares one Slack app. Each member's own Mac answers that member's mentions.</text>
+<path d="M48 152.5H1152" stroke="#d8e5df" stroke-width="1"/>
+<rect x="48" y="176" width="224" height="196" rx="20" fill="#f1f8f5"/>
+<g transform="translate(64 193) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></g>
+<text x="88" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#10211c" text-anchor="start">Slack</text>
+<text x="256" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="end">One app</text>
+<path d="M64 222.5H256" stroke="#d8e5df" stroke-width="1"/>
+<text x="64" y="242" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">@Pace status of web-01</text>
+<text x="64" y="259" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">alice asks</text>
+<path d="M64 268.5H256" stroke="#d8e5df" stroke-width="1"/>
+<text x="64" y="288" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">@Pace draft the PR</text>
+<text x="64" y="305" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">bob asks</text>
+<path d="M64 314.5H256" stroke="#d8e5df" stroke-width="1"/>
+<text x="64" y="334" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">@Pace connect K7Q2-9DMX</text>
+<text x="64" y="351" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Pairing a desktop</text>
+<rect x="360" y="176" width="400" height="228" rx="20" fill="#f1f8f5"/>
+<g transform="translate(376 193) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></g>
+<text x="400" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#10211c" text-anchor="start">Team hub</text>
+<text x="744" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="end">deploy/hub, behind HTTPS</text>
+<path d="M376 222.5H744" stroke="#d8e5df" stroke-width="1"/>
+<text x="376" y="242" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Holds the Slack tokens</text>
+<text x="376" y="259" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Socket Mode in, Web API out; desktops never get them</text>
+<path d="M376 268.5H744" stroke="#d8e5df" stroke-width="1"/>
+<text x="376" y="288" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Routes by who asked</text>
+<text x="376" y="305" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">A mention goes to that member's paired desktop</text>
+<path d="M376 314.5H744" stroke="#d8e5df" stroke-width="1"/>
+<text x="376" y="334" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Calls only within a grant</text>
+<text x="376" y="351" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Each desktop may touch only the threads routed to it</text>
+<rect x="376" y="370" width="104" height="20" rx="6" fill="#e2f1ea"/>
+<g transform="translate(383 374) scale(0.5)" color="#0e3629" fill="none" stroke="#0e3629" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7.7c0-.6-.4-1.2-.8-1.5l-6.3-3.9a1.72 1.72 0 0 0-1.7 0l-10.3 6c-.5.2-.9.8-.9 1.4v6.6c0 .5.4 1.2.8 1.5l6.3 3.9a1.72 1.72 0 0 0 1.7 0l10.3-6c.5-.3.9-1 .9-1.5Z"/><path d="M10 21.9V14L2.1 9.1"/><path d="m10 14 11.9-6.9"/><path d="M14 19.8v-8.1"/><path d="M18 17.5V9.4"/></g>
+<text x="399" y="384" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">pacenote-hub</text>
+<rect x="486" y="370" width="112" height="20" rx="6" fill="#e2f1ea"/>
+<text x="492.5" y="384" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">token hashes only</text>
+<rect x="832" y="176" width="320" height="106" rx="20" fill="#e7fff4"/>
+<g transform="translate(848 193) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></g>
+<text x="872" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#007c5c" text-anchor="start">alice's Mac</text>
+<text x="848" y="226" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Their own claude login and sandbox</text>
+<rect x="848" y="242" width="87" height="20" rx="6" fill="#e2f1ea"/>
+<text x="854.5" y="256" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">Pacenote.app</text>
+<rect x="941.5" y="242.5" width="128" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
+<circle cx="951" cy="252" r="3" fill="#029a92"/>
+<text x="958.5" y="256" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">Pace answers here</text>
+<rect x="832" y="298" width="320" height="106" rx="20" fill="#e7fff4"/>
+<g transform="translate(848 315) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></g>
+<text x="872" y="328" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#007c5c" text-anchor="start">bob's Mac</text>
+<text x="848" y="348" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Their own codex login and sandbox</text>
+<rect x="848" y="364" width="87" height="20" rx="6" fill="#e2f1ea"/>
+<text x="854.5" y="378" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">Pacenote.app</text>
+<rect x="941.5" y="364.5" width="128" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
+<circle cx="951" cy="374" r="3" fill="#029a92"/>
+<text x="958.5" y="378" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">Pace answers here</text>
+<path d="M274 290 L358 290" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
+<rect x="272.5" y="262" width="87" height="19" rx="9.5" fill="#ffffff"/>
+<text x="316" y="276" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">Socket Mode</text>
+<path d="M762 262 L788 262 Q796 262 796 254 L796 237 Q796 229 804 229 L830 229" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
+<path d="M762 318 L788 318 Q796 318 796 326 L796 343 Q796 351 804 351 L830 351" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)" marker-start="url(#arrow-main)"/>
+<rect x="757.5" y="280" width="77" height="19" rx="9.5" fill="#ffffff"/>
+<text x="796" y="294" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="600" fill="#007c5c" text-anchor="middle">WebSocket</text>
+<path d="M48 428.5H1152" stroke="#d8e5df" stroke-width="1"/>
+<g transform="translate(48 447) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></g>
+<text x="72" y="460" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#10211c" text-anchor="start">Pairing a desktop</text>
+<text x="1152" y="460" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#4f665e" text-anchor="end">Once per member; pairing again replaces the earlier desktop</text>
+<circle cx="58" cy="494" r="10" fill="#007c5c"/>
+<text x="58" y="498" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+<text x="76" y="499" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Connect</text>
+<text x="48" y="524" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Settings &gt; Messengers &gt; Slack &gt; Team hub:</text>
+<text x="48" y="541" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">enter the hub URL. The app makes a token</text>
+<text x="48" y="558" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">and sends only its hash.</text>
+<path d="M324.5 484V568" stroke="#d8e5df" stroke-width="1"/>
+<circle cx="350" cy="494" r="10" fill="#007c5c"/>
+<text x="350" y="498" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+<text x="368" y="499" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">A code</text>
+<text x="340" y="524" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The hub answers with a short code that</text>
+<text x="340" y="541" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">expires; the app shows it.</text>
+<path d="M600.5 484V568" stroke="#d8e5df" stroke-width="1"/>
+<circle cx="626" cy="494" r="10" fill="#007c5c"/>
+<text x="626" y="498" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+<text x="644" y="499" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">In Slack</text>
+<text x="616" y="524" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The member mentions @Pace connect</text>
+<text x="616" y="541" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">&lt;code&gt;, so the hub learns who is</text>
+<text x="616" y="558" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">pairing.</text>
+<path d="M876.5 484V568" stroke="#d8e5df" stroke-width="1"/>
+<circle cx="902" cy="494" r="10" fill="#007c5c"/>
+<text x="902" y="498" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+<text x="920" y="499" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Confirm</text>
+<text x="892" y="524" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">The app shows the Slack name it bound</text>
+<text x="892" y="541" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">to; confirming stores the token in</text>
+<text x="892" y="558" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">~/.pacenote/.env.</text>
 </svg>
