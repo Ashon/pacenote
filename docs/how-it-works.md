@@ -12,12 +12,14 @@ What happens between a mention and its answer: context, attachments, diagrams an
   -> post the answer as a new reply (long answers continue in more messages), and take the reactions off
 ```
 
-- While Pace works, the thread gets nothing from it but the reaction, so people talking in the thread are not
-  interrupted, and the answer arrives as a new reply at the bottom, which notifies them. (An edited message would not.)
+- The thread gets only answers. How Pace is doing shows as reactions on the mention (👀 working, ⏳ slow, ⚠️ failed),
+  and what only the asker needs goes to them in a message only they can see (ephemeral): why an answer failed, that Pace
+  is busy, that it is not allowed there. People talking in the thread are not interrupted, and the answer arrives as a
+  new reply at the bottom, which notifies them. (An edited message would not.)
 - A Slack app without the `reactions:write` scope (created from an older manifest, or not approved in the workspace)
-  gets a "Working on it..." message instead of the reaction. The answer still comes as a new reply that notifies, and the
-  placeholder is deleted once it is posted. The Pace screen and Settings > Messengers > Slack > Check connection say the
-  scope is missing; it is a limit, not a fault, so the status bar does not count it.
+  works the same, except that only the asker sees that Pace is working ("Working on it...", for them alone) or failed.
+  The Pace screen and Settings > Messengers > Slack > Check connection say the scope is missing; it is a limit, not a
+  fault, so the status bar does not count it.
 
 - A mention inside a thread also passes the bot's earlier answers as context, so it continues from them.
 - With `MENTION_ALLOWED_USERS` set, the bot answers only those users. Anyone else gets a message only they
@@ -25,10 +27,10 @@ What happens between a mention and its answer: context, attachments, diagrams an
 - It does not answer in private channels or DMs.
 - It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it tells the asker, in a
   message only they can see, that it is busy.
-- On failure it replies "I couldn't produce an answer" with what that means, read from the reasoner's error
-  (`src/mention/failure.ts`): its sign-in was rejected, it reached a usage limit, its service was unavailable, something in
-  the setup failed, or the request took too long. The channel is public, so the error itself goes only to the log and the
-  run history, where the run also says what to fix and links to it. A rejected sign-in or a usage limit also shows in the
+- On failure it puts ⚠️ on the mention and tells the asker alone "I couldn't produce an answer" with what that means,
+  read from the reasoner's error (`src/mention/failure.ts`): its sign-in was rejected, it reached a usage limit, its
+  service was unavailable, something in the setup failed, or the request took too long. The error itself goes only to the
+  log and the run history, where the run also says what to fix and links to it. A rejected sign-in or a usage limit also shows in the
   status bar's check issues until the reasoner answers again.
 
 ## Attachments

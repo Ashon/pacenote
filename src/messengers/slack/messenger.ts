@@ -41,16 +41,17 @@ const MAX_FILE_LOOKUPS = 10
 const REACTIONS: Record<Mark, string> = {
   working: 'eyes',
   slow: 'hourglass_flowing_sand',
+  failed: 'warning',
 }
 /**
- * Why reactions do not work, by error, as the status shows it. Pace posts a
- * placeholder instead, which works, so these are limits rather than faults.
+ * Why reactions do not work, by error, as the status shows it. Pace tells the
+ * asker alone instead, which works, so these are limits rather than faults.
  */
 const REACTION_LIMITS: Record<string, string> = {
   missing_scope:
-    'Slack: the app does not have reactions:write, so Pace posts "Working on it..." while it works instead of reacting with 👀. Adding the scope (slack-app-manifest.yaml) and reinstalling the app turns reactions on.',
+    'Slack: the app does not have reactions:write, so only the asker sees that Pace is working or failed, in messages for them alone, instead of 👀 and ⚠️ on their mention. Adding the scope (slack-app-manifest.yaml) and reinstalling the app turns reactions on.',
   method_not_allowed_by_hub:
-    'Slack: the team hub does not relay reactions, so Pace posts "Working on it..." while it works instead of reacting with 👀. Updating the hub turns reactions on.',
+    'Slack: the team hub does not relay reactions, so only the asker sees that Pace is working or failed, in messages for them alone, instead of 👀 and ⚠️ on their mention. Updating the hub turns reactions on.',
 }
 
 export interface SlackMessengerOptions {
@@ -301,7 +302,7 @@ export class SlackMessenger implements Messenger {
       this.warnReaction(
         error,
         limit ??
-          `Could not react to a mention (${error}); posting "Working on it..." instead.`
+          `Could not react to a mention (${error}); telling the asker alone instead.`
       )
       return false
     }

@@ -15,8 +15,9 @@ export const REQUIRED_BOT_SCOPES = [
 ] as const
 
 /**
- * Scopes the bot works without, a little worse: without reactions:write it
- * posts "Working on it..." instead of reacting to the mention with 👀
+ * Scopes the bot works without, a little worse: without reactions:write only
+ * the asker sees that it is working or failed, instead of 👀 and ⚠️ on the
+ * mention
  */
 export const OPTIONAL_BOT_SCOPES = ['reactions:write'] as const
 
@@ -109,7 +110,7 @@ export async function checkSlackTokens(
         detail: missing.length
           ? `Missing: ${missing.join(', ')}`
           : optional.length
-            ? `Missing ${optional.join(', ')}: Pace posts "Working on it..." instead of reacting with 👀. Add it from the manifest and reinstall the app.`
+            ? `Missing ${optional.join(', ')}: only the asker sees that Pace is working or failed, instead of 👀 and ⚠️ on their mention. Add it from the manifest and reinstall the app.`
             : undefined,
       })
     }

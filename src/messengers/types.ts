@@ -108,10 +108,11 @@ export interface Upload {
 }
 
 /**
- * A reaction the bot puts on a mention while it works on it: working (Slack:
- * 👀) from the start, slow (⏳) once it takes long
+ * A reaction the bot puts on a mention to show how it is doing: working (Slack:
+ * 👀) from the start, slow (⏳) once it takes long, failed (⚠️) when it could
+ * not answer
  */
-export type Mark = 'working' | 'slow'
+export type Mark = 'working' | 'slow' | 'failed'
 
 /** How answers read in this messenger, for the system prompt */
 export interface MessengerProfile {
@@ -160,17 +161,16 @@ export interface Messenger {
   post(mention: Mention, text: string): Promise<string>
   update(mention: Mention, message: string, text: string): Promise<void>
   /**
-   * Deletes a message the bot posted (the placeholder, once the answer is
-   * posted below it). False when it could not. Without it, the placeholder is
-   * edited into the answer.
+   * Deletes a message the bot posted: a placeholder ("Working on it...") an
+   * older version left in a request it resumes. False when it could not.
    */
   remove?(mention: Mention, message: string): Promise<boolean>
   upload(mention: Mention, files: Upload[]): Promise<void>
   /**
-   * Puts a reaction on the mention: the quiet way to say the bot has it, with
-   * no message in the conversation and no notification. False when it could
-   * not (Slack: the app lacks reactions:write); the pipeline then posts a
-   * placeholder message instead, as it does for a messenger without mark.
+   * Puts a reaction on the mention: the quiet way to say how the bot is doing,
+   * with no message in the conversation and no notification. False when it
+   * could not (Slack: the app lacks reactions:write); the pipeline then tells
+   * the asker alone (notice), as it does for a messenger without mark.
    */
   mark?(mention: Mention, mark: Mark): Promise<boolean>
   /** Takes the reaction off again; never fails */

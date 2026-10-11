@@ -56,9 +56,9 @@ and if it is still alive it exits with "Pace is already running".
 Restart handling:
 
 - Mentions in progress are recorded in `PACENOTE_DATA_DIR/inflight.json`. After a restart the bot resumes each one once; the 👀 stays on
-  the mention meanwhile (without `reactions:write`, the placeholder says "I restarted, so I'm picking this up again...").
-  Requests already resumed once or older than 30 minutes get "I couldn't finish this: I restarted and the request was cut
-  off. Please mention me again."
+  the mention meanwhile (without `reactions:write`, the asker alone is told "I restarted, so I'm picking this up again...").
+  Requests already resumed once or older than 30 minutes get ⚠️, and the asker alone is told "I couldn't finish this: I
+  restarted and the request was cut off. Please mention me again."
 - On a shutdown signal (SIGINT, SIGTERM) it stops taking new events and waits up to 20 seconds for requests in progress.
 - At startup it deletes attachment/output temp directories (`PACENOTE_DATA_DIR/attachments/*`) older than 1 hour.
 

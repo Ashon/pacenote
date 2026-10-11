@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { AppMentionEvent } from '@slack/types'
 import type { WebClient } from '@slack/web-api'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { loadConfig } from '../src/config.js'
 import { HistoryReader } from '../src/history/reader.js'
 import { HistoryStore } from '../src/history/recorder.js'
@@ -319,14 +319,16 @@ describe('answering through any messenger', () => {
     files: [],
   })
 
-  it('answers in the placeholder and posts the rest of a long answer', async () => {
+  it('tells only the asker it is working, and puts only the answer in the thread', async () => {
     const messenger = new MemoryMessenger()
     const responder = base(messenger, 'a'.repeat(45))
     await responder.handle(ask('hi'))
     expect(await responder.drain(5_000)).toBe(true)
-    expect(messenger.posts[0]).toMatch(/^Working on it\.\.\./)
-    expect(messenger.updates).toEqual(['a'.repeat(20)])
-    expect(messenger.posts.slice(1)).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.notices).toEqual([
+      expect.stringMatching(/^Working on it\.\.\./),
+    ])
+    expect(messenger.posts).toEqual(['a'.repeat(20), 'a'.repeat(20), 'aaaaa'])
+    expect(messenger.updates).toEqual([])
   })
 
   it('tells the asker when they are not allowed or the venue is not answered', async () => {
@@ -367,12 +369,12 @@ describe('answering through any messenger', () => {
     })
     // One runs and ten wait; the twelfth is one too many.
     for (let i = 0; i < 12; i++) await responder.handle(ask(`ask ${i}`))
+    // The one running is told it is working; the twelfth, that Pace is busy.
     expect(messenger.notices).toEqual([
+      expect.stringMatching(/^Working on it/),
       expect.stringMatching(/^I have too many/),
     ])
-    expect(messenger.posts.some((post) => post.startsWith('I have'))).toBe(
-      false
-    )
+    expect(messenger.posts).toEqual([])
     release()
     expect(await responder.drain(5_000)).toBe(true)
   })
@@ -384,7 +386,7 @@ describe('answering through any messenger', () => {
     await responder.handle(mention)
     await responder.handle({ ...mention })
     expect(await responder.drain(5_000)).toBe(true)
-    expect(messenger.updates).toEqual(['short'])
+    expect(messenger.posts).toEqual(['short'])
   })
 })
 
@@ -454,7 +456,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.marks).toEqual(['+working', '+slow', '-working', '-slow'])
   })
 
-  it('says a failure in a reply and takes the reaction off', async () => {
+  it('marks a failure with ⚠️ and tells only the asker why, leaving the thread alone', async () => {
     const messenger = new MarkingMessenger()
     const bot = responder(messenger, {
       answer: async () => {
@@ -463,34 +465,69 @@ describe('marking a mention instead of posting a placeholder', () => {
     })
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual([])
     // The test messenger keeps the first 20 characters of a one-line message.
-    expect(messenger.posts).toEqual(["I couldn't produce a"])
-    expect(messenger.updates).toEqual([])
-    expect(messenger.marks).toEqual(['+working', '-working'])
+    expect(messenger.notices).toEqual(["I couldn't produce a"])
+    expect(messenger.marks).toEqual(['+working', '+failed', '-working'])
   })
 
-  it('posts a placeholder when it cannot react, answers below it, and deletes it', async () => {
+  it('tells only the asker it is working or failed when it cannot react', async () => {
     const messenger = new MarkingMessenger()
     messenger.canMark = false
     const bot = responder(messenger)
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts[0]).toMatch(/^Working on it\.\.\./)
-    expect(messenger.posts.slice(1)).toEqual(['a'.repeat(20), 'aaaaa'])
-    expect(messenger.updates).toEqual([])
-    expect(messenger.removed).toEqual(['p1'])
+    expect(messenger.notices).toEqual([
+      expect.stringMatching(/^Working on it\.\.\./),
+    ])
+    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
     expect(messenger.marks).toEqual([])
+
+    const failing = new MarkingMessenger()
+    failing.canMark = false
+    await responder(failing, {
+      answer: async () => {
+        throw new Error('boom')
+      },
+    }).handle(ask())
+    await vi.waitFor(() => expect(failing.notices).toHaveLength(2))
+    expect(failing.notices[1]).toMatch(/^I couldn't produce/)
+    expect(failing.posts).toEqual([])
   })
 
-  it('points the placeholder to the answer when it cannot delete it', async () => {
+  it('takes away a placeholder an older version left, when it resumes the request', async () => {
+    const inflight = new InflightStore(path.join(root, 'legacy.json'))
+    const mention = ask()
+    inflight.upsert({
+      key: mentionKey(mention),
+      mention,
+      label: 'room-1',
+      placeholder: 'p0',
+      attempts: 1,
+      startedAt: Date.now(),
+    })
     const messenger = new MarkingMessenger()
-    messenger.canMark = false
-    messenger.canRemove = false
-    const bot = responder(messenger)
-    await bot.handle(ask())
+    const bot = responder(messenger, { inflight })
+    await bot.resumePending()
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts.slice(1)).toEqual(['a'.repeat(20), 'aaaaa'])
-    expect(messenger.updates).toEqual(['Answered below.'])
+    expect(messenger.removed).toEqual(['p0'])
+    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+
+    // Where it cannot delete it, the placeholder points to the answer.
+    const stuck = new MarkingMessenger()
+    stuck.canRemove = false
+    inflight.upsert({
+      key: mentionKey(mention),
+      mention,
+      label: 'room-1',
+      placeholder: 'p0',
+      attempts: 1,
+      startedAt: Date.now(),
+    })
+    const again = responder(stuck, { inflight })
+    await again.resumePending()
+    expect(await again.drain(5_000)).toBe(true)
+    expect(stuck.updates).toEqual(['I restarted; the ans'])
   })
 
   it('resumes a marked mention after a restart, answering in a new reply', async () => {
@@ -531,7 +568,8 @@ describe('marking a mention instead of posting a placeholder', () => {
     })
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual([
+    expect(messenger.posts).toEqual([])
+    expect(messenger.notices).toEqual([
       "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again in Pacenote.",
     ])
     // The responder runs on the host here, so the advice is to sign in there.

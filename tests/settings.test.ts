@@ -233,7 +233,7 @@ describe('connection check', () => {
       label: 'Bot scopes',
       ok: true,
       detail: expect.stringContaining(
-        'Missing reactions:write: Pace posts "Working on it..."'
+        'Missing reactions:write: only the asker sees that Pace is working or failed'
       ),
     })
   })

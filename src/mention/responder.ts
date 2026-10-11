@@ -110,11 +110,10 @@ interface Figure {
  * the local CLI (claude or codex), and posts the answer to the same thread as
  * the bot. Everything messenger-specific goes through Messenger.
  *
- * While it works, the mention carries a reaction (👀, and ⏳ once it takes
- * long) instead of a message, so a thread where people are talking gets
- * nothing from Pace until the answer, which comes as a new reply and notifies.
- * A messenger that cannot react gets a placeholder message ("Working on
- * it..."), deleted once the answer is posted below it.
+ * The thread gets only answers, as new replies that notify. How Pace is doing
+ * shows as reactions on the mention (👀 working, ⏳ slow, ⚠️ failed), and what
+ * only the asker needs (why it failed, that it is busy) goes to them alone. A
+ * messenger that cannot react tells the asker it is working the same way.
  */
 export class MentionResponder {
   private readonly limiter: ConcurrencyLimiter
@@ -201,31 +200,36 @@ export class MentionResponder {
     const { config, reasoner, log, inflight } = this.deps
     const where = `${reasoner.backend}@${reasoner.sandbox}`
     const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
-    let placeholder = resume?.placeholder
-    if (placeholder) {
+    // A placeholder message an older version posted, cut off by the upgrade:
+    // it goes, since the answer comes as a new reply.
+    if (resume?.placeholder)
+      await this.dropPlaceholder(
+        messenger,
+        mention,
+        resume.placeholder,
+        'I restarted; the answer comes below.'
+      )
+    const marked = Boolean(
+      await messenger.mark?.(mention, 'working').catch(() => false)
+    )
+    if (!marked)
       await messenger
-        .update(
+        .notice(
           mention,
-          placeholder,
-          say(`I restarted, so I'm picking this up again... (\`${where}\`)`)
+          say(
+            resume
+              ? `I restarted, so I'm picking this up again... (\`${where}\`)`
+              : `Working on it... (\`${where}\`)`
+          )
         )
         .catch(() => undefined)
-    } else if (
-      !(await messenger.mark?.(mention, 'working').catch(() => false))
-    ) {
-      placeholder = await messenger.post(
-        mention,
-        say(`Working on it... (\`${where}\`)`)
-      )
-    }
     // Marks to take off when done. The slow mark comes once the answer takes
     // long, counted from the first start across a restart.
-    const marks: Mark[] = placeholder ? [] : ['working']
+    const marks: Mark[] = marked ? ['working'] : []
     const startedAt = resume?.startedAt ?? Date.now()
     let slowing: Promise<void> | undefined
-    const slow = placeholder
-      ? undefined
-      : setTimeout(
+    const slow = marked
+      ? setTimeout(
           () => {
             slowing = messenger
               .mark?.(mention, 'slow')
@@ -239,6 +243,7 @@ export class MentionResponder {
             startedAt + (this.deps.slowAfterMs ?? SLOW_AFTER_MS) - Date.now()
           )
         )
+      : undefined
     const key = mentionKey(mention)
     this.requests.active += 1
     this.requests.lastAt = new Date().toISOString()
@@ -250,28 +255,17 @@ export class MentionResponder {
 
     try {
       const request = await messenger.request(mention)
-      run = this.openRun(
-        messenger,
-        mention,
-        label,
-        request,
-        placeholder,
-        resume?.runId
-      )
+      run = this.openRun(messenger, mention, label, request, resume?.runId)
       inflight?.upsert({
         key,
         mention,
         label,
-        placeholder,
         runId: run?.id,
         attempts: (resume?.attempts ?? 0) + 1,
         startedAt,
       })
       const context = (
-        await messenger.context(
-          mention,
-          placeholder ? [mention.message, placeholder] : [mention.message]
-        )
+        await messenger.context(mention, [mention.message])
       ).slice(-CONTEXT_MESSAGES)
       run?.patch({ context: { messages: context.length } })
       const time = (at: number) => formatTime(at, config.timezone)
@@ -358,12 +352,8 @@ export class MentionResponder {
         answer,
         attachmentsDir
       )
-      await this.deliver(
-        messenger,
-        mention,
-        placeholder,
-        messenger.render(text)
-      )
+      for (const chunk of messenger.render(text))
+        await messenger.post(mention, chunk)
       const generated = await this.shrinkImages(
         await collectGeneratedImages(outputDir),
         attachmentsDir
@@ -390,11 +380,13 @@ export class MentionResponder {
         this.deps.onReasoner?.(
           `${advice.text} (last at ${formatTime(Date.now(), config.timezone)})`
         )
-      // The conversation may be public, so the asker hears what it means and
-      // the error itself goes only to the log and the run history.
-      await this.deliver(messenger, mention, placeholder, [
-        say(failureReply(cause, reasoner.backend)),
-      ]).catch(() => undefined)
+      // ⚠️ on the mention, and what it means to the asker alone; the error
+      // itself stays in the log and the run history.
+      await this.fail(
+        messenger,
+        mention,
+        say(failureReply(cause, reasoner.backend))
+      )
     } finally {
       clearTimeout(slow)
       await slowing
@@ -450,12 +442,7 @@ export class MentionResponder {
         log.warn(
           `Giving up on interrupted request ${entry.key} (${entry.attempts} ${entry.attempts === 1 ? 'attempt' : 'attempts'})`
         )
-        await this.deliver(messenger, entry.mention, entry.placeholder, [
-          messenger.render(
-            "I couldn't finish this: I restarted and the request was cut off. Please mention me again."
-          )[0] ?? '',
-        ]).catch(() => undefined)
-        if (!entry.placeholder) await this.clearMarks(messenger, entry.mention)
+        await this.giveUp(messenger, entry.mention, entry.placeholder)
         continue
       }
       log.info(
@@ -471,7 +458,7 @@ export class MentionResponder {
       )
       if (!accepted) {
         inflight.remove(entry.key)
-        if (!entry.placeholder) await this.clearMarks(messenger, entry.mention)
+        await this.giveUp(messenger, entry.mention, entry.placeholder)
         if (entry.runId) {
           history?.reopen(entry.runId)?.finish('interrupted', {
             error: 'Could not resume because the queue was full',
@@ -501,7 +488,6 @@ export class MentionResponder {
     mention: Mention,
     label: string,
     request: Request,
-    placeholder: string | undefined,
     runId?: string
   ): RunHandle | undefined {
     const { history, reasoner, config, log } = this.deps
@@ -519,8 +505,6 @@ export class MentionResponder {
           conversationLabel: label,
           thread: mention.thread,
           message: mention.message,
-          placeholder,
-          // The mention itself: a placeholder is deleted once answered.
           permalink: messenger.permalink(mention, mention.message),
           userId: mention.userId,
           userName: request.userName,
@@ -538,36 +522,47 @@ export class MentionResponder {
     }
   }
 
-  /**
-   * Posts the answer (or a failure) where it notifies: as new replies at the
-   * bottom of the thread. A placeholder goes afterwards; a messenger that
-   * cannot delete messages gets it edited into the first reply instead, and one
-   * that fails to leaves it pointing below.
-   */
-  private async deliver(
+  /** ⚠️ on the mention, and the text to the asker alone */
+  private async fail(
     messenger: Messenger,
     mention: Mention,
-    placeholder: string | undefined,
-    chunks: string[]
+    text: string
   ): Promise<void> {
-    const [first = '', ...rest] = chunks
-    if (placeholder && !messenger.remove)
-      await messenger.update(mention, placeholder, first)
-    else await messenger.post(mention, first)
-    for (const chunk of rest) await messenger.post(mention, chunk)
-    if (
-      placeholder &&
-      messenger.remove &&
-      !(await messenger.remove(mention, placeholder).catch(() => false))
-    ) {
-      await messenger
-        .update(
-          mention,
-          placeholder,
-          messenger.render('Answered below.')[0] ?? ''
-        )
-        .catch(() => undefined)
-    }
+    await messenger.mark?.(mention, 'failed').catch(() => false)
+    await messenger.notice(mention, text).catch(() => undefined)
+  }
+
+  /** A request cut off by a restart that will not be answered after all */
+  private async giveUp(
+    messenger: Messenger,
+    mention: Mention,
+    placeholder: string | undefined
+  ): Promise<void> {
+    const text =
+      messenger.render(
+        "I couldn't finish this: I restarted and the request was cut off. Please mention me again."
+      )[0] ?? ''
+    if (placeholder)
+      await this.dropPlaceholder(messenger, mention, placeholder, text)
+    await this.clearMarks(messenger, mention)
+    await this.fail(messenger, mention, text)
+  }
+
+  /**
+   * Takes away a placeholder message an older version posted ("Working on
+   * it..."), or, where it cannot, leaves it saying the text instead
+   */
+  private async dropPlaceholder(
+    messenger: Messenger,
+    mention: Mention,
+    placeholder: string,
+    text: string
+  ): Promise<void> {
+    if (await messenger.remove?.(mention, placeholder).catch(() => false))
+      return
+    await messenger
+      .update(mention, placeholder, messenger.render(text)[0] ?? '')
+      .catch(() => undefined)
   }
 
   /** Takes the marks off a mention that will not be answered after all */
@@ -684,11 +679,21 @@ export class MentionResponder {
           (upload) => `${upload.title} source:\n\`\`\`\n${upload.raw}\n\`\`\``
         )
         .join('\n\n')
-      for (const chunk of messenger.render(
-        `I couldn't upload the images.${sources ? `\n${sources}` : ''}`
-      )) {
-        await messenger.post(mention, chunk).catch(() => undefined)
-      }
+      // The sources are part of the answer; that the upload failed is the
+      // asker's to know.
+      await messenger
+        .notice(
+          mention,
+          messenger.render(
+            sources
+              ? "I couldn't upload the images, so their sources are in the thread."
+              : "I couldn't upload the generated images."
+          )[0] ?? ''
+        )
+        .catch(() => undefined)
+      if (sources)
+        for (const chunk of messenger.render(sources))
+          await messenger.post(mention, chunk).catch(() => undefined)
       return false
     }
   }

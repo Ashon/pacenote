@@ -21,8 +21,8 @@ export interface InflightEntry {
   /** Where it was asked, as the run history shows it ("#ops") */
   label: string
   /**
-   * The bot's message the answer goes into. None when the mention was marked
-   * with a reaction instead, and the answer comes as a new reply.
+   * A placeholder message ("Working on it...") from an older version, which a
+   * resume takes away. Entries written now have none.
    */
   placeholder?: string
   /** Run id. When resuming, writing continues in the same run. */

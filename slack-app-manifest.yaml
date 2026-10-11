@@ -24,7 +24,7 @@ oauth_config:
       - files:read
       # Upload diagrams and generated images (files.uploadV2)
       - files:write
-      # React to a mention while answering it (👀), instead of posting "Working on it..."
+      # React to a mention while answering it (👀, ⏳, ⚠️), so status messages stay out of the thread
       - reactions:write
       # Show user names in the context
       - users:read

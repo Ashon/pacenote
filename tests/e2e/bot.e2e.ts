@@ -86,7 +86,7 @@ describe('bot on its own Slack app', () => {
     )
   })
 
-  it('posts "Working on it..." when the app cannot react, and deletes it once answered', async () => {
+  it('tells only the asker it is working when the app cannot react, and puts only the answer in the thread', async () => {
     world = await World.create([{ match: 'web-01', answer: 'Healthy.' }])
     const { slack, ops, alice } = world
     slack.scopes = slack.scopes.filter((scope) => scope !== 'reactions:write')
@@ -97,14 +97,19 @@ describe('bot on its own Slack app', () => {
       user: alice.id,
       text: `<@${slack.botUserId}> check web-01`,
     })
-    // The answer is still a new reply that notifies, and the placeholder goes.
     const replies = await world.answered(ops.id, ts)
     expect(replies.map((reply) => [reply.text, reply.edits])).toEqual([
       ['Healthy.', []],
     ])
-    expect(slack.deleted.map((message) => message.text)).toEqual([
-      'Working on it... (`claude@host`)',
+    expect(slack.ephemerals).toEqual([
+      {
+        channel: ops.id,
+        user: alice.id,
+        text: 'Working on it... (`claude@host`)',
+        thread_ts: undefined,
+      },
     ])
+    expect(slack.deleted).toEqual([])
     // The Pace screen says why, from the scopes Slack gave at startup; it is a
     // limit, not a problem the status bar counts.
     expect(world.status()).toMatchObject({
@@ -252,13 +257,22 @@ describe('bot on its own Slack app', () => {
       user: alice.id,
       text: `<@${slack.botUserId}> boom`,
     })
-    const [reply] = await eventually('the failure message', () => {
-      const replies = slack.replies(ops.id, ts)
-      return replies[0]?.text.startsWith("I couldn't") ? replies : undefined
-    })
-    expect(reply!.text).toBe(
-      "I couldn't produce an answer: I've reached my Claude usage limit for now. Please try again later."
+    // ⚠️ on the mention for everyone, why for the asker alone, and nothing in
+    // the thread
+    // 👀 comes off after ⚠️ goes on, so wait for both.
+    await eventually(
+      'the failure mark alone',
+      () => slack.message(ops.id, ts)?.reactions?.join() === 'warning'
     )
+    expect(slack.ephemerals).toEqual([
+      {
+        channel: ops.id,
+        user: alice.id,
+        text: "I couldn't produce an answer: I've reached my Claude usage limit for now. Please try again later.",
+        thread_ts: undefined,
+      },
+    ])
+    expect(slack.replies(ops.id, ts)).toEqual([])
     const run = await eventually('the failed run', () =>
       world!.runs().find((r) => r.status === 'failed')
     )

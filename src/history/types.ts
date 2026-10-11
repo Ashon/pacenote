@@ -80,9 +80,8 @@ export interface RunOrigin {
   /** The mention's message ID */
   message: string
   /**
-   * The placeholder message that said Pace was working, when it posted one
-   * (no reaction). It is deleted once the answer is posted; older versions
-   * edited the answer into it.
+   * Older versions: the placeholder message that said Pace was working, which
+   * the answer was edited into (later, deleted once the answer was posted)
    */
   placeholder?: string
   /** The mention in the messenger (older runs: the placeholder) */

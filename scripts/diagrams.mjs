@@ -670,7 +670,7 @@ function mentionFlow(c) {
     {
       tone: 'failed',
       title: 'The reasoner fails',
-      help: '"I couldn\'t produce an answer." as a reply; the cause stays in the log.',
+      help: '⚠️ on the mention; what it means, to the asker alone.',
     },
     {
       tone: 'interrupted',
