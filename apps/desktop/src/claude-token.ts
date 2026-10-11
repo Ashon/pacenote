@@ -5,49 +5,126 @@ import type { SettingsIssue } from '../../../src/settings/fields.js'
  * setup-token waits for the browser approval; past this the run is given up.
  */
 const TIMEOUT_MS = 5 * 60_000
-/** Where a long-lived Claude Code OAuth token starts */
-const TOKEN_START = /sk-ant-oat\d{2}-/
-/** A whole token, once its wrapped lines are joined */
-const TOKEN = /^sk-ant-oat\d{2}-[A-Za-z0-9_-]{20,}$/
-/**
- * What setup-token prints after the token: a blank line, then how to store and
- * use it
- */
-const AFTER_TOKEN = /\n[ \t]*\n|Store this token|Use this token/
+/** A long-lived Claude Code OAuth token */
+const TOKEN = /sk-ant-oat\d{2}-[A-Za-z0-9_-]{20,}/
+/** What setup-token shows under the token once it is all there */
+const AFTER_TOKEN = /Store this token|Use this token/
+/** Columns of the terminal setup-token runs in (stty cols in run()) */
+const COLUMNS = 1000
 
 export type ClaudeTokenResult = { ok: true } | { ok: false; error: string }
 
-/** Terminal output without color codes, cursor moves and carriage returns */
-export function plainText(output: string): string {
-  /* eslint-disable no-control-regex --
-     terminal escape sequences are control characters by definition */
-  return output
-    .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, '')
-    .replace(/\x1b\[[0-9;?<>=]*[ -/]*[@-~]/g, '')
-    .replace(/\x1b[@-Z\\-_]/g, '')
-    .replace(/\r/g, '')
-  /* eslint-enable no-control-regex */
+/* eslint-disable no-control-regex --
+   terminal escape sequences are control characters by definition */
+/**
+ * One piece of terminal output: a control sequence (OSC, CSI, a two-character
+ * escape), a control character, or a printable character
+ */
+const PIECE =
+  /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[([0-9;?<>=]*)[ -/]*([@-~])|\x1b[ -/]*([0-~])|[\x00-\x1f\x7f]|[^\x00-\x1f\x7f]/gu
+/* eslint-enable no-control-regex */
+
+/**
+ * The screen a terminal would show for this output, as lines. setup-token
+ * draws with a renderer that moves the cursor and rewrites only the characters
+ * that changed from the previous frame, so the output read as a stream glues
+ * the next line's changes onto the token; replaying it on a screen gives the
+ * lines as drawn. Handles what that renderer uses: cursor moves (CSI A B C D
+ * E F G H), erasing (CSI J K), cursor save and restore (ESC 7, ESC 8), CR, LF,
+ * BS; colors, modes and OSC (hyperlinks, titles) are skipped.
+ */
+export function screenLines(output: string, columns = COLUMNS): string[] {
+  const rows: string[][] = [[]]
+  let row = 0
+  let col = 0
+  let saved = { row: 0, col: 0 }
+  const line = (at: number) => {
+    while (rows.length <= at) rows.push([])
+    return rows[at]!
+  }
+  for (const [piece, params, final, escape] of output.matchAll(PIECE)) {
+    if (final) {
+      const [a = '', b = ''] = (params ?? '').split(';')
+      const n = Math.max(1, Number(a) || 1)
+      switch (final) {
+        case 'A':
+          row = Math.max(0, row - n)
+          break
+        case 'B':
+          row += n
+          break
+        case 'C':
+          col += n
+          break
+        case 'D':
+          col = Math.max(0, col - n)
+          break
+        case 'E':
+          row += n
+          col = 0
+          break
+        case 'F':
+          row = Math.max(0, row - n)
+          col = 0
+          break
+        case 'G':
+          col = n - 1
+          break
+        case 'H':
+        case 'f':
+          row = n - 1
+          col = Math.max(1, Number(b) || 1) - 1
+          break
+        case 'K': {
+          const cells = line(row)
+          if (a === '2') cells.length = 0
+          else if (a === '1') cells.fill(' ', 0, col + 1)
+          else cells.length = Math.min(cells.length, col)
+          break
+        }
+        case 'J':
+          if (a === '2' || a === '3') rows.splice(0, rows.length, [])
+          else if (a === '' || a === '0') {
+            rows.length = Math.min(rows.length, row + 1)
+            line(row).length = Math.min(line(row).length, col)
+          }
+          break
+      }
+    } else if (escape) {
+      if (escape === '7') saved = { row, col }
+      else if (escape === '8') ({ row, col } = saved)
+    } else if (piece === '\r') col = 0
+    else if (piece === '\n') row += 1
+    else if (piece === '\b') col = Math.max(0, col - 1)
+    else if (piece.codePointAt(0)! >= 0x20 && piece !== '\x7f') {
+      if (col >= columns) {
+        row += 1
+        col = 0
+      }
+      const cells = line(row)
+      while (cells.length < col) cells.push(' ')
+      cells[col] = piece
+      col += 1
+    }
+  }
+  return rows.map((cells) => cells.join('').trimEnd())
 }
 
 /**
- * The token in setup-token's output, once all of it is there. The command
- * wraps the token at its own width (120 columns, however wide the terminal),
- * so the lines up to what follows it are joined; until that has arrived, the
- * token may still be coming. At the end of the output (complete), the rest
- * counts.
+ * The token in setup-token's output, once all of it is there: the lines under
+ * it (how to store and use it) have been drawn, or the output has ended
+ * (complete).
  */
 export function findClaudeToken(
   output: string,
   complete = false
 ): string | undefined {
-  const text = plainText(output)
-  const start = text.search(TOKEN_START)
-  if (start < 0) return undefined
-  const rest = text.slice(start)
-  const end = rest.search(AFTER_TOKEN)
-  if (end < 0 && !complete) return undefined
-  const token = rest.slice(0, end < 0 ? undefined : end).replace(/\s+/g, '')
-  return TOKEN.test(token) ? token : undefined
+  const lines = screenLines(output)
+  const at = lines.findIndex((text) => TOKEN.test(text))
+  if (at < 0) return undefined
+  if (!complete && !lines.slice(at + 1).some((text) => AFTER_TOKEN.test(text)))
+    return undefined
+  return TOKEN.exec(lines[at]!)?.[0]
 }
 
 /**
@@ -163,8 +240,7 @@ export class ClaudeTokenSetup {
         if (token) return save(token)
         // Ended without a token: show the last line it printed (for example
         // that a subscription is required).
-        const last = plainText(output)
-          .split('\n')
+        const last = screenLines(output)
           .map((line) => line.trim())
           .filter((line) => line.length > 3 && !/^[·✢✳✶✻✽*]+$/.test(line))
           .at(-1)

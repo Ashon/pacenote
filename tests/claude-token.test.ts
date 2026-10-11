@@ -1,39 +1,41 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   ClaudeTokenSetup,
   findClaudeToken,
-  plainText,
+  screenLines,
 } from '../apps/desktop/src/claude-token.js'
 
-// Longer than the 120 columns setup-token wraps it at, as real tokens are
-const TOKEN = `sk-ant-oat01-${'Ab3_-'.repeat(24)}AA`
-/** How setup-token prints the token: wrapped at 120, then how to use it */
-const printed = (token: string) =>
-  `Your OAuth token (valid for 1 year):\r\n\r\n` +
-  `\x1b[33m${token.slice(0, 120)}\r\n${token.slice(120)}\x1b[39m\r\n\r\n` +
-  "Store this token securely. You won't be able to see it again.\r\n"
+/**
+ * What claude setup-token (Claude Code 2.1.296) printed under script(1) for a
+ * real approval, with a stand-in token: its renderer moves the cursor and
+ * rewrites only what changed from the previous frame.
+ */
+const RECORDED = readFileSync(
+  new URL('fixtures/claude-setup-token-2.1.296.txt', import.meta.url),
+  'utf8'
+)
+const RECORDED_TOKEN = `sk-ant-oat01-${'Fake-Token_0123456789'.repeat(5).slice(0, 95)}`
+const TOKEN = `sk-ant-oat01-${'Ab3_-'.repeat(19)}AA`
 
 describe('claude setup-token for the sandbox', () => {
-  it('finds the token in terminal output with escape codes and spinner frames', () => {
-    // The start of a real run under script(1), then the token as a terminal
-    // would draw it
-    const output =
-      '\x1b[?25l\x1b[>4;2mWelcome to Claude Code v2.1.295\r\n' +
-      '\x1b]0;claude\x07· Opening browser to sign in…\r\x1b[2K✢\r\n' +
-      printed(TOKEN)
-    expect(plainText(output)).toContain('Welcome to Claude Code')
-    expect(findClaudeToken(output)).toBe(TOKEN)
-    expect(findClaudeToken('Opening browser to sign in…')).toBeUndefined()
+  it('reads the token from the screen as drawn, not the stream', () => {
+    const lines = screenLines(RECORDED)
+    expect(lines).toContain(` ${RECORDED_TOKEN}`)
+    // Rewritten over "Paste code here if prompted >" with only the changes
+    expect(lines).toContain(
+      " Store this token securely. You won't be able to see it again."
+    )
+    expect(findClaudeToken(RECORDED)).toBe(RECORDED_TOKEN)
   })
 
-  it('joins a token wrapped over lines, and waits until all of it is there', () => {
-    const output = printed(TOKEN)
-    // Only the first wrapped line so far: not the token yet
-    const firstLine = output.slice(0, output.indexOf(TOKEN.slice(120)))
-    expect(findClaudeToken(firstLine)).toBeUndefined()
-    expect(findClaudeToken(output)).toBe(TOKEN)
-    // At the end of the output, the rest is the token.
-    expect(findClaudeToken(`token:\n${TOKEN}`, true)).toBe(TOKEN)
+  it('waits until the lines under the token are drawn, unless the output ended', () => {
+    const cut = RECORDED.slice(0, RECORDED.indexOf(RECORDED_TOKEN) + 60)
+    expect(findClaudeToken(cut)).toBeUndefined()
+    const token = RECORDED.slice(0, RECORDED.indexOf('Stor'))
+    expect(findClaudeToken(token)).toBeUndefined()
+    expect(findClaudeToken(token, true)).toBe(RECORDED_TOKEN)
+    expect(findClaudeToken('Opening browser to sign in…', true)).toBeUndefined()
   })
 
   it('saves the token it reads and reports success without handing the token back', async () => {
@@ -42,13 +44,13 @@ describe('claude setup-token for the sandbox', () => {
       toolPath: () => process.env.PATH ?? '',
       save,
       platform: 'darwin',
-      // The token arrives in two pieces, the way a wrapped line can.
+      // The token arrives in two pieces, the way the output can be read.
       command: [
         '/bin/sh',
         [
           '-c',
-          `printf 'Your OAuth token:\\n\\n${TOKEN.slice(0, 120)}\\n'; sleep 0.3; ` +
-            `printf '${TOKEN.slice(120)}\\n\\nStore this token securely.\\n'; exec sleep 30`,
+          `printf 'Your OAuth token:\\n\\n${TOKEN.slice(0, 50)}'; sleep 0.3; ` +
+            `printf '${TOKEN.slice(50)}\\n\\nStore this token securely.\\n'; exec sleep 30`,
         ],
       ],
     })
@@ -56,6 +58,24 @@ describe('claude setup-token for the sandbox', () => {
     expect(save).toHaveBeenCalledTimes(1)
     expect(save).toHaveBeenCalledWith(TOKEN)
     expect(setup.running).toBe(false)
+  })
+
+  it('saves the token from the recorded run, the way the app reads it', async () => {
+    const save = vi.fn(() => [])
+    const setup = new ClaudeTokenSetup({
+      toolPath: () => process.env.PATH ?? '',
+      save,
+      platform: 'darwin',
+      command: [
+        '/bin/cat',
+        [
+          new URL('fixtures/claude-setup-token-2.1.296.txt', import.meta.url)
+            .pathname,
+        ],
+      ],
+    })
+    expect(await setup.run()).toEqual({ ok: true })
+    expect(save).toHaveBeenCalledWith(RECORDED_TOKEN)
   })
 
   it('reports why it ended without a token, and stops when cancelled', async () => {
