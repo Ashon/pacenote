@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
@@ -40,8 +42,36 @@ function historyApi(): Plugin {
   }
 }
 
+/** The app's version (the three package.json files are bumped together) */
+const { version } = JSON.parse(
+  readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')
+) as { version: string }
+
+/**
+ * Where the build stands in git when it is not exactly the release:
+ * v0.3.9-3-g2034e74-dirty is 3 commits after v0.3.9, with uncommitted
+ * changes. None for a build of the release tag, or without git or its tags.
+ */
+function gitDescribe(): string | undefined {
+  try {
+    const describe = execFileSync(
+      'git',
+      ['describe', '--tags', '--dirty', '--match', 'v*'],
+      { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+      .toString()
+      .trim()
+    return describe === `v${version}` ? undefined : describe
+  } catch {
+    return undefined
+  }
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), historyApi()],
+  define: {
+    __PACENOTE_BUILD__: JSON.stringify({ version, describe: gitDescribe() }),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

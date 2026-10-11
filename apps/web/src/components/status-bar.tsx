@@ -11,8 +11,8 @@ import { describeBot, TONE_CLASS } from './bot-state'
 /**
  * The window's footer: indicators to glance at from any screen, on the chrome
  * under the sidebar and the content surface. Left: Pace (status, reasoner,
- * attached tools, check issues). Right: requests, and a button that opens the
- * run history in Finder. Narrow windows drop the less needed ones.
+ * attached tools, check issues). Right: requests, a button that opens the run
+ * history in Finder, and the version. Narrow windows drop the less needed ones.
  */
 export function StatusBar({
   onOpenRoute,
@@ -124,6 +124,8 @@ export function StatusBar({
             <FolderOpen />
           </Item>
         )}
+        {/* Which Pacenote this is, for upgrades and bug reports */}
+        <Version />
       </div>
     </footer>
   )
@@ -168,5 +170,44 @@ function Item({
         </span>
       )}
     </Tooltip>
+  )
+}
+
+/**
+ * The build: its version for a release, which opens its release notes, or
+ * where it stands in git for any other build (pnpm desktop, a build between
+ * releases)
+ */
+function Version() {
+  const { version, describe } = __PACENOTE_BUILD__
+  const dev = Boolean(window.pacenoteDesktop?.dev)
+  const where = dev ? ', running from the repository' : ''
+  if (!describe) {
+    const notes = `https://github.com/Ashon/pacenote/releases/tag/v${version}`
+    return dev ? (
+      <Item tip={`Pacenote ${version}${where}`}>v{version}</Item>
+    ) : (
+      <Item
+        tip={`Pacenote ${version}: open its release notes`}
+        onClick={() => window.open(notes, '_blank')}
+      >
+        v{version}
+      </Item>
+    )
+  }
+  // v0.3.9-3-g2034e74-dirty: 3 commits after v0.3.9, uncommitted changes
+  const [, base = describe, ahead, hash, dirty] =
+    /^(v.+?)(?:-(\d+)-g([0-9a-f]+))?(-dirty)?$/.exec(describe) ?? []
+  const parts = [
+    ahead ? `${ahead} commits after ${base} (${hash})` : `at ${base}`,
+    ...(dirty ? ['with uncommitted changes'] : []),
+  ]
+  return (
+    <Item
+      tip={`Pacenote built from git: ${parts.join(', ')}${where}`}
+      className="@max-[40rem]:hidden"
+    >
+      {describe}
+    </Item>
   )
 }
