@@ -30,7 +30,7 @@ services:
     build:
       context: ./reasoner
       args:
-        CLAUDE_CODE_VERSION: "2.1.293"
+        CLAUDE_CODE_VERSION: "2.1.296"
         CODEX_VERSION: "0.161.0"
     image: pacenote-reasoner:latest
     profiles: ["build"]
