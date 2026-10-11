@@ -27,13 +27,13 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CodeBlock } from './code-block'
-import { PacenoteMark } from './logo'
 import { PaceSpinner } from './pace-spinner'
 import { Markdown } from './markdown'
 
 /** Shows the request -> steps -> reply -> outputs in order. */
 export function Timeline({ run }: { run: RunRecord }) {
   const answer = run.answer?.trim()
+  const working = run.status === 'running'
   // The last message is the same as the final reply, so it is left out of the
   // steps.
   const lastMessageIndex = run.events.findLastIndex((e) => e.kind === 'message')
@@ -88,23 +88,25 @@ export function Timeline({ run }: { run: RunRecord }) {
         </div>
       )}
 
-      {/* Pace at work, where its answer will appear: the mark looks around
-          until the answer replaces it. */}
-      {run.status === 'running' && (
-        <div className="flex items-center gap-3 text-xs font-medium text-status-running">
-          <PaceSpinner />
-          Working
-        </div>
-      )}
-
-      {answer && (
+      {/* Pace's reply. While Pace works, its mark looks around where the
+          reply will appear; when the reply comes, the mark eases into the
+          logo and stays as Pace's avatar. */}
+      {(working || answer) && (
         <Bubble
-          avatar={<PacenoteMark className="size-7" />}
+          avatar={<PaceSpinner active={working} />}
           title="Pace"
-          meta={run.finishedAt ? formatDateTime(run.finishedAt) : undefined}
+          meta={
+            working ? (
+              <span className="text-shimmer font-medium text-status-running">
+                Working
+              </span>
+            ) : run.finishedAt ? (
+              formatDateTime(run.finishedAt)
+            ) : undefined
+          }
           accent
         >
-          <Markdown>{answer}</Markdown>
+          {answer && <Markdown>{answer}</Markdown>}
         </Bubble>
       )}
 
@@ -200,9 +202,10 @@ function Bubble({
 }: {
   avatar: React.ReactNode
   title: string
-  meta?: string
+  meta?: React.ReactNode
   accent?: boolean
-  children: React.ReactNode
+  /** None: only the header, as while Pace works on its reply */
+  children?: React.ReactNode
 }) {
   return (
     <div className="flex gap-3">
@@ -217,7 +220,7 @@ function Bubble({
             : 'surface-card'
         )}
       >
-        <div className="mb-2 flex items-baseline gap-2">
+        <div className={cn('flex items-baseline gap-2', children && 'mb-2')}>
           <span className="text-sm font-semibold">{title}</span>
           {meta && (
             <span className="text-[11px] text-muted-foreground">{meta}</span>

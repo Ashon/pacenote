@@ -1430,7 +1430,10 @@ function HubPairing({
             {/* Pace itself is watching Slack for the mention. */}
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <PaceSpinner className="size-6" />
-              Waiting for the code. It expires in 10 minutes.
+              <span>
+                <span className="text-shimmer">Waiting for the code.</span> It
+                expires in 10 minutes.
+              </span>
             </p>
           </div>
         )

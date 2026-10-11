@@ -177,7 +177,8 @@ Run history:
   which are most of the input and cost far less.
 - UI: run list (status filter, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for
   mentions and task collections), run detail ("Timeline" of the work in the order request -> tool calls -> answer -> outputs,
-  "Attachments", "Prompt", raw "JSON"; the Tokens figure breaks down on hover). Runs in progress are reread every 1.5 seconds.
+  where Pace's mark looks around while it works and stays as the answer's avatar; "Attachments", "Prompt", raw "JSON"; the
+  Tokens figure breaks down on hover). Runs in progress are reread every 1.5 seconds.
 
 Other:
 

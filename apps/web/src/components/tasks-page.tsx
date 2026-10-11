@@ -9,7 +9,6 @@ import {
   CircleCheck,
   ExternalLink,
   History,
-  LoaderCircle,
   RefreshCw,
   Settings,
   Undo2,
@@ -29,6 +28,7 @@ import {
 } from '@/lib/format'
 import { useCollect, useDecide, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { PaceSpinner } from './pace-spinner'
 
 type Tab = 'open' | 'maybe' | 'done'
 
@@ -230,8 +230,8 @@ function CollectButton({ running }: { running: boolean }) {
   if (running)
     return (
       <div className="flex items-center gap-1">
+        {/* The status line under the title shows Pace at work. */}
         <Button size="sm" variant="secondary" disabled>
-          <LoaderCircle className="animate-spin" />
           Collecting
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void stop()}>
@@ -269,17 +269,22 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups.`
   }
   if (!text && !last) return null
+  // Pace's mark looks around while a collection runs and eases into the logo
+  // beside its result.
   return (
     <p
       className={cn(
-        'mt-1 text-sm',
+        'mt-1 flex items-center gap-2 text-sm',
         last && !last.ok && !running
           ? 'text-status-interrupted'
           : 'text-muted-foreground'
       )}
     >
-      {text ?? (last && !last.ok ? last.error : null)}
-      {spent && <span className="text-foreground/80"> {spent}</span>}
+      <PaceSpinner active={Boolean(running)} className="size-6" />
+      <span className={cn('min-w-0', running && 'text-shimmer')}>
+        {text ?? (last && !last.ok ? last.error : null)}
+        {spent && <span className="text-foreground/80"> {spent}</span>}
+      </span>
     </p>
   )
 }
