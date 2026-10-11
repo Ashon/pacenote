@@ -1,4 +1,5 @@
 import type { RunEvent, RunRecord } from '@history/types'
+import { failureAdvice } from '@src/mention/failure'
 import {
   Brain,
   ChevronRight,
@@ -152,10 +153,41 @@ export function Timeline({ run }: { run: RunRecord }) {
             <p className="mt-0.5 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground">
               {run.error}
             </p>
+            {run.cause && <Advice run={run} cause={run.cause} />}
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+/** What the failure means for the operator, and where to fix it */
+function Advice({
+  run,
+  cause,
+}: {
+  run: RunRecord
+  cause: NonNullable<RunRecord['cause']>
+}) {
+  const advice = failureAdvice(cause, run.backend.reasoner, run.backend.sandbox)
+  if (!advice) return null
+  return (
+    <p className="mt-2 text-sm text-foreground">
+      {advice.text}
+      {advice.route && (
+        <>
+          {' '}
+          <a
+            href={advice.route}
+            className="font-medium text-primary underline-offset-2 hover:underline"
+          >
+            {advice.route.startsWith('#/settings')
+              ? 'Open Settings'
+              : 'Open Pace'}
+          </a>
+        </>
+      )}
+    </p>
   )
 }
 

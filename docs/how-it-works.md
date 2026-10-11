@@ -24,7 +24,11 @@ What happens between a mention and its answer: context, attachments, diagrams an
   can see (ephemeral): "I only answer specific people here."
 - It does not answer in private channels or DMs.
 - It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it replies that it is busy.
-- On failure it replies "I couldn't produce an answer." The channel is public, so error details go only to the log.
+- On failure it replies "I couldn't produce an answer" with what that means, read from the reasoner's error
+  (`src/mention/failure.ts`): its sign-in was rejected, it reached a usage limit, its service was unavailable, something in
+  the setup failed, or the request took too long. The channel is public, so the error itself goes only to the log and the
+  run history, where the run also says what to fix and links to it. A rejected sign-in or a usage limit also shows in the
+  status bar's check issues until the reasoner answers again.
 
 ## Attachments
 Files attached to the mention and to the thread are downloaded with the bot token (`files:read`) and passed along. Attachments

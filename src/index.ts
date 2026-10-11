@@ -73,6 +73,8 @@ async function main(): Promise<void> {
    * come from sandboxHealth
    */
   const problems: string[] = []
+  /** Why the reasoner cannot answer, until it answers again */
+  let reasonerProblem: string | undefined
 
   const sandbox: Sandbox = config.reasoner.sandbox
     ? new DockerSandbox(config.reasoner.sandbox)
@@ -84,6 +86,7 @@ async function main(): Promise<void> {
   // follows a proxy that is started or stopped later.
   const allProblems = () => [
     ...sandboxHealth.current.map((problem) => `Sandbox: ${problem}`),
+    ...(reasonerProblem ? [`Reasoner: ${reasonerProblem}`] : []),
     ...problems,
   ]
   const sandboxHealth = new SandboxHealth(
@@ -141,6 +144,11 @@ async function main(): Promise<void> {
     inflight: new InflightStore(path.join(config.dataDir, 'inflight.json')),
     history,
     onActivity: (requests) => status.update({ requests }),
+    onReasoner: (problem) => {
+      if (problem === reasonerProblem) return
+      reasonerProblem = problem
+      status.update({ problems: allProblems() })
+    },
   })
 
   status.update({

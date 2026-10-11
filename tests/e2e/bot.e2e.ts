@@ -240,7 +240,7 @@ describe('bot on its own Slack app', () => {
     expect(world.claudeCalls()).toEqual([])
   })
 
-  it('says an answer failed without showing the cause, and records the cause', async () => {
+  it('tells the asker what a failure means without the error, and the status what to do', async () => {
     world = await World.create([
       { match: 'boom', fail: 'API quota exceeded for org-123' },
     ])
@@ -257,12 +257,18 @@ describe('bot on its own Slack app', () => {
       return replies[0]?.text.startsWith("I couldn't") ? replies : undefined
     })
     expect(reply!.text).toBe(
-      "I couldn't produce an answer. An error occurred while processing the request."
+      "I couldn't produce an answer: I've reached my Claude usage limit for now. Please try again later."
     )
     const run = await eventually('the failed run', () =>
       world!.runs().find((r) => r.status === 'failed')
     )
-    expect(run.error).toContain('API quota exceeded for org-123')
+    expect(run).toMatchObject({
+      error: expect.stringContaining('API quota exceeded for org-123'),
+      cause: 'limit',
+    })
+    expect(world.status()?.problems).toEqual([
+      expect.stringMatching(/^Reasoner: claude reached its usage limit\./),
+    ])
   })
 
   it('reads attached files: text and images, files that need a lookup, and says which it could not read', async () => {

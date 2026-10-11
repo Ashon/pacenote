@@ -189,7 +189,10 @@ describe('mention run history', () => {
     expect(await responder.drain(5_000)).toBe(true)
     const failed = reader.list({ status: 'failed' })
     expect(failed).toHaveLength(1)
-    expect(reader.get(failed[0]!.id)?.error).toContain('quota exceeded')
+    expect(reader.get(failed[0]!.id)).toMatchObject({
+      error: expect.stringContaining('quota exceeded'),
+      cause: 'limit',
+    })
   })
 })
 
@@ -356,6 +359,7 @@ describe('marking a mention instead of posting a placeholder', () => {
       answer?: () => Promise<string>
       slowAfterMs?: number
       inflight?: InflightStore
+      onReasoner?: (problem: string | undefined) => void
     } = {}
   ) =>
     new MentionResponder({
@@ -375,6 +379,7 @@ describe('marking a mention instead of posting a placeholder', () => {
       extractPdfText: async () => '',
       slowAfterMs: options.slowAfterMs,
       inflight: options.inflight,
+      onReasoner: options.onReasoner,
     })
   const ask = (): Mention => ({
     messenger: 'slack',
@@ -471,5 +476,39 @@ describe('marking a mention instead of posting a placeholder', () => {
     // The 👀 from before the restart is still there; marking again is a no-op.
     expect(messenger.marks).toEqual(['+working', '-working'])
     expect(inflight.list()).toEqual([])
+  })
+
+  it('says what a rejected sign-in means, and tells the status until it answers again', async () => {
+    const messenger = new MarkingMessenger()
+    messenger.render = (markdown: string) => [markdown]
+    const problems: (string | undefined)[] = []
+    let signedIn = false
+    const bot = responder(messenger, {
+      answer: async () => {
+        if (!signedIn)
+          throw new Error(
+            'claude run failed: Failed to authenticate. API Error: 401 OAuth access token is invalid.'
+          )
+        return 'back'
+      },
+      onReasoner: (problem) => problems.push(problem),
+    })
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual([
+      "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again in Pacenote.",
+    ])
+    // The responder runs on the host here, so the advice is to sign in there.
+    expect(problems).toEqual([
+      expect.stringMatching(
+        /^claude's sign-in on this Mac was rejected\..*\(last at /
+      ),
+    ])
+
+    signedIn = true
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts.at(-1)).toBe('back')
+    expect(problems.at(-1)).toBeUndefined()
   })
 })

@@ -1,3 +1,4 @@
+import type { FailureCause } from '../mention/failure.js'
 import type { MessengerId } from '../messengers/ids.js'
 
 /**
@@ -109,6 +110,8 @@ export interface RunRecord {
   answer?: string
   outputs: RunOutput[]
   error?: string
+  /** Why the reasoner failed, when the error says (src/mention/failure.ts) */
+  cause?: FailureCause
 }
 
 /** Summary for the list screen */

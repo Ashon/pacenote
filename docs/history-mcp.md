@@ -36,7 +36,7 @@ when it needs it (stdio, no port). Pacenote does not need to be running.
 | --- | --- |
 | `recent_runs` | The latest runs, newest first: id, status, when, channel, requester, the request, the reasoner, how many tools it used. `limit` (default 10, at most 50), `status` |
 | `search_runs` | Runs whose request, channel, requester, answer or error contains `query`. `status`, `since` (ISO 8601), `limit` |
-| `get_run` | One run in full: the request and its Slack link, each tool call and command with its result (cut to 1500 characters), the answer or error, outputs, token use. `include_prompt` adds the prompt Pace sent to the reasoner |
+| `get_run` | One run in full: the request and its Slack link, each tool call and command with its result (cut to 1500 characters), the answer or error (and its cause, such as `auth` or `limit`), outputs, token use. `include_prompt` adds the prompt Pace sent to the reasoner |
 
 All three are read-only. The history is the one the desktop app shows (`PACENOTE_DATA_DIR`, by default `~/.pacenote`).
 

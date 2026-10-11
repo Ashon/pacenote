@@ -27,6 +27,7 @@ import {
   planAttachments,
   type FileCandidate,
 } from './attachments.js'
+import { failureAdvice, failureCause, failureReply } from './failure.js'
 import { collectGeneratedImages } from './generated.js'
 import { resumeDecision, type InflightStore } from './inflight.js'
 import { ConcurrencyLimiter } from './limiter.js'
@@ -62,6 +63,12 @@ export interface MentionResponderDeps {
   history?: HistoryStore
   /** When a mention gets the slow mark. Default SLOW_AFTER_MS (for tests) */
   slowAfterMs?: number
+  /**
+   * Why the reasoner cannot answer, for the status: a failure that lasts until
+   * fixed (a rejected sign-in, a usage limit), or undefined once it answers
+   * again
+   */
+  onReasoner?: (problem: string | undefined) => void
   /**
    * Called whenever the active/handled request counts change. (bot status file)
    */
@@ -237,6 +244,8 @@ export class MentionResponder {
     this.deps.onActivity?.({ ...this.requests })
     const attachmentsDir = path.join(this.attachmentsRoot, randomUUID())
     let run: RunHandle | undefined
+    // Only the reasoner's own errors say something about the reasoner.
+    let reasoning = false
 
     try {
       const request = await messenger.request(mention)
@@ -327,6 +336,7 @@ export class MentionResponder {
         imageGeneration: reasoner.backend === 'codex',
       })
       run?.setPrompt(system, prompt)
+      reasoning = true
       const answer = await reasoner.complete({
         system,
         prompt,
@@ -338,6 +348,8 @@ export class MentionResponder {
         outputDir,
         onEvent: run ? (step) => run?.event(step) : undefined,
       })
+      reasoning = false
+      this.deps.onReasoner?.(undefined)
       run?.patch({ answer })
       log.info(`Answered mention ${key} (${where}, ${Date.now() - started}ms)`)
 
@@ -366,14 +378,21 @@ export class MentionResponder {
       run?.finish('succeeded')
     } catch (err) {
       log.error(`Failed to answer mention ${key}`, err)
-      run?.finish('failed', { error: (err as Error).message })
-      // The conversation may be public, so internal error details go only to
-      // the log.
-      const reason = /timed out/.test((err as Error).message)
-        ? 'The request timed out.'
-        : 'An error occurred while processing the request.'
+      const error = (err as Error).message
+      const cause = reasoning ? failureCause(error) : 'other'
+      run?.finish('failed', {
+        error,
+        ...(cause === 'other' ? {} : { cause }),
+      })
+      const advice = failureAdvice(cause, reasoner.backend, reasoner.sandbox)
+      if (advice?.lasting)
+        this.deps.onReasoner?.(
+          `${advice.text} (last at ${formatTime(Date.now(), config.timezone)})`
+        )
+      // The conversation may be public, so the asker hears what it means and
+      // the error itself goes only to the log and the run history.
       await this.deliver(messenger, mention, placeholder, [
-        say(`I couldn't produce an answer. ${reason}`),
+        say(failureReply(cause, reasoner.backend)),
       ]).catch(() => undefined)
     } finally {
       clearTimeout(slow)

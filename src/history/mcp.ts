@@ -190,6 +190,7 @@ function detail(record: RunRecord, prompt: boolean) {
     steps: record.events.flatMap(step),
     answer: record.answer,
     error: record.error,
+    cause: record.cause,
     outputs: record.outputs.map(({ kind, title, file }) => ({
       kind,
       title,
