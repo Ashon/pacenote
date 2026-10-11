@@ -236,6 +236,40 @@
   .pacenote-gradient {
     background: var(--pacenote-gradient);
   }
+  /*
+   * Text at work: a band sweeps across it, the text's color leaning toward
+   * the foreground (darker in light, lighter in dark), so it never reads
+   * fainter than the text itself
+   */
+  .text-shimmer {
+    background: linear-gradient(
+        90deg,
+        currentColor 35%,
+        color-mix(in oklch, currentColor 35%, var(--foreground)) 50%,
+        currentColor 65%
+      )
+      0 0 / 300% 100%;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: text-shimmer 2s linear infinite;
+  }
+}
+
+@keyframes text-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-shimmer {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
 }
 
 @keyframes pulse-dot {
