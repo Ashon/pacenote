@@ -1,7 +1,14 @@
-import type { DismissReason, TaskView, TasksCollect } from '@src/tasks/types'
+import { newTokens } from '@history/usage'
+import type {
+  CollectionRecord,
+  DismissReason,
+  TaskView,
+  TasksCollect,
+} from '@src/tasks/types'
 import {
   CircleCheck,
   ExternalLink,
+  History,
   LoaderCircle,
   RefreshCw,
   Settings,
@@ -10,10 +17,16 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type * as React from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatRelative } from '@/lib/format'
+import {
+  formatDayGroup,
+  formatHourMinute,
+  formatRelative,
+  formatTokens,
+} from '@/lib/format'
 import { useCollect, useDecide, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 
@@ -171,6 +184,8 @@ export function TasksPage() {
           settled. Above about 30%, Pace is picking too loosely.
         </p>
       )}
+
+      <RecentCollections collections={data.collections ?? []} />
     </Page>
   )
 }
@@ -249,6 +264,8 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       ? `Added ${found.join(' and ')}.`
       : 'Nothing new to add.'
     if (last.skipped) text += ` ${last.skipped} left out by your settings.`
+    if (last.usage)
+      text += ` ${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups.`
   }
   if (!text && !last) return null
   return (
@@ -263,6 +280,102 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       {text ?? (last && !last.ok ? last.error : null)}
     </p>
   )
+}
+
+/** The most recent collections the list shows; the header counts them all */
+const RECENT_SHOWN = 10
+
+/**
+ * The collections the app ran in the last 7 days: when, how each ended, and
+ * the new tokens it spent (the Overview has them per day)
+ */
+function RecentCollections({
+  collections,
+}: {
+  collections: CollectionRecord[]
+}) {
+  if (!collections.length) return null
+  const spent = collections.map((entry) =>
+    entry.usage ? newTokens(entry.usage) : 0
+  )
+  const max = Math.max(1, ...spent)
+  const total = spent.reduce((sum, value) => sum + value, 0)
+  return (
+    <section
+      aria-labelledby="collections-title"
+      className="mt-10 border-t border-border pt-9"
+    >
+      <div className="flex items-center gap-2">
+        <History className="size-4 shrink-0 text-primary" />
+        <h2 id="collections-title" className="text-sm font-semibold">
+          Recent collections
+        </h2>
+        <span className="ml-auto text-xs text-muted-foreground">
+          Last 7 days · {collections.length}{' '}
+          {collections.length === 1 ? 'collection' : 'collections'} ·{' '}
+          {formatTokens(total)} new
+        </span>
+      </div>
+      <ul className="mt-4 text-[13px]">
+        {collections.slice(0, RECENT_SHOWN).map((entry, index) => (
+          <li
+            key={entry.startedAt}
+            className="grid grid-cols-[8.5rem_minmax(0,1fr)_auto] items-center gap-x-4 border-t border-border py-2.5"
+          >
+            <span className="font-medium tabular-nums">
+              {formatDayGroup(entry.startedAt)}{' '}
+              {formatHourMinute(entry.startedAt)}
+            </span>
+            <span className="flex min-w-0 items-center gap-3">
+              <Badge variant="outline">{TRIGGER_LABEL[entry.trigger]}</Badge>
+              <span
+                title={collectionNote(entry)}
+                className={cn(
+                  'truncate text-xs',
+                  entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
+                )}
+              >
+                {collectionNote(entry)}
+              </span>
+            </span>
+            <span className="flex items-center justify-end gap-2.5 text-xs">
+              <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
+                {spent[index]! > 0 && (
+                  <span
+                    className="block h-full min-w-1.5 rounded-full bg-chart-4"
+                    style={{ width: `${(spent[index]! / max) * 100}%` }}
+                  />
+                )}
+              </span>
+              <span className="w-16 text-right font-medium tabular-nums">
+                {spent[index] ? `${formatTokens(spent[index]!)} new` : '-'}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {collections.length > RECENT_SHOWN && (
+        <p className="border-t border-border pt-2.5 text-xs text-muted-foreground">
+          {collections.length - RECENT_SHOWN} more in the last 7 days.
+        </p>
+      )}
+    </section>
+  )
+}
+
+const TRIGGER_LABEL: Record<CollectionRecord['trigger'], string> = {
+  now: 'Collect now',
+}
+
+/** "23 lookups · 2 tasks, 1 Maybe", or why it stopped */
+function collectionNote(entry: CollectionRecord): string {
+  if (!entry.ok) return entry.error
+  const reads = entry.reads ?? 0
+  const found = [
+    entry.added && `${entry.added} ${entry.added === 1 ? 'task' : 'tasks'}`,
+    entry.maybe && `${entry.maybe} ${entry.maybe === 1 ? 'Maybe' : 'Maybes'}`,
+  ].filter(Boolean)
+  return `${reads} ${reads === 1 ? 'lookup' : 'lookups'} · ${found.length ? found.join(', ') : 'Nothing new'}`
 }
 
 /** How tasks are collected, and what it takes, before they are turned on */

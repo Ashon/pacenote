@@ -44,6 +44,7 @@
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -58,6 +59,8 @@
  *   Logo #01ab78 -> #1fc289 -> #48c89c, ring edge mint #a8e7d3
  *   Text contrast: white on light primary #007c5c 5.2:1, #04281d on dark primary #3ccb96 7.7:1
  *   The running status uses teal to stand apart from succeeded (green).
+ *   chart-4 is the series stacked on the gradient (task collections on tokens per day): primary in light, mint in
+ *   dark, so it differs from the gradient in lightness in both.
  * Surfaces, not borders, set the levels. Higher surfaces are lighter. (same rule in light and dark)
  *   sidebar: the window's chrome, card: the one content surface raised beside it,
  *   card-accent: emphasized surface such as bot replies and the setup notice,
@@ -109,6 +112,7 @@
   --chart-1: #0cb67e;
   --chart-2: #46c99b;
   --chart-3: #a8e7d3;
+  --chart-4: #007c5c;
   /* Card shadow: a very faint lift */
   --card-shadow:
     0 1px 2px oklch(0.3 0.03 170 / 0.05),
@@ -151,6 +155,7 @@
   --chart-1: #2ec790;
   --chart-2: #48c89c;
   --chart-3: #a8e7d3;
+  --chart-4: #a8e7d3;
   --card-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
 }
 

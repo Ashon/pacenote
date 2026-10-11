@@ -1,8 +1,12 @@
 import { setupSettingsRoute } from '@src/settings/fields'
+import type { TokenStats } from '@history/types'
+import { newTokens } from '@history/usage'
 import {
   Activity,
   BarChart3,
   CircleCheck,
+  Coins,
+  Layers,
   LoaderCircle,
   Settings,
   Timer,
@@ -12,7 +16,7 @@ import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { useStats } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
-import { formatDuration, formatNumber } from '@/lib/format'
+import { formatDuration, formatNumber, formatTokens } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 /**
@@ -67,7 +71,6 @@ export function Overview() {
       ? Math.round((data.byStatus.succeeded / finished) * 100)
       : undefined
   const daily = data?.daily ?? []
-  const maxDaily = Math.max(1, ...daily.map((d) => d.runs))
   const recentRuns = daily.reduce((sum, d) => sum + d.runs, 0)
   const recentFailed = daily.reduce((sum, d) => sum + d.failed, 0)
   const today = daily.at(-1)?.runs ?? 0
@@ -77,15 +80,15 @@ export function Overview() {
 
   return (
     // One surface, no cards: the figures share a row split by hairlines, and
-    // the chart and the tools sit side by side under a divider. The row wraps
-    // to two columns when the surface is narrow.
+    // each band below a divider holds two sections side by side. The row wraps
+    // to two columns, and the bands to one, when the surface is narrow.
     <div className="@container mx-auto max-w-4xl px-10 py-9">
       {/* A page title like the other screens'; the brand is the sidebar's. */}
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          How Pace has answered your Slack mentions: how many, how well, and
-          with which tools.
+          How Pace has answered your Slack mentions and collected your tasks:
+          how many, how well, with which tools, and with how many tokens.
         </p>
       </header>
 
@@ -156,52 +159,17 @@ export function Overview() {
                 {recentFailed > 0 ? `${recentFailed} failed` : 'No failures'}
               </p>
             </div>
-            {/* Pill-shaped bars: filled over the background (well) by run
-                count, with failures painted red at the top. The columns
-                share the width, so the chart never grows past its section;
-                when they get too narrow for every date, every other date
-                (counting back from today) is hidden. */}
-            <div className="@container/bars flex min-w-0 flex-1 items-end gap-1">
-              {daily.map((day, index) => (
-                <div
-                  key={day.day}
-                  className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
-                  title={`${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`}
-                >
-                  <span className="text-[10px] text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
-                    {day.runs}
-                  </span>
-                  <div className="relative flex w-2 flex-1 flex-col justify-end overflow-hidden rounded-full bg-well">
-                    {day.runs > 0 && (
-                      <div
-                        className="pacenote-gradient relative w-full rounded-full"
-                        style={{
-                          height: `${Math.max(12, (day.runs / maxDaily) * 100)}%`,
-                        }}
-                      >
-                        {day.failed > 0 && (
-                          <div
-                            className="absolute inset-x-0 top-0 rounded-full bg-status-failed"
-                            style={{
-                              height: `${(day.failed / day.runs) * 100}%`,
-                            }}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[10px] text-muted-foreground tabular-nums',
-                      (daily.length - 1 - index) % 2 === 1 &&
-                        '@max-[16rem]/bars:invisible'
-                    )}
-                  >
-                    {day.day.slice(8)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <DayBars
+              label="Runs per day for the last 14 days, failures at the top"
+              topClassName="bg-status-failed"
+              days={daily.map((day) => ({
+                day: day.day,
+                value: day.runs,
+                top: day.failed,
+                hover: String(day.runs),
+                title: `${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`,
+              }))}
+            />
           </div>
         </section>
 
@@ -221,12 +189,10 @@ export function Overview() {
                       {tool.calls}
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-well">
-                    <div
-                      className="pacenote-gradient h-full rounded-full"
-                      style={{ width: `${(tool.calls / maxTool) * 100}%` }}
-                    />
-                  </div>
+                  <LineBar
+                    share={tool.calls / maxTool}
+                    className="pacenote-gradient"
+                  />
                 </li>
               ))}
             </ul>
@@ -237,6 +203,252 @@ export function Overview() {
           )}
         </section>
       </div>
+
+      <TokenBand tokens={data?.tokens} />
+    </div>
+  )
+}
+
+/**
+ * Tokens over the same 14 days, and where they went. New tokens per day stack
+ * mentions at the bottom of each bar and task collections on top. Input read
+ * back from the cache is counted apart: it is most of the input and costs far
+ * less.
+ */
+function TokenBand({ tokens }: { tokens?: TokenStats }) {
+  const mentions = tokens ? newTokens(tokens.mentions.usage) : 0
+  const collections = tokens ? newTokens(tokens.collections.usage) : 0
+  const cacheRead = tokens
+    ? tokens.mentions.usage.cacheRead + tokens.collections.usage.cacheRead
+    : 0
+  const all = mentions + collections
+  const top = Math.max(1, mentions, collections)
+  const runs = tokens?.mentions.runs ?? 0
+  const count = tokens?.collections.count ?? 0
+  const found = tokens?.collections.found ?? 0
+
+  return (
+    <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
+      <section className="flex flex-col">
+        <CardHeader
+          icon={<Coins className="text-primary" />}
+          label="Tokens per day"
+          meta="New tokens"
+        />
+        <div className="mt-5 flex min-h-40 flex-1 gap-5">
+          <div className="flex shrink-0 flex-col justify-end pb-5">
+            <Value
+              value={tokens ? formatTokens(all) : '-'}
+              unit={tokens ? 'new' : undefined}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {cacheRead > 0
+                ? `+${formatTokens(cacheRead)} from cache`
+                : 'None from cache'}
+            </p>
+          </div>
+          <DayBars
+            label="New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections on top"
+            topClassName="bg-chart-4"
+            days={(tokens?.daily ?? []).map((day) => {
+              const fromMentions = newTokens(day.mentions)
+              const fromCollections = newTokens(day.collections)
+              const total = fromMentions + fromCollections
+              const cached = day.mentions.cacheRead + day.collections.cacheRead
+              return {
+                day: day.day,
+                value: total,
+                top: fromCollections,
+                hover: formatTokens(total),
+                title: `${day.day}: ${formatTokens(total)} new (mentions ${formatTokens(fromMentions)}, task collections ${formatTokens(fromCollections)}), ${formatTokens(cached)} from cache`,
+              }
+            })}
+          />
+        </div>
+      </section>
+
+      <section>
+        <CardHeader
+          icon={<Layers className="text-chart-1" />}
+          label="By source"
+          meta="Last 14 days"
+        />
+        <ul className="mt-5 space-y-3 text-xs">
+          <SourceRow
+            label="Mentions"
+            className="pacenote-gradient"
+            value={mentions}
+            share={mentions / top}
+            hint={
+              runs
+                ? `${runs} ${runs === 1 ? 'run' : 'runs'} · ${formatTokens(mentions / runs)} per run`
+                : 'No runs with tokens yet'
+            }
+          />
+          <SourceRow
+            label="Task collections"
+            className="bg-chart-4"
+            value={collections}
+            share={collections / top}
+            hint={
+              count
+                ? [
+                    `${count} ${count === 1 ? 'collection' : 'collections'}`,
+                    `${formatTokens(collections / count)} each`,
+                    found
+                      ? `${formatTokens(collections / found)} per task found`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : 'None run from the app yet'
+            }
+          />
+        </ul>
+        <div className="mt-3.5 border-t border-border pt-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full border border-input bg-well" />
+            <span className="font-medium">Read from cache</span>
+            <span className="ml-auto font-medium tabular-nums">
+              {formatTokens(cacheRead)}
+            </span>
+          </div>
+          <p className="mt-1.5">
+            {cacheRead > 0
+              ? `Context reused from earlier turns: ${Math.round((cacheRead / (all + cacheRead)) * 100)}% of all tokens.`
+              : 'Context reused from earlier turns.'}
+          </p>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+/** A source in By source: its new tokens, against the larger of the two */
+function SourceRow({
+  label,
+  className,
+  value,
+  share,
+  hint,
+}: {
+  label: string
+  /** The source's color, as in the chart */
+  className: string
+  value: number
+  share: number
+  hint: string
+}) {
+  return (
+    <li>
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className={cn('size-2 shrink-0 rounded-full', className)} />
+        <span className="font-medium">{label}</span>
+        <span className="ml-auto font-medium tabular-nums">
+          {formatTokens(value)}
+        </span>
+      </div>
+      <LineBar share={share} className={className} />
+      <p className="mt-1.5 text-muted-foreground">{hint}</p>
+    </li>
+  )
+}
+
+/**
+ * A thin bar over the well, filled by share (0 to 1). A fill is never
+ * narrower than it is tall, so both ends stay round.
+ */
+function LineBar({ share, className }: { share: number; className: string }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-well">
+      {share > 0 && (
+        <div
+          className={cn('h-full min-w-1.5 rounded-full', className)}
+          style={{ width: `${Math.min(1, share) * 100}%` }}
+        />
+      )}
+    </div>
+  )
+}
+
+interface DayBar {
+  day: string
+  /** The bar's height, against the tallest day */
+  value: number
+  /** The part of value painted at the top (failures, task collections) */
+  top: number
+  /** Shown over the bar on hover */
+  hover: string
+  title: string
+}
+
+/**
+ * Pill-shaped bars: filled over the background (well) by value, never under
+ * 12% so a small day still shows. The part on top is a pill of its own, at
+ * least as tall as the bar is wide, so every end stays round. The columns share
+ * the width, so the chart never grows past its section; when they get too
+ * narrow for every date, every other date (counting back from today) is
+ * hidden.
+ */
+function DayBars({
+  days,
+  label,
+  topClassName,
+}: {
+  days: DayBar[]
+  label: string
+  /** The color of the part on top */
+  topClassName: string
+}) {
+  const max = Math.max(1, ...days.map((day) => day.value))
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      className="@container/bars flex min-w-0 flex-1 items-end gap-1"
+    >
+      {days.map((day, index) => (
+        <div
+          key={day.day}
+          className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
+          title={day.title}
+        >
+          <span className="text-[10px] text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
+            {day.hover}
+          </span>
+          <div className="relative flex w-2 flex-1 flex-col justify-end overflow-hidden rounded-full bg-well">
+            {day.value > 0 && (
+              <div
+                className="pacenote-gradient relative w-full rounded-full"
+                style={{
+                  height: `${Math.max(12, (day.value / max) * 100)}%`,
+                }}
+              >
+                {day.top > 0 && (
+                  <div
+                    className={cn(
+                      'absolute inset-x-0 top-0 rounded-full',
+                      topClassName
+                    )}
+                    style={{
+                      height: `min(100%, max(0.5rem, ${(day.top / day.value) * 100}%))`,
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <span
+            className={cn(
+              'text-[10px] text-muted-foreground tabular-nums',
+              (days.length - 1 - index) % 2 === 1 &&
+                '@max-[16rem]/bars:invisible'
+            )}
+          >
+            {day.day.slice(8)}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import type {
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type {
+  CollectionRecord,
   CollectOutcome,
   TaskDecision,
   TasksCollect,
@@ -84,6 +85,8 @@ declare global {
           | (TasksView & {
               settings: { on: boolean; dms: boolean; exclude: string[] }
               collect: TasksCollect
+              /** The last 7 days' collections, newest first */
+              collections: CollectionRecord[]
             })
           | null
         >

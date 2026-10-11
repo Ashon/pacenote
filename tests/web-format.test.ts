@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { formatDuration, previewArgs } from '../apps/web/src/lib/format.js'
+import {
+  formatDuration,
+  formatTokens,
+  previewArgs,
+} from '../apps/web/src/lib/format.js'
 import { slackToMarkdown } from '../apps/web/src/lib/slack.js'
 
 describe('slackToMarkdown', () => {
@@ -45,5 +49,16 @@ describe('UI display formats', () => {
       'host=web-01 check=uptime'
     )
     expect(previewArgs({ q: 'x'.repeat(200) }, 20)).toHaveLength(20)
+  })
+})
+
+describe('formatTokens', () => {
+  it('shortens token counts', () => {
+    expect(formatTokens(950)).toBe('950')
+    expect(formatTokens(8_600)).toBe('8.6k')
+    expect(formatTokens(9_960)).toBe('10k')
+    expect(formatTokens(37_220)).toBe('37k')
+    expect(formatTokens(999_600)).toBe('1M')
+    expect(formatTokens(1_541_000)).toBe('1.54M')
   })
 })

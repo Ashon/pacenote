@@ -56,6 +56,14 @@ export function formatDuration(ms: number | undefined): string {
 
 export const formatNumber = (n: number) => n.toLocaleString('en-US')
 
+/** Token counts, short: 950, 8.6k, 37k, 1.54M */
+export function formatTokens(n: number): string {
+  if (n < 1000) return String(Math.round(n))
+  if (n < 9_950) return `${Number((n / 1000).toFixed(1))}k`
+  if (n < 999_500) return `${Math.round(n / 1000)}k`
+  return `${Number((n / 1_000_000).toFixed(2))}M`
+}
+
 /** Tool arguments as a one-line preview (host=web-01 check=uptime) */
 export function previewArgs(args: unknown, max = 90): string {
   if (args === undefined || args === null) return ''

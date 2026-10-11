@@ -173,8 +173,11 @@ Run history:
   ("Resumed after a bot restart (attempt 2)"), and records that will not be resumed are marked "Interrupted" at startup.
 - Date directories older than `HISTORY_RETENTION_DAYS` (default 30 days) are deleted. Change the location with `PACENOTE_DATA_DIR`.
 - Records contain thread context and attachment contents, so they stay local.
-- UI: run list (status filter, search), "Overview" (last 14 days, success rate, average duration, top tools), run detail ("Timeline" of the work
-  in the order request -> tool calls -> answer -> outputs, "Attachments", "Prompt", raw "JSON"). Runs in progress are reread every 1.5 seconds.
+- Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
+  which are most of the input and cost far less.
+- UI: run list (status filter, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for
+  mentions and task collections), run detail ("Timeline" of the work in the order request -> tool calls -> answer -> outputs,
+  "Attachments", "Prompt", raw "JSON"; the Tokens figure breaks down on hover). Runs in progress are reread every 1.5 seconds.
 
 Other:
 
