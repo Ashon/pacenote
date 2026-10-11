@@ -20,8 +20,9 @@ type Item = { section: Section; label: string; icon: LucideIcon }
 /** The screens for watching Pace, at the top */
 const ITEMS: Item[] = [
   { section: 'overview', label: 'Overview', icon: LayoutDashboard },
+  // What you have to do, above the jobs Pacenote ran
+  { section: 'tasks', label: 'Todo', icon: ListChecks },
   { section: 'runs', label: 'Runs', icon: History },
-  { section: 'tasks', label: 'Tasks', icon: ListChecks },
   { section: 'bot', label: 'Pace', icon: Bot },
 ]
 /** Setting the app up, at the bottom */

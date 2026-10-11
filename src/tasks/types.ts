@@ -117,7 +117,7 @@ export type CollectionRecord = CollectOutcome & {
 }
 
 /**
- * Collect now on the Tasks screen: the collection running (how many Slack
+ * Collect now on the Todo screen: the collection running (how many Slack
  * reads so far), and how the last one ended
  */
 export interface TasksCollect {

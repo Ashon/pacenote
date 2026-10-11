@@ -10,7 +10,7 @@ Add for that tool.
 
 ## Adding it to a tool
 
-Turn on **Share with AI tools** (or, for your tasks, Settings > Tasks > Gather my tasks from Slack). The same settings card then
+Turn on **Share with AI tools** (or, for your tasks, Settings > Todo > Gather my tasks from Slack). The same settings card then
 lists Claude Code and Codex, each with its state and one button:
 
 | State | What it means | Button |
@@ -54,7 +54,7 @@ when it needs it (stdio, no port). Pacenote does not need to be running.
 | `recent_runs` | The latest runs, newest first: id, status, when, channel, requester, the request, the reasoner, how many tools it used. `limit` (default 10, at most 50), `status` |
 | `search_runs` | Runs whose request, channel, requester, answer or error contains `query`. `status`, `since` (ISO 8601), `limit` |
 | `get_run` | One run in full: the request and its Slack link, each tool call and command with its result (cut to 1500 characters), the answer or error (and its cause, such as `auth` or `limit`), outputs, token use. `include_prompt` adds the prompt Pace sent to the reasoner |
-| `collect_context`, `add_tasks`, `close_task`, `my_tasks` | Your tasks from Slack, collected by the tool with its own Slack connector: see [Your tasks from Slack](tasks.md). These answer only while Settings > Tasks > Gather my tasks from Slack is on, separately from sharing the run history, and `add_tasks` and `close_task` write |
+| `collect_context`, `add_tasks`, `close_task`, `my_tasks` | Your tasks from Slack, collected by the tool with its own Slack connector: see [Your tasks from Slack](tasks.md). These answer only while Settings > Todo > Gather my tasks from Slack is on, separately from sharing the run history, and `add_tasks` and `close_task` write |
 
 The run tools are read-only. The history is the one the desktop app shows (`PACENOTE_DATA_DIR`, by default `~/.pacenote`).
 

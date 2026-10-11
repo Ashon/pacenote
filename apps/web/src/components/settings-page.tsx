@@ -651,7 +651,7 @@ export function SettingsPage() {
       <>
         {card('tasks', {
           after: valueOf('TASKS') === 'on' && (
-            <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Tasks screen works without this." />
+            <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this." />
           ),
         })}
       </>

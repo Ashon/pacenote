@@ -318,7 +318,7 @@ describe('the task tools over MCP', () => {
     const { call, client } = await connect({ ...on, on: false }, dir('mcp-off'))
     expect(await call('my_tasks')).toEqual({
       error: true,
-      text: 'Adding tasks is off. Turn it on in Pacenote: Settings > Tasks > Gather my tasks from Slack.',
+      text: 'Adding tasks is off. Turn it on in Pacenote: Settings > Todo > Gather my tasks from Slack.',
     })
     await client.close()
   })

@@ -203,7 +203,7 @@ function Page({
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         <header className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">Tasks</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Todo</h1>
           {meta && (
             <span className="text-sm text-muted-foreground">{meta}</span>
           )}

@@ -26,7 +26,7 @@ export function StatusBar({
 }) {
   const { data } = useBotStatus()
   const supervisor = useSupervisor()
-  // A collection keeps running when you leave the Tasks screen; this is where
+  // A collection keeps running when you leave the Todo screen; this is where
   // it still shows. (the sidebar already keeps the tasks query fresh)
   const collecting = useTasks().data?.collect.running
   return (

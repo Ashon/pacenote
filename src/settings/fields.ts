@@ -44,7 +44,7 @@ export const SETTING_SECTIONS: {
   },
   {
     id: 'tasks',
-    label: 'Tasks',
+    label: 'Todo',
     help: 'Your own tasks, gathered from Slack by your AI tools. Changes apply at once.',
   },
   {
@@ -219,7 +219,7 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     id: 'tasks',
     section: 'tasks',
     label: 'Gathering tasks',
-    help: 'Collect now on the Tasks screen has Claude Code read Slack with its own Slack connector, read only, and keeps what people asked of you and what you said you would do. Pacenote holds no Slack token for this.',
+    help: 'Collect now on the Todo screen has Claude Code read Slack with its own Slack connector, read only, and keeps what people asked of you and what you said you would do. Pacenote holds no Slack token for this.',
   },
   {
     id: 'history',
@@ -687,7 +687,7 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'TASKS',
     group: 'tasks',
     label: 'Gather my tasks from Slack',
-    help: "Off by default. Turns on Collect now on the Tasks screen, and the task tools of Pacenote's MCP server for the AI tools you add it to below, whether or not the run history is shared.",
+    help: "Off by default. Turns on Collect now on the Todo screen, and the task tools of Pacenote's MCP server for the AI tools you add it to below, whether or not the run history is shared.",
     type: 'toggle',
     default: 'off',
     applies: 'app',

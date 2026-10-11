@@ -174,7 +174,7 @@ function mcpLaunch() {
 /** Adds the MCP server to Claude Code and Codex, and checks they reach it */
 const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
 
-/** Collect now on the Tasks screen: Claude Code reads Slack, read only */
+/** Collect now on the Todo screen: Claude Code reads Slack, read only */
 const taskCollector = new TaskCollector({
   launch: () => {
     const { command, args, env } = mcpLaunch()
@@ -463,7 +463,7 @@ function registerBotIpc(): void {
       return {
         at: new Date().toISOString(),
         ok: false,
-        error: 'Turn on Settings > Tasks > Gather my tasks from Slack first.',
+        error: 'Turn on Settings > Todo > Gather my tasks from Slack first.',
       }
     return taskCollector.run()
   })

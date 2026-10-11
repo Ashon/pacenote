@@ -45,11 +45,12 @@ Using the packaged app:
 
 Layout:
 
-- The sidebar on the left lists the screens for watching Pace at the top ("Overview", "Runs", "Tasks", "Pace") and "Settings"
-  at the bottom. Tasks shows how many are open ([Your tasks from Slack](tasks.md)). The toggle at the left of the top bar (or Cmd+B) keeps only its icons, and the choice is remembered. Windows
+- The sidebar on the left lists the screens at the top ("Overview", "Todo", "Runs", "Pace") and "Settings" at the bottom.
+  Todo, your tasks, comes before Runs, the jobs Pacenote ran, and shows how many are open
+  ([Your tasks from Slack](tasks.md)). The toggle at the left of the top bar (or Cmd+B) keeps only its icons, and the choice is remembered. Windows
   narrower than 900 pixels keep only the icons too.
 - The status bar along the bottom of the window holds indicators to glance at: Pace's connection status, reasoner backend,
-  attached tools and startup check issues (when any) on the left; a task collection in progress (which opens Tasks),
+  attached tools and startup check issues (when any) on the left; a task collection in progress (which opens Todo),
   requests in progress, the last request time, a folder button that opens the run history in Finder, and the version
   (which opens its release notes) on the right. Clicking "Pace: ..." opens the Pace screen, or the
   settings to fix when setup is needed. Narrow windows drop the less needed ones.

@@ -1,6 +1,6 @@
 # Your tasks from Slack
 
-Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Tasks screen, so
+Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Todo screen, so
 you do not keep it in your head or scroll back for it. **Collect now** has Claude Code read Slack with the Slack connector
 of your claude.ai account, read only, and add the tasks through Pacenote's MCP server; Pacenote holds no Slack token for
 this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md).
@@ -8,9 +8,9 @@ this. It is off by default. The plan and the reasons behind it are in [the propo
 ## Turning it on
 
 1. Sign in to Claude Code on this Mac, and connect Slack in claude.ai's Settings > Connectors.
-2. In Pacenote, Settings > Tasks: turn on "Gather my tasks from Slack". DMs stay out unless you turn on "Count DMs and group
+2. In Pacenote, Settings > Todo: turn on "Gather my tasks from Slack". DMs stay out unless you turn on "Count DMs and group
    DMs"; "Leave out channels" skips the ones you list.
-3. On the Tasks screen, click **Collect now**. It takes a minute or two; the screen shows how far it got, and what it added.
+3. On the Todo screen, click **Collect now**. It takes a minute or two; the screen shows how far it got, and what it added.
    On other screens, the status bar shows it is still collecting.
 
 The settings apply at once, without restarting Pace.
@@ -32,7 +32,7 @@ Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the c
 
 ### Collecting from inside your AI tool
 
-Add Pacenote to Claude Code or Codex in Settings > Tasks (one click per tool, [details](history-mcp.md#adding-it-to-a-tool))
+Add Pacenote to Claude Code or Codex in Settings > Todo (one click per tool, [details](history-mcp.md#adding-it-to-a-tool))
 to ask them about your tasks (`my_tasks`), or to collect from inside them: in Claude Code, `/mcp__pacenote__collect_tasks`;
 in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, if it has a Slack connector.
 
