@@ -97,5 +97,5 @@
 <rect x="902" y="532" width="6" height="60" rx="3" fill="#029a92"/>
 <text x="918" y="546" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Too many at once</text>
 <text x="918" y="566" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Two run, ten wait; beyond that</text>
-<text x="918" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Pace says it is busy.</text>
+<text x="918" y="582" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">only the asker hears it is busy.</text>
 </svg>

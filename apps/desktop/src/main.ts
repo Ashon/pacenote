@@ -13,6 +13,7 @@ import {
   nativeImage,
   nativeTheme,
   net,
+  powerSaveBlocker,
   protocol,
   shell,
   Tray,
@@ -34,6 +35,7 @@ import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { ClaudeTokenSetup } from './claude-token.js'
+import { KeepAwake } from './keep-awake.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 
@@ -310,10 +312,15 @@ function botSummary(): { label: string; active: number } {
   return { label, active: status?.requests.active ?? 0 }
 }
 
+/** Holds off system sleep while Pace has requests in progress */
+const keepAwake = new KeepAwake(powerSaveBlocker)
+
 let lastTrayKey = ''
+/** Every 2 seconds: the menu bar item, and keeping the Mac awake */
 function updateTray(): void {
-  if (!tray) return
   const summary = botSummary()
+  keepAwake.set(summary.active > 0)
+  if (!tray) return
   const phase = supervisor?.current.phase
   const key = JSON.stringify([summary, phase])
   if (key === lastTrayKey) return

@@ -341,6 +341,42 @@ describe('answering through any messenger', () => {
     expect(elsewhere.posts).toEqual([])
   })
 
+  it('tells only the asker when it is too busy, leaving the conversation alone', async () => {
+    const messenger = new MemoryMessenger()
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const responder = new MentionResponder({
+      config: loadConfig({
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_CONCURRENCY: '1',
+      }),
+      messengers: [messenger],
+      reasoner: {
+        backend: 'claude',
+        sandbox: 'host',
+        canReadFiles: false,
+        mcpServerNames: [],
+        complete: async () => {
+          await held
+          return 'done'
+        },
+      },
+      log: createLogger('error'),
+      extractPdfText: async () => '',
+    })
+    // One runs and ten wait; the twelfth is one too many.
+    for (let i = 0; i < 12; i++) await responder.handle(ask(`ask ${i}`))
+    expect(messenger.notices).toEqual([
+      expect.stringMatching(/^I have too many/),
+    ])
+    expect(messenger.posts.some((post) => post.startsWith('I have'))).toBe(
+      false
+    )
+    release()
+    expect(await responder.drain(5_000)).toBe(true)
+  })
+
   it('handles a redelivered mention once', async () => {
     const messenger = new MemoryMessenger()
     const responder = base(messenger)

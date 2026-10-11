@@ -67,6 +67,8 @@ Bot management:
 - The Pace screen has "Start", "Stop", "Restart" and "Rebuild and restart" (development runs only). The number of requests in progress is shown next to the menu bar icon.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
   App settings (automatic start, run history folder) are in Settings.
+- While requests are in progress, the app keeps the Mac from going to sleep (`powerSaveBlocker`, system sleep only), so an
+  answer is not cut off halfway. The display still sleeps, and closing the lid still sleeps the Mac.
 - Stop and app quit send SIGTERM. The bot waits up to 20 seconds for requests in progress, and the rest resume on the next start.
 - Before launching the bot, the app checks the settings with the bot's own rules. When the Slack tokens are missing (a first run) or a
   value is invalid, it does not launch the bot and shows "Setup needed" with a way to Settings (on the Pace screen, the Overview,

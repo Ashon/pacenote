@@ -181,8 +181,9 @@ export class MentionResponder {
     const accepted = this.limiter.tryRun(() =>
       this.respond(messenger, mention, venue.label)
     )
+    // Only the asker needs to know, so the conversation stays as it was.
     if (!accepted) {
-      await messenger.post(
+      await messenger.notice(
         mention,
         say(
           'I have too many requests right now. Please mention me again in a moment.'

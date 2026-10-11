@@ -680,7 +680,7 @@ function mentionFlow(c) {
     {
       tone: 'running',
       title: 'Too many at once',
-      help: 'Two run, ten wait; beyond that Pace says it is busy.',
+      help: 'Two run, ten wait; beyond that only the asker hears it is busy.',
     },
   ]
   others.forEach((o, i) => {

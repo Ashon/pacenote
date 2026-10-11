@@ -23,7 +23,8 @@ What happens between a mention and its answer: context, attachments, diagrams an
 - With `MENTION_ALLOWED_USERS` set, the bot answers only those users. Anyone else gets a message only they
   can see (ephemeral): "I only answer specific people here."
 - It does not answer in private channels or DMs.
-- It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it replies that it is busy.
+- It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it tells the asker, in a
+  message only they can see, that it is busy.
 - On failure it replies "I couldn't produce an answer" with what that means, read from the reasoner's error
   (`src/mention/failure.ts`): its sign-in was rejected, it reached a usage limit, its service was unavailable, something in
   the setup failed, or the request took too long. The channel is public, so the error itself goes only to the log and the
