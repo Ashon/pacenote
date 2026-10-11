@@ -1,67 +1,213 @@
 // Draws the design diagrams in docs/diagrams as SVG, in the desktop app's look
-// (apps/web/src/index.css): the emerald to mint gradient, surfaces instead of
-// borders (canvas, card, well), 20px cards with a faint shadow, the system
-// font, and mono for code. Each diagram comes in a light and a dark variant for
-// GitHub's <picture>. Usage: node scripts/diagrams.mjs (pnpm docs:diagrams)
-import { mkdirSync, writeFileSync } from 'node:fs'
+// (apps/web/src/index.css): the window's tinted chrome around one content
+// surface; groups on it as recessed wells, their rows split by hairlines;
+// section headings with the app's icons (lucide); badges and facts as the app
+// draws them; the system font, and mono for code. The colors are read from
+// index.css on every run, so the diagrams follow the app. Each diagram comes in
+// a light and a dark variant for GitHub's <picture>.
+// Usage: node scripts/diagrams.mjs [name ...] (pnpm docs:diagrams)
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
-const OUT = path.resolve(import.meta.dirname, '../docs/diagrams')
-
-// The app's tokens (oklch in index.css, as hex so every SVG renderer agrees)
-const THEMES = {
-  light: {
-    canvas: '#f5faf8',
-    card: '#ffffff',
-    cardAccent: '#e7fff4',
-    well: '#eef6f2',
-    foreground: '#10211c',
-    muted: '#4f665e',
-    faint: '#8aa199',
-    line: '#b7cbc3',
-    primary: '#007c5c',
-    accent: '#d9f6e8',
-    accentFg: '#003e2a',
-    running: '#029a92',
-    succeeded: '#007c5c',
-    interrupted: '#be7100',
-    failed: '#d42f34',
-    shadow: { color: '#0f2a20', opacity: 0.08 },
-  },
-  dark: {
-    canvas: '#09100e',
-    card: '#121c19',
-    cardAccent: '#0f271e',
-    well: '#0c1513',
-    foreground: '#e1ebe6',
-    muted: '#93a79e',
-    faint: '#61756d',
-    line: '#2c3c36',
-    primary: '#3ccb96',
-    accent: '#112e24',
-    accentFg: '#daf2e6',
-    running: '#1bd3b3',
-    succeeded: '#3ccb96',
-    interrupted: '#e9a84a',
-    failed: '#f66c6d',
-    shadow: { color: '#000000', opacity: 0.45 },
-  },
-}
+const ROOT = path.resolve(import.meta.dirname, '..')
+const OUT = path.join(ROOT, 'docs/diagrams')
+const CSS = path.join(ROOT, 'apps/web/src/index.css')
 
 const SANS =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, 'Noto Sans KR', Helvetica, Arial, sans-serif"
+  "-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif"
 const MONO =
   "ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace"
+
+/** oklch(l c h) as sRGB channels, 0 to 255 */
+function oklchToRgb(l, c, h) {
+  const a = c * Math.cos((h * Math.PI) / 180)
+  const b = c * Math.sin((h * Math.PI) / 180)
+  const lms = [
+    l + 0.3963377774 * a + 0.2158037573 * b,
+    l - 0.1055613458 * a - 0.0638541728 * b,
+    l - 0.0894841775 * a - 1.291485548 * b,
+  ].map((v) => v ** 3)
+  const linear = [
+    [4.0767416621, -3.3077115913, 0.2309699292],
+    [-1.2684380046, 2.6097574011, -0.3413193965],
+    [-0.0041960863, -0.7034186147, 1.707614701],
+  ].map((row) => row.reduce((sum, k, i) => sum + k * lms[i], 0))
+  return linear.map((v) => {
+    const x = Math.min(1, Math.max(0, v))
+    return 255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055)
+  })
+}
+
+const toHex = (rgb) =>
+  '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
+
+/** A color from index.css (hex, or oklch with an optional alpha) */
+function parseColor(value) {
+  const o = value.match(
+    /^oklch\(([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+)(%?))?\)$/
+  )
+  if (o)
+    return {
+      rgb: oklchToRgb(+o[1], +o[2], +o[3]),
+      alpha: o[4] ? +o[4] / (o[5] ? 100 : 1) : 1,
+    }
+  const h = value.match(/^#([0-9a-f]{6})$/i)
+  if (h)
+    return {
+      rgb: [0, 2, 4].map((i) => parseInt(h[1].slice(i, i + 2), 16)),
+      alpha: 1,
+    }
+  throw new Error(`Cannot read the color ${value}`)
+}
+
+/**
+ * The app's tokens for both themes, as hex so every SVG renderer agrees.
+ * Colors with an alpha are flattened over the content surface.
+ */
+function readThemes() {
+  const css = readFileSync(CSS, 'utf8')
+  const block = (selector) => {
+    const start = css.indexOf(`\n${selector} {`)
+    const body = css.slice(start, css.indexOf('\n}', start))
+    return Object.fromEntries(
+      [...body.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([, k, v]) => [
+        k,
+        v.trim().replace(/\s+/g, ' '),
+      ])
+    )
+  }
+  const root = block(':root')
+  const gradient = [
+    ...root['pacenote-gradient'].matchAll(/(#[0-9a-f]{6}) ([\d.]+)%/gi),
+  ].map(([, color, at]) => [color, +at / 100])
+  const theme = (vars) => {
+    const get = (name) => parseColor(vars[name] ?? root[name])
+    const card = get('card').rgb
+    const solid = (name) => {
+      const { rgb, alpha } = get(name)
+      return toHex(rgb.map((v, i) => v * alpha + card[i] * (1 - alpha)))
+    }
+    return {
+      chrome: solid('sidebar'),
+      surface: solid('card'),
+      accentSurface: solid('card-accent'),
+      well: solid('well'),
+      foreground: solid('foreground'),
+      muted: solid('muted-foreground'),
+      // Secondary lines and empty slots: muted text, a step fainter
+      faint: toHex(
+        get('muted-foreground').rgb.map((v, i) => (v + card[i]) / 2)
+      ),
+      border: solid('border'),
+      primary: solid('primary'),
+      primaryFg: solid('primary-foreground'),
+      secondary: solid('secondary'),
+      secondaryFg: solid('secondary-foreground'),
+      accentFg: solid('accent-foreground'),
+      running: solid('status-running'),
+      succeeded: solid('status-succeeded'),
+      failed: solid('status-failed'),
+      interrupted: solid('status-interrupted'),
+      gradient,
+    }
+  }
+  // The content surface's lift (--card-shadow), as SVG drop shadows
+  const lift = toHex(oklchToRgb(0.3, 0.03, 170))
+  return {
+    light: {
+      ...theme(root),
+      shadows: [
+        { dy: 1, blur: 1, color: lift, opacity: 0.05 },
+        { dy: 8, blur: 12, color: lift, opacity: 0.07 },
+      ],
+    },
+    dark: {
+      ...theme(block('.dark')),
+      shadows: [{ dy: 1, blur: 1, color: '#000000', opacity: 0.25 }],
+    },
+  }
+}
+
+/** The app's icons (lucide-react), as SVG markup on a 24px grid */
+async function readIcons(names) {
+  const lucide = path.dirname(
+    createRequire(path.join(ROOT, 'apps/web/package.json')).resolve(
+      'lucide-react/package.json'
+    )
+  )
+  const kebab = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
+  const entries = await Promise.all(
+    names.map(async (name) => {
+      const file = path.join(lucide, 'dist/esm/icons', `${name}.js`)
+      const { __iconNode } = await import(pathToFileURL(file).href)
+      const markup = __iconNode
+        .map(([tag, attrs]) => {
+          const list = Object.entries(attrs)
+            .filter(([key]) => key !== 'key')
+            .map(([key, value]) => `${kebab(key)}="${value}"`)
+          return `<${tag} ${list.join(' ')}/>`
+        })
+        .join('')
+      return [name, markup]
+    })
+  )
+  return Object.fromEntries(entries)
+}
+
+const ICONS = [
+  'app-window',
+  'bot',
+  'container',
+  'cpu',
+  'folder',
+  'globe',
+  'hash',
+  'history',
+  'key-round',
+  'laptop',
+  'messages-square',
+  'plug',
+  'server',
+  'shield-check',
+  'terminal',
+  'user-check',
+]
 
 const esc = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+/** About how wide text sets in the system font, for badges and alignment */
+function textWidth(value, size, { mono = false, weight = 400 } = {}) {
+  if (mono) return [...value].length * size * 0.6
+  let em = 0
+  for (const ch of value) {
+    if (ch === ' ') em += 0.27
+    else if (/[ijlI.,:;'|!]/.test(ch)) em += 0.26
+    else if (/[frt()/-]/.test(ch)) em += 0.36
+    else if (/[mwMW@]/.test(ch)) em += 0.84
+    else if (/[A-Z]/.test(ch)) em += 0.66
+    else if (/[0-9]/.test(ch)) em += 0.58
+    else if (/\p{Extended_Pictographic}/u.test(ch)) em += 1.4
+    else if (/[\u{fe0f}]/u.test(ch)) em += 0
+    else em += 0.54
+  }
+  return em * size * (weight >= 600 ? 1.04 : 1)
+}
+
+/** The window's chrome, and the content surface inside it */
+const FRAME = { brand: 56, inset: 16, pad: 32 }
+
 /** A diagram drawn into one theme: shapes go in order, later ones on top */
 class Canvas {
-  constructor(t, width, height) {
+  constructor(t, icons, width, height) {
     this.t = t
+    this.icons = icons
     this.width = width
     this.height = height
+    this.left = FRAME.inset + FRAME.pad
+    this.right = width - FRAME.inset - FRAME.pad
     this.parts = []
   }
 
@@ -77,45 +223,158 @@ class Canvas {
       fill = this.t.foreground,
       mono = false,
       anchor = 'start',
-      italic = false,
     } = o
     return this.add(
       `<text x="${x}" y="${y}" font-family="${mono ? MONO : SANS}" font-size="${size}" font-weight="${weight}"` +
-        `${italic ? ' font-style="italic"' : ''} fill="${fill}" text-anchor="${anchor}">${esc(value)}</text>`
+        ` fill="${fill}" text-anchor="${anchor}">${esc(value)}</text>`
     )
   }
 
-  /** A raised surface, like the app's surface-card */
-  card(x, y, w, h, o = {}) {
-    const fill = o.accent ? this.t.cardAccent : this.t.card
-    this.add(
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.radius ?? 18}" fill="${fill}" filter="url(#shadow)"/>`
+  /** A lucide icon, size px square, its top left at x, y */
+  icon(name, x, y, o = {}) {
+    const { size = 16, color = this.t.primary } = o
+    return this.add(
+      `<g transform="translate(${x} ${y}) scale(${size / 24})" color="${color}" fill="none" stroke="${color}"` +
+        ` stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${this.icons[name]}</g>`
     )
-    if (o.title) this.text(x + 18, y + 30, o.title, { size: 15, weight: 600 })
-    if (o.sub)
-      this.text(x + 18, y + 49, o.sub, { size: 12, fill: this.t.muted })
+  }
+
+  /** A line between parts of the content surface */
+  hairline(x1, x2, y) {
+    return this.add(
+      `<path d="M${x1} ${y + 0.5}H${x2}" stroke="${this.t.border}" stroke-width="1"/>`
+    )
+  }
+
+  vline(x, y1, y2) {
+    return this.add(
+      `<path d="M${x + 0.5} ${y1}V${y2}" stroke="${this.t.border}" stroke-width="1"/>`
+    )
+  }
+
+  /**
+   * A group on the content surface: a recessed well, like a card inside the
+   * app's main; accent for the emphasized one (Pace, as its replies)
+   */
+  well(x, y, w, h, o = {}) {
+    const fill = o.accent ? this.t.accentSurface : this.t.well
+    return this.add(
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.radius ?? 20}" fill="${fill}"/>`
+    )
+  }
+
+  /**
+   * A part inside a group, a step up from its well (higher surfaces are
+   * lighter); accent for the emphasized one
+   */
+  box(x, y, w, h, o = {}) {
+    const fill = o.accent ? this.t.accentSurface : this.t.surface
+    return this.add(
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${fill}"/>`
+    )
+  }
+
+  /**
+   * A section's heading as the app draws one: the icon, the title, and a meta
+   * line to the right. y is the title's baseline.
+   */
+  heading(x, y, w, { icon, title, meta, tone }) {
+    if (icon) this.icon(icon, x, y - 13, { color: tone ?? this.t.primary })
+    this.text(x + (icon ? 24 : 0), y, title, {
+      size: 14,
+      weight: 600,
+      fill: tone ?? this.t.foreground,
+    })
+    if (meta)
+      this.text(x + w, y, meta, {
+        size: 12,
+        fill: this.t.muted,
+        anchor: 'end',
+      })
     return this
   }
 
-  /** A recessed surface inside a card, for lists and code */
-  well(x, y, w, h, o = {}) {
-    return this.add(
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.radius ?? 12}" fill="${this.t.well}"/>`
-    )
+  /**
+   * Rows split by hairlines, each a label (mono unless said) and a line of
+   * help; returns the y below them
+   */
+  rows(x, y, w, list, o = {}) {
+    let top = y
+    list.forEach((row, i) => {
+      const { label, help, mono = true, after } = row
+      if (i > 0 || o.first !== false) this.hairline(x, x + w, top)
+      this.text(x, top + 20, label, {
+        mono,
+        size: mono ? 12 : 13,
+        weight: 600,
+        fill: row.fill ?? this.t.foreground,
+      })
+      if (help) this.text(x, top + 37, help, { size: 11.5, fill: this.t.muted })
+      const height = after ? after(top + 46) + 8 - top : 46
+      top += height
+    })
+    return top
   }
 
-  /** A well with a mono label and a line of help under it */
-  item(x, y, w, label, help, o = {}) {
-    const h = help ? 46 : 30
-    this.well(x, y, w, h, o)
-    this.text(x + 12, y + 19, label, {
-      mono: o.mono ?? true,
-      size: 12,
-      weight: 600,
-      fill: o.labelFill ?? this.t.foreground,
+  /**
+   * A badge (ui/badge.tsx): secondary by default, outline, or a status tone
+   * (status.tsx, rounded); returns its width
+   */
+  badge(x, y, value, o = {}) {
+    const { tone, outline, mono = false, icon } = o
+    const size = 11
+    const width = Math.round(
+      textWidth(value, size, { mono, weight: 500 }) + (icon ? 30 : 13)
+    )
+    const color = tone ? this.t[tone] : outline ? this.t.foreground : null
+    if (tone)
+      this.add(
+        `<rect x="${x + 0.5}" y="${y + 0.5}" width="${width - 1}" height="19" rx="9.5" fill="${color}" fill-opacity="0.12"` +
+          ` stroke="${color}" stroke-opacity="0.3"/>`
+      )
+    else if (outline)
+      this.add(
+        `<rect x="${x + 0.5}" y="${y + 0.5}" width="${width - 1}" height="19" rx="6" fill="none" stroke="${this.t.border}"/>`
+      )
+    else
+      this.add(
+        `<rect x="${x}" y="${y}" width="${width}" height="20" rx="6" fill="${this.t.secondary}"/>`
+      )
+    const fill = color ?? this.t.secondaryFg
+    if (icon) this.icon(icon, x + 7, y + 4, { size: 12, color: fill })
+    this.text(x + (icon ? 23 : 6.5), y + 14, value, {
+      size,
+      weight: 500,
+      fill,
+      mono,
     })
-    if (help)
-      this.text(x + 12, y + 36, help, { size: 11.5, fill: this.t.muted })
+    return width
+  }
+
+  /** Badges in a line from x, gap apart; returns the x after the last */
+  badges(x, y, list, o = {}) {
+    let at = x
+    for (const item of list) {
+      const [value, extra] = Array.isArray(item) ? item : [item, {}]
+      at += this.badge(at, y, value, { ...o, ...extra }) + (o.gap ?? 6)
+    }
+    return at
+  }
+
+  /**
+   * Facts in a row (run-facts.tsx): an icon and a label, a value under them
+   * and a hint, split by hairlines
+   */
+  facts(x, y, w, list) {
+    const column = w / list.length
+    list.forEach(({ icon, label, value, hint }, i) => {
+      const left = x + i * column + (i ? 16 : 0)
+      if (i) this.vline(x + i * column, y, y + 58)
+      this.icon(icon, left, y + 1, { size: 14, color: this.t.muted })
+      this.text(left + 20, y + 12, label, { size: 11, fill: this.t.muted })
+      this.text(left, y + 34, value, { size: 14, weight: 600 })
+      this.text(left, y + 52, hint, { size: 11.5, fill: this.t.muted })
+    })
     return this
   }
 
@@ -125,67 +384,90 @@ class Canvas {
    */
   slot(x, y, w, label) {
     this.add(
-      `<rect x="${x + 0.75}" y="${y + 0.75}" width="${w - 1.5}" height="28.5" rx="12" fill="none"` +
-        ` stroke="${this.t.line}" stroke-width="1.5" stroke-dasharray="5 4"/>`
+      `<rect x="${x + 0.75}" y="${y + 0.75}" width="${w - 1.5}" height="28.5" rx="10" fill="none"` +
+        ` stroke="${this.t.border}" stroke-width="1.5" stroke-dasharray="5 4"/>`
     )
     return this.text(x + 12, y + 19, label, { size: 12, fill: this.t.faint })
   }
 
-  /** A small rounded label; tone picks a status color */
-  chip(x, y, value, o = {}) {
-    const tone = o.tone ? this.t[o.tone] : this.t.accentFg
-    const width = o.width ?? Math.round(value.length * 6.6 + 18)
-    this.add(
-      `<rect x="${x}" y="${y}" width="${width}" height="20" rx="10" fill="${o.tone ? tone : this.t.accent}" fill-opacity="${o.tone ? 0.14 : 1}"/>`
-    )
-    this.text(x + width / 2, y + 14, value, {
-      size: 11,
-      weight: 600,
-      fill: tone,
-      anchor: 'middle',
-    })
-    return width
-  }
-
-  /** A numbered step marker in the gradient */
+  /** A numbered step, in the primary button's colors */
   step(x, y, n) {
-    this.add(`<circle cx="${x}" cy="${y}" r="11" fill="url(#mark)"/>`)
+    this.add(`<circle cx="${x}" cy="${y}" r="10" fill="${this.t.primary}"/>`)
     return this.text(x, y + 4, n, {
-      size: 11.5,
+      size: 11,
       weight: 700,
-      fill: '#ffffff',
+      fill: this.t.primaryFg,
       anchor: 'middle',
     })
   }
 
   /**
-   * A line between points; main lines are primary, others muted; dashed for
-   * optional paths
+   * A line through points, its corners rounded; main lines are primary,
+   * others faint; dashed for optional paths
    */
   arrow(points, o = {}) {
     const color = o.main ? this.t.primary : this.t.faint
-    const d = points.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ')
-    this.add(
-      `<path d="${d}" fill="none" stroke="${color}" stroke-width="${o.main ? 2 : 1.5}" stroke-linecap="round"` +
-        ` stroke-linejoin="round"${o.dashed ? ' stroke-dasharray="5 5"' : ''}` +
-        `${o.end === false ? '' : ` marker-end="url(#${o.main ? 'arrow-main' : 'arrow'})"`}` +
-        `${o.start ? ` marker-start="url(#${o.main ? 'arrow-main' : 'arrow'})"` : ''}/>`
-    )
-    if (o.label) {
-      const [x, y] = o.at ?? points[0]
-      const width = Math.round(o.label.length * 6.3 + 14)
-      const lx = o.anchor === 'middle' ? x - width / 2 : x
-      this.add(
-        `<rect x="${lx}" y="${y - 13}" width="${width}" height="19" rx="9.5" fill="${this.t.canvas}"/>`
+    let d = `M${points[0][0]} ${points[0][1]}`
+    for (let i = 1; i < points.length; i++) {
+      const [x, y] = points[i]
+      const next = points[i + 1]
+      if (!next) {
+        d += ` L${x} ${y}`
+        break
+      }
+      const [px, py] = points[i - 1]
+      const r = Math.min(
+        8,
+        Math.hypot(x - px, y - py) / 2,
+        Math.hypot(next[0] - x, next[1] - y) / 2
       )
-      this.text(lx + width / 2, y + 1, o.label, {
-        size: 11,
-        fill: o.main ? this.t.primary : this.t.muted,
+      const into = [Math.sign(x - px), Math.sign(y - py)]
+      const out = [Math.sign(next[0] - x), Math.sign(next[1] - y)]
+      d +=
+        ` L${x - into[0] * r} ${y - into[1] * r}` +
+        ` Q${x} ${y} ${x + out[0] * r} ${y + out[1] * r}`
+    }
+    const marker = o.main ? 'arrow-main' : 'arrow'
+    this.add(
+      `<path d="${d}" fill="none" stroke="${color}" stroke-width="${o.main ? 1.75 : 1.5}" stroke-linecap="round"` +
+        ` stroke-linejoin="round"${o.dashed ? ' stroke-dasharray="5 5"' : ''}` +
+        `${o.end === false ? '' : ` marker-end="url(#${marker})"`}` +
+        `${o.start ? ` marker-start="url(#${marker})"` : ''}/>`
+    )
+    if (o.label) this.label(o.at ?? points[0], o.label, o)
+    return this
+  }
+
+  /**
+   * A line's label on a pill of the surface it crosses, led by its step's
+   * number when it is one of a sequence
+   */
+  label([x, y], value, o = {}) {
+    const lead = o.step ? 18 : 0
+    const width = Math.round(
+      textWidth(value, 11, { weight: o.main ? 600 : 400 }) + 14 + lead
+    )
+    const lx = o.anchor === 'start' ? x : x - width / 2
+    this.add(
+      `<rect x="${lx}" y="${y - 10}" width="${width}" height="19" rx="9.5" fill="${o.on ?? this.t.surface}"/>`
+    )
+    if (o.step) {
+      this.add(
+        `<circle cx="${lx + 10}" cy="${y - 0.5}" r="7.5" fill="${this.t.primary}"/>`
+      )
+      this.text(lx + 10, y + 3, o.step, {
+        size: 10,
+        weight: 700,
+        fill: this.t.primaryFg,
         anchor: 'middle',
-        weight: o.main ? 600 : 400,
       })
     }
-    return this
+    return this.text(lx + lead + (width - lead) / 2, y + 4, value, {
+      size: 11,
+      fill: o.main ? this.t.primary : this.t.muted,
+      anchor: 'middle',
+      weight: o.main ? 600 : 400,
+    })
   }
 
   /** The Pacenote mark (assets/pacenote.svg), size px wide */
@@ -193,41 +475,62 @@ class Canvas {
     const s = size / 412
     return this.add(
       `<g transform="translate(${x - 50 * s} ${y - 50 * s}) scale(${s})">` +
-        `<path d="M273.1 92.9A164 164 0 1 0 419.1 238.9" fill="none" stroke="url(#mark-big)" stroke-width="84" stroke-linecap="round"/>` +
-        `<circle cx="372" cy="140" r="42" fill="url(#mark-big)"/></g>`
+        `<path d="M273.1 92.9A164 164 0 1 0 419.1 238.9" fill="none" stroke="url(#mark)" stroke-width="84" stroke-linecap="round"/>` +
+        `<circle cx="372" cy="140" r="42" fill="url(#mark)"/></g>`
     )
   }
 
   /**
-   * The header every diagram opens with: the mark, "Pacenote" in the gradient,
-   * a title and a line of help
+   * The page header on the content surface, as the app's screens open: the
+   * title with a meta line beside it, a line of help, and a hairline
    */
-  header(title, help) {
-    this.mark(40, 34, 30)
-    this.text(84, 56, 'Pacenote', {
-      size: 22,
-      weight: 700,
-      fill: 'url(#wordmark)',
-    })
-    this.text(84 + 104, 56, title, { size: 22, weight: 600 })
-    this.text(84, 80, help, { size: 13, fill: this.t.muted })
-    return this
+  page(title, meta, help) {
+    const top = FRAME.brand + FRAME.pad
+    this.text(this.left, top + 18, title, { size: 20, weight: 600 })
+    this.text(
+      this.left + textWidth(title, 20, { weight: 600 }) + 10,
+      top + 18,
+      meta,
+      { size: 13, fill: this.t.muted }
+    )
+    this.text(this.left, top + 42, help, { size: 13, fill: this.t.muted })
+    return this.hairline(this.left, this.right, top + 64)
   }
 
   svg(title) {
-    const { t } = this
-    const defs = `<defs>
-  <linearGradient id="mark" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#01ab78"/><stop offset="0.46" stop-color="#1fc289"/><stop offset="1" stop-color="#48c89c"/></linearGradient>
-  <linearGradient id="mark-big" gradientUnits="userSpaceOnUse" x1="54" y1="314" x2="458" y2="198"><stop offset="0" stop-color="#01ab78"/><stop offset="0.46" stop-color="#1fc289"/><stop offset="1" stop-color="#48c89c"/></linearGradient>
-  <linearGradient id="wordmark" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${t.primary === '#007c5c' ? '#01ab78' : '#1fc289'}"/><stop offset="1" stop-color="${t.primary === '#007c5c' ? '#1fc289' : '#48c89c'}"/></linearGradient>
-  <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="${t.shadow.color}" flood-opacity="${t.shadow.opacity}"/></filter>
-  <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="${t.faint}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>
-  <marker id="arrow-main" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="${t.primary}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker>
-</defs>`
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${this.width}" height="${this.height}" viewBox="0 0 ${this.width} ${this.height}" role="img" aria-label="${esc(title)}">
+    const { t, width, height } = this
+    const stops = t.gradient
+      .map(([color, at]) => `<stop offset="${at}" stop-color="${color}"/>`)
+      .join('')
+    const shadows = t.shadows
+      .map(
+        (s) =>
+          `<feDropShadow dx="0" dy="${s.dy}" stdDeviation="${s.blur / 2}" flood-color="${s.color}" flood-opacity="${s.opacity}"/>`
+      )
+      .join('')
+    const arrow = (id, color) =>
+      `<marker id="${id}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">` +
+      `<path d="M1.5 1.5L8.5 5L1.5 8.5" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></marker>`
+    const surface = {
+      x: FRAME.inset,
+      y: FRAME.brand,
+      w: width - 2 * FRAME.inset,
+      h: height - FRAME.brand - FRAME.inset,
+    }
+    const brand = new Canvas(t, this.icons, width, height)
+    brand.mark(24, 17, 22)
+    brand.text(56, 33, 'Pacenote', { size: 15, weight: 600 })
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}">
 <title>${esc(title)}</title>
-${defs}
-<rect width="${this.width}" height="${this.height}" rx="28" fill="${t.canvas}"/>
+<defs>
+  <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="54" y1="314" x2="458" y2="198">${stops}</linearGradient>
+  <filter id="lift" x="-5%" y="-5%" width="110%" height="115%">${shadows}</filter>
+  ${arrow('arrow', t.faint)}
+  ${arrow('arrow-main', t.primary)}
+</defs>
+<rect width="${width}" height="${height}" rx="24" fill="${t.chrome}"/>
+${brand.parts.join('\n')}
+<rect x="${surface.x}" y="${surface.y}" width="${surface.w}" height="${surface.h}" rx="20" fill="${t.surface}" filter="url(#lift)"/>
 ${this.parts.join('\n')}
 </svg>
 `
@@ -235,807 +538,512 @@ ${this.parts.join('\n')}
 }
 
 /**
- * Slack, Pace's layers on the desktop, the Docker sandbox, and what the
- * sandbox may reach
+ * Slack, Pace's layers on the Mac, the Docker sandbox, and what the sandbox
+ * may reach
  */
 function architecture(c) {
-  c.header(
-    'architecture',
-    "One person's setup: Pace runs on your Mac and reasons each answer in a disposable sandbox."
+  c.page(
+    'Architecture',
+    "One person's setup",
+    'Pace answers your mentions on your Mac, and reasons each answer in a disposable sandbox.'
   )
+  const TOP = 176
 
   // Slack
-  c.card(40, 120, 220, 300, { title: 'Slack', sub: 'Your workspace' })
-  c.item(56, 176, 188, '#ops', 'A public channel')
-  c.item(56, 232, 188, '@Pace  check web-01', 'A mention, in a thread or not', {
-    mono: false,
+  c.well(48, TOP, 216, 242)
+  c.heading(64, TOP + 30, 184, {
+    icon: 'messages-square',
+    title: 'Slack',
+    meta: 'Your workspace',
   })
-  c.item(56, 288, 188, 'Socket Mode', 'Events over a WebSocket')
-  c.item(56, 344, 188, 'Web API', 'Replies, reactions, files')
+  c.rows(64, TOP + 46, 184, [
+    { label: '#ops', help: 'A public channel' },
+    {
+      label: '@Pace check web-01',
+      help: 'A mention, in a thread or not',
+      mono: false,
+    },
+    { label: 'Socket Mode', help: 'Events over a WebSocket' },
+    { label: 'Web API', help: 'Replies, reactions, files' },
+  ])
 
   // The Mac. Pace's layers, in the order a mention goes through them.
-  c.card(320, 120, 410, 526, {
+  c.well(344, TOP, 428, 500)
+  c.heading(360, TOP + 30, 396, {
+    icon: 'laptop',
     title: 'Your Mac',
-    sub: 'Pacenote.app, from Homebrew',
+    meta: 'Pacenote.app, from Homebrew',
   })
-  c.card(336, 176, 378, 284, { accent: true, radius: 14 })
-  c.text(352, 200, 'Pace', { size: 14, weight: 700, fill: c.t.primary })
-  c.text(394, 200, 'the bot process, managed by the app', {
-    size: 12,
-    fill: c.t.muted,
+  c.box(360, TOP + 46, 396, 274, { accent: true })
+  c.heading(376, TOP + 76, 364, {
+    icon: 'bot',
+    title: 'Pace',
+    meta: 'The bot process, run by the app',
+    tone: c.t.primary,
   })
-  const layers = [
-    ['messengers/slack', 'Messenger: Slack events in, answers out'],
-    ['mention pipeline', 'Who may ask, context, attachments, prompt'],
-    ['reasoners/claude, codex', 'Reasoner: calls the CLI, reads its steps'],
-    ['sandbox/docker', 'Sandbox: a container per request, or the host'],
-  ]
-  layers.forEach(([name, help], i) =>
-    c.item(352, 214 + i * 52, 346, name, help)
-  )
-  c.chip(352, 426, 'claude@docker', { width: 108 })
-  c.chip(468, 426, '👀 on the mention', { tone: 'running', width: 124 })
-  c.item(
-    336,
-    474,
-    378,
-    'Desktop app',
-    'Status, run history, settings, menu bar',
+  c.rows(376, TOP + 92, 364, [
     {
-      mono: false,
-    }
-  )
-  c.well(336, 532, 378, 98)
-  c.text(352, 554, '~/.pacenote', { mono: true, size: 12, weight: 600 })
-  c.text(352, 572, 'Settings and what Pace keeps, outside the app', {
-    size: 11.5,
-    fill: c.t.muted,
-  })
-  ;['.env', 'runs/', 'logs/', 'ops-broker/'].forEach((name, i) =>
-    c.text(352 + i * 84, 606, name, {
-      mono: true,
-      size: 11.5,
-      fill: c.t.accentFg,
-    })
+      label: 'messengers/slack',
+      help: 'Messenger: Slack events in, answers out',
+    },
+    {
+      label: 'mention pipeline',
+      help: 'Who may ask, context, attachments, prompt',
+    },
+    {
+      label: 'reasoners/claude, codex',
+      help: 'Reasoner: calls the CLI, reads its steps',
+    },
+    {
+      label: 'sandbox/docker',
+      help: 'Sandbox: a container per request, or the host',
+    },
+  ])
+  c.badges(376, TOP + 286, [
+    ['claude@docker', { icon: 'cpu' }],
+    ['👀 on the mention', { tone: 'running' }],
+  ])
+  c.rows(
+    360,
+    TOP + 332,
+    396,
+    [
+      {
+        label: 'Desktop app',
+        help: 'Overview, Todo, Runs, Settings; keeps Pace running',
+        mono: false,
+      },
+      {
+        label: 'MCP server',
+        help: 'Run history and Todo for Claude Code and Codex',
+        mono: false,
+      },
+      {
+        label: '~/.pacenote',
+        help: 'Settings and what Pace keeps, outside the app',
+        after: (y) => {
+          c.badges(360, y - 2, ['.env', 'runs/', 'logs/', 'tasks.json'], {
+            outline: true,
+            mono: true,
+          })
+          return y + 18
+        },
+      },
+    ],
+    { first: false }
   )
 
   // The sandbox: the renderer on its own, and the reasoner with its only two
   // ways out
-  c.card(820, 120, 340, 526, {
+  c.well(844, TOP, 308, 418)
+  c.heading(860, TOP + 30, 276, {
+    icon: 'container',
     title: 'Docker sandbox',
-    sub: 'pacenote-* containers, on the same Mac',
+    meta: 'pacenote-* containers',
   })
-  c.item(836, 176, 308, 'renderer', 'Diagrams to PNG, no network')
-  c.item(
-    836,
-    238,
-    308,
-    'reasoner',
-    'claude or codex, a new container per request'
-  )
-  c.item(836, 316, 151, 'egress-proxy', 'Allowed domains only')
-  c.item(993, 316, 151, 'ops-broker', 'Credentials stay here')
+  c.hairline(860, 1136, TOP + 46)
+  c.text(860, TOP + 66, 'Every container', { size: 11.5, fill: c.t.muted })
+  const first = c.badge(860, TOP + 76, 'read-only root')
+  c.badge(866 + first, TOP + 76, 'no capabilities')
+  const second = c.badge(860, TOP + 102, 'internal network')
+  c.badge(866 + second, TOP + 102, 'removed after use')
+  c.rows(860, TOP + 138, 276, [
+    { label: 'renderer', help: 'Diagrams to PNG, no network' },
+    { label: 'reasoner', help: 'claude or codex, a new container per request' },
+  ])
+  c.hairline(860, 1136, TOP + 230)
+  c.vline(998, TOP + 240, TOP + 402)
   ;[
-    [911, 'HTTPS'],
-    [1068, 'MCP'],
+    [929, 'HTTPS'],
+    [1071, 'MCP'],
   ].forEach(([x, label]) => {
     c.arrow(
       [
-        [x, 284],
-        [x, 314],
+        [x, TOP + 234],
+        [x, TOP + 256],
       ],
       {}
     )
-    c.text(x + 8, 304, label, { size: 11, fill: c.t.muted })
-    c.arrow(
-      [
-        [x, 362],
-        [x, 382],
-      ],
-      {}
-    )
+    c.text(x + 8, TOP + 249, label, { size: 11, fill: c.t.muted })
   })
-  c.well(836, 384, 151, 146)
-  c.text(848, 404, 'Model APIs', { size: 11.5, fill: c.t.muted })
-  c.chip(848, 414, 'api.anthropic.com', { width: 124 })
-  c.chip(848, 442, 'chatgpt.com', { width: 92 })
-  c.text(848, 486, 'and your allowlist', { size: 11.5, fill: c.t.muted })
-  c.well(993, 384, 151, 146)
-  c.text(1005, 404, 'Ops tools', { size: 11.5, fill: c.t.muted })
-  c.chip(1005, 414, 'SSH hosts', { width: 84 })
-  c.chip(1005, 442, 'k8s, read-only', { width: 112 })
-  c.chip(1005, 470, 'GitHub', { width: 66 })
-  c.chip(1077, 470, 'Jira', { width: 50 })
-  c.chip(1005, 498, 'work directory', { width: 108 })
-  c.well(836, 544, 308, 88)
-  c.text(848, 564, 'Every container', { size: 11.5, fill: c.t.muted })
-  const first = c.chip(848, 574, 'read-only root')
-  c.chip(856 + first, 574, 'no capabilities')
-  const second = c.chip(848, 602, 'internal network')
-  c.chip(856 + second, 602, 'removed after use')
+  c.text(860, TOP + 274, 'egress-proxy', { mono: true, size: 12, weight: 600 })
+  c.text(860, TOP + 291, 'Allowed domains only', {
+    size: 11.5,
+    fill: c.t.muted,
+  })
+  c.badge(860, TOP + 304, 'api.anthropic.com')
+  c.badge(860, TOP + 330, 'chatgpt.com')
+  c.text(860, TOP + 370, 'and your allowlist', {
+    size: 11.5,
+    fill: c.t.muted,
+  })
+  c.text(1014, TOP + 274, 'ops-broker', { mono: true, size: 12, weight: 600 })
+  c.text(1014, TOP + 291, 'Credentials stay here', {
+    size: 11.5,
+    fill: c.t.muted,
+  })
+  c.badge(1014, TOP + 304, 'SSH hosts')
+  c.badge(1014, TOP + 330, 'k8s, read-only')
+  c.badges(1014, TOP + 356, ['GitHub', 'Jira'])
+  c.badge(1014, TOP + 382, 'work directory')
 
   // Slack and Pace's messenger
   c.arrow(
     [
-      [260, 255],
-      [336, 230],
+      [264, TOP + 109],
+      [358, TOP + 109],
     ],
-    { main: true, label: 'mention', at: [298, 240], anchor: 'middle' }
+    { main: true, label: 'mention', at: [300, TOP + 96] }
   )
   c.arrow(
     [
-      [336, 252],
-      [260, 362],
+      [360, TOP + 121],
+      [312, TOP + 121],
+      [312, TOP + 207],
+      [264, TOP + 207],
     ],
-    { main: true, label: 'answer', at: [298, 310], anchor: 'middle' }
+    { main: true, label: 'answer', at: [312, TOP + 166] }
   )
   // The pipeline renders diagrams; the sandbox layer starts the reasoner
   c.arrow(
     [
-      [714, 289],
-      [836, 199],
+      [756, TOP + 161],
+      [852, TOP + 161],
     ],
-    { dashed: true, label: 'diagrams', at: [775, 244], anchor: 'middle' }
+    { dashed: true, label: 'diagrams', at: [808, TOP + 161] }
   )
   c.arrow(
     [
-      [714, 393],
-      [836, 261],
+      [756, TOP + 253],
+      [808, TOP + 253],
+      [808, TOP + 207],
+      [852, TOP + 207],
     ],
-    { main: true, label: 'docker run', at: [775, 327], anchor: 'middle' }
+    { main: true, label: 'docker run', at: [808, TOP + 230] }
   )
 
-  // Footer: the rules that hold everywhere
-  const rules = [
-    ['No public endpoint', 'Socket Mode connects outward'],
-    ['Public channels only', 'Private channels and DMs are refused'],
-    ['Allowed users', 'Required when ops tools are on'],
-    ['Nothing leaves silently', 'The proxy allows listed domains only'],
-  ]
-  rules.forEach(([title, help], i) => {
-    const x = 40 + i * 282
-    c.card(x, 670, 266, 66, { radius: 14 })
-    c.text(x + 16, 696, title, { size: 13, weight: 600 })
-    c.text(x + 16, 716, help, { size: 11.5, fill: c.t.muted })
-  })
+  // The rules that hold everywhere
+  c.hairline(48, 1152, 700)
+  c.facts(48, 724, 1104, [
+    {
+      icon: 'globe',
+      label: 'Connection',
+      value: 'No public endpoint',
+      hint: 'Socket Mode connects outward',
+    },
+    {
+      icon: 'hash',
+      label: 'Channels',
+      value: 'Public channels only',
+      hint: 'Private channels and DMs are refused',
+    },
+    {
+      icon: 'user-check',
+      label: 'People',
+      value: 'Allowed users',
+      hint: 'Required when ops tools are on',
+    },
+    {
+      icon: 'shield-check',
+      label: 'Egress',
+      value: 'Nothing leaves silently',
+      hint: 'The proxy allows listed domains only',
+    },
+  ])
 }
 
 /**
- * One Slack app for a team: the hub routes each member's mentions to their own
- * desktop
+ * Your tasks: Collect now has Claude Code read your Slack with your own
+ * connector and add them through Pacenote's MCP server, which your AI tools
+ * use too
  */
-function teamHub(c) {
-  c.header(
-    'team hub',
-    "A team shares one Slack app. Each member's own Mac answers that member's mentions."
+function todo(c) {
+  c.page(
+    'Todo and AI tools',
+    'Your tasks, read as you',
+    'Collect now has Claude Code read your Slack with your claude.ai connector; Pacenote holds no Slack token for it.'
   )
+  const TOP = 176
 
-  c.card(40, 120, 250, 250, {
+  // Your side of Slack, the connector that reads it, and your AI tools
+  c.well(48, TOP, 200, 196)
+  c.heading(64, TOP + 30, 168, {
+    icon: 'messages-square',
     title: 'Slack',
-    sub: 'One app for the workspace',
+    meta: 'Read as you',
   })
-  c.item(56, 176, 218, '@Pace  status of web-01', 'alice asks', {
-    mono: false,
+  c.rows(64, TOP + 46, 168, [
+    {
+      label: 'Mentions of you',
+      help: 'Someone asked you by name',
+      mono: false,
+    },
+    {
+      label: 'Threads you are in',
+      help: 'The last word is not yours',
+      mono: false,
+    },
+    {
+      label: 'Your own messages',
+      help: 'Saying you will do something',
+      mono: false,
+    },
+  ])
+  c.well(48, TOP + 236, 200, 104)
+  c.heading(64, TOP + 266, 168, {
+    icon: 'plug',
+    title: 'claude.ai',
+    meta: 'Your account',
   })
-  c.item(56, 232, 218, '@Pace  draft the PR', 'bob asks', { mono: false })
-  c.item(56, 288, 218, '@Pace  connect K7Q2-9DMX', 'Pairing a desktop', {
-    mono: false,
+  c.rows(64, TOP + 282, 168, [
+    {
+      label: 'Slack connector',
+      help: 'Search, read channels, threads',
+      mono: false,
+    },
+  ])
+  c.well(48, TOP + 372, 200, 152)
+  c.heading(64, TOP + 402, 168, {
+    icon: 'terminal',
+    title: 'Your AI tools',
+  })
+  c.rows(64, TOP + 418, 168, [
+    {
+      label: 'Claude Code',
+      help: 'my_tasks, or collects itself',
+      mono: false,
+    },
+    {
+      label: 'Codex',
+      help: 'my_tasks and the run history',
+      mono: false,
+    },
+  ])
+
+  // The Mac: the collection, the app, the server and the files
+  c.well(344, TOP, 808, 524)
+  c.heading(360, TOP + 30, 776, {
+    icon: 'laptop',
+    title: 'Your Mac',
+    meta: 'Pacenote.app',
   })
 
-  c.card(360, 120, 380, 250, {
-    title: 'Team hub',
-    sub: 'deploy/hub: a container on a server, behind HTTPS',
+  c.box(360, TOP + 46, 336, 240, { accent: true })
+  c.heading(376, TOP + 76, 304, {
+    icon: 'terminal',
+    title: 'Claude Code',
+    meta: 'Headless, from Collect now',
+    tone: c.t.primary,
   })
-  c.item(
-    376,
-    176,
-    348,
-    'Holds the Slack tokens',
-    'Socket Mode in, Web API out; desktops never get them',
-    { mono: false }
-  )
-  c.item(
-    376,
-    232,
-    348,
-    'Routes by who asked',
-    "A mention goes to that member's paired desktop",
-    { mono: false }
-  )
-  c.item(
-    376,
-    288,
-    348,
-    'Calls only within a grant',
-    'Each desktop may touch only the threads routed to it',
-    { mono: false }
-  )
-  c.chip(376, 344, 'pacenote-hub', { width: 100 })
-  c.chip(484, 344, 'token hashes only', { width: 124 })
+  c.rows(376, TOP + 92, 304, [
+    {
+      label: 'claude -p /mcp__pacenote__collect_tasks',
+      help: 'One at a time, for at most 10 minutes',
+    },
+  ])
+  c.hairline(376, 680, TOP + 138)
+  c.text(376, TOP + 158, 'Allowed', { size: 11.5, fill: c.t.muted })
+  c.badges(376, TOP + 168, [
+    'Slack read tools',
+    'Pacenote task tools',
+    'ToolSearch',
+  ])
+  c.text(376, TOP + 208, 'Denied outright', { size: 11.5, fill: c.t.muted })
+  c.badges(376, TOP + 218, ['send', 'draft', 'schedule', 'react', 'canvases'], {
+    tone: 'failed',
+  })
+  c.text(376, TOP + 264, 'Your settings, plugins and MCP servers stay out', {
+    size: 11.5,
+    fill: c.t.muted,
+  })
 
-  const desks = [
-    ["alice's Mac", 'Their own claude login and sandbox'],
-    ["bob's Mac", 'Their own codex login and sandbox'],
+  c.box(800, TOP + 46, 336, 240)
+  c.heading(816, TOP + 76, 304, { icon: 'app-window', title: 'Desktop app' })
+  c.rows(816, TOP + 92, 304, [
+    { label: 'Todo', help: 'Open, Maybe, Done; your decisions', mono: false },
+    {
+      label: 'Runs',
+      help: 'Each collection, a run beside the answers',
+      mono: false,
+    },
+    {
+      label: 'Status bar',
+      help: 'Collecting tasks, on any screen',
+      mono: false,
+    },
+    {
+      label: 'Settings > Todo',
+      help: 'What to gather; adds Pacenote to your tools',
+      mono: false,
+    },
+  ])
+
+  c.box(360, TOP + 318, 336, 190)
+  c.heading(376, TOP + 348, 304, {
+    icon: 'server',
+    title: 'Pacenote MCP server',
+    meta: 'stdio',
+  })
+  c.hairline(376, 680, TOP + 364)
+  c.vline(528, TOP + 376, TOP + 494)
+  const tools = [
+    [
+      376,
+      'Todo',
+      'While Gather my tasks is on',
+      ['collect_context', 'add_tasks', 'close_task', 'my_tasks'],
+    ],
+    [
+      544,
+      'Run history',
+      'While Share is on',
+      ['recent_runs', 'search_runs', 'get_run'],
+    ],
   ]
-  desks.forEach(([title, help], i) => {
-    const y = 120 + i * 130
-    c.card(810, y, 350, 116, { accent: true, title, sub: help })
-    c.chip(828, y + 70, 'Pacenote.app', { width: 100 })
-    c.chip(936, y + 70, 'Pace answers here', { tone: 'running', width: 136 })
+  tools.forEach(([x, title, help, names]) => {
+    c.text(x, TOP + 386, title, { size: 13, weight: 600 })
+    c.text(x, TOP + 403, help, { size: 11, fill: c.t.muted })
+    names.forEach((name, i) =>
+      c.text(x, TOP + 426 + i * 20, name, { mono: true, size: 11.5 })
+    )
   })
 
+  c.box(800, TOP + 318, 336, 190)
+  c.heading(816, TOP + 348, 304, { icon: 'folder', title: '~/.pacenote' })
+  c.rows(816, TOP + 364, 304, [
+    { label: 'tasks.json', help: 'The list: add_tasks, close_task' },
+    {
+      label: 'tasks-decisions.json',
+      help: 'Done, dismissed and kept: yours alone',
+    },
+    { label: 'runs/', help: 'Collections, kept as long as the answers' },
+  ])
+
+  // 1 to 4: one collection
   c.arrow(
     [
-      [290, 245],
-      [360, 245],
+      [800, TOP + 108],
+      [698, TOP + 108],
+    ],
+    { main: true, label: 'Collect now', step: '1', at: [748, TOP + 108] }
+  )
+  c.arrow(
+    [
+      [698, TOP + 154],
+      [798, TOP + 154],
+    ],
+    { label: 'its steps', at: [748, TOP + 154] }
+  )
+  c.arrow(
+    [
+      [432, TOP + 286],
+      [432, TOP + 316],
     ],
     {
       main: true,
+      label: 'collect_context',
+      step: '2',
+      at: [444, TOP + 301],
+      anchor: 'start',
+    }
+  )
+  c.arrow(
+    [
+      [360, TOP + 270],
+      [250, TOP + 270],
+    ],
+    { main: true, label: 'read Slack', step: '3', at: [296, TOP + 251] }
+  )
+  c.arrow(
+    [
+      [148, TOP + 234],
+      [148, TOP + 198],
+    ],
+    { main: true, label: 'as you', at: [160, TOP + 216], anchor: 'start' }
+  )
+  c.arrow(
+    [
+      [600, TOP + 286],
+      [600, TOP + 316],
+    ],
+    {
+      main: true,
+      label: 'add_tasks, close_task',
+      step: '4',
+      at: [612, TOP + 301],
+      anchor: 'start',
+    }
+  )
+  // What follows from them
+  c.arrow(
+    [
+      [696, TOP + 424],
+      [798, TOP + 424],
+    ],
+    { main: true, label: 'writes', at: [747, TOP + 424] }
+  )
+  c.arrow(
+    [
+      [968, TOP + 288],
+      [968, TOP + 316],
+    ],
+    {
       start: true,
-      label: 'Socket Mode',
-      at: [325, 228],
-      anchor: 'middle',
+      label: 'reads tasks, writes runs',
+      at: [980, TOP + 301],
+      anchor: 'start',
     }
   )
   c.arrow(
     [
-      [740, 200],
-      [810, 178],
+      [248, TOP + 448],
+      [358, TOP + 448],
     ],
-    { main: true, start: true }
-  )
-  c.arrow(
-    [
-      [740, 290],
-      [810, 308],
-    ],
-    { main: true, start: true }
-  )
-  c.text(775, 252, 'WebSocket', {
-    size: 11,
-    fill: c.t.primary,
-    anchor: 'middle',
-    weight: 600,
-  })
-  c.text(775, 266, 'per desktop', {
-    size: 11,
-    fill: c.t.muted,
-    anchor: 'middle',
-  })
-
-  // Pairing, step by step
-  c.card(40, 400, 1120, 196, {
-    title: 'Pairing a desktop',
-    sub: 'Once per member; pairing again replaces the earlier desktop',
-  })
-  const steps = [
-    [
-      'Connect',
-      'Settings > Messengers > Slack > Team hub: enter the hub URL. The app makes a token and sends only its hash.',
-    ],
-    [
-      'A code',
-      'The hub answers with a short code that expires; the app shows it.',
-    ],
-    [
-      'In Slack',
-      'The member mentions @Pace connect <code>, so the hub learns who is pairing.',
-    ],
-    [
-      'Confirm',
-      'The app shows the Slack name it bound to; confirming stores the token in ~/.pacenote/.env.',
-    ],
-  ]
-  steps.forEach(([title, help], i) => {
-    const x = 56 + i * 274
-    c.well(x, 460, 258, 120)
-    c.step(x + 22, 484, String(i + 1))
-    c.text(x + 42, 489, title, { size: 13, weight: 600 })
-    wrap(help, 38).forEach((line, j) =>
-      c.text(x + 14, 516 + j * 17, line, { size: 11.5, fill: c.t.muted })
-    )
-  })
-}
-
-/**
- * One mention, from the event to the answer, with what happens on failure and
- * after a restart
- */
-function mentionFlow(c) {
-  c.header('one mention', 'What Pace does between a mention and its answer.')
-
-  // Three lanes, named on the left
-  const lanes = [
-    ['Slack', 'The workspace', 120, 104],
-    ['Pace', 'On your Mac', 236, 132],
-    ['Sandbox', 'Docker or the host', 380, 104],
-  ]
-  lanes.forEach(([name, help, y, h], i) => {
-    c.add(
-      `<rect x="40" y="${y}" width="1120" height="${h}" rx="18" fill="${i === 1 ? c.t.cardAccent : c.t.card}" filter="url(#shadow)"/>`
-    )
-    c.text(60, y + h / 2 - 2, name, {
-      size: 14,
-      weight: 700,
-      fill: i === 1 ? c.t.primary : c.t.foreground,
-    })
-    c.text(60, y + h / 2 + 16, help, { size: 11.5, fill: c.t.muted })
-  })
-
-  const W = 150
-  const steps = [
-    {
-      n: '1',
-      lane: 0,
-      x: 160,
-      title: 'app_mention',
-      help: ['Acked; a redelivery', 'is handled once'],
-    },
-    {
-      n: '2',
-      lane: 1,
-      x: 160,
-      title: 'Allowed here?',
-      help: ['Allowed users,', 'public channels only'],
-    },
-    {
-      n: '3',
-      lane: 0,
-      x: 330,
-      title: 'React 👀',
-      help: ['On the mention: no', 'message, no ping'],
-    },
-    {
-      n: '4',
-      lane: 1,
-      x: 330,
-      title: 'Read the thread',
-      help: ['Names, text,', 'images, PDFs'],
-    },
-    {
-      n: '5',
-      lane: 2,
-      x: 500,
-      title: 'Reason',
-      help: ['claude or codex,', 'tools over MCP'],
-    },
-    {
-      n: '6',
-      lane: 1,
-      x: 670,
-      title: 'Record',
-      help: ['Each step into', 'runs/, as it happens'],
-    },
-    {
-      n: '7',
-      lane: 2,
-      x: 840,
-      title: 'Render',
-      help: ['Diagram blocks to', 'PNG, no network'],
-    },
-    {
-      n: '8',
-      lane: 0,
-      x: 1000,
-      title: 'Answer',
-      help: ['A new reply that', 'pings; 👀 comes off'],
-    },
-  ]
-  const laneY = [138, 262, 398]
-  steps.forEach((s) => {
-    const y = laneY[s.lane]
-    c.well(s.x, y, W, 68)
-    c.step(s.x + 20, y + 20, s.n)
-    c.text(s.x + 38, y + 25, s.title, { size: 12.5, weight: 600 })
-    s.help.forEach((line, i) =>
-      c.text(s.x + 14, y + 44 + i * 15, line, { size: 11.5, fill: c.t.muted })
-    )
-  })
-  // Down within a column, then elbows between columns
-  const right = (s) => s.x + W
-  const mid = (s) => laneY[s.lane] + 34
-  const down = (a, b) =>
-    c.arrow(
-      [
-        [a.x + 75, laneY[a.lane] + 68],
-        [b.x + 75, laneY[b.lane]],
-      ],
-      { main: true }
-    )
-  const elbow = (a, b) =>
-    c.arrow(
-      [
-        [right(a), mid(a)],
-        [right(a) + 10, mid(a)],
-        [right(a) + 10, mid(b)],
-        [b.x, mid(b)],
-      ],
-      { main: true }
-    )
-  down(steps[0], steps[1])
-  elbow(steps[1], steps[2])
-  down(steps[2], steps[3])
-  elbow(steps[3], steps[4])
-  elbow(steps[4], steps[5])
-  elbow(steps[5], steps[6])
-  elbow(steps[6], steps[7])
-
-  // What can go another way
-  const others = [
-    {
-      tone: 'failed',
-      title: 'Not allowed or not public',
-      help: 'A note only the asker sees; nothing runs.',
-    },
-    {
-      tone: 'failed',
-      title: 'The reasoner fails',
-      help: '⚠️ on the mention; what it means, to the asker alone.',
-    },
-    {
-      tone: 'interrupted',
-      title: 'Pace restarts',
-      help: 'inflight.json resumes it once; the 👀 stays on the mention meanwhile.',
-    },
-    {
-      tone: 'running',
-      title: 'Too many at once',
-      help: 'Two run, ten wait; beyond that only the asker hears it is busy.',
-    },
-  ]
-  others.forEach((o, i) => {
-    const x = 40 + i * 282
-    c.card(x, 512, 266, 100, { radius: 14 })
-    c.add(
-      `<rect x="${x + 16}" y="532" width="6" height="60" rx="3" fill="${c.t[o.tone]}"/>`
-    )
-    c.text(x + 32, 546, o.title, { size: 13, weight: 600 })
-    wrap(o.help, 34).forEach((line, j) =>
-      c.text(x + 32, 566 + j * 16, line, { size: 11.5, fill: c.t.muted })
-    )
-  })
-}
-
-/**
- * The code: the mention pipeline talks to chat apps only through the messenger
- * interface
- */
-function codeLayout(c) {
-  c.header(
-    'code layout',
-    'Where things live in the repository, and the one interface every chat app goes through.'
+    { dashed: true, label: 'MCP', at: [296, TOP + 448] }
   )
 
-  // Entry
-  c.card(40, 120, 260, 120, { title: 'src/index.ts', sub: 'Assembles the bot' })
-  c.text(58, 192, 'Connects the messenger, starts', {
-    size: 11.5,
-    fill: c.t.muted,
-  })
-  c.text(58, 208, 'the responder, the sandbox checks', {
-    size: 11.5,
-    fill: c.t.muted,
-  })
-  c.text(58, 224, 'and the status file', { size: 11.5, fill: c.t.muted })
-
-  // Messengers
-  c.card(40, 266, 260, 330, {
-    title: 'src/messengers/slack',
-    sub: 'The Slack adapter',
-  })
-  ;[
-    ['connect.ts', 'Bolt, Socket Mode or the hub'],
-    ['messenger.ts', 'SlackMessenger'],
-    ['files.ts', 'Lookups, downloads'],
-    ['format.ts', 'Markdown to mrkdwn'],
-    ['directory.ts', 'Names, channels'],
-  ].forEach(([name, help], i) => c.item(56, 322 + i * 52, 228, name, help))
-
-  // The interface
-  c.card(350, 120, 330, 476, {
-    accent: true,
-    title: 'Messenger',
-    sub: 'src/messengers/types.ts',
-  })
-  const methods = [
-    ['venue / request / context', 'Where, what, and the thread so far'],
-    ['resolveFiles / download', 'Attachments'],
-    ['notice / post / update', 'Replies, edits, notes to the asker'],
-    ['upload', 'Generated images, diagrams'],
-    ['render', "Markdown into the app's markup"],
-    ['permalink', 'Links in the run history'],
-  ]
-  methods.forEach(([name, help], i) =>
-    c.item(366, 176 + i * 54, 298, name, help)
-  )
-  c.chip(366, 508, 'Mention: plain JSON, resumable', { width: 214 })
-  c.text(366, 552, 'A new chat app is a new adapter;', {
-    size: 11.5,
-    fill: c.t.muted,
-  })
-  c.text(366, 569, 'the pipeline does not change.', {
-    size: 11.5,
-    fill: c.t.muted,
-  })
-
-  // Pipeline
-  c.card(730, 120, 430, 228, {
-    title: 'src/mention',
-    sub: 'The pipeline, messenger-neutral',
-  })
-  ;[
-    ['responder.ts', 'One mention end to end'],
-    ['prompt.ts', 'System and user prompts'],
-    ['attachments.ts', 'What to read, and reading it'],
-    ['inflight.ts', 'Resume after a restart'],
-  ].forEach(([name, help], i) =>
-    c.item(746 + (i % 2) * 202, 176 + Math.floor(i / 2) * 54, 194, name, help)
-  )
-  c.item(746, 284, 194, 'limiter.ts', 'Concurrency, queue')
-  c.item(948, 284, 196, 'run-record.ts', 'Into the history')
-
-  // Below the pipeline
-  const below = [
-    ['src/reasoners', 'An adapter per CLI'],
-    ['src/sandbox', 'Where it runs: host, docker'],
-    ['src/history', 'runs/ written and read'],
-    ['src/hub, src/broker', 'Team hub; ops tools'],
-  ]
-  below.forEach(([name, help], i) => {
-    const x = 730 + (i % 2) * 218
-    const y = 368 + Math.floor(i / 2) * 76
-    c.card(x, y, 212, 64, { radius: 14 })
-    c.text(x + 16, y + 26, name, { mono: true, size: 12, weight: 600 })
-    c.text(x + 16, y + 46, help, { size: 11.5, fill: c.t.muted })
-  })
-
-  c.arrow(
-    [
-      [300, 380],
-      [350, 380],
-    ],
-    { main: true, label: 'implements', at: [325, 364], anchor: 'middle' }
-  )
-  c.arrow(
-    [
-      [680, 250],
-      [730, 250],
-    ],
-    { main: true, start: true, label: 'uses', at: [705, 234], anchor: 'middle' }
-  )
-  c.arrow(
-    [
-      [170, 240],
-      [170, 266],
-    ],
-    {}
-  )
-
-  // Apps
-  c.card(40, 616, 1120, 72, { radius: 14 })
-  c.text(60, 646, 'apps/desktop', { mono: true, size: 12.5, weight: 600 })
-  c.text(
-    60,
-    666,
-    'Electron: supervises Pace, settings store, sandbox jobs, menu bar',
+  c.hairline(48, 1152, TOP + 548)
+  c.facts(48, TOP + 572, 1104, [
     {
-      size: 11.5,
-      fill: c.t.muted,
-    }
-  )
-  c.text(620, 646, 'apps/web', { mono: true, size: 12.5, weight: 600 })
-  c.text(
-    620,
-    666,
-    'React UI over pacenote://app: status, run history, settings',
-    {
-      size: 11.5,
-      fill: c.t.muted,
-    }
-  )
-}
-
-/**
- * The three interfaces around the mention pipeline, what implements each today,
- * and where the next ones go
- */
-function layers(c) {
-  c.header(
-    'layers',
-    "Three interfaces keep the pipeline apart from the chat app, the model's CLI, and where it runs."
-  )
-  const W = 232
-  const GAP = 64
-  const TOP = 120
-  const H = 516
-  const left = (i) => 40 + i * (W + GAP)
-  const columns = [
-    {
-      title: 'Messenger',
-      sub: 'src/messengers/types.ts',
-      accent: true,
-      upper: 'Interface',
-      contract: [
-        ['venue / request', 'Where, and what was asked'],
-        ['context / download', 'The thread, attachments'],
-        ['post / update / upload', 'Answers, edits, images'],
-        ['render', "Markdown in the app's markup"],
-      ],
-      lower: 'Adapters',
-      adapters: [['slack/', 'Bolt, Socket Mode or the hub']],
-      slots: ['Telegram', 'Discord'],
+      icon: 'key-round',
+      label: 'Slack token',
+      value: 'None for your tasks',
+      hint: "The connector is your claude.ai account's",
     },
     {
-      title: 'Mention pipeline',
-      sub: 'src/mention',
-      upper: 'Messenger- and model-neutral',
-      contract: [
-        ['responder.ts', 'One mention end to end'],
-        ['prompt.ts', 'System and user prompts'],
-        ['attachments.ts', 'What to read, and reading it'],
-        ['limiter.ts', 'Concurrency, the queue'],
-      ],
-      lower: 'Around it',
-      adapters: [
-        ['src/index.ts', 'Picks one of each'],
-        ['src/history', 'Runs and their steps'],
-      ],
-      slots: [],
+      icon: 'shield-check',
+      label: 'Slack writes',
+      value: 'Denied outright',
+      hint: "Whatever Claude Code's permissions say",
     },
     {
-      title: 'Reasoner',
-      sub: 'src/reasoners/types.ts',
-      accent: true,
-      upper: 'Interface',
-      contract: [
-        ['complete(request)', 'Prompt in, the answer out'],
-        ['onEvent', 'Steps for the run history'],
-        ['canReadFiles', 'Whether it may read files'],
-        ['CliAdapter', 'invocation, events, answer'],
-      ],
-      lower: 'Adapters',
-      adapters: [
-        ['claude.ts', 'claude -p, stream-json'],
-        ['codex.ts', 'codex exec --json'],
-      ],
-      slots: ['Another CLI (gemini, ...)', 'An API reasoner'],
+      icon: 'bot',
+      label: "Pace's answers",
+      value: 'Never read as you',
+      hint: 'They read the thread with the bot token',
     },
     {
-      title: 'Sandbox',
-      sub: 'src/sandbox/runtime.ts',
-      accent: true,
-      upper: 'Interface',
-      contract: [
-        ['run(SandboxRun)', 'One process: env, mounts, stdin'],
-        ['pathIn(mount, file)', 'Paths as the process sees them'],
-        ['extractPdfText', 'Uploaded PDFs, no network'],
-        ['verify()', 'What keeps it from running'],
-      ],
-      lower: 'Implementations',
-      adapters: [
-        ['host.ts', 'Your login, no isolation'],
-        ['docker.ts', 'Hardened, one per request'],
-      ],
-      slots: ['Podman', 'A VM or a remote runner'],
+      icon: 'history',
+      label: "A collection's run",
+      value: 'Keeps no messages',
+      hint: 'Tool calls and tokens, not what Slack said',
     },
-  ]
-
-  columns.forEach((col, i) => {
-    const x = left(i)
-    c.card(x, TOP, W, H, { accent: col.accent, title: col.title, sub: col.sub })
-    c.text(x + 18, TOP + 80, col.upper, { size: 11.5, fill: c.t.muted })
-    col.contract.forEach(([name, help], j) =>
-      c.item(x + 16, TOP + 90 + j * 54, W - 32, name, help)
-    )
-    c.text(x + 18, TOP + 326, col.lower, { size: 11.5, fill: c.t.muted })
-    col.adapters.forEach(([name, help], j) =>
-      c.item(x + 16, TOP + 336 + j * 54, W - 32, name, help, {
-        labelFill: c.t.primary,
-      })
-    )
-    col.slots.forEach((label, j) =>
-      c.slot(x + 16, TOP + 444 + j * 34, W - 32, label)
-    )
-  })
-
-  // What crosses each interface, there and back
-  const pairs = [
-    ['mention', 'answer'],
-    ['request', 'answer'],
-    ['process', 'stdout'],
-  ]
-  pairs.forEach(([there, back], i) => {
-    const from = left(i) + W
-    const to = left(i + 1)
-    const mid = (from + to) / 2
-    c.arrow(
-      [
-        [from, TOP + 170],
-        [to, TOP + 170],
-      ],
-      { main: true, label: there, at: [mid, TOP + 156], anchor: 'middle' }
-    )
-    c.arrow(
-      [
-        [to, TOP + 226],
-        [from, TOP + 226],
-      ],
-      { label: back, at: [mid, TOP + 212], anchor: 'middle' }
-    )
-  })
-
-  // How each kind of new thing gets in
-  const adding = [
-    [
-      'A chat app',
-      [
-        'An adapter in src/messengers',
-        'and its settings section. The',
-        'pipeline does not change.',
-      ],
-    ],
-    [
-      'Settings',
-      [
-        "REASONER picks the model's",
-        'adapter, REASONER_SANDBOX',
-        'the sandbox: host or docker.',
-      ],
-    ],
-    [
-      'A model',
-      [
-        'An adapter in src/reasoners and',
-        'its id in ids.ts; the CLI goes',
-        'into the reasoner image.',
-      ],
-    ],
-    [
-      'A runtime',
-      [
-        'A Sandbox in src/sandbox.',
-        'Adapters ask for mounts and',
-        'env, never for docker.',
-      ],
-    ],
-  ]
-  adding.forEach(([title, lines], i) => {
-    const x = left(i)
-    const y = TOP + H + 24
-    c.card(x, y, W, 98, { radius: 14 })
-    c.text(x + 16, y + 26, title, { size: 13, weight: 600 })
-    lines.forEach((line, j) =>
-      c.text(x + 16, y + 48 + j * 17, line, { size: 11.5, fill: c.t.muted })
-    )
-  })
-}
-
-/** Splits text into lines of at most `width` characters */
-function wrap(text, width) {
-  const lines = []
-  let line = ''
-  for (const word of text.split(' ')) {
-    if (line && (line + ' ' + word).length > width) {
-      lines.push(line)
-      line = word
-    } else line = line ? `${line} ${word}` : word
-  }
-  if (line) lines.push(line)
-  return lines
+  ])
 }
 
 const DIAGRAMS = [
-  ['architecture', 'Pacenote architecture', 1200, 760, architecture],
-  ['team-hub', 'Pacenote team hub', 1200, 628, teamHub],
-  ['mention-flow', 'Pacenote: one mention', 1200, 640, mentionFlow],
-  ['layers', 'Pacenote layers', 1200, 800, layers],
-  ['code-layout', 'Pacenote code layout', 1200, 720, codeLayout],
+  ['architecture', 'Pacenote architecture', 1200, 816, architecture],
+  ['todo', 'Pacenote: Todo and AI tools', 1200, 846, todo],
 ]
 
+const only = process.argv.slice(2)
+const themes = readThemes()
+const icons = await readIcons(ICONS)
 mkdirSync(OUT, { recursive: true })
 for (const [name, title, width, height, draw] of DIAGRAMS) {
-  for (const [theme, tokens] of Object.entries(THEMES)) {
-    const canvas = new Canvas(tokens, width, height)
+  if (only.length && !only.includes(name)) continue
+  for (const [theme, tokens] of Object.entries(themes)) {
+    const canvas = new Canvas(tokens, icons, width, height)
     draw(canvas)
     const file = path.join(OUT, `${name}-${theme}.svg`)
     writeFileSync(file, canvas.svg(title))

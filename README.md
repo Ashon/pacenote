@@ -18,7 +18,7 @@ voice of the app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
-  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox); and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="docs/diagrams/architecture-light.svg">
+  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="docs/diagrams/architecture-light.svg">
 </picture>
 
 ## What it does

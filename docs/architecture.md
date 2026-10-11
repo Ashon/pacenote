@@ -1,6 +1,6 @@
 # Architecture
 
-How Pacenote is put together, in five pictures. The diagrams are drawn by `scripts/diagrams.mjs`
+How Pacenote is put together, in six pictures. The diagrams are drawn by `scripts/diagrams.mjs`
 (`pnpm docs:diagrams`) in the desktop app's look, with a light and a dark variant.
 
 ## The pieces
@@ -10,12 +10,13 @@ mention pipeline, the reasoner that calls your `claude` or `codex` CLI, and the 
 it over Socket Mode, so nothing listens on a public port. With the Docker sandbox, each answer is reasoned in a new,
 hardened container whose only ways out are the egress proxy (the model APIs and the domains you allow) and ops-broker
 (ops tools, with the credentials kept in the broker); without it, the CLI runs on your Mac with your own login.
-Diagrams are rendered in a container of their own, with no network. Settings and everything Pace keeps live in
-`~/.pacenote`.
+Diagrams are rendered in a container of their own, with no network. The app also offers an MCP server to the AI tools
+on your Mac, for your tasks and the run history ([below](#your-tasks-and-ai-tools)). Settings and everything Pace keeps
+live in `~/.pacenote`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/architecture-dark.svg">
-  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox); and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="diagrams/architecture-light.svg">
+  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="diagrams/architecture-light.svg">
 </picture>
 
 More: [How it works](how-it-works.md), [Reasoner sandbox](sandbox.md), [Ops tools](ops-tools.md),
@@ -31,6 +32,21 @@ comes as a new reply. A restart resumes an unfinished answer once, with the 👀
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/mention-flow-dark.svg">
   <img alt="The steps of one mention across Slack, Pace and the sandbox, and what happens when a mention is refused, fails, is interrupted or has to wait" src="diagrams/mention-flow-light.svg">
 </picture>
+
+## Your tasks and AI tools
+
+Todo keeps what people ask of you in Slack. **Collect now** has Claude Code, headless, read your Slack with the Slack
+connector of your claude.ai account, read only, and add the tasks through Pacenote's MCP server: Pacenote holds no Slack
+token for your tasks, and Pace's answers never read as you. Each collection is a run in the run history, with its tool
+calls and tokens but not what Slack returned. The same server, started by Claude Code or Codex over stdio, gives them
+your tasks and, while you share it, the run history.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/todo-dark.svg">
+  <img alt="Collect now running Claude Code, which reads your Slack through your claude.ai connector and adds tasks through Pacenote's MCP server; the desktop app and the files it keeps; and your AI tools reaching the same server" src="diagrams/todo-light.svg">
+</picture>
+
+More: [Your tasks from Slack](tasks.md), [Run history for AI tools](history-mcp.md).
 
 ## Team hub
 

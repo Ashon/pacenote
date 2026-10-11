@@ -6,7 +6,7 @@ anything else that speaks MCP) can read that history through Pacenote's MCP serv
 Pace find about web-01 this morning?", or the background of a draft PR Pace opened.
 
 Pacenote only offers its own history. Which tools use it is up to you: Pacenote adds itself to a tool only when you click
-Add for that tool.
+Add for that tool. How it fits with your tasks is drawn in [Architecture](architecture.md#your-tasks-and-ai-tools).
 
 ## Adding it to a tool
 

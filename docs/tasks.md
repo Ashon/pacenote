@@ -3,7 +3,8 @@
 Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Todo screen, so
 you do not keep it in your head or scroll back for it. **Collect now** has Claude Code read Slack with the Slack connector
 of your claude.ai account, read only, and add the tasks through Pacenote's MCP server; Pacenote holds no Slack token for
-this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md).
+this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md), and
+the pieces are drawn in [Architecture](architecture.md#your-tasks-and-ai-tools).
 
 ## Turning it on
 
