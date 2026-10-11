@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatDuration,
+  formatShortDay,
   formatTokens,
   previewArgs,
 } from '../apps/web/src/lib/format.js'
@@ -60,5 +61,20 @@ describe('formatTokens', () => {
     expect(formatTokens(37_220)).toBe('37k')
     expect(formatTokens(999_600)).toBe('1M')
     expect(formatTokens(1_541_000)).toBe('1.54M')
+  })
+})
+
+describe('formatShortDay', () => {
+  it('names the day in a short list: Today, Yesterday, then the weekday', () => {
+    const now = new Date(2026, 9, 11, 15)
+    expect(formatShortDay(new Date(2026, 9, 11, 9).toISOString(), now)).toBe(
+      'Today'
+    )
+    expect(formatShortDay(new Date(2026, 9, 10, 9).toISOString(), now)).toBe(
+      'Yesterday'
+    )
+    expect(formatShortDay(new Date(2026, 9, 9, 9).toISOString(), now)).toBe(
+      'Fri'
+    )
   })
 })

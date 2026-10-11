@@ -223,6 +223,24 @@ describe('collecting from the app with Claude Code', () => {
     })
   })
 
+  it('starts with how the last logged collection ended', () => {
+    const last = {
+      at: '2026-10-10T05:00:00.000Z',
+      ok: true as const,
+      added: 1,
+      maybe: 0,
+      skipped: 0,
+      reads: 12,
+    }
+    const collector = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => '',
+      cwd: process.cwd(),
+      last,
+    })
+    expect(collector.state).toEqual({ last })
+  })
+
   it('stops a collection, and tells when claude is missing or too slow', async () => {
     const slow = new TaskCollector({
       launch: () => LAUNCH,

@@ -240,6 +240,8 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       cwd: string
       /** Keeps a finished collection (src/tasks/collections.ts) */
       record?: (entry: CollectionRecord) => void
+      /** How the last one ended, from the log, so the screen has it at start */
+      last?: CollectOutcome
       /** For tests: the command in place of claude */
       command?: [string, string[]]
       timeoutMs?: number
@@ -247,6 +249,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     }
   ) {
     super()
+    if (options.last) this.current = { last: options.last }
   }
 
   get state(): TasksCollect {

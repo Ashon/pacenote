@@ -31,6 +31,7 @@ import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
 import {
   addCollection,
+  readCollections,
   recentCollections,
 } from '../../../src/tasks/collections.js'
 import { decide, tasksView } from '../../../src/tasks/store.js'
@@ -182,6 +183,7 @@ const taskCollector = new TaskCollector({
   toolPath,
   cwd: dataDir,
   record: (entry) => addCollection(dataDir, entry),
+  last: readCollections(dataDir).at(-1),
 })
 
 /** Sandbox status, allowed domains, apply jobs */

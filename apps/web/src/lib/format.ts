@@ -32,6 +32,12 @@ export function formatDayGroup(iso: string, now = new Date()): string {
   return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`
 }
 
+/** A day in a short list: Today, Yesterday, Fri (for the last week) */
+export function formatShortDay(iso: string, now = new Date()): string {
+  const group = formatDayGroup(iso, now)
+  return group.includes(',') ? group.split(',')[0]! : group
+}
+
 export function formatRelative(iso: string, now = Date.now()): string {
   const sec = Math.max(0, Math.round((now - Date.parse(iso)) / 1000))
   if (sec < 45) return 'just now'

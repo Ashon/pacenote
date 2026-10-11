@@ -22,9 +22,9 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  formatDayGroup,
   formatHourMinute,
   formatRelative,
+  formatShortDay,
   formatTokens,
 } from '@/lib/format'
 import { useCollect, useDecide, useTasks } from '@/lib/tasks'
@@ -251,6 +251,7 @@ function CollectButton({ running }: { running: boolean }) {
 function CollectStatus({ collect }: { collect: TasksCollect }) {
   const { running, last } = collect
   let text: string | undefined
+  let spent: string | undefined
   if (running)
     text = running.reads
       ? `Reading Slack, read only: ${running.reads} lookups so far.`
@@ -265,7 +266,7 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       : 'Nothing new to add.'
     if (last.skipped) text += ` ${last.skipped} left out by your settings.`
     if (last.usage)
-      text += ` ${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups.`
+      spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups.`
   }
   if (!text && !last) return null
   return (
@@ -278,6 +279,7 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       )}
     >
       {text ?? (last && !last.ok ? last.error : null)}
+      {spent && <span className="text-foreground/80"> {spent}</span>}
     </p>
   )
 }
@@ -320,23 +322,23 @@ function RecentCollections({
         {collections.slice(0, RECENT_SHOWN).map((entry, index) => (
           <li
             key={entry.startedAt}
-            className="grid grid-cols-[8.5rem_minmax(0,1fr)_auto] items-center gap-x-4 border-t border-border py-2.5"
+            className="grid grid-cols-[7.25rem_6.75rem_minmax(0,1fr)_11rem] items-center gap-x-4 border-t border-border py-2.5"
           >
             <span className="font-medium tabular-nums">
-              {formatDayGroup(entry.startedAt)}{' '}
+              {formatShortDay(entry.startedAt)}{' '}
               {formatHourMinute(entry.startedAt)}
             </span>
-            <span className="flex min-w-0 items-center gap-3">
+            <span>
               <Badge variant="outline">{TRIGGER_LABEL[entry.trigger]}</Badge>
-              <span
-                title={collectionNote(entry)}
-                className={cn(
-                  'truncate text-xs',
-                  entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
-                )}
-              >
-                {collectionNote(entry)}
-              </span>
+            </span>
+            <span
+              title={collectionNote(entry)}
+              className={cn(
+                'truncate text-xs',
+                entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
+              )}
+            >
+              {collectionNote(entry)}
             </span>
             <span className="flex items-center justify-end gap-2.5 text-xs">
               <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
