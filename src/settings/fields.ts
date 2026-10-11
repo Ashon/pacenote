@@ -15,7 +15,7 @@ import type { SandboxComponent } from '../sandbox/types.js'
  * not .env entries and have a "general" section of their own on the screen.
  */
 export type SettingSection =
-  'messengers' | 'answers' | 'sandbox' | 'ops' | 'logs'
+  'messengers' | 'answers' | 'sandbox' | 'ops' | 'tasks' | 'logs'
 
 export const SETTING_SECTIONS: {
   id: SettingSection
@@ -43,6 +43,11 @@ export const SETTING_SECTIONS: {
     help: "Tools the reasoner can call through ops-broker. SSH keys, kubeconfig, and tokens stay in the broker container, never in the reasoner's.",
   },
   {
+    id: 'tasks',
+    label: 'Tasks',
+    help: 'Your own tasks, gathered from the Slack conversations you are in. Changes apply at the next collection.',
+  },
+  {
     id: 'logs',
     label: 'History & logs',
     help: 'What Pace keeps after answering. Changes apply when Pace restarts.',
@@ -63,6 +68,7 @@ export type SettingGroup =
   | 'jira'
   | 'k8s'
   | 'ssh'
+  | 'tasks'
   | 'history'
   | 'logs'
 
@@ -208,6 +214,12 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     label: 'SSH hosts',
     help: 'Read-only checks on hosts in the allowed range.',
     requires: ['OPS_SSH_USER', 'OPS_SSH_ALLOWED_CIDR', 'OPS_SSH_KEY'],
+  },
+  {
+    id: 'tasks',
+    section: 'tasks',
+    label: 'Gathering tasks',
+    help: 'Pace reads the conversations you are in with your own Slack user token, keeps the messages that mention you, the threads you took part in, and what you said you would do, and asks the reasoner which are tasks for you. Those messages go to the reasoner; the token stays on this Mac.',
   },
   {
     id: 'history',
@@ -670,6 +682,45 @@ export const SETTING_FIELDS: SettingField[] = [
     type: 'toggle',
     default: 'off',
     applies: 'app',
+  },
+  {
+    key: 'TASKS',
+    group: 'tasks',
+    label: 'Gather my tasks from Slack',
+    help: 'Off by default. Collect from the Tasks screen.',
+    type: 'toggle',
+    default: 'off',
+    applies: 'app',
+  },
+  {
+    key: 'SLACK_USER_TOKEN',
+    group: 'tasks',
+    label: 'Slack user token',
+    help: 'Add the user scopes channels:history, groups:history, channels:read, groups:read and users:read to your Pacenote app (im:history, im:read, mpim:history, mpim:read for DMs), reinstall it, then copy OAuth & Permissions > User OAuth Token.',
+    type: 'secret',
+    placeholder: 'xoxp-...',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_DMS',
+    group: 'tasks',
+    label: 'Also read DMs and group DMs',
+    help: 'Their messages go to the reasoner too. Needs the im and mpim scopes.',
+    type: 'toggle',
+    default: 'off',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_EXCLUDE_CHANNELS',
+    group: 'tasks',
+    label: 'Leave out channels',
+    help: 'Comma-separated channel names or IDs.',
+    type: 'text',
+    placeholder: '#random, #social',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
   },
   {
     key: 'LOG_LEVEL',

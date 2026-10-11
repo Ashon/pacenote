@@ -35,6 +35,15 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     openDataDir: () => ipcRenderer.invoke('pacenote:settings:open-data-dir'),
     historyMcp: () => ipcRenderer.invoke('pacenote:settings:history-mcp'),
   },
+  // Your tasks: the list, Collect now (the bot does it), and your decisions
+  tasks: {
+    list: () => ipcRenderer.invoke('pacenote:tasks:list'),
+    collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
+    decide: (id: string, decision: unknown) =>
+      ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
+    leaveOut: (label: string) =>
+      ipcRenderer.invoke('pacenote:tasks:leave-out', label),
+  },
   // Team hub pairing. The token stays in the main process; these return { error
   // } on failure.
   hub: {

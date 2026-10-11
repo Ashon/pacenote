@@ -1,3 +1,5 @@
+import type { TasksStatus } from '../tasks/types.js'
+
 /**
  * Bot runtime status. The bot writes it to <PACENOTE_DATA_DIR>/bot.json; the
  * desktop app and UI read it. The same file also acts as a run lock. (A second
@@ -34,6 +36,8 @@ export interface BotStatus {
    * reactions:write. Shown on the Pace screen, not counted as problems.
    */
   limits?: string[]
+  /** Collecting your tasks (src/tasks) */
+  tasks?: TasksStatus
   requests: { active: number; handled: number; lastAt?: string }
   /**
    * Config fingerprint at startup (config.ts configFingerprint). A change means

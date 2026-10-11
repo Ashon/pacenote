@@ -7,6 +7,8 @@ import { readEnvFile, readEnvValues } from '../settings/env-file.js'
 import { defaultHome } from '../settings/home.js'
 import { loadEnv } from '../settings/load-env.js'
 import { envFilePath } from '../settings/paths.js'
+import { readTasksSettings } from '../tasks/settings.js'
+import { tasksView } from '../tasks/store.js'
 
 /**
  * Pacenote's run history over MCP (stdio), for AI tools on this Mac. They
@@ -24,11 +26,16 @@ const launched = process.env.HISTORY_SHARE
 const envFile = envFilePath()
 loadEnv()
 
+const data = dataDir(process.env.PACENOTE_DATA_DIR)
 const server = createHistoryServer({
-  reader: new HistoryReader(dataDir(process.env.PACENOTE_DATA_DIR)),
+  reader: new HistoryReader(data),
   enabled: () =>
     (launched ?? readEnvValues(readEnvFile(envFile)).HISTORY_SHARE) === 'on',
   version: process.env.PACENOTE_VERSION ?? 'dev',
+  tasks: () => {
+    const settings = readTasksSettings(process.env, envFile)
+    return settings.on ? tasksView(data, settings.exclude) : undefined
+  },
 })
 await server.connect(new StdioServerTransport())
 

@@ -10,6 +10,7 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
 - [Team hub](team-hub.md): one Slack app for a team, with each member's desktop answering their own mentions
 - [Run history for AI tools](history-mcp.md): Pacenote's MCP server, for Claude Code, Codex and other tools on your Mac to
   read what Pace did
+- [Your tasks from Slack](tasks.md): what people asked of you, gathered on the Tasks screen and over MCP
 - [Installation](installation.md): Homebrew in detail, running from source, restarts and the run lock
 - [Desktop app](desktop-app.md): the app's screens, bot management, settings, sandbox controls, packaging
 - [Development](development.md): checks, end-to-end tests and coverage, adding a messenger

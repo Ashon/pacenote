@@ -27,6 +27,7 @@ import {
   FolderOpen,
   History,
   KeyRound,
+  ListChecks,
   LoaderCircle,
   MessagesSquare,
   Monitor,
@@ -77,6 +78,7 @@ const SECTION_ICON: Record<SettingSection, LucideIcon> = {
   answers: Sparkles,
   sandbox: Box,
   ops: Wrench,
+  tasks: ListChecks,
   logs: History,
 }
 
@@ -645,6 +647,7 @@ export function SettingsPage() {
         {integration('ssh')}
       </>
     ),
+    tasks: <>{card('tasks')}</>,
     logs: (
       <>
         {card('history', {

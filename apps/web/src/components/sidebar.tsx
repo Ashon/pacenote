@@ -3,14 +3,17 @@ import {
   Bug,
   History,
   LayoutDashboard,
+  ListChecks,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
 
-export type Section = 'overview' | 'runs' | 'bot' | 'settings' | 'debug'
+export type Section =
+  'overview' | 'runs' | 'tasks' | 'bot' | 'settings' | 'debug'
 
 type Item = { section: Section; label: string; icon: LucideIcon }
 
@@ -18,6 +21,7 @@ type Item = { section: Section; label: string; icon: LucideIcon }
 const ITEMS: Item[] = [
   { section: 'overview', label: 'Overview', icon: LayoutDashboard },
   { section: 'runs', label: 'Runs', icon: History },
+  { section: 'tasks', label: 'Tasks', icon: ListChecks },
   { section: 'bot', label: 'Pace', icon: Bot },
 ]
 /** Setting the app up, at the bottom */
@@ -45,10 +49,17 @@ export function Sidebar({
   onNavigate: (section: Section) => void
   showDebug: boolean
 }) {
+  // Open tasks, beside Tasks
+  const tasks = useTasks().data
+  const openTasks =
+    tasks?.settings.on && tasks.settings.hasToken
+      ? tasks.tasks.filter((task) => task.status === 'open').length
+      : 0
   const item = (props: Item) => (
     <NavItem
       key={props.section}
       {...props}
+      count={props.section === 'tasks' ? openTasks : 0}
       current={active === props.section}
       compact={compact}
       onClick={() => onNavigate(props.section)}
@@ -96,10 +107,17 @@ export function Sidebar({
 function NavItem({
   label,
   icon: Icon,
+  count,
   current,
   compact,
   onClick,
-}: Item & { current: boolean; compact: boolean; onClick: () => void }) {
+}: Item & {
+  /** Shown beside the label when above zero */
+  count: number
+  current: boolean
+  compact: boolean
+  onClick: () => void
+}) {
   const button = (
     <button
       type="button"
@@ -119,6 +137,11 @@ function NavItem({
         strokeWidth={1.75}
       />
       {!compact && label}
+      {!compact && count > 0 && (
+        <span className="ml-auto text-xs font-semibold text-primary tabular-nums">
+          {count}
+        </span>
+      )}
     </button>
   )
   return compact ? (

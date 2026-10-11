@@ -22,6 +22,7 @@ import { SearchField } from './components/search-field'
 import { SettingsPage } from './components/settings-page'
 import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
+import { TasksPage } from './components/tasks-page'
 
 /**
  * The Debug section is only in builds made for development: the Vite dev
@@ -42,12 +43,14 @@ const showDebug = DebugPage !== undefined && !!window.pacenoteDesktop?.dev
 type Route =
   | { page: 'overview' }
   | { page: 'runs'; id?: string }
+  | { page: 'tasks' }
   | { page: 'bot' }
   | { page: 'settings' }
   | { page: 'debug' }
 
 /**
- * #/runs: the run list, #/runs/<id>: one run, #/bot: Pace's status and logs,
+ * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks, #/bot:
+ * Pace's status and logs,
  * #/settings: Settings, #/debug: Debug (development builds), otherwise:
  * Overview
  */
@@ -56,6 +59,7 @@ function readRoute(): Route {
   const run = /^#\/runs\/([^/?#]+)/.exec(hash)?.[1]
   if (run) return { page: 'runs', id: decodeURIComponent(run) }
   if (hash.startsWith('#/runs')) return { page: 'runs' }
+  if (hash.startsWith('#/tasks')) return { page: 'tasks' }
   if (hash.startsWith('#/bot')) return { page: 'bot' }
   if (hash.startsWith('#/settings')) return { page: 'settings' }
   if (hash.startsWith('#/debug') && showDebug) return { page: 'debug' }
@@ -151,6 +155,8 @@ export default function App() {
           >
             {route.page === 'bot' ? (
               <BotPage />
+            ) : route.page === 'tasks' ? (
+              <TasksPage />
             ) : route.page === 'settings' ? (
               <SettingsPage />
             ) : route.page === 'debug' ? (

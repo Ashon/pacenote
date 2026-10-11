@@ -159,6 +159,21 @@ export const EnvSchema = z.object({
    */
   HISTORY_SHARE: z.enum(['on', 'off']).default('off'),
 
+  /**
+   * Your own tasks, gathered from Slack (src/tasks). Read by the bot when it
+   * collects, so a change needs no restart.
+   */
+  TASKS: z.enum(['on', 'off']).default('off'),
+  /** A Slack user token (xoxp-) from the same app, with read scopes */
+  SLACK_USER_TOKEN: z
+    .string()
+    .regex(/^xoxp-/, 'Must be a Slack user token (xoxp-...)')
+    .optional(),
+  /** Also read DMs and group DMs for tasks */
+  TASKS_DMS: z.enum(['on', 'off']).default('off'),
+  /** Channels tasks leave out, by name (#random) or ID */
+  TASKS_EXCLUDE_CHANNELS: z.string().optional(),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
 
@@ -241,10 +256,18 @@ const providedValues = (env: NodeJS.ProcessEnv) =>
 
 /**
  * Values a bot restart does not need: the data location, which the desktop app
- * passes as an absolute path when launching the bot, and sharing the history,
- * which the MCP server reads on each call.
+ * passes as an absolute path when launching the bot, sharing the history, which
+ * the MCP server reads on each call, and the tasks settings, read when the bot
+ * collects.
  */
-const OUTSIDE_FINGERPRINT = new Set(['PACENOTE_DATA_DIR', 'HISTORY_SHARE'])
+const OUTSIDE_FINGERPRINT = new Set([
+  'PACENOTE_DATA_DIR',
+  'HISTORY_SHARE',
+  'TASKS',
+  'SLACK_USER_TOKEN',
+  'TASKS_DMS',
+  'TASKS_EXCLUDE_CHANNELS',
+])
 
 /**
  * Bot config fingerprint. The bot writes it to the status file at startup, and

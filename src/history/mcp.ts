@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import type { TasksView } from '../tasks/types.js'
 import type { HistoryReader } from './reader.js'
 import type { RunEvent, RunRecord, RunSummary, StepStatus } from './types.js'
 
@@ -18,6 +19,10 @@ export interface HistoryServerOptions {
   /** Whether sharing is on (HISTORY_SHARE), read on every call */
   enabled: () => boolean
   version: string
+  /**
+   * Your tasks (src/tasks), read on every call; undefined while tasks are off
+   */
+  tasks?: () => TasksView | undefined
 }
 
 const STATUSES = ['running', 'succeeded', 'failed', 'interrupted'] as const
@@ -36,6 +41,7 @@ export function createHistoryServer({
   reader,
   enabled,
   version,
+  tasks,
 }: HistoryServerOptions): McpServer {
   const server = new McpServer(
     { name: 'pacenote', version },
@@ -44,7 +50,8 @@ export function createHistoryServer({
         'Pacenote records each Slack mention its assistant Pace answered: ' +
         'the request, the tool calls it made and its answer. Use ' +
         'recent_runs or search_runs to find a run, then get_run for its ' +
-        `steps. ${NOTE}`,
+        'steps. my_tasks lists what people asked of the user in Slack. ' +
+        NOTE,
     }
   )
 
@@ -134,6 +141,51 @@ export function createHistoryServer({
         const record = reader.get(id)
         if (!record) throw new Error(`No run with id ${id}`)
         return { run: detail(record, include_prompt ?? false) }
+      })
+  )
+
+  server.registerTool(
+    'my_tasks',
+    {
+      description:
+        "The user's open tasks, gathered from Slack by Pacenote: what someone " +
+        'asked of them or what they said they would do, newest first, with ' +
+        'who asked, where, a due hint, why it is a task and a Slack link. ' +
+        'Guesses Pacenote is not sure about are left out.',
+      inputSchema: {
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe('How many tasks (default 20)'),
+      },
+      annotations: readOnly,
+    },
+    ({ limit }) =>
+      respond(enabled, () => {
+        const view = tasks?.()
+        if (!view)
+          throw new Error(
+            'Tasks are off. Turn them on in Pacenote: Settings > Tasks.'
+          )
+        return {
+          collectedAt: view.collectedAt,
+          tasks: view.tasks
+            .filter((task) => task.status === 'open')
+            .slice(0, limit ?? 20)
+            .map((task) => ({
+              title: task.title,
+              kind: task.kind,
+              askedBy: task.askedBy,
+              where: task.source.label,
+              postedAt: task.postedAt,
+              due: task.due,
+              reason: task.reason,
+              link: task.source.permalink,
+            })),
+        }
       })
   )
 

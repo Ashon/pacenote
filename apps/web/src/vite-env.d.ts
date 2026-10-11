@@ -13,6 +13,7 @@ import type {
   SettingsView,
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
+import type { TaskDecision, TasksView } from '@src/tasks/types'
 import type {
   AllowlistIssue,
   SandboxJob,
@@ -70,6 +71,27 @@ declare global {
             }
           | undefined
         >
+      }
+      /** Your tasks (src/tasks) */
+      tasks: {
+        list(): Promise<
+          | (TasksView & {
+              settings: {
+                on: boolean
+                hasToken: boolean
+                dms: boolean
+                hub: boolean
+                exclude: string[]
+              }
+            })
+          | null
+        >
+        collect(): Promise<{ ok: true } | { error: string }>
+        decide(
+          id: string,
+          decision: Omit<TaskDecision, 'at'> | null
+        ): Promise<void>
+        leaveOut(label: string): Promise<SettingsIssue[]>
       }
       /** Team hub pairing. Each call returns { error } instead of throwing. */
       hub: {

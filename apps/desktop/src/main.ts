@@ -28,6 +28,8 @@ import { BotSupervisor, type SupervisorState } from './bot.js'
 import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
+import { decide, tasksView } from '../../../src/tasks/store.js'
+import type { TaskDecision } from '../../../src/tasks/types.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { HubPairing } from './hub-pairing.js'
@@ -395,6 +397,49 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:bot:open-logs', (event) => {
     if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
   })
+
+  // Your tasks: the bot collects them; the app shows them and keeps your
+  // decisions (tasks-decisions.json, which only the app writes).
+  const tasksSettings = () => {
+    const env = settings.effectiveEnv()
+    return {
+      on: env.TASKS === 'on',
+      hasToken: Boolean(env.SLACK_USER_TOKEN?.trim()),
+      dms: env.TASKS_DMS === 'on',
+      hub: env.SLACK_CONNECTION === 'hub',
+      exclude: (env.TASKS_EXCLUDE_CHANNELS ?? '')
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean),
+    }
+  }
+  ipcMain.handle('pacenote:tasks:list', (event) => {
+    if (!fromMainWindow(event)) return null
+    const current = tasksSettings()
+    return { settings: current, ...tasksView(dataDir, current.exclude) }
+  })
+  ipcMain.handle('pacenote:tasks:collect', (event) => {
+    if (!fromMainWindow(event)) return { error: 'Not allowed.' }
+    return supervisor?.collectTasks()
+      ? { ok: true }
+      : { error: 'Start Pace first: it does the collecting.' }
+  })
+  ipcMain.handle(
+    'pacenote:tasks:decide',
+    (event, id: unknown, decision: unknown) => {
+      if (!fromMainWindow(event) || typeof id !== 'string') return
+      decide(dataDir, id, taskDecision(decision))
+    }
+  )
+  ipcMain.handle('pacenote:tasks:leave-out', (event, label: unknown) => {
+    if (!fromMainWindow(event) || typeof label !== 'string' || !label.trim())
+      return []
+    const { exclude } = tasksSettings()
+    if (exclude.includes(label)) return []
+    return settings.save({
+      TASKS_EXCLUDE_CHANNELS: [...exclude, label].join(', '),
+    })
+  })
   ipcMain.handle('pacenote:settings:get', (event) =>
     fromMainWindow(event) ? settings.view() : null
   )
@@ -664,3 +709,14 @@ app.on('window-all-closed', () => {
   if (isQuitting) app.quit()
 })
 process.once('SIGTERM', () => app.quit())
+
+/** A decision from the screen, or undefined to take one back */
+function taskDecision(value: unknown): Omit<TaskDecision, 'at'> | undefined {
+  const { status, reason } = (value ?? {}) as Partial<TaskDecision>
+  if (status !== 'done' && status !== 'dismissed' && status !== 'kept')
+    return undefined
+  const reasons = ['not-mine', 'done-already', 'not-worth-it']
+  return status === 'dismissed' && reason && reasons.includes(reason)
+    ? { status, reason }
+    : { status }
+}
