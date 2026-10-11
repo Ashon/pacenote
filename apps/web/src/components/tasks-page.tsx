@@ -1,9 +1,9 @@
-import type { DismissReason, TaskView } from '@src/tasks/types'
+import type { DismissReason, TaskView, TasksCollect } from '@src/tasks/types'
 import {
-  Check,
   CircleCheck,
-  Copy,
   ExternalLink,
+  LoaderCircle,
+  RefreshCw,
   Settings,
   Undo2,
   X,
@@ -14,10 +14,8 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatRelative } from '@/lib/format'
-import { useMcpClients } from '@/lib/mcp-clients'
-import { useDecide, useTasks } from '@/lib/tasks'
+import { useCollect, useDecide, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
-import { McpClientRows } from './mcp-connections'
 
 type Tab = 'open' | 'maybe' | 'done'
 
@@ -37,9 +35,6 @@ const SETTLED_LABEL: Record<string, string> = {
   checked: 'Closed: marked with a check',
   resolved: 'Closed: settled in Slack',
 }
-
-/** Claude Code's slash command for Pacenote's collect_tasks prompt */
-const COLLECT_COMMAND = '/mcp__pacenote__collect_tasks'
 
 /** The leave-out offers you turned down, per channel, in this browser */
 const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
@@ -114,13 +109,9 @@ export function TasksPage() {
             ` · collected ${formatRelative(data.collectedAt)}`}
         </>
       }
-      action={<CopyCommand />}
+      action={<CollectButton running={Boolean(data.collect.running)} />}
     >
-      <p className="mt-1 text-sm text-muted-foreground">
-        To collect, ask Claude Code or Codex, with its Slack connector. In
-        Claude Code, run {COLLECT_COMMAND}.
-      </p>
-      <NotConnected />
+      <CollectStatus collect={data.collect} />
       {offer && (
         <Banner tone="note">
           <span className="flex-1">
@@ -149,8 +140,8 @@ export function TasksPage() {
       </Tabs>
       {tab === 'maybe' && (
         <p className="mt-3 text-xs text-muted-foreground">
-          Guesses Pace is not sure about. They stay out of the list and my_tasks
-          until you keep one.
+          Guesses Pace is not sure about. They stay out of the list until you
+          keep one.
         </p>
       )}
 
@@ -218,42 +209,59 @@ function Banner({ children }: { tone: 'note'; children: React.ReactNode }) {
   )
 }
 
-/** Neither tool has Pacenote's MCP server: add it from here */
-function NotConnected() {
-  const clients = useMcpClients()
-  if (
-    !clients.data ||
-    clients.data.some((client) => client.state === 'connected')
-  )
-    return null
+/** Collect now, or Stop while a collection runs */
+function CollectButton({ running }: { running: boolean }) {
+  const { collect, stop } = useCollect()
+  if (running)
+    return (
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="secondary" disabled>
+          <LoaderCircle className="animate-spin" />
+          Collecting
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => void stop()}>
+          Stop
+        </Button>
+      </div>
+    )
   return (
-    <div className="mt-4 rounded-xl bg-card-accent px-4 py-3 text-sm">
-      <p>
-        Claude Code and Codex do not reach Pacenote yet, so they cannot add
-        tasks here.
-      </p>
-      <McpClientRows className="mt-2" />
-    </div>
+    <Button size="sm" onClick={() => void collect()}>
+      <RefreshCw />
+      Collect now
+    </Button>
   )
 }
 
-/** Copies the collect command for Claude Code */
-function CopyCommand() {
-  const [copied, setCopied] = useState(false)
+/** What the running collection is doing, or how the last one ended */
+function CollectStatus({ collect }: { collect: TasksCollect }) {
+  const { running, last } = collect
+  let text: string | undefined
+  if (running)
+    text = running.reads
+      ? `Reading Slack, read only: ${running.reads} lookups so far.`
+      : 'Starting: Pacenote gives the collection its rules.'
+  else if (last?.ok) {
+    const found = [
+      last.added && `${last.added} ${last.added === 1 ? 'task' : 'tasks'}`,
+      last.maybe && `${last.maybe} ${last.maybe === 1 ? 'Maybe' : 'Maybes'}`,
+    ].filter(Boolean)
+    text = found.length
+      ? `Added ${found.join(' and ')}.`
+      : 'Nothing new to add.'
+    if (last.skipped) text += ` ${last.skipped} left out by your settings.`
+  }
+  if (!text && !last) return null
   return (
-    <Button
-      size="sm"
-      variant="secondary"
-      onClick={() => {
-        void navigator.clipboard.writeText(COLLECT_COMMAND).then(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
-        })
-      }}
+    <p
+      className={cn(
+        'mt-1 text-sm',
+        last && !last.ok && !running
+          ? 'text-status-interrupted'
+          : 'text-muted-foreground'
+      )}
     >
-      {copied ? <Check /> : <Copy />}
-      {copied ? 'Copied' : 'Copy the collect command'}
-    </Button>
+      {text ?? (last && !last.ok ? last.error : null)}
+    </p>
   )
 }
 
@@ -262,24 +270,24 @@ function Setup() {
   return (
     <div className="mt-2">
       <p className="text-sm text-muted-foreground">
-        Claude Code or Codex reads Slack with its own Slack connector and adds
-        what people asked of you, and what you said you would do, to a short
-        list here. Pacenote holds no Slack token for this, and nothing is posted
-        anywhere.
+        Pacenote has Claude Code read Slack with its own Slack connector, and
+        keeps a short list here of what people asked of you and what you said
+        you would do. Pacenote holds no Slack token for this, and nothing is
+        posted anywhere.
       </p>
       <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
         <SetupPart title="What it needs">
-          Claude Code or Codex with a Slack connector, and Pacenote added to it
-          as an MCP server: Settings &gt; Tasks adds it in one click.
+          Claude Code on this Mac, signed in, with the Slack connector of your
+          claude.ai account.
         </SetupPart>
         <SetupPart title="What is read">
           Messages that mention you, threads you took part in, and what you said
           you would do, since the last collection; DMs only if you count them.
-          The tool reads them with its own Slack access.
+          Read only: the collection cannot post or react.
         </SetupPart>
         <SetupPart title="How to collect">
-          In Claude Code, run {COLLECT_COMMAND}. Pacenote gives the tool its
-          rules: precision first, and anything unsure is a Maybe.
+          Collect now on this screen. Pacenote gives the collection its rules:
+          precision first, and anything unsure is a Maybe.
         </SetupPart>
       </div>
       <Button

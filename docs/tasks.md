@@ -1,26 +1,39 @@
 # Your tasks from Slack
 
 Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Tasks screen, so
-you do not keep it in your head or scroll back for it. Claude Code or Codex collects the tasks with its own Slack connector
-and adds them through Pacenote's MCP server; Pacenote holds no Slack token for this. It is off by default. The plan and the
-reasons behind it are in [the proposal](proposals/personal-tasks.md).
+you do not keep it in your head or scroll back for it. **Collect now** has Claude Code read Slack with the Slack connector
+of your claude.ai account, read only, and add the tasks through Pacenote's MCP server; Pacenote holds no Slack token for
+this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md).
 
 ## Turning it on
 
-1. In Pacenote, Settings > Tasks: turn on "Let AI tools add my tasks". DMs stay out unless you turn on "Count DMs and group
+1. Sign in to Claude Code on this Mac, and connect Slack in claude.ai's Settings > Connectors.
+2. In Pacenote, Settings > Tasks: turn on "Gather my tasks from Slack". DMs stay out unless you turn on "Count DMs and group
    DMs"; "Leave out channels" skips the ones you list.
-2. Add Pacenote to Claude Code or Codex as an MCP server: Settings > Tasks lists both, whether each has Pacenote and reaches
-   it, with an Add button that runs the tool's own CLI ([details](history-mcp.md#adding-it-to-a-tool)). The Tasks screen
-   offers the same while neither has it.
-3. Make sure the tool has a Slack connector: in Claude Code, the Slack connector of your claude.ai account.
-4. Collect: in Claude Code, run `/mcp__pacenote__collect_tasks`. In Codex, ask it to collect your tasks with Pacenote's
-   collect_context tool. The Tasks screen has a button that copies the command.
+3. On the Tasks screen, click **Collect now**. It takes a minute or two; the screen shows how far it got, and what it added.
 
 The settings apply at once, without restarting Pace.
 
+### What Collect now runs
+
+Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the collection:
+
+- Only Pacenote's task tools and the Slack connector's read tools (search, read a channel or thread, reactions, channel
+  and user lookups) are allowed; sending, drafting, scheduling, reacting and canvases are denied outright.
+- Your own Claude Code settings, permissions, plugins, CLAUDE.md and MCP servers are not loaded (`--setting-sources
+  project`, in Pacenote's data folder), and the only built-in tool is ToolSearch. Pacenote passes its own MCP server, so it
+  does not need to be added to Claude Code.
+- One collection runs at a time, for at most 10 minutes; Stop ends it.
+
+### Collecting from inside your AI tool
+
+Add Pacenote to Claude Code or Codex in Settings > Tasks (one click per tool, [details](history-mcp.md#adding-it-to-a-tool))
+to ask them about your tasks (`my_tasks`), or to collect from inside them: in Claude Code, `/mcp__pacenote__collect_tasks`;
+in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, if it has a Slack connector.
+
 ## How a collection goes
 
-- The tool calls `collect_context`: the rules, the channels to leave out, whether DMs count, since when to read (the last
+- Claude Code (or your tool) calls `collect_context`: the rules, the channels to leave out, whether DMs count, since when to read (the last
   collection, or the last 7 days the first time), and the open tasks to check.
 - With its Slack tools, read only, it looks for messages that mention you, threads you took part in whose last word is not
   yours, what someone said in a DM after your last message (when DMs count), and your own messages saying you will do
@@ -53,7 +66,7 @@ The settings apply at once, without restarting Pace.
 | `my_tasks` | Your open tasks, with who asked, where, a due hint, why, and a link; Maybes are left out |
 | `collect_tasks` (prompt) | The steps of a collection, as a slash command in Claude Code |
 
-They answer only while "Let AI tools add my tasks" is on, read on every call, and are separate from sharing the run
+They answer only while "Gather my tasks from Slack" is on, read on every call, and are separate from sharing the run
 history.
 
 ## Not yet

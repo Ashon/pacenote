@@ -13,7 +13,12 @@ import type {
   SettingsView,
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
-import type { TaskDecision, TasksView } from '@src/tasks/types'
+import type {
+  CollectOutcome,
+  TaskDecision,
+  TasksCollect,
+  TasksView,
+} from '@src/tasks/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
@@ -78,6 +83,7 @@ declare global {
         list(): Promise<
           | (TasksView & {
               settings: { on: boolean; dms: boolean; exclude: string[] }
+              collect: TasksCollect
             })
           | null
         >
@@ -86,6 +92,9 @@ declare global {
           decision: Omit<TaskDecision, 'at'> | null
         ): Promise<void>
         leaveOut(label: string): Promise<SettingsIssue[]>
+        /** Runs a collection (Claude Code, Slack read only) and waits for it */
+        collect(): Promise<CollectOutcome | undefined>
+        stopCollect(): Promise<void>
       }
       /**
        * Pacenote's MCP server in Claude Code and Codex. connect adds this

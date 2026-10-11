@@ -34,6 +34,7 @@ import type { TaskDecision } from '../../../src/tasks/types.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
+import { TaskCollector } from './task-collector.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 
@@ -167,6 +168,16 @@ function mcpLaunch() {
 
 /** Adds the MCP server to Claude Code and Codex, and checks they reach it */
 const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
+
+/** Collect now on the Tasks screen: Claude Code reads Slack, read only */
+const taskCollector = new TaskCollector({
+  launch: () => {
+    const { command, args, env } = mcpLaunch()
+    return { command, args, env }
+  },
+  toolPath,
+  cwd: dataDir,
+})
 
 /** Sandbox status, allowed domains, apply jobs */
 const sandbox = new SandboxService({
@@ -432,7 +443,24 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:tasks:list', (event) => {
     if (!fromMainWindow(event)) return null
     const current = tasksSettings()
-    return { settings: current, ...tasksView(dataDir, current.exclude) }
+    return {
+      settings: current,
+      collect: taskCollector.state,
+      ...tasksView(dataDir, current.exclude),
+    }
+  })
+  ipcMain.handle('pacenote:tasks:collect', (event) => {
+    if (!fromMainWindow(event)) return undefined
+    if (!tasksSettings().on)
+      return {
+        at: new Date().toISOString(),
+        ok: false,
+        error: 'Turn on Settings > Tasks > Gather my tasks from Slack first.',
+      }
+    return taskCollector.run()
+  })
+  ipcMain.handle('pacenote:tasks:collect-stop', (event) => {
+    if (fromMainWindow(event)) taskCollector.cancel()
   })
   ipcMain.handle(
     'pacenote:tasks:decide',
@@ -708,6 +736,7 @@ if (!app.requestSingleInstanceLock()) {
 let botStopped = false
 app.on('before-quit', (event) => {
   isQuitting = true
+  taskCollector.cancel()
   // A bot started by the app finishes active requests before it stops. (up to
   // 30 seconds)
   if (supervisor?.managing && !botStopped) {

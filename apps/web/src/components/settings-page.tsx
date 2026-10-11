@@ -651,7 +651,7 @@ export function SettingsPage() {
       <>
         {card('tasks', {
           after: valueOf('TASKS') === 'on' && (
-            <McpConnections about="Claude Code and Codex reach your tasks through Pacenote's MCP server. With a Slack connector of their own, they can then collect them: in Claude Code, run /mcp__pacenote__collect_tasks." />
+            <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Tasks screen works without this." />
           ),
         })}
       </>

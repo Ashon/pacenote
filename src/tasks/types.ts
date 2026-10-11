@@ -92,3 +92,17 @@ export interface TasksView {
    */
   leaveOut?: { conversation: string; label: string; count: number }
 }
+
+/** How a collection from the app ended */
+export type CollectOutcome =
+  | { at: string; ok: true; added: number; maybe: number; skipped: number }
+  | { at: string; ok: false; error: string }
+
+/**
+ * Collect now on the Tasks screen: the collection running (how many Slack
+ * reads so far), and how the last one ended
+ */
+export interface TasksCollect {
+  running?: { startedAt: string; reads: number }
+  last?: CollectOutcome
+}

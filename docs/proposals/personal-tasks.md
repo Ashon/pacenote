@@ -1,6 +1,8 @@
 # Proposal: your own tasks, gathered from Slack
 
-Status: phase 0 shipped in v0.4.0 with a Slack user token, and moved to the AI tool's Slack connector in v0.4.1 (2026-10-11).
+Status: phase 0 shipped in v0.4.0 with a Slack user token, and moved to the AI tool's Slack connector in v0.4.1
+(2026-10-11). Collect now on the Tasks screen (Claude Code headless with Slack read tools only) followed; collecting on a
+schedule is still phase 1.
 Storyboard: the "Pacenote personal tasks storyboard" canvas.
 
 ## Why
@@ -35,7 +37,7 @@ automatically (Slack's PKCE flow with a localhost redirect) was set aside: turni
 | Where to look | Public and private channels you are in, by default. DMs and group DMs only when you turn them on. Channels can be left out. |
 | Where tasks show | The Tasks screen and the `my_tasks` MCP tool; the daily DM summary in phase 1 |
 | How to read Slack | The AI tool's own Slack connector, read only (v0.4.1). v0.4.0 read conversation history with a user token of Pacenote's. |
-| When to collect | When you run the collect command in the tool (`/mcp__pacenote__collect_tasks` in Claude Code) |
+| When to collect | Collect now on the Tasks screen, or the collect command in the tool (`/mcp__pacenote__collect_tasks` in Claude Code) |
 | Precision | When unsure, it is a Maybe, not a task (below) |
 
 ## Precision first
@@ -58,7 +60,7 @@ first lever is picking fewer, better tasks; Dismiss is the safety net.
 
 ## Design
 
-**MCP.** On Pacenote's MCP server, behind Settings > Tasks > Let AI tools add my tasks (separate from sharing the run
+**MCP.** On Pacenote's MCP server, behind Settings > Tasks > Gather my tasks from Slack (separate from sharing the run
 history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks), `add_tasks`,
 `close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash command. `add_tasks` holds the
 settings whatever the tool sends: it skips messages from channels left out and DMs while they do not count.
@@ -73,7 +75,8 @@ checked | resolved } }`.
 ## Risks
 
 - **Trust boundary.** The tool's Slack connector sees what you can see, and also has tools that write (send, react). The
-  collect prompt tells it to read only, and a scheduled collection from Pacenote (phase 1) must allow only read tools.
+  collect prompt tells it to read only, and a collection from Pacenote allows only read tools (Collect now does; a
+  scheduled one must too).
 - **Where the text goes.** The messages go to the tool's model, as anything the tool reads does.
 - **Noise.** Precision first, Maybe, closing by itself, the dismiss rate.
 - **Workspace policy.** Some workspaces do not allow the tool's Slack connector; tasks then cannot be collected.
@@ -85,7 +88,7 @@ checked | resolved } }`.
 | Phase | Scope |
 | --- | --- |
 | 0 | The MCP tools and the collect prompt, precision first with Maybe, closing, Done and Dismiss with reasons, the leave-out offer, the dismiss rate, the Tasks screen |
-| 1 | Collecting from Pacenote on a schedule (the tool run headless with Slack read tools only), the daily DM summary, the dismiss rate in Overview |
+| 1 | Collecting from Pacenote: Collect now (Claude Code headless with Slack read tools only) first, then on a schedule; the daily DM summary, the dismiss rate in Overview |
 | 2 | Sending tasks to Linear, Jira or Reminders |
 
 ## Still open (phase 1)

@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     leaveOut: (label: string) =>
       ipcRenderer.invoke('pacenote:tasks:leave-out', label),
+    // Collect now: Claude Code reads Slack, read only, in the main process
+    collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
+    stopCollect: () => ipcRenderer.invoke('pacenote:tasks:collect-stop'),
   },
   // Pacenote's MCP server in Claude Code and Codex: added with their own CLIs
   mcp: {
