@@ -4,6 +4,7 @@ import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useBotStatus } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
+import { useTasks } from '@/lib/tasks'
 import { formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { describeBot, TONE_CLASS } from './bot-state'
@@ -11,8 +12,9 @@ import { describeBot, TONE_CLASS } from './bot-state'
 /**
  * The window's footer: indicators to glance at from any screen, on the chrome
  * under the sidebar and the content surface. Left: Pace (status, reasoner,
- * attached tools, check issues). Right: requests, a button that opens the run
- * history in Finder, and the version. Narrow windows drop the less needed ones.
+ * attached tools, check issues). Right: work in progress (a task collection,
+ * requests), a button that opens the run history in Finder, and the version.
+ * Narrow windows drop the less needed ones.
  */
 export function StatusBar({
   onOpenRoute,
@@ -25,6 +27,9 @@ export function StatusBar({
   const { tone, label } = describeBot(data, supervisor)
   const status = data?.alive ? data.status : undefined
   const active = status?.requests.active ?? 0
+  // A collection keeps running when you leave the Tasks screen; this is where
+  // it still shows. (the sidebar already keeps the tasks query fresh)
+  const collecting = useTasks().data?.collect.running
   const problems = status?.problems ?? []
   const tools = [
     ...(status?.mcp ?? []),
@@ -95,6 +100,20 @@ export function StatusBar({
       )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {collecting && (
+          <Item
+            tip={
+              collecting.reads
+                ? `Collecting your tasks: ${collecting.reads} ${collecting.reads === 1 ? 'lookup' : 'lookups'} so far`
+                : 'Collecting your tasks'
+            }
+            onClick={() => onOpenRoute('#/tasks')}
+            className="text-status-running"
+          >
+            <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
+            Collecting tasks
+          </Item>
+        )}
         {active > 0 && (
           <Item
             tip="Requests in progress now"

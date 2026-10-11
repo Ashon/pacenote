@@ -48,8 +48,9 @@ Layout:
   at the bottom. Tasks shows how many are open ([Your tasks from Slack](tasks.md)). The toggle at the left of the top bar (or Cmd+B) keeps only its icons, and the choice is remembered. Windows
   narrower than 900 pixels keep only the icons too.
 - The status bar along the bottom of the window holds indicators to glance at: Pace's connection status, reasoner backend,
-  attached tools and startup check issues (when any) on the left; requests in progress, the last request time, a folder
-  button that opens the run history in Finder, and the version (which opens its release notes) on the right. Clicking "Pace: ..." opens the Pace screen, or the
+  attached tools and startup check issues (when any) on the left; a task collection in progress (which opens Tasks),
+  requests in progress, the last request time, a folder button that opens the run history in Finder, and the version
+  (which opens its release notes) on the right. Clicking "Pace: ..." opens the Pace screen, or the
   settings to fix when setup is needed. Narrow windows drop the less needed ones.
 - Each screen is one content surface next to the sidebar. Its parts are told apart by space and hairlines, not by cards of their own.
 - The top bar holds the run search (Cmd+K focuses it, Esc clears it). Typing a search opens Runs.

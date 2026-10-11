@@ -11,6 +11,7 @@ this. It is off by default. The plan and the reasons behind it are in [the propo
 2. In Pacenote, Settings > Tasks: turn on "Gather my tasks from Slack". DMs stay out unless you turn on "Count DMs and group
    DMs"; "Leave out channels" skips the ones you list.
 3. On the Tasks screen, click **Collect now**. It takes a minute or two; the screen shows how far it got, and what it added.
+   On other screens, the status bar shows it is still collecting.
 
 The settings apply at once, without restarting Pace.
 
