@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { readCollections } from '../tasks/collections.js'
 import {
   ARTIFACTS_DIR,
   dayDirFor,
@@ -18,6 +19,7 @@ import {
   type RunStatus,
   type RunSummary,
 } from './types.js'
+import { addUsage, NO_USAGE, runUsage } from './usage.js'
 
 /**
  * Reads run history. Used by the desktop app. Uses the cache when a file has
@@ -74,6 +76,13 @@ export class HistoryReader {
         failed: 0,
       })
     }
+    const tokenDays = new Map(
+      [...daily.keys()].map((day) => [
+        day,
+        { mentions: NO_USAGE, collections: NO_USAGE },
+      ])
+    )
+    const mentions = { runs: 0, usage: NO_USAGE }
     const tools = new Map<string, number>()
     let total = 0
     let durationSum = 0
@@ -86,6 +95,13 @@ export class HistoryReader {
         day.runs += 1
         if (record.status === 'failed') day.failed += 1
       }
+      const usage = runUsage(record.events)
+      const tokenDay = tokenDays.get(dayOf(record.id) ?? '')
+      if (usage && tokenDay) {
+        tokenDay.mentions = addUsage(tokenDay.mentions, usage)
+        mentions.runs += 1
+        mentions.usage = addUsage(mentions.usage, usage)
+      }
       if (record.status === 'succeeded' && record.durationMs !== undefined) {
         durationSum += record.durationMs
         durationCount += 1
@@ -95,6 +111,16 @@ export class HistoryReader {
         const name = `${event.server}.${event.tool}`
         tools.set(name, (tools.get(name) ?? 0) + 1)
       }
+    }
+    const collections = { count: 0, found: 0, usage: NO_USAGE }
+    for (const entry of readCollections(this.root)) {
+      const tokenDay = tokenDays.get(dayDirFor(new Date(entry.startedAt)))
+      if (!tokenDay) continue
+      collections.count += 1
+      if (entry.ok) collections.found += entry.added + entry.maybe
+      if (!entry.usage) continue
+      tokenDay.collections = addUsage(tokenDay.collections, entry.usage)
+      collections.usage = addUsage(collections.usage, entry.usage)
     }
     return {
       total,
@@ -107,6 +133,11 @@ export class HistoryReader {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([name, calls]) => ({ name, calls })),
+      tokens: {
+        daily: [...tokenDays].map(([day, value]) => ({ day, ...value })),
+        mentions,
+        collections,
+      },
     }
   }
 

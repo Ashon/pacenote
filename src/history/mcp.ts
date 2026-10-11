@@ -5,6 +5,7 @@ import { redactSecrets } from '../broker/redact.js'
 import { registerTaskTools, type TaskToolsOptions } from '../tasks/mcp.js'
 import type { HistoryReader } from './reader.js'
 import type { RunEvent, RunRecord, RunSummary, StepStatus } from './types.js'
+import { runUsage } from './usage.js'
 
 /**
  * Pacenote's run history as an MCP server, for the user's other AI tools
@@ -180,7 +181,6 @@ function summary(run: RunSummary) {
 }
 
 function detail(record: RunRecord, prompt: boolean) {
-  const usage = record.events.filter((event) => event.kind === 'usage')
   return {
     id: record.id,
     status: record.status,
@@ -207,12 +207,7 @@ function detail(record: RunRecord, prompt: boolean) {
       title,
       file,
     })),
-    tokens: usage.length
-      ? {
-          input: sum(usage.map((event) => event.inputTokens)),
-          output: sum(usage.map((event) => event.outputTokens)),
-        }
-      : undefined,
+    tokens: runUsage(record.events),
     prompt:
       prompt && record.prompt
         ? {
@@ -280,10 +275,6 @@ function step(event: RunEvent): Step[] {
 function cut<T extends string | undefined>(text: T, max: number): T {
   if (text === undefined || text.length <= max) return text
   return `${text.slice(0, max)}… (${text.length - max} more characters)` as T
-}
-
-function sum(values: (number | undefined)[]): number {
-  return values.reduce<number>((total, value) => total + (value ?? 0), 0)
 }
 
 /** Every string in the result, with secrets replaced */

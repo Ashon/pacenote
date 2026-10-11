@@ -78,7 +78,12 @@ describe('codex events', () => {
       status: 'completed',
       result: '$ uptime\n up 3 days',
     })
-    expect(events[3]).toMatchObject({ inputTokens: 43200, outputTokens: 131 })
+    // codex counts the cached input in input_tokens; the record keeps it apart.
+    expect(events[3]).toMatchObject({
+      inputTokens: 43200 - 40576,
+      cacheReadTokens: 40576,
+      outputTokens: 131,
+    })
     expect(lastMessage(events)).toBe('web-01 has been up for 3 days.')
     expect(codexLineToEvents('not json')).toEqual([])
   })

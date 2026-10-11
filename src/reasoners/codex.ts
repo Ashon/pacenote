@@ -223,12 +223,17 @@ export function codexLineToEvents(
     return []
   }
   if (event.type === 'turn.completed' && event.usage) {
+    // codex counts the cached input in input_tokens; the record keeps the two
+    // apart.
+    const input = event.usage.input_tokens
+    const cached = event.usage.cached_input_tokens
     return [
       {
         kind: 'usage',
         at,
-        inputTokens: event.usage.input_tokens,
-        cachedInputTokens: event.usage.cached_input_tokens,
+        inputTokens:
+          input === undefined ? undefined : Math.max(0, input - (cached ?? 0)),
+        cacheReadTokens: cached,
         outputTokens: event.usage.output_tokens,
       },
     ]

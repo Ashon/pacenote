@@ -1,7 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
-import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
+import {
+  claudeResultUsage,
+  type TokenUsage,
+} from '../../../src/history/usage.js'
+import type {
+  CollectionRecord,
+  CollectOutcome,
+  TasksCollect,
+} from '../../../src/tasks/types.js'
 
 const SLACK = 'mcp__claude_ai_Slack__'
 /** The Slack connector's tools a collection may use: reading only */
@@ -86,6 +94,8 @@ interface StreamEvent {
   message?: { content?: unknown }
   is_error?: boolean
   result?: string
+  usage?: Record<string, number>
+  total_cost_usd?: number
 }
 
 interface ContentBlock {
@@ -99,7 +109,8 @@ interface ContentBlock {
 
 /**
  * Reads Claude Code's stream-json output of a collection: how many times it
- * read Slack, what add_tasks answered, and how the run ended.
+ * read Slack, what add_tasks answered, how the run ended and the tokens it
+ * spent.
  */
 export class CollectStream {
   reads = 0
@@ -109,6 +120,7 @@ export class CollectStream {
   skipped = 0
   addError?: string
   ended?: { ok: boolean; text: string }
+  usage?: TokenUsage
   private addCall?: string
 
   push(line: string): void {
@@ -131,6 +143,7 @@ export class CollectStream {
         ok: event.subtype === 'success' && !event.is_error,
         text: event.result ?? '',
       }
+      if (event.usage) this.usage = claudeResultUsage(event)
       return
     }
     const content = event.message?.content
@@ -164,6 +177,9 @@ export class CollectStream {
 
   /** How the collection ended, once the process is gone */
   outcome(at: string, fallback?: string): CollectOutcome {
+    const spent = this.usage
+      ? { reads: this.reads, usage: this.usage }
+      : { reads: this.reads }
     if (this.added)
       return {
         at,
@@ -171,6 +187,7 @@ export class CollectStream {
         added: this.added.filter((task) => task.confidence === 'sure').length,
         maybe: this.added.filter((task) => task.confidence !== 'sure').length,
         skipped: this.skipped,
+        ...spent,
       }
     // Why the run itself failed comes first: signed out, there are no
     // connectors at all.
@@ -185,7 +202,7 @@ export class CollectStream {
       (this.noSlack && this.reads === 0 ? NO_SLACK : undefined) ??
       (firstLine(this.ended?.text) ||
         'The collection stopped before it finished.')
-    return { at, ok: false, error }
+    return { at, ok: false, error, ...spent }
   }
 }
 
@@ -203,7 +220,8 @@ function firstLine(text: string | undefined): string {
 /**
  * Collect now on the Tasks screen: runs one collection at a time in Claude
  * Code (collectCommand) and keeps its progress and how the last one ended, for
- * the screen to show.
+ * the screen to show. Each finished collection goes to record (the log in the
+ * data folder).
  */
 export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
   private child?: ChildProcess
@@ -220,6 +238,8 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       toolPath: () => string
       /** Where Claude Code runs: the data folder, with no project settings */
       cwd: string
+      /** Keeps a finished collection (src/tasks/collections.ts) */
+      record?: (entry: CollectionRecord) => void
       /** For tests: the command in place of claude */
       command?: [string, string[]]
       timeoutMs?: number
@@ -244,10 +264,8 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     }
     this.cancelled = false
     const stream = new CollectStream()
-    this.set({
-      last: this.current.last,
-      running: { startedAt: this.now(), reads: 0 },
-    })
+    const startedAt = this.now()
+    this.set({ last: this.current.last, running: { startedAt, reads: 0 } })
 
     return new Promise((resolve) => {
       let settled = false
@@ -261,6 +279,11 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         this.child = undefined
         const last = stream.outcome(this.now(), fallback)
         this.set({ last })
+        try {
+          this.options.record?.({ ...last, startedAt, trigger: 'now' })
+        } catch {
+          // A collection the log could not keep still ends as it did.
+        }
         resolve(last)
       }
       const [command, args] =

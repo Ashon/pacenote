@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { clip, contentText, splitToolName } from '../history/events.js'
 import type { RunEvent } from '../history/types.js'
+import { claudeResultUsage } from '../history/usage.js'
 import { SANDBOX_PATHS } from '../sandbox/runtime.js'
 import type { CliAdapter, McpServerRef, ReasonImage } from './types.js'
 
@@ -208,14 +209,16 @@ export function claudeLineToEvents(
     return []
   }
   if (event.type === 'result') {
+    const usage = claudeResultUsage(event)
     return [
       {
         kind: 'usage',
         at,
-        inputTokens: event.usage?.input_tokens,
-        cachedInputTokens: event.usage?.cache_read_input_tokens,
-        outputTokens: event.usage?.output_tokens,
-        costUsd: event.total_cost_usd,
+        inputTokens: usage.input,
+        cacheReadTokens: usage.cacheRead,
+        cacheWriteTokens: usage.cacheWrite,
+        outputTokens: usage.output,
+        costUsd: usage.costUsd,
       },
     ]
   }

@@ -38,7 +38,7 @@ export function emptyTasks(): TasksFile {
   return { version: 1, tasks: [] }
 }
 
-function readJson<T>(file: string, fallback: T): T {
+export function readJson<T>(file: string, fallback: T): T {
   if (!existsSync(file)) return fallback
   try {
     return JSON.parse(readFileSync(file, 'utf8')) as T
@@ -48,7 +48,7 @@ function readJson<T>(file: string, fallback: T): T {
 }
 
 /** Writes through a temporary file, so no half-written file is left behind */
-function writeJson(file: string, value: unknown): void {
+export function writeJson(file: string, value: unknown): void {
   mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
   writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`)

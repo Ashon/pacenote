@@ -29,6 +29,10 @@ import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
+import {
+  addCollection,
+  recentCollections,
+} from '../../../src/tasks/collections.js'
 import { decide, tasksView } from '../../../src/tasks/store.js'
 import type { TaskDecision } from '../../../src/tasks/types.js'
 import { ClaudeTokenSetup } from './claude-token.js'
@@ -177,6 +181,7 @@ const taskCollector = new TaskCollector({
   },
   toolPath,
   cwd: dataDir,
+  record: (entry) => addCollection(dataDir, entry),
 })
 
 /** Sandbox status, allowed domains, apply jobs */
@@ -446,6 +451,7 @@ function registerBotIpc(): void {
     return {
       settings: current,
       collect: taskCollector.state,
+      collections: recentCollections(dataDir),
       ...tasksView(dataDir, current.exclude),
     }
   })

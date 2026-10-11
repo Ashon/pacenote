@@ -41,11 +41,12 @@ const toolResult = (id: string, text: string, isError = false) => ({
     ],
   },
 })
-const result = (text: string, ok = true) => ({
+const result = (text: string, ok = true, usage?: Record<string, number>) => ({
   type: 'result',
   subtype: ok ? 'success' : 'error_during_execution',
   is_error: !ok,
   result: text,
+  ...(usage ? { usage, total_cost_usd: 0.42 } : {}),
 })
 const lines = (...events: object[]) => events.map((e) => JSON.stringify(e))
 
@@ -94,7 +95,12 @@ describe('collecting from the app with Claude Code', () => {
           skipped: [{ link: 'x', why: '#random is left out' }],
         })
       ),
-      result('Added two tasks.')
+      result('Added two tasks.', true, {
+        input_tokens: 1200,
+        cache_read_input_tokens: 30000,
+        cache_creation_input_tokens: 4000,
+        output_tokens: 800,
+      })
     ))
       stream.push(line)
     expect(stream.reads).toBe(2)
@@ -104,6 +110,14 @@ describe('collecting from the app with Claude Code', () => {
       added: 2,
       maybe: 1,
       skipped: 1,
+      reads: 2,
+      usage: {
+        input: 1200,
+        cacheRead: 30000,
+        cacheWrite: 4000,
+        output: 800,
+        costUsd: 0.42,
+      },
     })
   })
 
@@ -164,10 +178,12 @@ describe('collecting from the app with Claude Code', () => {
 
   it('runs one collection at a time, with its progress and how it ended', async () => {
     const changes: unknown[] = []
+    const logged: unknown[] = []
     const collector = new TaskCollector({
       launch: () => LAUNCH,
       toolPath: () => process.env.PATH ?? '',
       cwd: process.cwd(),
+      record: (entry) => logged.push(entry),
       command: fake([
         init(),
         toolUse('2', 'mcp__claude_ai_Slack__slack_read_channel'),
@@ -194,8 +210,13 @@ describe('collecting from the app with Claude Code', () => {
       added: 0,
       maybe: 0,
       skipped: 0,
+      reads: 1,
     })
     expect(collector.state).toEqual({ last })
+    // The log gets the finished collection, not the one turned away.
+    expect(logged).toEqual([
+      { ...last, startedAt: '2026-10-11T05:00:00.000Z', trigger: 'now' },
+    ])
     expect(changes).toContainEqual({
       last: undefined,
       running: { startedAt: '2026-10-11T05:00:00.000Z', reads: 1 },
