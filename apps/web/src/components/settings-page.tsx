@@ -145,10 +145,10 @@ interface Hint {
 }
 
 /**
- * Settings screen that edits the settings file (~/.orbly/.env). Available only
- * in the desktop app. draft holds the values changed in the UI. An empty string
- * means revert to default. Changes are kept across sections and saved together
- * from the bar at the bottom.
+ * Settings screen that edits the settings file (~/.pacenote/.env). Available
+ * only in the desktop app. draft holds the values changed in the UI. An empty
+ * string means revert to default. Changes are kept across sections and saved
+ * together from the bar at the bottom.
  */
 export function SettingsPage() {
   const settings = bridge()
@@ -363,11 +363,13 @@ export function SettingsPage() {
   const issueSection = issues
     .map((issue) => settingSectionOf(issue.key))
     .find(Boolean)
-  const canRestart =
-    botChanged &&
+  // Whether this app can start or restart Pace now (not one running elsewhere)
+  const canControl =
     supervisor &&
     supervisor.phase !== 'external' &&
     supervisor.phase !== 'building'
+  // The save bar restarts Pace only for changes it picks up on a restart.
+  const canRestart = botChanged && canControl
 
   // What each section shows in the navigation: an issue dot, its unsaved
   // changes, or a short state.
@@ -785,7 +787,7 @@ export function SettingsPage() {
                   <TriangleAlert className="size-4 shrink-0" />
                 )}
                 <span className="select-text">{notice.text}</span>
-                {notice.restart && canRestart && (
+                {notice.restart && canControl && (
                   <Button
                     size="xs"
                     variant="outline"

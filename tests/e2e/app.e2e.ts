@@ -62,8 +62,7 @@ async function launch(world: World): Promise<Page> {
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
       (entry): entry is [string, string] =>
-        entry[1] !== undefined &&
-        !/^(PACENOTE|ORBLY|VERDA|SLACK|HUB)_/.test(entry[0])
+        entry[1] !== undefined && !/^(PACENOTE|SLACK|HUB)_/.test(entry[0])
     )
   )
   app = await _electron.launch({
@@ -71,8 +70,8 @@ async function launch(world: World): Promise<Page> {
     args: [path.join(REPO, 'apps/desktop')],
     env: {
       ...env,
-      // Its own HOME, so the bot lock does not see a real Pacenote, Orbly or
-      // Verda running from its home.
+      // Its own HOME, so the bot lock does not see a real Pacenote running from
+      // its home.
       HOME: world.root,
       PACENOTE_HOME: world.home,
       PACENOTE_DATA_DIR: world.home,
@@ -140,13 +139,14 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const [reply] = await world.answered(ops.id, ts)
     expect(reply!.text).toBe('*Healthy*. Up 3 days.')
 
-    // The run shows up in the history with the answer and a link back to Slack.
+    // The run shows up in the history with the answer and a link back to the
+    // mention in Slack.
     await page.evaluate("window.location.hash = '#/runs'")
     await page.getByText('how is web-01?').first().click({ timeout: 15_000 })
     await page.getByText('Up 3 days.').first().waitFor()
     const link = page.getByRole('link', { name: 'View in Slack' })
     expect(await link.getAttribute('href')).toBe(
-      `${slack.url}/archives/${ops.id}/p${reply!.ts.replace('.', '')}?thread_ts=${ts}&cid=${ops.id}`
+      `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}`
     )
   })
 })
