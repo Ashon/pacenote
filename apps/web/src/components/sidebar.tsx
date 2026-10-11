@@ -36,7 +36,10 @@ const DEBUG: Item = { section: 'debug', label: 'Debug', icon: Bug }
 /**
  * The app's sections as a labeled list: the screens for watching Pace at the
  * top, and Settings at the bottom. (Pace's status is in the status bar.) A
- * compact sidebar keeps only the icons, for narrow windows.
+ * compact sidebar keeps only the icons, for narrow windows. Both use the same
+ * padding and only drop the labels, so the icons and the mark stay put when it
+ * switches: 12px of sidebar and 11px of item put an 18px icon on the compact
+ * sidebar's center line.
  */
 export function Sidebar({
   active,
@@ -68,19 +71,14 @@ export function Sidebar({
     <nav
       aria-label="Sections"
       className={cn(
-        'flex shrink-0 flex-col pb-3',
-        compact ? 'w-16 items-center px-2' : 'w-56 px-3'
+        'flex shrink-0 flex-col px-3 pb-3',
+        compact ? 'w-16' : 'w-56'
       )}
     >
-      <div
-        className={cn(
-          'flex items-center gap-2.5 pt-1 pb-5',
-          compact ? 'justify-center' : 'px-2.5'
-        )}
-      >
+      <div className="flex items-center gap-2.5 px-[11px] pt-1 pb-5">
         {/* Larger than the icons below, but on their center line and taking
             their width, so "Pacenote" starts where the labels do. */}
-        <PacenoteMark className="-mx-[5px] size-7" />
+        <PacenoteMark className="-mx-[5px] size-7 max-w-none shrink-0" />
         {!compact && (
           <span className="text-[15px] font-semibold tracking-tight">
             Pacenote
@@ -124,8 +122,8 @@ function NavItem({
       aria-current={current ? 'page' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-9 items-center gap-2.5 rounded-xl text-[13.5px] transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-        compact ? 'w-10 justify-center' : 'px-2.5',
+        'flex h-9 items-center gap-2.5 rounded-xl px-[11px] text-[13.5px] transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        compact && 'w-10',
         current
           ? 'bg-selected font-semibold text-foreground'
           : 'text-muted-foreground hover:bg-selected/50 hover:text-foreground'
