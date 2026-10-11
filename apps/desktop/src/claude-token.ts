@@ -5,8 +5,15 @@ import type { SettingsIssue } from '../../../src/settings/fields.js'
  * setup-token waits for the browser approval; past this the run is given up.
  */
 const TIMEOUT_MS = 5 * 60_000
-/** A long-lived Claude Code OAuth token, as claude setup-token prints it */
-const TOKEN = /sk-ant-oat\d{2}-[A-Za-z0-9_-]{20,}/
+/** Where a long-lived Claude Code OAuth token starts */
+const TOKEN_START = /sk-ant-oat\d{2}-/
+/** A whole token, once its wrapped lines are joined */
+const TOKEN = /^sk-ant-oat\d{2}-[A-Za-z0-9_-]{20,}$/
+/**
+ * What setup-token prints after the token: a blank line, then how to store and
+ * use it
+ */
+const AFTER_TOKEN = /\n[ \t]*\n|Store this token|Use this token/
 
 export type ClaudeTokenResult = { ok: true } | { ok: false; error: string }
 
@@ -22,9 +29,25 @@ export function plainText(output: string): string {
   /* eslint-enable no-control-regex */
 }
 
-/** The token in setup-token's output, if it has printed one */
-export function findClaudeToken(output: string): string | undefined {
-  return TOKEN.exec(plainText(output))?.[0]
+/**
+ * The token in setup-token's output, once all of it is there. The command
+ * wraps the token at its own width (120 columns, however wide the terminal),
+ * so the lines up to what follows it are joined; until that has arrived, the
+ * token may still be coming. At the end of the output (complete), the rest
+ * counts.
+ */
+export function findClaudeToken(
+  output: string,
+  complete = false
+): string | undefined {
+  const text = plainText(output)
+  const start = text.search(TOKEN_START)
+  if (start < 0) return undefined
+  const rest = text.slice(start)
+  const end = rest.search(AFTER_TOKEN)
+  if (end < 0 && !complete) return undefined
+  const token = rest.slice(0, end < 0 ? undefined : end).replace(/\s+/g, '')
+  return TOKEN.test(token) ? token : undefined
 }
 
 /**
@@ -108,10 +131,7 @@ export class ClaudeTokenSetup {
           }),
         TIMEOUT_MS
       )
-      const onData = (chunk: Buffer) => {
-        output += chunk.toString('utf8')
-        const token = findClaudeToken(output)
-        if (!token) return
+      const save = (token: string) => {
         const issues = this.options.save(token)
         finish(
           issues.length > 0
@@ -121,6 +141,11 @@ export class ClaudeTokenSetup {
               }
             : { ok: true }
         )
+      }
+      const onData = (chunk: Buffer) => {
+        output += chunk.toString('utf8')
+        const token = findClaudeToken(output)
+        if (token) save(token)
       }
       child.stdout.on('data', onData)
       child.stderr.on('data', onData)
@@ -133,6 +158,9 @@ export class ClaudeTokenSetup {
       child.on('close', (code) => {
         if (settled) return
         if (this.cancelled) return finish({ ok: false, error: 'Cancelled.' })
+        // The token was the last thing it printed.
+        const token = findClaudeToken(output, true)
+        if (token) return save(token)
         // Ended without a token: show the last line it printed (for example
         // that a subscription is required).
         const last = plainText(output)
