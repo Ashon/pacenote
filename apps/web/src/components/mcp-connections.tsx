@@ -5,7 +5,7 @@ import {
   CircleDashed,
   CircleX,
   LoaderCircle,
-  RotateCcw,
+  RotateCw,
   TriangleAlert,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -37,7 +37,7 @@ export function McpConnections({ about }: { about: string }) {
           disabled={clients.isFetching}
           onClick={() => void clients.refetch()}
         >
-          <RotateCcw className={cn(clients.isFetching && 'animate-spin')} />
+          <RotateCw className={cn(clients.isFetching && 'animate-spin')} />
           Check again
         </Button>
       </div>
