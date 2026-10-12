@@ -76,6 +76,11 @@ Bot management:
   four times as fast while it answers. With reduced motion it stays still. Stopped, a gray stop sign (a circle and a bar) takes its place. The status bar's dot pings only while Pace starts or stops.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
   App settings (opening at login, automatic start, run history folder) are in Settings.
+- When Pace needs attention, the app tells you once with a macOS notification, unless its window is in front: Pace stopped
+  (until it runs again), it needs setup, it lost Slack for 2 minutes or more, or a problem the Pace screen lists (a sign-in
+  the reasoner rejected, a usage limit, the sandbox's proxy). Clicking it opens the screen to look at. While any of it lasts,
+  the menu bar shows ⚠︎ next to the icon, and the menu lists what the status line does not say. macOS's own notification
+  settings turn them off.
 - "Open Pacenote when you log in" (Settings > General, installed app only) adds Pacenote to macOS Login Items. Opened at
   login, it stays in the menu bar without a window and starts Pace if automatic start is on. On macOS 13 and later, a new
   login item may wait for your approval; the row says so and opens System Settings > General > Login Items.

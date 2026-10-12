@@ -13,6 +13,7 @@ import {
   nativeImage,
   nativeTheme,
   net,
+  Notification,
   powerSaveBlocker,
   protocol,
   shell,
@@ -23,7 +24,7 @@ import { HistoryStore } from '../../../src/history/recorder.js'
 import { handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import { DESKTOP_LOG_FILE, readBotStatus } from '../../../src/runtime/status.js'
-import type { LoginItemState } from '../../../src/runtime/types.js'
+import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
 import {
   defaultHome,
@@ -32,6 +33,12 @@ import {
 } from '../../../src/settings/home.js'
 import { envFilePath } from '../../../src/settings/paths.js'
 import { BotSupervisor, type SupervisorState } from './bot.js'
+import {
+  currentTroubles,
+  newTroubles,
+  unknownWithoutBot,
+  type Trouble,
+} from './troubles.js'
 import { SandboxService } from './sandbox.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
@@ -343,7 +350,11 @@ const PHASE_LABEL: Record<SupervisorState['phase'], string> = {
   external: 'Running in terminal',
 }
 
-function botSummary(): { label: string; active: number } {
+function botSummary(): {
+  label: string
+  active: number
+  status: BotStatus | undefined
+} {
   const view = readBotStatus(dataDir)
   const status = view.alive ? view.status : undefined
   const phase = supervisor?.current.phase
@@ -357,7 +368,38 @@ function botSummary(): { label: string; active: number } {
   ) {
     label = `Connected${phase === 'external' ? ' in terminal' : ''} (${status.reasoner ?? '?'})`
   }
-  return { label, active: status?.requests.active ?? 0 }
+  return { label, active: status?.requests.active ?? 0, status }
+}
+
+/** Troubles already told as notifications (troubles.ts) */
+const toldTroubles = new Set<string>()
+
+/**
+ * Tells each new trouble once as a notification, unless the window is in
+ * front, where the app shows it already. Clicking one opens where to look.
+ */
+function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
+  const fresh = newTroubles(
+    toldTroubles,
+    troubles,
+    (key) => botRunning || !unknownWithoutBot(key)
+  )
+  if (fresh.length === 0 || mainWindow?.isFocused()) return
+  if (!Notification.isSupported()) return
+  for (const trouble of fresh) {
+    log.info(`Notifying: ${trouble.title}: ${trouble.body}`)
+    const notice = new Notification({
+      title: trouble.title,
+      body: trouble.body,
+    })
+    notice.on('click', () => showMainWindow(trouble.route))
+    notice.show()
+  }
+}
+
+/** A menu item's text, short enough for the menu bar's menu */
+function truncateLabel(text: string, max = 72): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
 /** Holds off system sleep while Pace has requests in progress */
@@ -368,18 +410,37 @@ let lastTrayKey = ''
 function updateTray(): void {
   const summary = botSummary()
   keepAwake.set(summary.active > 0)
+  const troubles = supervisor
+    ? currentTroubles(supervisor.current, summary.status)
+    : []
+  tellTroubles(troubles, summary.status !== undefined)
   if (!tray) return
   const phase = supervisor?.current.phase
-  const key = JSON.stringify([summary, phase])
+  // What the status line does not say already
+  const notes = troubles
+    .filter((trouble) => trouble.key !== 'exit' && trouble.key !== 'setup')
+    .map((trouble) =>
+      trouble.key === 'socket' ? trouble.title : truncateLabel(trouble.body)
+    )
+  const key = JSON.stringify([
+    summary.label,
+    summary.active,
+    phase,
+    troubles.length,
+    notes,
+  ])
   if (key === lastTrayKey) return
   lastTrayKey = key
   tray.setToolTip(`${appName} - Pace: ${summary.label}`)
   // Shows the number of active requests next to the menu bar icon. (macOS)
   // Dev runs say so next to the tray icon, since the installed Pacenote may sit
   // beside it.
+  // A warning sign while there is trouble, so it shows with the window
+  // closed.
   tray.setTitle(
     [
       app.isPackaged ? '' : 'Dev',
+      troubles.length > 0 ? '\u26a0\ufe0e' : '',
       summary.active > 0 ? String(summary.active) : '',
     ]
       .filter(Boolean)
@@ -416,6 +477,7 @@ function updateTray(): void {
       { label: `Open ${appName}`, click: () => showMainWindow() },
       { type: 'separator' },
       { label: `Pace: ${summary.label}`, enabled: false },
+      ...notes.map((note) => ({ label: note, enabled: false })),
       ...(summary.active > 0
         ? [
             {
