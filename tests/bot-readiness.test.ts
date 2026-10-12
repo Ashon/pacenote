@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  HEALTHY_RUN_MS,
+  nextRetry,
+  RETRY_MAX_MS,
   setupProblem,
   startFailureProblem,
 } from '../apps/desktop/src/bot-readiness.js'
@@ -58,5 +61,21 @@ describe('bot readiness', () => {
       startFailureProblem(["Error: Cannot find module 'x'"])
     ).toBeUndefined()
     expect(startFailureProblem([])).toBeUndefined()
+  })
+
+  it('waits longer with each exit in a row, and starts over after a good run', () => {
+    let failures = 0
+    const waits: number[] = []
+    for (let i = 0; i < 9; i++) {
+      const retry = nextRetry(failures, 1_000)
+      failures = retry.failures
+      waits.push(retry.delayMs / 1_000)
+    }
+    expect(waits).toEqual([3, 6, 12, 24, 48, 96, 192, 300, 300])
+    expect(nextRetry(failures, 60_000).delayMs).toBe(RETRY_MAX_MS)
+    expect(nextRetry(failures, HEALTHY_RUN_MS)).toEqual({
+      failures: 1,
+      delayMs: 3_000,
+    })
   })
 })

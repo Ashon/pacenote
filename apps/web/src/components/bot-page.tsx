@@ -155,11 +155,11 @@ export function BotPage() {
 
 /**
  * The supervisor's notice under the header. Setup needed is amber with a way to
- * Settings (and the failing values, if any); a failed start or a crash is red;
- * anything else is a quiet note.
+ * Settings (and the failing values, if any); a failed start or a crash is red,
+ * with when the app tries again; anything else is a quiet note.
  */
 function Notice({ supervisor }: { supervisor: SupervisorState }) {
-  const { phase, message, issues } = supervisor
+  const { phase, message, issues, retryAt } = supervisor
   const tone =
     phase === 'setup'
       ? TONE_CLASS.warn
@@ -177,6 +177,7 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
     >
       <div className="min-w-0 flex-1 space-y-1.5">
         <p className="select-text">{message}</p>
+        {retryAt !== undefined && <RetryCountdown at={retryAt} />}
         {phase === 'setup' && issues && issues.length > 0 && (
           <ul className="space-y-0.5">
             {issues.map((issue) => (
@@ -200,6 +201,23 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
         </Button>
       )}
     </div>
+  )
+}
+
+/** When the app starts Pace again, counting down */
+function RetryCountdown({ at }: { at: number }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1_000)
+    return () => clearInterval(timer)
+  }, [])
+  const seconds = Math.ceil((at - now) / 1_000)
+  return (
+    <p>
+      {seconds <= 0
+        ? 'Starting it again now.'
+        : `Starting it again in ${seconds < 60 ? `${seconds}s` : formatDuration(seconds * 1_000)}.`}
+    </p>
   )
 }
 
@@ -288,6 +306,8 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
   }
   const busy = pending || phase === 'building' || phase === 'stopping'
   const live = phase === 'running' || phase === 'starting'
+  /** Waiting to start again after an exit; Stop ends the wait */
+  const waiting = supervisor.retryAt !== undefined
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">
       <div className="flex items-center gap-1.5">
@@ -301,7 +321,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             onClick={() => run(() => control.start())}
           >
             <Play />
-            Start
+            {waiting ? 'Start now' : 'Start'}
           </Button>
         )}
         {live && (
@@ -326,7 +346,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             Rebuild and restart
           </Button>
         )}
-        {live && (
+        {(live || waiting) && (
           <Button
             size="sm"
             variant="outline"

@@ -62,6 +62,9 @@ export interface LogLine {
  * - failed: the build failed, or the bot exited right after starting for
  *   another reason
  * - crashed: the bot died after running normally
+ *
+ * After an exit no one asked for (failed to start or crashed), the app starts
+ * the bot again at retryAt, waiting longer each time.
  */
 export type BotPhase =
   | 'idle'
@@ -88,8 +91,10 @@ export interface SupervisorState {
    */
   issues?: { key?: string; message: string }[]
   autoStart: boolean
-  /** Number of restarts after abnormal exits (last 10 minutes) */
+  /** Exits no one asked for in a row, since the bot last ran well */
   restarts: number
+  /** When the app starts the bot again (epoch ms), while it waits to */
+  retryAt?: number
   /**
    * Whether it can rebuild from source (dev runs only. The packaged app uses
    * its bundle as is)

@@ -13,7 +13,11 @@ import { utilityProcess, type UtilityProcess } from 'electron'
 import { RECHECK_SANDBOX } from '../../../src/runtime/sandbox-health.js'
 import { readRunningBot } from '../../../src/runtime/status.js'
 import { botLockDirs } from '../../../src/settings/home.js'
-import { setupProblem, startFailureProblem } from './bot-readiness.js'
+import {
+  nextRetry,
+  setupProblem,
+  startFailureProblem,
+} from './bot-readiness.js'
 import type { SupervisorState } from '../../../src/runtime/types.js'
 
 export type { SupervisorState }
@@ -29,8 +33,10 @@ export type { SupervisorState }
  * - Before launching, the bot's environment is checked with the bot's own
  *   rules. Missing settings (a first run) or tokens Slack rejected show as
  *   "setup" instead of launching a bot that would only exit on them.
- * - A bot that was running fine and dies is restarted a few times. One that
- *   dies right after starting for another reason is left stopped as "failed".
+ * - A bot that exits when no one asked it to is started again, after a wait
+ *   that doubles with each exit in a row (up to 5 minutes) and starts over
+ *   after a run that went well (nextRetry). Stop ends the wait. Tokens Slack
+ *   rejected are a setup problem instead, and are not tried again.
  * - Stopping sends SIGTERM. The bot gives active requests up to 15 seconds,
  *   stops the reasoner runs left, and resumes them on the next start.
  */
@@ -40,10 +46,8 @@ interface Settings {
 
 const OUTPUT_LINES = 200
 const STOP_TIMEOUT_MS = 30_000
-/** A bot that dies after running at least this long is restarted. */
-const HEALTHY_UPTIME_MS = 30_000
-const MAX_RESTARTS = 3
-const RESTART_WINDOW_MS = 10 * 60_000
+/** A bot that exits sooner than this failed to start; later, it crashed. */
+const STARTED_MS = 30_000
 
 export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   /**
@@ -57,7 +61,10 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   private child?: UtilityProcess
   private childStartedAt = 0
   private stopRequested = false
-  private restartTimes: number[] = []
+  /** Exits no one asked for in a row (nextRetry) */
+  private failures = 0
+  /** Starts the bot again after such an exit */
+  private retryTimer?: NodeJS.Timeout
   private poller?: NodeJS.Timeout
   private state: SupervisorState
   private readonly settingsFile: string
@@ -117,6 +124,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
 
   async start(options: { rebuild?: boolean } = {}): Promise<void> {
     if (this.child || this.state.phase === 'building') return
+    this.cancelRetry()
     this.refreshExternal()
     if (this.state.phase === 'external') return
     this.stopRequested = false
@@ -142,6 +150,17 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   }
 
   async stop(): Promise<void> {
+    this.failures = 0
+    // Waiting to start again, it stays stopped instead.
+    if (this.retryTimer) {
+      this.cancelRetry()
+      this.set({
+        phase: 'idle',
+        pid: undefined,
+        message: 'Stopped',
+        restarts: 0,
+      })
+    }
     const child = this.child
     if (!child) return
     this.stopRequested = true
@@ -175,6 +194,13 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
 
   dispose(): void {
     if (this.poller) clearInterval(this.poller)
+    this.cancelRetry()
+  }
+
+  private cancelRetry(): void {
+    clearTimeout(this.retryTimer)
+    this.retryTimer = undefined
+    if (this.state.retryAt !== undefined) this.set({ retryAt: undefined })
   }
 
   /** pnpm build (tsc). Output is kept in output. Called only in dev runs. */
@@ -247,6 +273,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       message: undefined,
       issues: undefined,
       output: [],
+      retryAt: undefined,
     })
 
     const capture = (chunk: Buffer) => {
@@ -270,51 +297,44 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       this.set({ phase: 'idle', pid: undefined, message: 'Stopped' })
       return
     }
-    const now = Date.now()
-    this.restartTimes = this.restartTimes.filter(
-      (t) => now - t < RESTART_WINDOW_MS
-    )
-    const last = this.state.output.at(-1) ?? ''
-    if (
-      uptime >= HEALTHY_UPTIME_MS &&
-      this.restartTimes.length < MAX_RESTARTS
-    ) {
-      this.restartTimes.push(now)
+    // Tokens Slack or the hub rejected are a setup problem, which another try
+    // does not fix.
+    const problem = startFailureProblem(this.state.output)
+    if (problem) {
+      this.failures = 0
       this.set({
-        phase: 'crashed',
+        phase: 'setup',
         pid: undefined,
-        restarts: this.restartTimes.length,
-        message: `Pace exited (code ${code}). Restarting in 3 seconds.`,
+        message: problem.message,
+        issues: [],
+        restarts: 0,
       })
-      setTimeout(() => void this.start(), 3_000)
       return
     }
-    if (uptime < HEALTHY_UPTIME_MS) {
-      // Tokens Slack rejected are a setup problem; anything else is a failed
-      // start, with the output kept.
-      const problem = startFailureProblem(this.state.output)
-      this.set(
-        problem
-          ? {
-              phase: 'setup',
-              pid: undefined,
-              message: problem.message,
-              issues: [],
-            }
-          : {
-              phase: 'failed',
-              pid: undefined,
-              message:
-                `Pace stopped right after starting (code ${code}). ${last}`.trim(),
-            }
-      )
-      return
-    }
+    // Anything else is tried again, with the output kept.
+    const retry = nextRetry(this.failures, uptime)
+    this.failures = retry.failures
+    // The last line without the log's time, level and scope
+    const last = (this.state.output.at(-1) ?? '').replace(
+      /^\S+\s+(?:DEBUG|INFO|WARN|ERROR)\s+\[[^\]]*\]\s*/,
+      ''
+    )
     this.set({
-      phase: 'crashed',
       pid: undefined,
-      message: `Pace keeps exiting and will not be restarted (code ${code}).`,
+      restarts: retry.failures,
+      retryAt: Date.now() + retry.delayMs,
+      ...(uptime < STARTED_MS
+        ? {
+            phase: 'failed',
+            message:
+              `Pace stopped right after starting (code ${code}). ${last}`.trim(),
+          }
+        : { phase: 'crashed', message: `Pace exited (code ${code}).` }),
     })
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined
+      void this.start()
+    }, retry.delayMs)
   }
 
   /**
@@ -334,6 +354,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     }
     const externalPid = view.alive ? view.status?.pid : undefined
     if (externalPid && this.state.phase !== 'external') {
+      this.cancelRetry()
       this.set({
         phase: 'external',
         pid: externalPid,

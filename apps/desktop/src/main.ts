@@ -347,6 +347,7 @@ function botSummary(): { label: string; active: number } {
   const status = view.alive ? view.status : undefined
   const phase = supervisor?.current.phase
   let label = phase ? PHASE_LABEL[phase] : status ? 'Running' : 'Stopped'
+  if (supervisor?.current.retryAt !== undefined) label += ', starting again'
   if (status?.state === 'running' && status.socket.state !== 'connected') {
     label = `Socket Mode ${status.socket.state === 'reconnecting' ? 'reconnecting' : 'disconnected'}`
   } else if (

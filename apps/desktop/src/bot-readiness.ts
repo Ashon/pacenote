@@ -104,3 +104,26 @@ export function startFailureProblem(
   }
   return undefined
 }
+
+/** The first wait before Pace starts again after an exit no one asked for */
+export const RETRY_FIRST_MS = 3_000
+/** The longest wait between tries */
+export const RETRY_MAX_MS = 5 * 60_000
+/** A run this long went well: the waits start over after it */
+export const HEALTHY_RUN_MS = 10 * 60_000
+
+/**
+ * When to start Pace again after it exited on its own: the wait doubles with
+ * each exit in a row, up to RETRY_MAX_MS, and starts over after a run that
+ * went well. failures is the count of exits in a row so far.
+ */
+export function nextRetry(
+  failures: number,
+  uptimeMs: number
+): { failures: number; delayMs: number } {
+  const before = uptimeMs >= HEALTHY_RUN_MS ? 0 : failures
+  return {
+    failures: before + 1,
+    delayMs: Math.min(RETRY_FIRST_MS * 2 ** before, RETRY_MAX_MS),
+  }
+}

@@ -85,9 +85,10 @@ Bot management:
   the status bar, and the tray menu). That way opens the section to fix: Slack for missing or rejected tokens, otherwise the section
   of the first invalid value. Tokens Slack rejects (`invalid_auth` and the like) also end up there. Saving in Settings then starts
   the bot ("Save and start Pace").
-- If the bot dies after running normally for 30 seconds or more, it shows "Crashed" and is restarted after 3 seconds (up to 3 times in
-  10 minutes). If it stops right after starting for another reason, or a dev build fails, it shows "Failed to start" with the cause and
-  the last output on the Pace screen.
+- If the bot exits when no one asked it to, the app starts it again: after 3 seconds, then 6, 12 and so on up to 5 minutes for
+  each exit in a row, starting over after a run of 10 minutes. It shows "Crashed" (after running for 30 seconds or more) or
+  "Failed to start" (sooner) with the cause, the last output and a countdown on the Pace screen, where "Start now" skips the wait
+  and "Stop" ends it. A dev build that fails shows "Failed to start" and is not tried again.
 - If a bot is already running from a terminal (`pnpm dev` and so on), the app leaves it alone and only shows its status and logs as "Running in terminal".
   When the terminal bot stops, the app takes over. (It starts the bot right away if automatic start is on)
 - Closing the window hides the app in the tray and the bot keeps running. Quit from the tray menu or with Cmd+Q.
