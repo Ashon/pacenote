@@ -1,0 +1,73 @@
+name: hub image
+
+# Pushing a v* tag publishes the team hub's image (deploy/hub, docs/team-hub.md) to ghcr.io/ashon/pacenote-hub, as
+# the version (0.5.0) and latest, for amd64 and arm64 servers. Running a hub then needs only compose.yaml and hub.env,
+# not the repository. The desktop app is released from the same tag outside this repository. Run by hand (Actions >
+# hub image > Run workflow), it builds the image without pushing it, which checks the Dockerfile without a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Read-only by default; only the image job writes, to ghcr. Every checkout drops the token it would leave in
+# .git/config.
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: build and publish the hub image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push the image to ghcr.io
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: install pnpm
+        # The exact version package.json pins.
+        run: npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")" # zizmor: ignore[adhoc-packages]
+      - run: pnpm install --frozen-lockfile
+      # Writes deploy/hub/dist/hub.mjs, the one file the image copies.
+      - run: pnpm bundle
+
+      # Lowercase, because ghcr rejects an uppercase path and the account is `Ashon`. Off a tag the version is a
+      # placeholder: nothing is pushed, but buildx still parses the tag, and a branch name may not be a valid one.
+      - name: derive tags
+        id: tags
+        run: |
+          set -euo pipefail
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          case "$GITHUB_REF_NAME" in
+            v*) version="${GITHUB_REF_NAME#v}" ;;
+            *) version="dry-run" ;;
+          esac
+          echo "image=ghcr.io/${owner}/pacenote-hub" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # The Dockerfile has a RUN step, so the arm64 image is built under emulation on this amd64 runner.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: log in to ghcr
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          # A path, not the git context: the bundle is built above and is not committed.
+          context: deploy/hub
+          platforms: linux/amd64,linux/arm64
+          # Only a tag publishes.
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: |
+            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.version }}
+            ${{ steps.tags.outputs.image }}:latest

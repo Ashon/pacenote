@@ -26,14 +26,22 @@ Running the hub (on a server of its own, with Docker):
 
 1. Create the Slack app from `slack-app-manifest.yaml` (Socket Mode), install it, and create an app-level token with
    `connections:write`.
-2. On a machine with the repository: `pnpm install && pnpm bundle`, which writes `deploy/hub/dist/hub.mjs`
-   (`pnpm hub:image` also builds the image `pacenote-hub:latest`).
-3. In `deploy/hub`: `cp hub.env.example hub.env`, fill in `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN` and `HUB_PUBLIC_URL`
-   (optionally `HUB_ALLOWED_USERS`), then `docker compose up -d --build`. Paired desktops are kept in the `hub-data` volume.
+2. On the server, in a folder of its own, get the two files from `deploy/hub`; the repository is not needed:
+   ```sh
+   base=https://raw.githubusercontent.com/Ashon/pacenote/main/deploy/hub
+   curl -fsSL -O "$base/compose.yaml" -O "$base/hub.env.example"
+   ```
+3. `cp hub.env.example hub.env`, fill in `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN` and `HUB_PUBLIC_URL`
+   (optionally `HUB_ALLOWED_USERS`), then `docker compose up -d`. It pulls `ghcr.io/ashon/pacenote-hub:latest`, which each
+   release publishes for amd64 and arm64 servers; name a version in `compose.yaml` instead (`:0.5.0`) to stay on one.
+   Paired desktops are kept in the `hub-data` volume. To update: `docker compose pull && docker compose up -d`.
 4. The hub listens on `127.0.0.1:8790`. Serve it over HTTPS at `HUB_PUBLIC_URL`, for example with Caddy:
    `pacenote-hub.example.com { reverse_proxy 127.0.0.1:8790 }` (WebSockets pass through). Desktops accept only https URLs
    (http only for localhost).
 5. Give members the URL. `docker compose logs -f hub` shows pairings, connections, routed mentions and refused calls.
+
+From the repository instead of the published image: `pnpm install && pnpm bundle`, which writes `deploy/hub/dist/hub.mjs`,
+then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the same image without starting it).
 
 | Hub setting (`hub.env`) | Meaning |
 | --- | --- |

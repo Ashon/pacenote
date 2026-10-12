@@ -1,12 +1,15 @@
 # Pacenote team hub on a server of its own (docs/team-hub.md).
-#   cp hub.env.example hub.env   # the Slack app's tokens live only here
-#   docker compose up -d --build # after pnpm bundle (the image copies dist/hub.mjs)
+#   cp hub.env.example hub.env                  # the Slack app's tokens live only here
+#   docker compose up -d                        # pulls the image each release publishes
+#   docker compose pull && docker compose up -d # later, to update
+# From the repository instead: pnpm bundle, then docker compose up -d --build.
 # The hub listens on 127.0.0.1:8790; put HTTPS in front of it (Caddy, nginx, or a tunnel) and give members that URL.
 name: pacenote-hub
 services:
   hub:
+    # latest follows releases. Name a version instead (ghcr.io/ashon/pacenote-hub:0.5.0) to stay on one.
+    image: ghcr.io/ashon/pacenote-hub:latest
     build: .
-    image: pacenote-hub:latest
     restart: unless-stopped
     env_file: hub.env
     ports:
