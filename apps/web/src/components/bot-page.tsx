@@ -206,7 +206,7 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
 /**
  * Pace's mark beside its name: looking around while Pace starts, builds or
  * stops, turning slowly while it is connected and faster while it answers.
- * Otherwise the state's icon.
+ * Stopped, a stop sign; otherwise the state's icon.
  */
 export function BotMark({
   tone,
@@ -226,6 +226,7 @@ export function BotMark({
       />
     )
   }
+  if (tone === 'off') return <StopSign className={cn('size-10', className)} />
   return (
     <span
       className={cn(
@@ -236,6 +237,35 @@ export function BotMark({
     >
       <Bot className={cn('size-5', TONE_CLASS[tone].text)} />
     </span>
+  )
+}
+
+/**
+ * Pace stopped: a circle and a bar in gray, like the status bar's dot, as heavy
+ * as the mark it stands in for (ring radius 164 and stroke 84 of 512)
+ */
+function StopSign({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      aria-hidden
+      className={cn('shrink-0 text-muted-foreground', className)}
+    >
+      <circle
+        cx="20"
+        cy="20"
+        r="12.8"
+        className="fill-muted-foreground/10"
+        stroke="currentColor"
+        strokeWidth="6.5"
+      />
+      <path
+        d="M16.5 20h7"
+        stroke="currentColor"
+        strokeWidth="6.5"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }
 

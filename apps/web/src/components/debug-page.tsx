@@ -334,7 +334,8 @@ function MarkBench() {
       <p className="text-xs text-muted-foreground">
         The mark beside Pace&apos;s name. It looks around while Pace starts or
         stops, turns once in 16 seconds while Pace is connected, and four times
-        as fast while it answers. Switch states to see it change.
+        as fast while it answers. Stopped, it is a gray stop sign. Switch states
+        to see it change.
       </p>
       <div className="grid gap-x-8 gap-y-3 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>

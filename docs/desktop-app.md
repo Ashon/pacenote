@@ -73,7 +73,7 @@ Bot management:
   PATH comes from the login shell. (So docker, codex and pnpm are found even when the app is launched from Finder)
 - The Pace screen has "Start", "Stop", "Restart" and "Rebuild and restart" (development runs only). The number of requests in progress is shown next to the menu bar icon.
   Pace's mark beside its name looks around while Pace starts or stops, and turns while it is connected: once in 16 seconds,
-  four times as fast while it answers. With reduced motion it stays still. The status bar's dot pings only while Pace starts or stops.
+  four times as fast while it answers. With reduced motion it stays still. Stopped, a gray stop sign (a circle and a bar) takes its place. The status bar's dot pings only while Pace starts or stops.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
   App settings (automatic start, run history folder) are in Settings.
 - While requests are in progress, the app keeps the Mac from going to sleep (`powerSaveBlocker`, system sleep only), so an
