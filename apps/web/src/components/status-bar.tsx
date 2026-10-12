@@ -76,8 +76,10 @@ export function StatusBarView({
             : openBot
         }
       >
+        {/* The dot pings only while Pace starts, builds or stops; connected,
+            it holds still. */}
         <span className="relative flex size-2">
-          {(tone === 'ok' || tone === 'busy') && (
+          {tone === 'busy' && (
             <span
               className={cn(
                 'absolute inset-0 animate-ping rounded-full opacity-50',

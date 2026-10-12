@@ -31,6 +31,7 @@ SACC = "cubic-bezier(.15,.85,.3,1)"  # saccade: fast start, hard stop
 END = 720  # two full turns, lands back on rest
 FIRST_REST = 300  # ms still before the first look: a short load never moves
 LAST_REST = 700  # ms resting after the last one (with tremor)
+TURN_SECONDS = 16  # one turn while connected (TURN_RATE in pace-spinner.tsx)
 
 # Sizes come from a fixed bag so big and small moves are spread across the loop
 # instead of clustering: no two small moves (or look-backs) in a row, and the
@@ -385,6 +386,9 @@ def css(seed):
  * two pupils.
  * The rules without animation are the logo: PaceSpinner stops the loop
  * (data-still) and eases back to them from wherever the loop was.
+ * Apart from the loop, the turn: the whole mark going round at a steady pace
+ * (data-turn), while Pace is connected. PaceSpinner speeds it up while Pace
+ * answers.
  */
 .pace-spinner-eye {{
   transform-box: view-box;
@@ -412,6 +416,16 @@ def css(seed):
 .pace-spinner[data-still] :is(.pace-spinner-eye, .pace-spinner-track, .pace-spinner-pupil, .pace-spinner-front) {{
   animation: none;
 }}
+.pace-spinner-turn {{
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+}}
+.pace-spinner[data-turn] .pace-spinner-turn {{
+  animation: pace-spinner-turn {TURN_SECONDS}s linear infinite;
+}}
+@keyframes pace-spinner-turn {{
+  to {{ transform: rotate(360deg); }}
+}}
 {look}
 {keyframes("pace-spinner-focus", arc.frames, total, pupil_dash)}
 {keyframes("pace-spinner-open", gap.frames, total, track_dash)}
@@ -423,7 +437,8 @@ def css(seed):
   .pace-spinner-eye,
   .pace-spinner-track,
   .pace-spinner-pupil,
-  .pace-spinner-front {{
+  .pace-spinner-front,
+  .pace-spinner[data-turn] .pace-spinner-turn {{
     animation: none;
   }}
   .pace-spinner:not([data-still]) {{

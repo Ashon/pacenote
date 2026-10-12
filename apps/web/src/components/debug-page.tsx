@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { BotMark } from './bot-page'
+import { TONE_CLASS, type BotTone } from './bot-state'
 import { PaceSpinner } from './pace-spinner'
 import { StatusBarView } from './status-bar'
 
@@ -29,6 +31,14 @@ const PACE_STATES: Record<string, { phase: BotPhase; socket?: SocketState }> = {
   'Failed to start': { phase: 'failed' },
   Crashed: { phase: 'crashed' },
   Stopped: { phase: 'idle' },
+}
+/** States of Pace's mark on the Pace screen, in the order they come */
+const MARK_STATES: Record<string, BotTone> = {
+  Stopped: 'off',
+  Starting: 'busy',
+  Connected: 'ok',
+  Reconnecting: 'warn',
+  Stopping: 'busy',
 }
 const CHECK_ISSUES = [
   'Sandbox: the egress proxy is not running',
@@ -57,6 +67,7 @@ export function DebugPage() {
         </header>
         <SpinnerBench />
         <SettleBench />
+        <MarkBench />
         <StatusBench />
       </div>
     </ScrollArea>
@@ -301,6 +312,67 @@ function SettleBench() {
             </p>
           </div>
         </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The mark beside Pace's name on the Pace screen, from state to state: it
+ * looks around while Pace starts or stops and turns while Pace is connected,
+ * faster while it answers.
+ */
+function MarkBench() {
+  const [pace, setPace] = useState('Connected')
+  const [active, setActive] = useState(0)
+  const tone = MARK_STATES[pace]!
+  const answering = tone === 'ok' && active > 0
+
+  return (
+    <section className="space-y-5">
+      <h2 className="text-sm font-semibold">Pace screen</h2>
+      <p className="text-xs text-muted-foreground">
+        The mark beside Pace&apos;s name. It looks around while Pace starts or
+        stops, turns once in 16 seconds while Pace is connected, and four times
+        as fast while it answers. Switch states to see it change.
+      </p>
+      <div className="grid gap-x-8 gap-y-3 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]">
+        <span className="self-center">Pace</span>
+        <Choice
+          options={Object.keys(MARK_STATES).map((name) => ({
+            value: name,
+            label: name,
+          }))}
+          value={pace}
+          onChange={setPace}
+        />
+        <span className="self-center">Requests in progress</span>
+        <Choice
+          options={[0, 1, 3].map((n) => ({ value: n, label: String(n) }))}
+          value={active}
+          onChange={setActive}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-8 border-y border-border py-6">
+        <div className="flex items-start gap-4">
+          <BotMark tone={tone} answering={answering} className="mt-1" />
+          <div>
+            <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              Pace
+              <span
+                className={cn('text-sm font-medium', TONE_CLASS[tone].text)}
+              >
+                {pace}
+              </span>
+            </div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {answering
+                ? `Answering ${active} ${active === 1 ? 'mention' : 'mentions'}`
+                : 'As on the Pace screen, at 40 px and at 96 px'}
+            </p>
+          </div>
+        </div>
+        <BotMark tone={tone} answering={answering} className="size-24" />
       </div>
     </section>
   )

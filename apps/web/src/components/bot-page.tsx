@@ -23,7 +23,7 @@ import { useBotLogs, useBotStatus } from '@/lib/api'
 import { botControl, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { describeBot, TONE_CLASS } from './bot-state'
+import { describeBot, TONE_CLASS, type BotTone } from './bot-state'
 import { CodeBlock } from './code-block'
 import { PaceSpinner } from './pace-spinner'
 
@@ -46,19 +46,11 @@ export function BotPage() {
       <div className="shrink-0 border-b px-10 pt-8 pb-6">
         <div className="@container mx-auto max-w-5xl">
           <div className="flex items-start gap-4">
-            {/* While Pace starts, builds or stops, its mark looks around. */}
-            {tone === 'busy' ? (
-              <PaceSpinner className="mt-1 size-10" />
-            ) : (
-              <span
-                className={cn(
-                  'mt-1 grid size-10 place-items-center rounded-xl',
-                  TONE_CLASS[tone].bg
-                )}
-              >
-                <Bot className={cn('size-5', TONE_CLASS[tone].text)} />
-              </span>
-            )}
+            <BotMark
+              tone={tone}
+              answering={(status?.requests.active ?? 0) > 0}
+              className="mt-1"
+            />
             <div className="min-w-0 flex-1">
               <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                 Pace
@@ -208,6 +200,42 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
         </Button>
       )}
     </div>
+  )
+}
+
+/**
+ * Pace's mark beside its name: looking around while Pace starts, builds or
+ * stops, turning slowly while it is connected and faster while it answers.
+ * Otherwise the state's icon.
+ */
+export function BotMark({
+  tone,
+  answering,
+  className,
+}: {
+  tone: BotTone
+  answering: boolean
+  className?: string
+}) {
+  if (tone === 'busy' || tone === 'ok') {
+    return (
+      <PaceSpinner
+        active={tone === 'busy'}
+        turn={tone === 'ok' ? (answering ? 'fast' : 'slow') : undefined}
+        className={cn('size-10', className)}
+      />
+    )
+  }
+  return (
+    <span
+      className={cn(
+        'grid size-10 place-items-center rounded-xl',
+        TONE_CLASS[tone].bg,
+        className
+      )}
+    >
+      <Bot className={cn('size-5', TONE_CLASS[tone].text)} />
+    </span>
   )
 }
 

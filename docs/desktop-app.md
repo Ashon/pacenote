@@ -16,8 +16,8 @@ folder and single-instance lock, so they start next to an installed Pacenote. Th
 same config and data folder (`~/.pacenote`), so the bot lock still keeps a single bot running.
 
 These runs also have a Debug section above Settings, for things to look at in motion (Pace's spinner at each size, with speed,
-pause, a scrubber and the frame rate, and loads of a few lengths that end with the mark easing back into the logo) and the
-status bar in made-up states (Pace's state, requests, a task collection, check issues, narrower windows). Its code is only
+pause, a scrubber and the frame rate, loads of a few lengths that end with the mark easing back into the logo, and the Pace
+screen's mark from state to state) and the status bar in made-up states (Pace's state, requests, a task collection, check issues, narrower windows). Its code is only
 in builds made for development: `pnpm desktop` builds the UI with `VITE_PACENOTE_DEBUG=1`, and the Vite dev server always
 includes it. `pnpm desktop:build` and `pnpm package:mac`, which release builds use, leave it out.
 
@@ -72,6 +72,8 @@ Bot management:
   Environment variables are read from the config file (`~/.pacenote/.env`) like `node --env-file`, and existing environment variables take precedence.
   PATH comes from the login shell. (So docker, codex and pnpm are found even when the app is launched from Finder)
 - The Pace screen has "Start", "Stop", "Restart" and "Rebuild and restart" (development runs only). The number of requests in progress is shown next to the menu bar icon.
+  Pace's mark beside its name looks around while Pace starts or stops, and turns while it is connected: once in 16 seconds,
+  four times as fast while it answers. With reduced motion it stays still. The status bar's dot pings only while Pace starts or stops.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
   App settings (automatic start, run history folder) are in Settings.
 - While requests are in progress, the app keeps the Mac from going to sleep (`powerSaveBlocker`, system sleep only), so an
