@@ -1,11 +1,22 @@
-import type { BotStatusView, SupervisorState } from '@runtime/types'
+import type {
+  BotStatusView,
+  SupervisorState,
+  UpdateState,
+} from '@runtime/types'
 import { setupSettingsRoute } from '@src/settings/fields'
 import type { TasksCollect } from '@src/tasks/types'
-import { Clock, Cpu, FolderOpen, Plug, TriangleAlert } from 'lucide-react'
+import {
+  CircleArrowUp,
+  Clock,
+  Cpu,
+  FolderOpen,
+  Plug,
+  TriangleAlert,
+} from 'lucide-react'
 import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useBotStatus } from '@/lib/api'
-import { useSupervisor } from '@/lib/desktop'
+import { useSupervisor, useUpdate } from '@/lib/desktop'
 import { useTasks } from '@/lib/tasks'
 import { formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -29,11 +40,13 @@ export function StatusBar({
   // A collection keeps running when you leave the Todo screen; this is where
   // it still shows. (the sidebar already keeps the tasks query fresh)
   const collecting = useTasks().data?.collect.running
+  const update = useUpdate()
   return (
     <StatusBarView
       bot={data}
       supervisor={supervisor}
       collecting={collecting}
+      update={update}
       onOpenRoute={onOpenRoute}
     />
   )
@@ -44,12 +57,15 @@ export function StatusBarView({
   bot: data,
   supervisor,
   collecting,
+  update,
   onOpenRoute,
 }: {
   bot?: BotStatusView
   supervisor?: SupervisorState
   /** The task collection running, if one is */
   collecting?: TasksCollect['running']
+  /** A newer Pacenote, if there is one */
+  update?: UpdateState
   onOpenRoute: (route: string) => void
 }) {
   const { tone, label } = describeBot(data, supervisor)
@@ -168,6 +184,16 @@ export function StatusBarView({
             onClick={() => void openDataDir()}
           >
             <FolderOpen />
+          </Item>
+        )}
+        {update?.available && update.latest && (
+          <Item
+            tip={`Pacenote ${update.latest.version} is out: how to update`}
+            onClick={() => onOpenRoute('#/settings/general')}
+            className="text-primary"
+          >
+            <CircleArrowUp />
+            Update
           </Item>
         )}
         {/* Which Pacenote this is, for upgrades and bug reports */}

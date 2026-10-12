@@ -12,6 +12,7 @@ import {
   type SettingsView,
 } from '@src/settings/fields'
 import type { HubUser } from '@src/hub/protocol'
+import type { UpdateState } from '@runtime/types'
 import {
   MESSENGER_IDS,
   MESSENGER_NAMES,
@@ -58,9 +59,12 @@ import {
   useLoginItem,
   useSandbox,
   useSupervisor,
+  useUpdate,
 } from '@/lib/desktop'
+import { formatRelative } from '@/lib/format'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
 import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
@@ -162,6 +166,7 @@ export function SettingsPage() {
   const settings = bridge()
   const supervisor = useSupervisor()
   const loginItem = useLoginItem()
+  const update = useUpdate()
   const sandbox = useSandbox()
   const [section, go] = useSection()
   const [view, setView] = useState<SettingsView>()
@@ -745,6 +750,7 @@ export function SettingsPage() {
             )}
           </div>
         </section>
+        <UpdatesCard update={update} />
         <section className="surface-group">
           <CardHeader
             title="Files"
@@ -1954,6 +1960,62 @@ function ThemePicker() {
         </button>
       ))}
     </div>
+  )
+}
+
+/** How to update with Homebrew, which installs Pacenote */
+const BREW_UPGRADE = 'brew upgrade --cask pacenote'
+
+/**
+ * Updates: whether a newer Pacenote is out, and how to get it. The app only
+ * tells; Homebrew installs it, quitting the app first and reopening it.
+ */
+function UpdatesCard({ update }: { update: UpdateState | undefined }) {
+  const { version } = __PACENOTE_BUILD__
+  const latest = update?.latest
+  return (
+    <section className="surface-group">
+      <CardHeader
+        title="Updates"
+        help="Pacenote looks for a new release twice a day. Homebrew installs it."
+      />
+      <div className="divide-y divide-border">
+        <Row
+          label={
+            update?.available && latest
+              ? `Pacenote ${latest.version} is out`
+              : `Pacenote ${version}`
+          }
+          help={
+            !update
+              ? 'Only the installed Pacenote looks for updates.'
+              : update.available
+                ? `You have ${update.current}. Run this in Terminal; it quits Pacenote, updates it and opens it again. Pace finishes or resumes what it was answering.`
+                : update.checkedAt
+                  ? `Up to date. Checked ${formatRelative(update.checkedAt)}.`
+                  : 'Not checked yet.'
+          }
+        >
+          {update?.available && latest ? (
+            <div className="flex items-center gap-1">
+              <code className="rounded-md bg-muted px-2 py-1 font-mono text-xs select-text">
+                {BREW_UPGRADE}
+              </code>
+              <CopyButton text={BREW_UPGRADE} />
+              {latest.url && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => window.open(latest.url, '_blank')}
+                >
+                  Release notes
+                </Button>
+              )}
+            </div>
+          ) : null}
+        </Row>
+      </div>
+    </section>
   )
 }
 

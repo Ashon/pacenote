@@ -1,4 +1,8 @@
-import type { LoginItemState, SupervisorState } from '@runtime/types'
+import type {
+  LoginItemState,
+  SupervisorState,
+  UpdateState,
+} from '@runtime/types'
 import type {
   SandboxJob,
   SandboxJobKind,
@@ -22,6 +26,18 @@ export function useSupervisor(): SupervisorState | undefined {
 }
 
 export const botControl = () => window.pacenoteDesktop?.bot
+
+/** What the app knows about a newer Pacenote. undefined outside the app */
+export function useUpdate(): UpdateState | undefined {
+  const bridge = window.pacenoteDesktop?.updates
+  const [state, setState] = useState<UpdateState>()
+  useEffect(() => {
+    if (!bridge) return
+    void bridge.state().then((value) => value && setState(value))
+    return bridge.onChange(setState)
+  }, [bridge])
+  return state
+}
 
 /**
  * Whether the app opens when you log in. Read again when the window comes back,

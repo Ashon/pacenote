@@ -26,7 +26,8 @@ brew install --cask pacenote
   upgrades and uninstall. The folder is kept to your account (700, and `.env` 600), and the app's own log is
   `logs/desktop.log`, beside Pace's `logs/bot.log`.
 - `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 15 seconds to finish its requests, and the rest
-  resume on the next start) and reopens it. `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
+  resume on the next start) and reopens it. The app tells you when a new release is out ("Update" in its status bar).
+  `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
 
 ## From source
 

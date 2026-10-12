@@ -40,6 +40,7 @@ import {
   type Trouble,
 } from './troubles.js'
 import { SandboxService } from './sandbox.js'
+import { UpdateCheck } from './updates.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
@@ -402,6 +403,25 @@ function truncateLabel(text: string, max = 72): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
+/**
+ * Looks for a newer release: the installed app only, or a dev run pointed at a
+ * test server with PACENOTE_DESKTOP_UPDATE_URL.
+ * PACENOTE_DESKTOP_UPDATE_CHECK=off turns it off.
+ */
+const updateUrl = process.env.PACENOTE_DESKTOP_UPDATE_URL
+const updates =
+  process.env.PACENOTE_DESKTOP_UPDATE_CHECK !== 'off' &&
+  !captureFile &&
+  (app.isPackaged || updateUrl)
+    ? new UpdateCheck({
+        current: app.getVersion(),
+        url: updateUrl,
+        // Chromium's network stack, which follows the system proxy
+        fetch: net.fetch as typeof fetch,
+        log: (message) => log.info(message),
+      })
+    : undefined
+
 /** Holds off system sleep while Pace has requests in progress */
 const keepAwake = new KeepAwake(powerSaveBlocker)
 
@@ -422,12 +442,16 @@ function updateTray(): void {
     .map((trouble) =>
       trouble.key === 'socket' ? trouble.title : truncateLabel(trouble.body)
     )
+  const update = updates?.current.available
+    ? updates.current.latest?.version
+    : undefined
   const key = JSON.stringify([
     summary.label,
     summary.active,
     phase,
     troubles.length,
     notes,
+    update,
   ])
   if (key === lastTrayKey) return
   lastTrayKey = key
@@ -488,6 +512,14 @@ function updateTray(): void {
         : []),
       ...controls,
       { type: 'separator' },
+      ...(update
+        ? [
+            {
+              label: `Pacenote ${update} is out...`,
+              click: () => showMainWindow('#/settings/general'),
+            },
+          ]
+        : []),
       { label: `Quit ${appName}`, click: () => app.quit() },
     ])
   )
@@ -748,6 +780,13 @@ function registerBotIpc(): void {
     mainWindow?.webContents.send('pacenote:bot:changed', state)
     updateTray()
   })
+  ipcMain.handle('pacenote:app:update', (event) =>
+    fromMainWindow(event) ? (updates?.current ?? null) : null
+  )
+  updates?.on('change', (state) => {
+    mainWindow?.webContents.send('pacenote:app:update-changed', state)
+    updateTray()
+  })
 }
 
 async function createWindow(route = ''): Promise<void> {
@@ -879,6 +918,8 @@ if (!app.requestSingleInstanceLock()) {
       // Opened at login, it stays in the menu bar until you open it.
       const atLogin =
         app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin
+      // A test server answers at once; GitHub can wait for the app to settle.
+      updates?.start(updateUrl ? 1_000 : 30_000)
       if (atLogin) log.info('Opened at login; the window waits')
       else await createWindow()
       app.on('activate', () => showMainWindow())

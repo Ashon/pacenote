@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
-import type { LoginItemState, SupervisorState } from '@runtime/types'
+import type {
+  LoginItemState,
+  SupervisorState,
+  UpdateState,
+} from '@runtime/types'
 import type {
   HubTeam,
   HubUser,
@@ -48,6 +52,11 @@ declare global {
       dev?: boolean
       /** Writes a screen's render error to the app's log */
       reportError(report: { message: string; stack?: string }): Promise<void>
+      /** A newer Pacenote, when there is one */
+      updates: {
+        state(): Promise<UpdateState | null>
+        onChange(callback: (state: UpdateState) => void): () => void
+      }
       /** Opening the app when you log in */
       loginItem: {
         get(): Promise<LoginItemState | null>

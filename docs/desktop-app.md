@@ -76,6 +76,9 @@ Bot management:
   four times as fast while it answers. With reduced motion it stays still. Stopped, a gray stop sign (a circle and a bar) takes its place. The status bar's dot pings only while Pace starts or stops.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
   App settings (opening at login, automatic start, run history folder) are in Settings.
+- The installed app looks for a new release on GitHub twice a day (`PACENOTE_DESKTOP_UPDATE_CHECK=off` turns it off). When one
+  is out, the status bar shows "Update" and the menu bar menu "Pacenote x.y.z is out...", both leading to Settings > General,
+  which shows `brew upgrade --cask pacenote` to copy and the release notes. The app never replaces itself; Homebrew does.
 - When Pace needs attention, the app tells you once with a macOS notification, unless its window is in front: Pace stopped
   (until it runs again), it needs setup, it lost Slack for 2 minutes or more, or a problem the Pace screen lists (a sign-in
   the reasoner rejected, a usage limit, the sandbox's proxy). Clicking it opens the screen to look at. While any of it lasts,
@@ -109,7 +112,7 @@ Settings:
 
   | Section | What it holds |
   | --- | --- |
-  | General | Theme, opening the app at login, starting the bot with the app, the settings file and run history folder |
+  | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
   | Sandbox | Run environment (on this Mac or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |

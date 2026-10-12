@@ -10,6 +10,17 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   // The error screen tells the app's log what broke.
   reportError: (report: { message: string; stack?: string }) =>
     ipcRenderer.invoke('pacenote:app:report-error', report),
+  // A newer Pacenote, when there is one (Homebrew installs it)
+  updates: {
+    state: () => ipcRenderer.invoke('pacenote:app:update'),
+    onChange: (callback: (state: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, state: unknown) =>
+        callback(state)
+      ipcRenderer.on('pacenote:app:update-changed', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:app:update-changed', listener)
+    },
+  },
   // Opening the app when you log in (macOS Login Items)
   loginItem: {
     get: () => ipcRenderer.invoke('pacenote:app:login-item'),

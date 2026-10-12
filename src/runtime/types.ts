@@ -110,3 +110,14 @@ export interface LoginItemState {
   /** macOS 13 and later hold a new login item until you allow it */
   needsApproval: boolean
 }
+
+/** What the desktop app knows about a newer Pacenote (updates.ts) */
+export interface UpdateState {
+  /** This app's version */
+  current: string
+  /** The latest release, once a check went through */
+  latest?: { version: string; url: string }
+  /** Whether the latest release is newer than this app */
+  available: boolean
+  checkedAt?: string
+}
