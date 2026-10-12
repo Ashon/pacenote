@@ -52,6 +52,8 @@ declare global {
       dev?: boolean
       /** Writes a screen's render error to the app's log */
       reportError(report: { message: string; stack?: string }): Promise<void>
+      /** Diagnostics text for a bug report, secrets taken out */
+      diagnostics(): Promise<string | null>
       /** A newer Pacenote, when there is one */
       updates: {
         state(): Promise<UpdateState | null>

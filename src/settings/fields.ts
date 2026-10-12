@@ -786,6 +786,11 @@ export const SECRET_SETTINGS = SETTING_FIELDS.filter(
   (field) => field.type === 'secret'
 ).map((field) => field.key)
 
+/** Whether a setting holds a secret: Pacenote's own, or a CLI's login */
+export function isSecretKey(key: string): boolean {
+  return SECRET_SETTINGS.includes(key) || CLI_SECRETS.includes(key)
+}
+
 /**
  * The secret values in an environment: Pacenote's secret settings and the CLIs'
  * login variables. Answers are redacted of them before they are posted.

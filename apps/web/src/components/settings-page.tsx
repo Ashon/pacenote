@@ -22,9 +22,11 @@ import type { BrokerHealth } from '@src/sandbox/types'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import {
   Box,
+  Check,
   ChevronRight,
   CircleCheck,
   CircleX,
+  Copy,
   FolderOpen,
   History,
   KeyRound,
@@ -751,6 +753,7 @@ export function SettingsPage() {
           </div>
         </section>
         <UpdatesCard update={update} />
+        <HelpCard />
         <section className="surface-group">
           <CardHeader
             title="Files"
@@ -1960,6 +1963,43 @@ function ThemePicker() {
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * Help: diagnostics to paste into a bug report. The secrets are taken out in
+ * the app; the logs can still name channels and people, so it says to read it
+ * first.
+ */
+function HelpCard() {
+  const diagnostics = window.pacenoteDesktop?.diagnostics
+  const [copied, setCopied] = useState<'yes' | 'failed'>()
+  if (!diagnostics) return null
+  const copy = () =>
+    void diagnostics()
+      .then((text) => navigator.clipboard.writeText(text ?? ''))
+      .then(
+        () => setCopied('yes'),
+        () => setCopied('failed')
+      )
+  return (
+    <section className="surface-group">
+      <CardHeader title="Help" />
+      <div className="divide-y divide-border">
+        <Row
+          label="Diagnostics"
+          help="Versions, Pace's status, the settings without their secrets, and the latest logs, to paste into a bug report. The logs can name channels and people, so read it before you share it."
+          warning={
+            copied === 'failed' ? 'Could not copy the diagnostics.' : undefined
+          }
+        >
+          <Button size="xs" variant="outline" onClick={copy}>
+            {copied === 'yes' ? <Check /> : <Copy />}
+            {copied === 'yes' ? 'Copied' : 'Copy diagnostics'}
+          </Button>
+        </Row>
+      </div>
+    </section>
   )
 }
 

@@ -181,7 +181,11 @@ Status and logs:
 - Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`) The app's own
   log is `logs/desktop.log` beside it: the bot's exits and restarts, builds, and errors in the window. A screen that
   breaks shows "This screen stopped working" with Reload and Back to Overview, instead of a blank window, and writes the
-  error there. "Open logs folder" on the Pace screen opens both.
+  error there. "Open logs folder" on the Pace screen opens both. A window whose process ends loads again (unless it keeps
+  ending), and errors nothing caught in the app go to `desktop.log` too.
+- "Copy diagnostics" (Settings > General > Help) copies what a bug report needs: versions, Pace's state and status, the
+  settings file with its secrets only said to be set, and the last 200 lines of both logs, with secret values and token
+  formats taken out. The logs can still name channels and people, so read it before you share it.
   Bolt and Socket Mode client logs go through the same logger, with the scopes `pacenote:socket` and `pacenote:bolt`.
   Connects, reconnects, disconnects and received events (envelope, retry count) are logged.
 - The log file masks token and key formats and the ticket in the Socket Mode connection URL.

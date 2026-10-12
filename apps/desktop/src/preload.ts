@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   // The error screen tells the app's log what broke.
   reportError: (report: { message: string; stack?: string }) =>
     ipcRenderer.invoke('pacenote:app:report-error', report),
+  // Versions, Pace's state, settings without secrets and the latest logs, for
+  // a bug report
+  diagnostics: () => ipcRenderer.invoke('pacenote:app:diagnostics'),
   // A newer Pacenote, when there is one (Homebrew installs it)
   updates: {
     state: () => ipcRenderer.invoke('pacenote:app:update'),

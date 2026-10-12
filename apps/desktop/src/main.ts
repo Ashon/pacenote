@@ -23,9 +23,17 @@ import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
 import { handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
-import { DESKTOP_LOG_FILE, readBotStatus } from '../../../src/runtime/status.js'
+import {
+  DESKTOP_LOG_FILE,
+  LOG_FILE,
+  readBotStatus,
+} from '../../../src/runtime/status.js'
 import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
-import { setupSettingsRoute } from '../../../src/settings/fields.js'
+import { readEnvFile, readEnvValues } from '../../../src/settings/env-file.js'
+import {
+  secretValues,
+  setupSettingsRoute,
+} from '../../../src/settings/fields.js'
 import {
   defaultHome,
   securePrivateDir,
@@ -41,6 +49,7 @@ import {
 } from './troubles.js'
 import { SandboxService } from './sandbox.js'
 import { UpdateCheck } from './updates.js'
+import { diagnosticsText, tailFile } from './diagnostics.js'
 import { resolveAppPaths } from './app-paths.js'
 import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
@@ -96,6 +105,16 @@ const log = createLogger('info', 'desktop', [
   fileSink(path.join(dataDir, DESKTOP_LOG_FILE)),
 ])
 log.info(`Starting ${app.getVersion()} (pid ${process.pid})`)
+// An error nothing caught goes to the log instead of a dialog; the bot runs in
+// its own process either way.
+process.on('uncaughtException', (err) =>
+  log.error(`Uncaught error in the app: ${err.stack ?? err.message}`)
+)
+process.on('unhandledRejection', (reason) =>
+  log.error(
+    `Unhandled rejection in the app: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`
+  )
+)
 const reader = new HistoryReader(dataDir)
 /**
  * The app writes the task collections it runs into the run history (the bot
@@ -534,6 +553,37 @@ function createTray(): void {
   setInterval(updateTray, 2_000).unref()
 }
 
+/** Diagnostics for a bug report (diagnostics.ts) */
+function diagnostics(): string {
+  return diagnosticsText({
+    app: {
+      version: app.getVersion(),
+      packaged: app.isPackaged,
+      electron: process.versions.electron,
+      node: process.versions.node,
+      os:
+        process.platform === 'darwin'
+          ? `macOS ${process.getSystemVersion()}`
+          : `${process.platform} ${process.getSystemVersion()}`,
+      arch: process.arch,
+    },
+    supervisor: supervisor?.current,
+    bot: readBotStatus(dataDir),
+    settings: readEnvValues(readEnvFile(envFile)),
+    secrets: secretValues(settings.effectiveEnv()),
+    logs: [
+      {
+        name: "Pace's log",
+        lines: tailFile(path.join(dataDir, LOG_FILE), 200),
+      },
+      {
+        name: "The app's log",
+        lines: tailFile(path.join(dataDir, DESKTOP_LOG_FILE), 200),
+      },
+    ],
+  })
+}
+
 /**
  * Whether the app opens when you log in. macOS keeps the setting (Login Items),
  * and only the installed app can be one: a dev run would add Electron itself.
@@ -598,6 +648,9 @@ function registerBotIpc(): void {
         'x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
       )
   })
+  ipcMain.handle('pacenote:app:diagnostics', (event) =>
+    fromMainWindow(event) ? diagnostics() : null
+  )
   ipcMain.handle('pacenote:bot:open-logs', (event) => {
     if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
   })
@@ -831,11 +884,25 @@ async function createWindow(route = ''): Promise<void> {
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
   })
-  window.webContents.on('render-process-gone', (_event, details) =>
+  // A window whose process ended is blank: it loads again, unless that keeps
+  // happening.
+  const gone: number[] = []
+  window.webContents.on('render-process-gone', (_event, details) => {
     log.error(
       `The window's process ended (${details.reason}, exit code ${details.exitCode})`
     )
-  )
+    if (details.reason === 'clean-exit' || isQuitting) return
+    const now = Date.now()
+    gone.push(now)
+    while (gone.length && now - gone[0]! > 60_000) gone.shift()
+    if (gone.length > 3) {
+      log.error('Not reloading the window: its process keeps ending.')
+      return
+    }
+    window.webContents.reload()
+  })
+  window.on('unresponsive', () => log.warn('The window stopped responding.'))
+  window.on('responsive', () => log.info('The window responds again.'))
   // External addresses such as Slack links open in the default browser.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
