@@ -20,6 +20,8 @@ export interface RunResult {
 }
 
 const MAX_OUTPUT_BYTES = 20 * 1024 * 1024
+/** How long a process gets to exit on SIGTERM before SIGKILL */
+const KILL_GRACE_MS = 5_000
 
 /**
  * Non-zero exit code. Carries the output so callers can interpret the cause for
@@ -37,8 +39,9 @@ export class ProcessExitError extends Error {
 }
 
 /**
- * Runs a CLI and passes input through stdin. Kills the process on timeout or
- * abort.
+ * Runs a CLI and passes input through stdin. On timeout or abort, stops the
+ * process and whatever it started (its process group), and settles once it has
+ * exited.
  */
 export function runProcess(
   command: string,
@@ -46,16 +49,26 @@ export function runProcess(
   options: RunOptions
 ): Promise<RunResult> {
   return new Promise((resolve, reject) => {
+    const aborted = () => new Error(`${command} run was aborted.`)
+    if (options.signal?.aborted) {
+      reject(aborted())
+      return
+    }
+    // Its own process group, so stopping it also stops the tools and servers
+    // it started.
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     })
 
     let stdout = ''
     let stderr = ''
     let pending = ''
     let settled = false
+    /** Why it is being stopped, once it is */
+    let stopping: Error | undefined
     const finish = (err?: Error) => {
       if (settled) return
       settled = true
@@ -64,10 +77,24 @@ export function runProcess(
       if (err) reject(err)
       else resolve({ stdout, stderr })
     }
+    const signal = (name: NodeJS.Signals) => {
+      try {
+        if (child.pid && process.platform !== 'win32')
+          process.kill(-child.pid, name)
+        else child.kill(name)
+      } catch {
+        // Already gone
+      }
+    }
     const kill = (reason: string) => {
-      child.kill('SIGTERM')
-      setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
-      finish(new Error(reason))
+      if (stopping) return
+      stopping = new Error(reason)
+      signal('SIGTERM')
+      // Settles even if the process never exits.
+      setTimeout(() => {
+        signal('SIGKILL')
+        setTimeout(() => finish(stopping), 1_000).unref()
+      }, KILL_GRACE_MS).unref()
     }
 
     const timer = setTimeout(
@@ -75,7 +102,7 @@ export function runProcess(
         kill(`${command} timed out (${Math.round(options.timeoutMs / 1000)}s)`),
       options.timeoutMs
     )
-    const onAbort = () => kill(`${command} run was aborted.`)
+    const onAbort = () => kill(aborted().message)
     options.signal?.addEventListener('abort', onAbort, { once: true })
 
     child.stdout.on('data', (chunk: Buffer) => {
@@ -99,7 +126,16 @@ export function runProcess(
           : err.message
       finish(new Error(hint))
     })
+    // Something it started may still hold its output open, so a stopped process
+    // settles when it exits, not when its output closes.
+    child.on('exit', () => {
+      if (stopping) finish(stopping)
+    })
     child.on('close', (code) => {
+      if (stopping) {
+        finish(stopping)
+        return
+      }
       if (options.onStdoutLine && pending.trim()) options.onStdoutLine(pending)
       if (code === 0) {
         finish()

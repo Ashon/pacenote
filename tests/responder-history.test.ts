@@ -403,9 +403,11 @@ describe('answering through any messenger', () => {
     })
     // One runs and ten wait; the twelfth is one too many.
     for (let i = 0; i < 12; i++) await responder.handle(ask(`ask ${i}`))
-    // The one running is told it is working; the twelfth, that Pace is busy.
+    // The one running is told it is working, the ten waiting that they are
+    // next, and the twelfth that Pace is busy.
     expect(messenger.notices).toEqual([
       expect.stringMatching(/^Working on it/),
+      ...Array<unknown>(10).fill(expect.stringMatching(/^Got it\. I'll start/)),
       expect.stringMatching(/^I have too many/),
     ])
     expect(messenger.posts).toEqual([])
@@ -428,10 +430,11 @@ describe('marking a mention instead of posting a placeholder', () => {
   const responder = (
     messenger: MemoryMessenger,
     options: {
-      answer?: () => Promise<string>
+      answer?: (request: ReasonRequest) => Promise<string>
       slowAfterMs?: number
       inflight?: InflightStore
       onReasoner?: (problem: string | undefined) => void
+      concurrency?: number
     } = {}
   ) =>
     new MentionResponder({
@@ -439,6 +442,7 @@ describe('marking a mention instead of posting a placeholder', () => {
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
         MENTION_ANYONE: 'on',
+        MENTION_CONCURRENCY: String(options.concurrency ?? 2),
       }),
       messengers: [messenger],
       reasoner: {
@@ -583,6 +587,133 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.updates).toEqual([])
     // The 👀 from before the restart is still there; marking again is a no-op.
     expect(messenger.marks).toEqual(['+working', '-working'])
+    expect(inflight.list()).toEqual([])
+  })
+
+  it('marks and records a mention as soon as it is taken on, also while it waits its turn', async () => {
+    const inflight = new InflightStore(path.join(root, 'waiting.json'))
+    const messenger = new MarkingMessenger()
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const bot = responder(messenger, {
+      inflight,
+      concurrency: 1,
+      answer: async () => {
+        await held
+        return 'done'
+      },
+    })
+    const first = ask()
+    const second = ask()
+    await bot.handle(first)
+    await bot.handle(second)
+    expect(messenger.marks).toEqual(['+working', '+working'])
+    // The first has started; the second waits, and a restart would pick it up.
+    await vi.waitFor(() =>
+      expect(inflight.list().map((e) => [e.key, e.attempts])).toEqual([
+        [mentionKey(first), 1],
+        [mentionKey(second), 0],
+      ])
+    )
+    release()
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.posts).toEqual(['done', 'done'])
+    expect(inflight.list()).toEqual([])
+  })
+
+  it('cuts off its runs to shut down, and keeps them and the waiting ones for the next start', async () => {
+    const inflight = new InflightStore(path.join(root, 'stopping.json'))
+    const messenger = new MarkingMessenger()
+    const bot = responder(messenger, {
+      inflight,
+      concurrency: 1,
+      answer: (request) =>
+        new Promise((_, reject) =>
+          request.signal?.addEventListener('abort', () =>
+            reject(new Error('claude run was aborted.'))
+          )
+        ),
+    })
+    const running = ask()
+    const waiting = ask()
+    await bot.handle(running)
+    await bot.handle(waiting)
+    await vi.waitFor(() =>
+      expect(
+        inflight.list().find((e) => e.key === mentionKey(running))
+      ).toMatchObject({ attempts: 1 })
+    )
+    expect(await bot.stop(50, 2_000)).toBe(true)
+    // Nothing failed: the 👀 stay, and the attempt cut off does not count.
+    expect(messenger.posts).toEqual([])
+    expect(messenger.notices).toEqual([])
+    expect(messenger.marks).toEqual(['+working', '+working'])
+    const attempts = () =>
+      Object.fromEntries(inflight.list().map((e) => [e.key, e.attempts]))
+    expect(attempts()).toEqual({
+      [mentionKey(running)]: 0,
+      [mentionKey(waiting)]: 0,
+    })
+    // A mention that comes in while stopping is kept as well.
+    const late = ask()
+    await bot.handle(late)
+    expect(Object.keys(attempts())).toHaveLength(3)
+
+    const next = new MarkingMessenger()
+    const restarted = responder(next, { inflight })
+    await restarted.resumePending()
+    expect(await restarted.drain(5_000)).toBe(true)
+    expect(next.posts).toHaveLength(6)
+    expect(inflight.list()).toEqual([])
+  })
+
+  it('does not answer again after a restart once posting the answer began', async () => {
+    const inflight = new InflightStore(path.join(root, 'posting.json'))
+    // Posting is recorded before the first part goes out.
+    const hanging = new MarkingMessenger()
+    hanging.post = () => new Promise<string>(() => {})
+    const mention = ask()
+    await responder(hanging, { inflight }).handle(mention)
+    await vi.waitFor(() =>
+      expect(inflight.list()).toEqual([
+        expect.objectContaining({ answer: 'posting' }),
+      ])
+    )
+
+    const answered = ask()
+    inflight.upsert({
+      key: mentionKey(answered),
+      mention: answered,
+      label: 'room-1',
+      attempts: 1,
+      startedAt: Date.now(),
+      answer: 'posted',
+    })
+    const messenger = new MarkingMessenger()
+    let asked = 0
+    const bot = responder(messenger, {
+      inflight,
+      answer: async () => {
+        asked += 1
+        return 'again'
+      },
+    })
+    await bot.resumePending()
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(asked).toBe(0)
+    expect(messenger.posts).toEqual([])
+    // The one cut off partway gets ⚠️ and a word to the asker alone; the one
+    // posted in full only loses its marks.
+    expect(messenger.notices).toEqual([
+      expect.stringMatching(/^I restarted while/),
+    ])
+    expect(messenger.marks).toEqual([
+      '-working',
+      '-slow',
+      '+failed',
+      '-working',
+      '-slow',
+    ])
     expect(inflight.list()).toEqual([])
   })
 

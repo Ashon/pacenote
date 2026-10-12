@@ -25,7 +25,7 @@ brew install --cask pacenote
 - Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive
   upgrades and uninstall. The folder is kept to your account (700, and `.env` 600), and the app's own log is
   `logs/desktop.log`, beside Pace's `logs/bot.log`.
-- `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 20 seconds to finish its requests, and the rest
+- `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 15 seconds to finish its requests, and the rest
   resume on the next start) and reopens it. `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
 
 ## From source
@@ -59,16 +59,22 @@ brew install --cask pacenote
 
 Two processes with the same app token make Slack split events between them, so run only one.
 At startup the bot takes a run lock through `PACENOTE_DATA_DIR/bot.json`. If another bot is alive, it waits 30 seconds for it to exit,
-and if it is still alive it exits with "Pace is already running".
+and if it is still alive it exits with "Pace is already running". A `bot.json` left behind by a crash or a power cut does not
+count, even once another process has its pid: a process that started after the bot did is not the bot.
 `pnpm dev` restarts the process whenever the source changes, so requests in progress can be cut off while you edit code.
 
 Restart handling:
 
-- Mentions in progress are recorded in `PACENOTE_DATA_DIR/inflight.json`. After a restart the bot resumes each one once; the 👀 stays on
-  the mention meanwhile (without `reactions:write`, the asker alone is told "I restarted, so I'm picking this up again...").
+- Mentions are recorded in `PACENOTE_DATA_DIR/inflight.json` and get 👀 as soon as they are taken on, also while they wait their
+  turn. After a restart the bot resumes each one once; the 👀 stays on the mention meanwhile (without `reactions:write`, the
+  asker alone is told "I restarted, so I'm picking this up again...").
   Requests already resumed once or older than 30 minutes get ⚠️, and the asker alone is told "I couldn't finish this: I
   restarted and the request was cut off. Please mention me again."
-- On a shutdown signal (SIGINT, SIGTERM) it stops taking new events and waits up to 20 seconds for requests in progress.
+- An answer is never posted twice: once posting has begun, a restart does not answer again. If it came partway through, the
+  mention gets ⚠️ and the asker alone is told "I restarted while posting my answer, so it may be cut short."
+- On a shutdown signal (SIGINT, SIGTERM) it stops taking new events and waits up to 15 seconds for requests in progress. Then it
+  stops their reasoner runs (on this Mac the CLI and whatever it started, in the sandbox the container), which resume on the
+  next start without counting as an attempt.
 - At startup it deletes attachment/output temp directories (`PACENOTE_DATA_DIR/attachments/*`) older than 1 hour.
 
 Requirements: Node.js 22.9 or later, pnpm 11, and Docker for the sandbox.

@@ -78,7 +78,8 @@ Bot management:
   App settings (automatic start, run history folder) are in Settings.
 - While requests are in progress, the app keeps the Mac from going to sleep (`powerSaveBlocker`, system sleep only), so an
   answer is not cut off halfway. The display still sleeps, and closing the lid still sleeps the Mac.
-- Stop and app quit send SIGTERM. The bot waits up to 20 seconds for requests in progress, and the rest resume on the next start.
+- Stop and app quit send SIGTERM. The bot gives requests in progress up to 15 seconds, then stops their reasoner runs (the CLI
+  and whatever it started, or the container). Those, and the mentions still waiting their turn, resume on the next start.
 - Before launching the bot, the app checks the settings with the bot's own rules. When the Slack tokens are missing (a first run) or a
   value is invalid, it does not launch the bot and shows "Setup needed" with a way to Settings (on the Pace screen, the Overview,
   the status bar, and the tray menu). That way opens the section to fix: Slack for missing or rejected tokens, otherwise the section

@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import {
   existsSync,
   mkdirSync,
@@ -28,6 +29,59 @@ export function isAlive(pid: number): boolean {
 }
 
 /**
+ * How long a process has been running, from ps's etime ("[[dd-]hh:]mm:ss"), in
+ * milliseconds
+ */
+export function parseElapsed(etime: string): number | undefined {
+  const match = /^(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)$/.exec(etime.trim())
+  if (!match) return undefined
+  const [, days = '0', hours = '0', minutes = '0', seconds = '0'] = match
+  return (((+days * 24 + +hours) * 60 + +minutes) * 60 + +seconds) * 1000
+}
+
+/** When the process started, or undefined when ps cannot tell */
+function processStartedAt(pid: number): number | undefined {
+  const ps = spawnSync('ps', ['-o', 'etime=', '-p', String(pid)], {
+    encoding: 'utf8',
+    timeout: 2_000,
+  })
+  const elapsed = ps.status === 0 ? parseElapsed(ps.stdout) : undefined
+  return elapsed === undefined ? undefined : Date.now() - elapsed
+}
+
+/**
+ * ps counts whole seconds, and a bot writes startedAt a moment after its
+ * process starts.
+ */
+const START_SLACK_MS = 2_000
+/** How long a pid confirmed as the bot's goes unchecked */
+const CONFIRMED_FOR_MS = 60_000
+const confirmed = new Map<string, number>()
+
+/**
+ * Whether the bot that wrote this status still runs. Its pid alone is not
+ * enough: after a crash or a power cut, bot.json stays behind and another
+ * process can get the same pid. A process that started after the bot wrote
+ * startedAt is not the bot.
+ */
+export function isBotRunning(
+  status: Pick<BotStatus, 'pid' | 'startedAt'>
+): boolean {
+  if (!isAlive(status.pid)) return false
+  const startedAt = Date.parse(status.startedAt)
+  if (Number.isNaN(startedAt)) return true
+  const key = `${status.pid}@${status.startedAt}`
+  if (Date.now() - (confirmed.get(key) ?? -Infinity) < CONFIRMED_FOR_MS)
+    return true
+  const since = processStartedAt(status.pid)
+  // Without ps there is only the pid to go by.
+  if (since !== undefined && since > startedAt + START_SLACK_MS) return false
+  if (confirmed.size > 50) confirmed.clear()
+  confirmed.set(key, Date.now())
+  return true
+}
+
+/**
  * The first bot alive among these data folders (see botLockDirs), else the
  * status of the first folder
  */
@@ -41,7 +95,7 @@ export function readBotStatus(dataDir: string): BotStatusView {
   if (!existsSync(file)) return { alive: false }
   try {
     const status = JSON.parse(readFileSync(file, 'utf8')) as BotStatus
-    return { status, alive: isAlive(status.pid) }
+    return { status, alive: isBotRunning(status) }
   } catch {
     return { alive: false }
   }

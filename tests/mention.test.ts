@@ -142,4 +142,27 @@ describe('ConcurrencyLimiter', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(maxRunning).toBe(1)
   })
+
+  it('tells whether a task would wait or be turned away, and drops the queue', async () => {
+    const limiter = new ConcurrencyLimiter(1, 1)
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let started = 0
+    const task = async () => {
+      started += 1
+      await held
+    }
+    expect([limiter.saturated, limiter.full]).toEqual([false, false])
+    limiter.tryRun(task)
+    expect([limiter.saturated, limiter.full]).toEqual([true, false])
+    limiter.tryRun(task)
+    expect([limiter.saturated, limiter.full]).toEqual([true, true])
+
+    limiter.clear()
+    release()
+    await new Promise((r) => setTimeout(r, 0))
+    // The queued task never starts.
+    expect(started).toBe(1)
+    expect(limiter.busy).toBe(false)
+  })
 })

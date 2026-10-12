@@ -26,9 +26,18 @@ export interface InflightEntry {
   placeholder?: string
   /** Run id. When resuming, writing continues in the same run. */
   runId?: string
-  /** Number of times processing has started so far */
+  /**
+   * Number of times processing has started so far: 0 while it waits its turn,
+   * and not counting a run cut off to shut down
+   */
   attempts: number
+  /** When it was taken on, across restarts */
   startedAt: number
+  /**
+   * How far posting the answer got. A request whose answer was posted, in part
+   * or in full, is not answered again after a restart.
+   */
+  answer?: 'posting' | 'posted'
 }
 
 /**

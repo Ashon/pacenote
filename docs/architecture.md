@@ -28,7 +28,7 @@ More: [How it works](how-it-works.md), [Reasoner sandbox](sandbox.md), [Ops tool
 A mention is checked (allowed users, public channels), marked with 👀 at once (and ⏳ after 90 seconds), and reasoned
 with the thread and its attachments as context, while the app keeps the Mac awake. Each step goes into the run history as
 it happens, diagram blocks are rendered, and the answer comes as a new reply. A restart resumes an unfinished answer
-once, with the 👀 still on the mention.
+once, with the 👀 still on the mention, and never posts an answer twice.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/mention-flow-dark.svg">

@@ -69,7 +69,31 @@ async function main(): Promise<void> {
   status.update({ configHash: configFingerprint(process.env) })
   log.info(`Starting (pid ${process.pid}, ${status.current.managedBy})`)
 
+  // Set up as soon as the status file is ours, so a stop while starting also
+  // ends through process.exit, which takes the status file away.
+  const started: {
+    connection?: Awaited<ReturnType<typeof connectSlack>>
+    responder?: MentionResponder
+  } = {}
   let stopping = false
+  const shutdown = async (signal: string) => {
+    if (stopping) return
+    stopping = true
+    status.update({ state: 'stopping' })
+    log.info(
+      `Received ${signal}, waiting for in-progress requests before shutting down.`
+    )
+    await started.connection?.stop().catch(() => undefined)
+    // Unfinished requests stay in PACENOTE_DATA_DIR/inflight.json and resume on
+    // the next start.
+    if (started.responder && !(await started.responder.stop(15_000)))
+      log.warn('Shutting down with requests still in progress.')
+    log.info(`Stopped (pid ${process.pid})`)
+    process.exit(0)
+  }
+  process.on('SIGINT', () => void shutdown('SIGINT'))
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+
   const connection = await connectSlack({
     config,
     log,
@@ -80,6 +104,7 @@ async function main(): Promise<void> {
     },
     onLimits: () => status.update({ limits: connection.limits() }),
   })
+  started.connection = connection
   const { messenger, bot } = connection
   /**
    * Problems fixed for this process's life (diagram rendering); the sandbox's
@@ -177,6 +202,7 @@ async function main(): Promise<void> {
       status.update({ problems: allProblems() })
     },
   })
+  started.responder = responder
 
   status.update({
     bot,
@@ -217,24 +243,6 @@ async function main(): Promise<void> {
       `MCP=[${reasoner.mcpServerNames.join(', ')}], diagrams=${renderer ? 'on' : 'off'}, ` +
       `data=${config.dataDir}${history ? '' : ' (history off)'}`
   )
-
-  const shutdown = async (signal: string) => {
-    if (stopping) return
-    stopping = true
-    status.update({ state: 'stopping' })
-    log.info(
-      `Received ${signal}, waiting for in-progress requests before shutting down.`
-    )
-    await connection.stop().catch(() => undefined)
-    // Unfinished requests stay in PACENOTE_DATA_DIR/inflight.json and resume on
-    // the next start.
-    if (!(await responder.drain(20_000)))
-      log.warn('Shutting down with requests still in progress.')
-    log.info(`Stopped (pid ${process.pid})`)
-    process.exit(0)
-  }
-  process.on('SIGINT', () => void shutdown('SIGINT'))
-  process.on('SIGTERM', () => void shutdown('SIGTERM'))
 }
 
 const fail = (err: unknown) => {

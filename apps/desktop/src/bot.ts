@@ -31,8 +31,8 @@ export type { SupervisorState }
  *   "setup" instead of launching a bot that would only exit on them.
  * - A bot that was running fine and dies is restarted a few times. One that
  *   dies right after starting for another reason is left stopped as "failed".
- * - Stopping sends SIGTERM. The bot waits up to 20 seconds for active requests
- *   and resumes the rest on the next start.
+ * - Stopping sends SIGTERM. The bot gives active requests up to 15 seconds,
+ *   stops the reasoner runs left, and resumes them on the next start.
  */
 interface Settings {
   autoStartBot: boolean

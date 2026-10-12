@@ -17,6 +17,7 @@ import {
   BotAlreadyRunningError,
   BotStatusFile,
   LOG_FILE,
+  parseElapsed,
   readBotStatus,
   STATUS_FILE,
 } from '../src/runtime/status.js'
@@ -135,6 +136,32 @@ describe('bot status file', () => {
     await expect(
       BotStatusFile.acquire(d, 'desktop', 600)
     ).rejects.toBeInstanceOf(BotAlreadyRunningError)
+  })
+
+  it('does not take a status file left behind for the bot, though its pid lives on', async () => {
+    const d = dir('left-behind')
+    const write = (startedAt: string) =>
+      writeFileSync(
+        path.join(d, STATUS_FILE),
+        JSON.stringify({ pid: process.ppid, managedBy: 'terminal', startedAt })
+      )
+    // The parent process (vitest) started after this bot did, so it is not
+    // the bot: its pid was reused after a crash or a power cut.
+    write('2020-01-01T00:00:00.000Z')
+    expect(readBotStatus(d).alive).toBe(false)
+    const status = await BotStatusFile.acquire(d, 'desktop', 0)
+    expect(readBotStatus(d).status?.pid).toBe(process.pid)
+    status.release()
+    // Started before the status was written, it is.
+    write(new Date().toISOString())
+    expect(readBotStatus(d).alive).toBe(true)
+  })
+
+  it("reads ps's elapsed time", () => {
+    expect(parseElapsed('05:07')).toBe(307_000)
+    expect(parseElapsed(' 1:02:03\n')).toBe(3_723_000)
+    expect(parseElapsed('2-01:00:00')).toBe(176_400_000)
+    expect(parseElapsed('')).toBeUndefined()
   })
 })
 

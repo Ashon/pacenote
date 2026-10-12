@@ -30,7 +30,11 @@ import {
 } from './attachments.js'
 import { failureAdvice, failureCause, failureReply } from './failure.js'
 import { collectGeneratedImages } from './generated.js'
-import { resumeDecision, type InflightStore } from './inflight.js'
+import {
+  resumeDecision,
+  type InflightEntry,
+  type InflightStore,
+} from './inflight.js'
 import { ConcurrencyLimiter } from './limiter.js'
 import { systemPrompt, userPrompt } from './prompt.js'
 import { recordAttachments, recordOutputs } from './run-record.js'
@@ -105,12 +109,8 @@ export function isAllowedUser(
     : allowedUserIds.includes(mention.userId)
 }
 
-interface Resume {
-  placeholder?: string
-  attempts: number
-  startedAt: number
-  runId?: string
-}
+/** How a request was taken on, which says what the asker is told */
+type Taking = 'now' | 'queued' | 'resumed'
 
 interface Figure {
   figure: number
@@ -127,10 +127,17 @@ interface Figure {
  * shows as reactions on the mention (👀 working, ⏳ slow, ⚠️ failed), and what
  * only the asker needs (why it failed, that it is busy) goes to them alone. A
  * messenger that cannot react tells the asker it is working the same way.
+ *
+ * A mention is recorded (InflightStore) and marked as soon as it is taken on,
+ * also while it waits its turn, so a restart picks it up again.
  */
 export class MentionResponder {
   private readonly limiter: ConcurrencyLimiter
   private readonly seen = new Set<string>()
+  /** Cuts off the reasoner runs in progress, to shut down */
+  private readonly running = new Set<AbortController>()
+  /** Set once shutting down: nothing more starts */
+  private stopping = false
   private readonly messengers: Map<MessengerId, Messenger>
   private readonly requests: {
     active: number
@@ -194,56 +201,105 @@ export class MentionResponder {
       return
     }
 
-    const accepted = this.limiter.tryRun(() =>
-      this.respond(messenger, mention, venue.label)
-    )
     // Only the asker needs to know, so the conversation stays as it was.
-    if (!accepted) {
+    if (this.limiter.full) {
       await messenger.notice(
         mention,
         say(
           'I have too many requests right now. Please mention me again in a moment.'
         )
       )
+      return
     }
+    const entry: InflightEntry = {
+      key,
+      mention,
+      label: venue.label,
+      attempts: 0,
+      startedAt: Date.now(),
+    }
+    this.record(entry)
+    // While shutting down, it is kept for the next start.
+    const taken = this.take(
+      messenger,
+      entry,
+      this.stopping || this.limiter.saturated ? 'queued' : 'now'
+    )
+    if (!this.stopping)
+      this.limiter.tryRun(async () =>
+        this.respond(messenger, entry, await taken)
+      )
+    await taken
   }
 
-  private async respond(
+  /**
+   * Shows the asker the request is taken on: the working mark, or where the
+   * messenger cannot react, a notice. Returns whether it is marked.
+   */
+  private async take(
     messenger: Messenger,
-    mention: Mention,
-    label: string,
-    resume?: Resume
-  ) {
-    const { config, reasoner, log, inflight } = this.deps
-    const where = `${reasoner.backend}@${reasoner.sandbox}`
-    const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
+    entry: InflightEntry,
+    taking: Taking
+  ): Promise<boolean> {
+    const { reasoner } = this.deps
+    const { mention } = entry
     // A placeholder message an older version posted, cut off by the upgrade:
     // it goes, since the answer comes as a new reply.
-    if (resume?.placeholder)
+    if (entry.placeholder)
       await this.dropPlaceholder(
         messenger,
         mention,
-        resume.placeholder,
+        entry.placeholder,
         'I restarted; the answer comes below.'
       )
     const marked = Boolean(
       await messenger.mark?.(mention, 'working').catch(() => false)
     )
-    if (!marked)
+    if (!marked) {
+      const where = `\`${reasoner.backend}@${reasoner.sandbox}\``
+      const text = {
+        now: `Working on it... (${where})`,
+        queued: `Got it. I'll start on this after the requests ahead of it. (${where})`,
+        resumed: `I restarted, so I'm picking this up again... (${where})`,
+      }[taking]
       await messenger
-        .notice(
-          mention,
-          say(
-            resume
-              ? `I restarted, so I'm picking this up again... (\`${where}\`)`
-              : `Working on it... (\`${where}\`)`
-          )
-        )
+        .notice(mention, messenger.render(text)[0] ?? '')
         .catch(() => undefined)
+    }
+    return marked
+  }
+
+  /** Records a request so a restart picks it up again. */
+  private record(entry: InflightEntry): void {
+    try {
+      this.deps.inflight?.upsert(entry)
+    } catch (err) {
+      this.deps.log.warn(
+        `Could not record ${entry.key} for a restart: ${(err as Error).message}`
+      )
+    }
+  }
+
+  private async respond(
+    messenger: Messenger,
+    taken: InflightEntry,
+    marked: boolean
+  ) {
+    // Taken on while shutting down: it stays recorded for the next start.
+    if (this.stopping) return
+    const { config, reasoner, log } = this.deps
+    const { key, mention, label, startedAt } = taken
+    const where = `${reasoner.backend}@${reasoner.sandbox}`
+    const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
+    /** The request as recorded for a restart, kept up to date */
+    let entry = taken
+    const note = (patch: Partial<InflightEntry>) => {
+      entry = { ...entry, ...patch }
+      this.record(entry)
+    }
     // Marks to take off when done. The slow mark comes once the answer takes
-    // long, counted from the first start across a restart.
+    // long, counted from when it was taken on, across a restart.
     const marks: Mark[] = marked ? ['working'] : []
-    const startedAt = resume?.startedAt ?? Date.now()
     let slowing: Promise<void> | undefined
     const slow = marked
       ? setTimeout(
@@ -261,25 +317,25 @@ export class MentionResponder {
           )
         )
       : undefined
-    const key = mentionKey(mention)
     this.requests.active += 1
     this.requests.lastAt = new Date().toISOString()
     this.deps.onActivity?.({ ...this.requests })
     const attachmentsDir = path.join(this.attachmentsRoot, randomUUID())
+    const cutOff = new AbortController()
+    this.running.add(cutOff)
     let run: RunHandle | undefined
     // Only the reasoner's own errors say something about the reasoner.
     let reasoning = false
+    /** Whether it was cut off to shut down, and stays for the next start */
+    let kept = false
 
     try {
       const request = await messenger.request(mention)
-      run = this.openRun(messenger, mention, label, request, resume?.runId)
-      inflight?.upsert({
-        key,
-        mention,
-        label,
+      run = this.openRun(messenger, mention, label, request, taken.runId)
+      note({
         runId: run?.id,
-        attempts: (resume?.attempts ?? 0) + 1,
-        startedAt,
+        attempts: taken.attempts + 1,
+        placeholder: undefined,
       })
       const context = (
         await messenger.context(mention, [mention.message])
@@ -358,6 +414,7 @@ export class MentionResponder {
           mimetype: image.mimetype,
         })),
         outputDir,
+        signal: cutOff.signal,
         onEvent: run ? (step) => run?.event(step) : undefined,
       })
       reasoning = false
@@ -385,8 +442,11 @@ export class MentionResponder {
         answer,
         attachmentsDir
       )
+      // Once any of it is in the thread, a restart does not answer again.
+      note({ answer: 'posting' })
       for (const chunk of messenger.render(text))
         await messenger.post(mention, chunk)
+      note({ answer: 'posted' })
       const generated = await this.shrinkImages(
         await collectGeneratedImages(outputDir),
         attachmentsDir
@@ -401,6 +461,20 @@ export class MentionResponder {
       }
       run?.finish('succeeded')
     } catch (err) {
+      if (reasoning && cutOff.signal.aborted) {
+        // The run stays open: the next start resumes it, or marks it
+        // interrupted.
+        kept = true
+        log.info(
+          `Stopped answering ${key} to shut down; it resumes on the next start.`
+        )
+        run?.event({
+          kind: 'note',
+          at: new Date().toISOString(),
+          text: 'Stopped to shut down; resumes on the next start.',
+        })
+        return
+      }
       log.error(`Failed to answer mention ${key}`, err)
       const error = (err as Error).message
       const cause = reasoning ? failureCause(error) : 'other'
@@ -421,38 +495,58 @@ export class MentionResponder {
         say(failureReply(cause, reasoner.backend))
       )
     } finally {
+      this.running.delete(cutOff)
       clearTimeout(slow)
       await slowing
-      for (const mark of marks) await messenger.unmark?.(mention, mark)
-      inflight?.remove(key)
+      if (kept) {
+        // The marks stay, and the attempt it did not get to finish does not
+        // count.
+        note({ attempts: taken.attempts })
+      } else {
+        for (const mark of marks) await messenger.unmark?.(mention, mark)
+        this.forget(key)
+        this.requests.handled += 1
+      }
       await rm(attachmentsDir, { recursive: true, force: true })
       this.requests.active -= 1
-      this.requests.handled += 1
       this.deps.onActivity?.({ ...this.requests })
+    }
+  }
+
+  private forget(key: string): void {
+    try {
+      this.deps.inflight?.remove(key)
+    } catch (err) {
+      this.deps.log.warn(
+        `Could not clear ${key} from the restart record: ${(err as Error).message}`
+      )
     }
   }
 
   /**
    * Cleans up interrupted requests at startup. Each is resumed once (in the
    * same placeholder message, if it had one), and requests that were already
-   * retried or are too old are reported as failed.
+   * retried or are too old are reported as failed. One whose answer was
+   * already posting is not answered again.
    */
   async resumePending(): Promise<void> {
     const { inflight, log, history } = this.deps
     await this.cleanupStaleAttachments()
     const entries = inflight?.list() ?? []
-    // Keeps the runs of requests to resume, and marks the other runs still left
-    // as running as interrupted.
-    const resuming = new Set(
+    const resumable = (entry: InflightEntry) =>
+      this.messengers.has(entry.mention.messenger) &&
+      !entry.answer &&
+      resumeDecision(entry) === 'resume'
+    // Keeps the runs of requests to resume or that were answered, and marks
+    // the other runs still left as running as interrupted.
+    const keep = new Set(
       entries.flatMap((entry) =>
-        entry.runId &&
-        this.messengers.has(entry.mention.messenger) &&
-        resumeDecision(entry) === 'resume'
+        entry.runId && (entry.answer === 'posted' || resumable(entry))
           ? [entry.runId]
           : []
       )
     )
-    const interrupted = history?.interruptStale(resuming) ?? 0
+    const interrupted = history?.interruptStale(keep) ?? 0
     if (interrupted > 0)
       log.info(
         `Marked ${interrupted} ${interrupted === 1 ? 'run' : 'runs'} as interrupted.`
@@ -464,46 +558,66 @@ export class MentionResponder {
       if (!messenger) {
         // Asked in a messenger the bot no longer connects to: nothing to answer
         // through.
-        inflight.remove(entry.key)
+        this.forget(entry.key)
         log.warn(
           `Dropping interrupted request ${entry.key}: ${entry.mention.messenger} is not connected`
         )
         continue
       }
+      if (entry.answer) {
+        this.forget(entry.key)
+        await this.clearMarks(messenger, entry.mention)
+        if (entry.answer === 'posted') {
+          // Only the images, if any, and the cleanup were left.
+          log.info(`Already answered ${entry.key} before the restart`)
+          const run = entry.runId ? history?.read(entry.runId) : undefined
+          if (run?.status === 'running')
+            history?.reopen(run.id)?.finish('succeeded')
+          continue
+        }
+        log.warn(`Restarted while posting the answer to ${entry.key}`)
+        await this.fail(
+          messenger,
+          entry.mention,
+          messenger.render(
+            'I restarted while posting my answer, so it may be cut short. Please mention me again if it is.'
+          )[0] ?? ''
+        )
+        continue
+      }
       if (resumeDecision(entry) === 'give_up') {
-        inflight.remove(entry.key)
+        this.forget(entry.key)
         log.warn(
           `Giving up on interrupted request ${entry.key} (${entry.attempts} ${entry.attempts === 1 ? 'attempt' : 'attempts'})`
         )
         await this.giveUp(messenger, entry.mention, entry.placeholder)
         continue
       }
-      log.info(
-        `Resuming interrupted request ${entry.key} (attempt ${entry.attempts + 1})`
-      )
-      const accepted = this.limiter.tryRun(() =>
-        this.respond(messenger, entry.mention, entry.label, {
-          placeholder: entry.placeholder,
-          attempts: entry.attempts,
-          startedAt: entry.startedAt,
-          runId: entry.runId,
-        })
-      )
-      if (!accepted) {
-        inflight.remove(entry.key)
+      if (this.limiter.full) {
+        this.forget(entry.key)
         await this.giveUp(messenger, entry.mention, entry.placeholder)
         if (entry.runId) {
           history?.reopen(entry.runId)?.finish('interrupted', {
             error: 'Could not resume because the queue was full',
           })
         }
+        continue
       }
+      log.info(
+        entry.attempts === 0
+          ? `Taking up ${entry.key}, which was waiting its turn`
+          : `Resuming interrupted request ${entry.key} (attempt ${entry.attempts + 1})`
+      )
+      const taken = this.take(messenger, entry, 'resumed')
+      this.limiter.tryRun(async () =>
+        this.respond(messenger, entry, await taken)
+      )
+      await taken
     }
   }
 
   /**
-   * Waits for active requests to finish before shutdown. Remaining requests are
-   * resumed at the next start.
+   * Waits for active requests to finish. Returns whether they all did.
    */
   async drain(timeoutMs: number): Promise<boolean> {
     const deadline = Date.now() + timeoutMs
@@ -511,6 +625,20 @@ export class MentionResponder {
       await new Promise((resolve) => setTimeout(resolve, 200))
     }
     return !this.limiter.busy
+  }
+
+  /**
+   * Stops to shut down. Nothing waiting starts, requests being answered get
+   * graceMs to finish, and the rest are cut off, their reasoner runs stopped.
+   * Requests not answered stay recorded and resume on the next start. Returns
+   * whether every request settled in time.
+   */
+  async stop(graceMs: number, cutOffMs = 8_000): Promise<boolean> {
+    this.stopping = true
+    this.limiter.clear()
+    if (await this.drain(graceMs)) return true
+    for (const run of this.running) run.abort()
+    return this.drain(cutOffMs)
   }
 
   /**
