@@ -14,6 +14,7 @@ import { createReasoner } from './reasoners/cli.js'
 import { hostCliProblems } from './reasoners/host-check.js'
 import { DockerSandbox } from './sandbox/docker.js'
 import { HostSandbox } from './sandbox/host.js'
+import { VmSandbox } from './sandbox/vm.js'
 import type { Sandbox } from './sandbox/runtime.js'
 import { DiagramRenderer } from './render/diagrams.js'
 import { RECHECK_SANDBOX, SandboxHealth } from './runtime/sandbox-health.js'
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
   const started: {
     connection?: Awaited<ReturnType<typeof connectSlack>>
     responder?: MentionResponder
+    sandbox?: Sandbox
   } = {}
   let stopping = false
   const shutdown = async (signal: string) => {
@@ -88,6 +90,7 @@ async function main(): Promise<void> {
     // the next start.
     if (started.responder && !(await started.responder.stop(15_000)))
       log.warn('Shutting down with requests still in progress.')
+    await started.sandbox?.close?.().catch(() => undefined)
     log.info(`Stopped (pid ${process.pid})`)
     process.exit(0)
   }
@@ -116,7 +119,10 @@ async function main(): Promise<void> {
 
   const sandbox: Sandbox = config.reasoner.sandbox
     ? new DockerSandbox(config.reasoner.sandbox)
-    : new HostSandbox(config.reasoner.commands)
+    : config.reasoner.vm
+      ? new VmSandbox(config.reasoner.vm, log.child('egress'))
+      : new HostSandbox(config.reasoner.commands)
+  started.sandbox = sandbox
   const reasoner = createReasoner(config.reasoner, sandbox)
   // If the sandbox is not ready, reasoner calls fail. They do not fall back to
   // the host. The check repeats while the bot runs, and right away when the
@@ -215,12 +221,12 @@ async function main(): Promise<void> {
   })
   // A claude credential the API rejects (cut short, revoked) shows in the
   // status at once, not only when a mention fails on it.
-  if (sandbox.kind === 'docker' && reasoner.backend === 'claude')
+  if (sandbox.isolated && reasoner.backend === 'claude')
     void checkClaudeCredential(
       claudeCredential(config.reasoner.auth?.env ?? {})
     ).then((state) => {
       if (state !== 'rejected' || reasonerProblem) return
-      reasonerProblem = `${failureAdvice('auth', 'claude', 'docker')?.text} (checked at startup)`
+      reasonerProblem = `${failureAdvice('auth', 'claude', sandbox.kind)?.text} (checked at startup)`
       status.update({ problems: allProblems() })
     })
   await connection.start((mention) => responder.handle(mention))

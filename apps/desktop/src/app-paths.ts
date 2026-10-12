@@ -22,6 +22,11 @@ export interface AppPaths {
   jobRunner: string
   /** The run history's MCP server (src/tools/history-mcp.ts bundle) */
   historyMcp: string
+  /**
+   * The built-in VM sandbox's helper (apps/vm): beside the app's executable
+   * when packaged (Apple silicon only), the Swift build output in dev runs
+   */
+  vmBin: string
   /** Dev runs only: the repository to rebuild the bot from */
   repoRoot?: string
 }
@@ -37,6 +42,7 @@ export function resolveAppPaths(distDir: string, packaged: boolean): AppPaths {
       sandboxDir: path.join(appRoot, 'sandbox'),
       jobRunner: path.join(appRoot, 'tools/sandbox-job.mjs'),
       historyMcp: path.join(appRoot, 'tools/history-mcp.mjs'),
+      vmBin: path.join(appRoot, '../../MacOS/pacenote-vm'),
     }
   }
   const repoRoot = path.resolve(distDir, '../../..')
@@ -47,6 +53,7 @@ export function resolveAppPaths(distDir: string, packaged: boolean): AppPaths {
     sandboxDir: path.join(repoRoot, 'sandbox'),
     jobRunner: path.join(repoRoot, 'build/tools/sandbox-job.mjs'),
     historyMcp: path.join(repoRoot, 'build/tools/history-mcp.mjs'),
+    vmBin: path.join(repoRoot, 'apps/vm/.build/release/pacenote-vm'),
     repoRoot,
   }
 }

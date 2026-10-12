@@ -7,13 +7,20 @@ import { ensureAllowlistFile } from '../sandbox/allowlist.js'
 import { loadBrokerEnv } from '../sandbox/env.js'
 import { writeKubeconfig } from '../sandbox/kubeconfig.js'
 import { prepareBrokerFiles } from '../sandbox/prepare.js'
+import { defaultVmBin } from '../sandbox/vm.js'
+import { setupVm } from '../sandbox/vm-setup.js'
 import { readEnvFile, readEnvValues } from '../settings/env-file.js'
-import { allowlistPath, envFilePath, pacenoteHome } from '../settings/paths.js'
+import {
+  allowlistPath,
+  envFilePath,
+  pacenoteHome,
+  vmRootPath,
+} from '../settings/paths.js'
 
 /**
  * Sandbox apply jobs. The desktop app and the terminal (pnpm sandbox:*) use the
  * same steps.
- * Usage: sandbox-job <images|proxy|broker|kubeconfig> [--dry-run]
+ * Usage: sandbox-job <images|proxy|broker|kubeconfig|vm> [--dry-run]
  * - The sandbox directory is PACENOTE_SANDBOX_DIR (the sandbox inside the
  *   bundle for the app), otherwise sandbox in the current directory
  * - Settings are read from the config file (PACENOTE_HOME/.env), and existing
@@ -21,7 +28,13 @@ import { allowlistPath, envFilePath, pacenoteHome } from '../settings/paths.js'
  * - The compose project name (pacenote-sandbox) is the same, so the repository
  *   and the app manage the same containers.
  */
-export const JOB_KINDS = ['images', 'proxy', 'broker', 'kubeconfig'] as const
+export const JOB_KINDS = [
+  'images',
+  'proxy',
+  'broker',
+  'kubeconfig',
+  'vm',
+] as const
 export type JobKind = (typeof JOB_KINDS)[number]
 
 export interface JobContext {
@@ -36,6 +49,7 @@ export type JobStep =
   | { kind: 'broker-bundle' }
   | { kind: 'kubeconfig' }
   | { kind: 'credentials' }
+  | { kind: 'vm' }
   | { kind: 'compose'; args: string[] }
 
 /** Turns a job into steps. (Does not run them) */
@@ -71,6 +85,8 @@ export function planJob(kind: JobKind, ctx: JobContext): JobStep[] {
       ]
     case 'kubeconfig':
       return [{ kind: 'kubeconfig' }]
+    case 'vm':
+      return [{ kind: 'allowlist' }, { kind: 'vm' }]
   }
 }
 
@@ -183,6 +199,13 @@ async function main(): Promise<void> {
         log(`$ docker ${step.args.join(' ')}`)
         if (!dryRun) await run('docker', step.args, env)
         break
+      case 'vm': {
+        const root = vmRootPath(env)
+        const bin = defaultVmBin(env)
+        log(`Built-in sandbox: ${root} (pacenote-vm ${bin})`)
+        if (!dryRun) await setupVm({ bin, root, sandboxDir, log })
+        break
+      }
     }
   }
 }

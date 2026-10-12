@@ -9,6 +9,8 @@ export default tseslint.config(
     ignores: [
       '**/dist/',
       '**/node_modules/',
+      // Swift Package Manager's checkouts and build output (apps/vm)
+      '**/.build/',
       'build/',
       'coverage/',
       'release/',

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { _electron, type ElectronApplication, type Page } from 'playwright-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { REPO } from './support/processes.js'
+import * as vm from './support/vm.js'
 import { World } from './support/world.js'
 
 /**
@@ -42,9 +43,15 @@ afterEach(async (context) => {
   world = undefined
 })
 
-async function launch(world: World): Promise<Page> {
-  // What a member would have set before: everything except the Slack tokens,
-  // which the test enters in Settings.
+/**
+ * Opens the app on the world. settings: lines the settings file has besides
+ * what any member would have set before (all but the Slack tokens, which the
+ * first test enters in Settings); env: the app's environment on top.
+ */
+async function launch(
+  world: World,
+  options: { settings?: string[]; env?: Record<string, string> } = {}
+): Promise<Page> {
   mkdirSync(world.home, { recursive: true })
   writeFileSync(
     path.join(world.home, '.env'),
@@ -56,6 +63,7 @@ async function launch(world: World): Promise<Page> {
       `SLACK_API_URL=${world.slack.apiUrl}`,
       `CLAUDE_BIN=${world.claudeBin}`,
       `FAKE_CLAUDE_DIR=${world.claudeDir}`,
+      ...(options.settings ?? []),
       '',
     ].join('\n')
   )
@@ -77,6 +85,7 @@ async function launch(world: World): Promise<Page> {
       PACENOTE_DATA_DIR: world.home,
       PACENOTE_DESKTOP_USER_DATA: path.join(world.root, 'user-data'),
       PACENOTE_DESKTOP_THEME: 'light',
+      ...options.env,
     },
   })
   const page = await app.firstWindow()
@@ -157,4 +166,70 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}`
     )
   })
+
+  it.skipIf(vm.skip !== undefined)(
+    'runs Pace in the built-in sandbox chosen in Settings',
+    async () => {
+      await vm.prepare()
+      world = await World.create()
+      const { slack, ops, alice } = world
+      mkdirSync(path.join(world.home, 'sandbox'), { recursive: true })
+      writeFileSync(
+        path.join(world.home, 'sandbox/allowed-domains.txt'),
+        'api.anthropic.com\n'
+      )
+      const page = await launch(world, {
+        settings: [
+          `SLACK_APP_TOKEN=${slack.appToken}`,
+          `SLACK_BOT_TOKEN=${slack.botToken}`,
+          'MENTION_ANYONE=on',
+        ],
+        env: {
+          PACENOTE_VM_BIN: vm.BIN,
+          PACENOTE_VM_ROOT: vm.ROOT,
+          // Checking the sandbox login asks nothing outside this computer.
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:9',
+        },
+      })
+      await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+
+      await page.evaluate("window.location.hash = '#/settings/sandbox'")
+      await page.getByRole('radio', { name: /^Built-in sandbox/ }).click()
+      await enterSecret(
+        page,
+        'SANDBOX_CLAUDE_OAUTH_TOKEN',
+        'sk-ant-oat01-e2e',
+        'enter'
+      )
+      // What the built-in sandbox has ready, and the job that sets it up
+      await page.getByText('Kernel ready').waitFor()
+      await page.getByText('Init ready').waitFor()
+      await page
+        .getByText(/^Built .* on docker\.io\/library\/node:24-alpine$/)
+        .waitFor()
+      await page.getByText('Set up built-in sandbox').first().waitFor()
+      await page.getByText('Kernel ready').scrollIntoViewIfNeeded()
+      await page.screenshot({
+        path: path.join(REPO, 'test-results/built-in-sandbox.png'),
+        fullPage: true,
+      })
+
+      await page.getByRole('button', { name: 'Save and restart Pace' }).click()
+      // Pace starts again, in a VM this time.
+      await expect
+        .poll(() => world?.status()?.reasoner, { timeout: 60_000 })
+        .toBe('claude@vm')
+
+      const ts = await slack.mention({
+        channel: ops.id,
+        user: alice.id,
+        text: `<@${slack.botUserId}> where do you run?`,
+      })
+      const [reply] = await world.answered(ops.id, ts)
+      expect(reply!.text).toBe(
+        'From the VM: Linux aarch64, uid 1000, network devices: lo, login set, example.com 403'
+      )
+    },
+    240_000
+  )
 })

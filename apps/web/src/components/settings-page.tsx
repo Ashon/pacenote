@@ -3,6 +3,7 @@ import {
   SETTING_GROUPS,
   SETTING_SECTIONS,
   settingSectionOf,
+  shownFor,
   type SettingField,
   type SettingGroup,
   type SettingGroupInfo,
@@ -76,6 +77,7 @@ import {
   JobsCard,
   PendingList,
   SandboxStatusCard,
+  VmStatusCard,
 } from './sandbox-panel'
 
 const bridge = () => window.pacenoteDesktop?.settings
@@ -251,7 +253,7 @@ export function SettingsPage() {
   const shown = (field: SettingField) =>
     !field.internal &&
     (!field.shownWhen ||
-      valueOf(field.shownWhen.key) === field.shownWhen.equals)
+      shownFor(field.shownWhen, valueOf(field.shownWhen.key)))
 
   const set = (key: string, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }))
@@ -405,6 +407,8 @@ export function SettingsPage() {
   const sectionIssues = (id: Section) =>
     issues.filter((issue) => settingSectionOf(issue.key) === id).length
   const docker = valueOf('REASONER_SANDBOX') === 'docker'
+  const builtIn = valueOf('REASONER_SANDBOX') === 'vm'
+  const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
   const pending = sandbox.status?.pending ?? []
   const opsReady = docker && isSet('MENTION_ALLOWED_USERS')
@@ -424,13 +428,22 @@ export function SettingsPage() {
     // Short enough to sit beside "Messengers"; the Slack heading says what is
     // missing.
     messengers: slackReady ? undefined : { tone: 'warn', text: 'Set up' },
-    sandbox: !docker
-      ? { tone: 'muted', text: 'Off' }
-      : sandbox.status && !sandbox.status.docker.ok
-        ? { tone: 'warn', text: 'No docker' }
-        : pending.some((item) => item.component !== 'broker')
-          ? { tone: 'warn', text: 'Apply needed' }
-          : undefined,
+    sandbox: builtIn
+      ? vmStatus &&
+        (vmStatus.unsupported ||
+          !vmStatus.helper.ok ||
+          !vmStatus.kernel ||
+          !vmStatus.initfs ||
+          !vmStatus.image)
+        ? { tone: 'warn', text: 'Set up' }
+        : undefined
+      : !docker
+        ? { tone: 'muted', text: 'Off' }
+        : sandbox.status && !sandbox.status.docker.ok
+          ? { tone: 'warn', text: 'No docker' }
+          : pending.some((item) => item.component !== 'broker')
+            ? { tone: 'warn', text: 'Apply needed' }
+            : undefined,
     ops: !opsOn
       ? { tone: 'muted', text: 'Off' }
       : !opsReady
@@ -587,7 +600,7 @@ export function SettingsPage() {
     sandbox: (
       <>
         {card('environment')}
-        {docker &&
+        {(docker || builtIn) &&
           card('credentials', {
             help: credentialsHelp(valueOf('REASONER')),
             after:
@@ -611,8 +624,20 @@ export function SettingsPage() {
                 />
               ) : undefined,
           })}
-        {docker && sandbox.available && <AllowlistCard sandbox={sandbox} />}
-        {sandbox.available && (
+        {(docker || builtIn) && sandbox.available && (
+          <AllowlistCard sandbox={sandbox} builtIn={builtIn} />
+        )}
+        {builtIn && sandbox.available && (
+          <>
+            <SubHeading
+              title="Status and setup"
+              help="The Linux kernel, the init filesystem and the reasoner image. Setting up fetches the kernel once and builds the image in a VM; run it again for newer CLIs."
+            />
+            <VmStatusCard sandbox={sandbox} />
+            <JobsCard sandbox={sandbox} kinds={['vm']} />
+          </>
+        )}
+        {!builtIn && sandbox.available && (
           <>
             <SubHeading
               title="Status and maintenance"
@@ -1227,8 +1252,8 @@ function brokerReport(
 
 function credentialsHelp(reasoner: string): string {
   return reasoner === 'codex'
-    ? 'The codex login passed into each sandbox container. Your own CLI login on this Mac is not used there.'
-    : 'The claude login passed into each sandbox container. Your own CLI login on this Mac is not used there.'
+    ? 'The codex login passed into the sandbox for each request. Your own CLI login on this Mac is not used there.'
+    : 'The claude login passed into the sandbox for each request. Your own CLI login on this Mac is not used there.'
 }
 
 /**
@@ -1718,7 +1743,12 @@ function Choice({
     <div
       role="radiogroup"
       aria-label={field.label}
-      className="grid grid-cols-2 gap-2 @max-[36rem]/content:grid-cols-1"
+      className={cn(
+        'grid gap-2',
+        (field.options?.length ?? 0) > 2
+          ? 'grid-cols-3 @max-[52rem]/content:grid-cols-1'
+          : 'grid-cols-2 @max-[36rem]/content:grid-cols-1'
+      )}
     >
       {field.options?.map((option) => {
         const checked = option.value === selected
@@ -1730,7 +1760,7 @@ function Choice({
             aria-checked={checked}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-xl border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+              'flex flex-col justify-start rounded-xl border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
               checked
                 ? 'border-primary/50 bg-primary/6'
                 : 'border-border hover:border-primary/30 hover:bg-muted/40'

@@ -4,6 +4,9 @@ node_modules/
 # build output
 dist/
 *.tsbuildinfo
+# Swift Package Manager (apps/vm): checkouts and build output
+.build/
+.swiftpm/
 # pnpm bundle output (bundles for the bot, the sandbox jobs and the broker image) and pnpm package:mac output
 build/
 sandbox/ops-broker/dist/

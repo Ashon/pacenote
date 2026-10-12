@@ -14,12 +14,13 @@ brew install --cask pacenote
 
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
   `codex` CLI login (codex 0.138 or later), Docker (Docker Desktop, OrbStack or colima) only for the Docker sandbox and
-  diagrams, and `gh` and `git` for the ops tools.
+  diagrams, and `gh` and `git` for the ops tools. The built-in sandbox needs nothing installed, on Apple silicon with
+  macOS 15 or later.
 - Open Pacenote. Settings > Messengers > Slack opens Slack with Pacenote's manifest filled in ("Create the Slack app") and
   takes the app's two tokens; "Who can ask" takes your Slack member ID. Pace answers no one until you name who may ask,
   or turn on "Anyone in the workspace may ask".
-- Answers run on this Mac by default (Settings > Sandbox > Run environment). For the Docker sandbox, choose it there, then
-  run "Build sandbox images" and "Restart proxy" in Settings > Sandbox.
+- Answers run on this Mac by default (Settings > Sandbox > Run environment). For the built-in sandbox, choose it there, then
+  run "Set up built-in sandbox"; for the Docker sandbox, "Build sandbox images" and "Restart proxy".
 - At startup Pace checks that the CLI is installed, signed in and, for codex, new enough; what is missing shows in the
   status bar with what to do.
 - Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive
@@ -74,8 +75,8 @@ Restart handling:
 - An answer is never posted twice: once posting has begun, a restart does not answer again. If it came partway through, the
   mention gets ⚠️ and the asker alone is told "I restarted while posting my answer, so it may be cut short."
 - On a shutdown signal (SIGINT, SIGTERM) it stops taking new events and waits up to 15 seconds for requests in progress. Then it
-  stops their reasoner runs (on this Mac the CLI and whatever it started, in the sandbox the container), which resume on the
-  next start without counting as an attempt.
+  stops their reasoner runs (on this Mac the CLI and whatever it started, in a sandbox its VM or container), which resume on
+  the next start without counting as an attempt.
 - At startup it deletes attachment/output temp directories (`PACENOTE_DATA_DIR/attachments/*`) older than 1 hour.
 
 Requirements: Node.js 22.9 or later, pnpm 11, and Docker for the sandbox.

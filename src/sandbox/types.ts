@@ -32,6 +32,8 @@ export interface SandboxCheck {
   label: string
   ok: boolean
   detail?: string
+  /** The reasoner's login, which both sandboxes take (the rest: the broker) */
+  login?: boolean
 }
 
 export interface PendingApply {
@@ -60,6 +62,20 @@ export interface SandboxStatus {
    * blocked.
    */
   activeRequests: number
+  /** The built-in VM sandbox, when it is the run environment */
+  vm?: VmStatus
+}
+
+/** What the built-in VM sandbox has ready (src/sandbox/vm.ts) */
+export interface VmStatus {
+  /** Why this Mac cannot run it, if it cannot */
+  unsupported?: string
+  /** pacenote-vm, and whether it answered */
+  helper: { path: string; ok: boolean; error?: string }
+  kernel: boolean
+  initfs: boolean
+  /** The reasoner image, once built */
+  image?: { createdAt: string; base: string }
 }
 
 export interface AllowlistIssue {
@@ -67,7 +83,7 @@ export interface AllowlistIssue {
   message: string
 }
 
-export type SandboxJobKind = 'proxy' | 'broker' | 'images' | 'kubeconfig'
+export type SandboxJobKind = 'proxy' | 'broker' | 'images' | 'kubeconfig' | 'vm'
 
 export const SANDBOX_JOBS: Record<
   SandboxJobKind,
@@ -92,6 +108,11 @@ export const SANDBOX_JOBS: Record<
     label: 'Rebuild kubeconfig',
     script: 'k8s:kubeconfig',
     help: 'Builds the broker kubeconfig from the read-only SA token. Recreate the broker afterward.',
+  },
+  vm: {
+    label: 'Set up built-in sandbox',
+    script: 'sandbox:vm',
+    help: 'Fetches the Linux kernel the first time, then builds the reasoner image in a VM. Run it again to update the CLIs.',
   },
 }
 

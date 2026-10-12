@@ -8,7 +8,7 @@ import type { RunResult } from './process.js'
  * remote runner) is a new Sandbox, and no adapter changes.
  */
 
-export type SandboxKind = 'host' | 'docker'
+export type SandboxKind = 'host' | 'docker' | 'vm'
 
 /**
  * Where an isolated sandbox puts the host paths it is given. The reasoner image
@@ -89,6 +89,8 @@ export interface Sandbox {
    * proxy)
    */
   verify(): Promise<string[]>
+  /** Lets go of what it holds open (the VM's egress proxy), at shutdown */
+  close?(): Promise<void>
 }
 
 /** pdftotext: the first 50 pages only, in UTF-8, without warnings */

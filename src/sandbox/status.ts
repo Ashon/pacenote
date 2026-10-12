@@ -6,13 +6,18 @@ import path from 'node:path'
 import { configFingerprint } from '../config.js'
 import { readBotStatus } from '../runtime/status.js'
 import { readEnvFile, readEnvValues } from '../settings/env-file.js'
-import { allowlistPath, brokerRuntimeDir } from '../settings/paths.js'
+import {
+  allowlistPath,
+  brokerRuntimeDir,
+  vmRootPath,
+} from '../settings/paths.js'
 import {
   parseAllowlist,
   readAllowlistFile,
   REQUIRED_DOMAINS,
 } from './allowlist.js'
 import { brokerExpected } from './env.js'
+import { defaultVmBin, VM_IMAGE, vmStatus } from './vm.js'
 import type {
   BrokerHealth,
   ContainerState,
@@ -317,6 +322,9 @@ export async function collectSandboxStatus(options: {
   }
   const reasoner = values.REASONER === 'codex' ? 'codex' : 'claude'
   const useDocker = values.REASONER_SANDBOX === 'docker'
+  const useVm = values.REASONER_SANDBOX === 'vm'
+  /** Both sandboxes take the CLI's login the same way. */
+  const isolated = useDocker || useVm
   const opsOn = values.OPS_TOOLS === 'on'
   // The allowlist lives under PACENOTE_HOME. If it does not exist yet (proxy
   // never started), the default list is shown.
@@ -434,15 +442,16 @@ export async function collectSandboxStatus(options: {
     existsSync(file)
       ? { label, ok: true, detail: file }
       : { label, ok: false, detail: `Missing: ${file}` }
-  if (useDocker && reasoner === 'codex') {
-    status.checks.push(
-      fileCheck(
+  if (isolated && reasoner === 'codex') {
+    status.checks.push({
+      ...fileCheck(
         'codex login file',
         expandHome(values.SANDBOX_CODEX_AUTH_FILE || '~/.codex/auth.json', home)
-      )
-    )
+      ),
+      login: true,
+    })
   }
-  if (useDocker && reasoner === 'claude') {
+  if (isolated && reasoner === 'claude') {
     const set = Boolean(
       values.SANDBOX_CLAUDE_OAUTH_TOKEN || values.SANDBOX_ANTHROPIC_API_KEY
     )
@@ -454,6 +463,7 @@ export async function collectSandboxStatus(options: {
       : undefined
     status.checks.push({
       label: 'Sandbox claude token',
+      login: true,
       ok: set && state !== 'rejected',
       detail: !set
         ? 'SANDBOX_CLAUDE_OAUTH_TOKEN required'
@@ -543,6 +553,16 @@ export async function collectSandboxStatus(options: {
         author.name && author.email
           ? `${author.name} <${author.email}> (${author.source})`
           : 'OPS_GIT_AUTHOR_NAME and OPS_GIT_AUTHOR_EMAIL, or git config --global, required',
+    })
+  }
+
+  // Shown when the built-in sandbox is chosen, saved or not yet; on a Mac
+  // that cannot run it, only why.
+  if (process.platform === 'darwin') {
+    status.vm = await vmStatus({
+      bin: defaultVmBin(options.env),
+      root: vmRootPath(options.env, home),
+      image: VM_IMAGE,
     })
   }
 

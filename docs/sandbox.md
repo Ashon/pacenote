@@ -1,8 +1,9 @@
 # Reasoner sandbox
-The requester's message and the thread content become model input as they are. With `REASONER_SANDBOX=docker`, each
-request runs the reasoner in a new container that is removed when it finishes. In the code this is `DockerSandbox`
-(`src/sandbox/docker.ts`), one implementation of the `Sandbox` interface; `REASONER_SANDBOX=none`, the default, is
-`HostSandbox`, which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
+The requester's message and the thread content become model input as they are. With `REASONER_SANDBOX=vm`, each
+request runs the reasoner in a lightweight Linux VM of its own, built into Pacenote; with `REASONER_SANDBOX=docker`, in a
+new container. Either is gone when the request finishes. In the code these are `VmSandbox` (`src/sandbox/vm.ts`) and
+`DockerSandbox` (`src/sandbox/docker.ts`), implementations of the `Sandbox` interface; `REASONER_SANDBOX=none`, the
+default, is `HostSandbox`, which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
 
 ## On this Mac
 
@@ -22,7 +23,46 @@ or to nothing without one:
 - At startup and every 5 minutes, Pace checks that the CLI is installed, signed in and, for codex, new enough. What is
   missing shows in the status bar with what to do.
 
-What leaves the Mac is not limited to allowed domains here; that is what the Docker sandbox below is for.
+What leaves the Mac is not limited to allowed domains here; that is what the sandboxes below are for.
+
+## Built-in sandbox
+
+```
+bot (host) --pacenote-vm run--> a Linux VM of its own, with no network device
+                                |- the reasoner image   read-only root
+                                |- /workspace, /attachments, /out, /run/secrets   as in the Docker sandbox
+                                |- HOME, /tmp           tmpfs, empty on every run
+                                '- 127.0.0.1:3128 --socket--> egress proxy in Pace --> allowed domains only
+```
+
+Settings > Sandbox > Run environment > "Built-in sandbox" (`REASONER_SANDBOX=vm`) runs each request in a VM of its own,
+which starts in under a second. `VmSandbox` asks `pacenote-vm` to start it: a helper in the app (`apps/vm`, Swift on
+Apple's [Containerization](https://github.com/apple/containerization) and Virtualization.framework). Nothing else is
+installed: no Docker, no proxy container. It needs a Mac with Apple silicon and macOS 15 or later.
+
+| Item | Limit |
+| --- | --- |
+| Isolation | A VM per request under its own Linux kernel, stopped when the request ends or is cut off. Requests at the same time each get their own |
+| Filesystem | The reasoner image read-only, and only the mounts the CLI's adapter asks for, the same ones as in Docker. A single file (codex's `auth.json`) is copied into the VM alone, never with its folder |
+| Network | No network device at all. The CLIs' `HTTPS_PROXY` is 127.0.0.1:3128, which the image forwards over a socket that pacenote-vm relays to Pace's own egress proxy (`src/sandbox/egress.ts`). It lets through only the domains in `~/.pacenote/sandbox/allowed-domains.txt` (exact names; CONNECT on 443, and plain HTTP), the list the Docker sandbox uses, and reads it again when it changes, so an edit applies to the next request. It looks each name up itself and connects to that address, never to this Mac's own (loopback), the link-local range (where cloud metadata answers), "any" or multicast, even for an allowed name; private ranges stay reachable by name |
+| Privileges | uid 1000 |
+| Auth | As in the Docker sandbox: claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` by variable name only, codex its `auth.json` read-only |
+| On failure | Settings > Sandbox and the status bar say what is missing and how to set it up. Reasoner calls fail; it does not fall back to running on the host |
+
+The CLIs run as in the Docker sandbox: the same adapters, mounts and login, from the same CLI versions.
+
+Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in the repository. It keeps everything in
+`~/.pacenote/vm`:
+
+1. The Linux kernel: Kata Containers' build, the one Containerization is tested with. It comes in Kata's release archive
+   (about 290 MB), downloaded once and checked against a pinned SHA-256 (`KERNEL` in `src/sandbox/vm-setup.ts`); only the
+   14 MB kernel is kept.
+2. The init filesystem: vminitd, from `ghcr.io/apple/containerization/vminit`.
+3. The reasoner image, built in a VM from `node:24-bookworm-slim` by `sandbox/vm/build.sh`, with the CLI versions pinned in
+   `sandbox/compose.yaml`. The build's own way out goes only to `deb.debian.org` and `registry.npmjs.org`.
+
+Run it again to build the image anew, with newer CLIs. Ops tools still need the Docker sandbox, and diagram rendering
+uses Docker in any run environment.
 
 ## Docker sandbox
 

@@ -1,0 +1,312 @@
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { arch, release, tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { Logger } from '../logger.js'
+import { parseAllowlist } from './allowlist.js'
+import { EgressProxy, type Resolve } from './egress.js'
+import { runProcess, type RunResult } from './process.js'
+import {
+  PDFTOTEXT_ARGS,
+  SANDBOX_PATHS,
+  type Mount,
+  type Sandbox,
+  type SandboxRun,
+} from './runtime.js'
+import { jobHint, type VmStatus } from './types.js'
+
+/**
+ * The reasoner sandbox built into Pacenote: each run is one process in a
+ * lightweight Linux VM of its own (pacenote-vm, apps/vm), started in well under
+ * a second from a read-only image. Like the Docker sandbox, it sees only the
+ * mounts a run asks for, and HOME and /tmp are empty every time. The VM has no
+ * network device: its one way out is the egress proxy here, relayed in as a
+ * socket, which lets through only the allowed domains (the same list the
+ * Docker sandbox's proxy reads). Nothing else to install: no Docker, no proxy
+ * container.
+ */
+export interface VmSandboxOptions {
+  /** pacenote-vm */
+  bin: string
+  /** pacenote-vm's folder: kernel, init filesystem, images */
+  root: string
+  /** The image runs use */
+  image: string
+  /** Memory for the process, in MiB */
+  memoryMiB: number
+  cpus: number
+  /** The allowed domains, read again when the file changes */
+  allowlistFile: string
+  /** How the way out looks names up (tests point them at local servers) */
+  resolve?: Resolve
+}
+
+/** The image the setup job builds, and runs use */
+export const VM_IMAGE = 'reasoner'
+/** What pacenote-vm says and takes (its formatVersion) */
+export const VM_FORMAT = 1
+
+/** HOME and /tmp: empty tmpfs on every run, as in the Docker sandbox */
+const TMPFS = [
+  '/tmp:size=256m,mode=1777',
+  '/home/node:size=256m,uid=1000,gid=1000,mode=0700',
+]
+
+/**
+ * pacenote-vm in this repository, once built (cd apps/vm && swift build -c
+ * release). The desktop app passes the one in its bundle as PACENOTE_VM_BIN.
+ */
+export function defaultVmBin(env: NodeJS.ProcessEnv = process.env): string {
+  return (
+    env.PACENOTE_VM_BIN?.trim() ||
+    fileURLToPath(
+      new URL('../../apps/vm/.build/release/pacenote-vm', import.meta.url)
+    )
+  )
+}
+
+/** Why this Mac cannot run the built-in sandbox, if it cannot */
+export function vmUnsupported(
+  platform: string = process.platform,
+  cpu: string = arch(),
+  kernel: string = release()
+): string | undefined {
+  const darwin = Number(kernel.split('.')[0])
+  // Darwin 24 is macOS 15.
+  if (platform !== 'darwin' || cpu !== 'arm64' || !(darwin >= 24))
+    return 'The built-in sandbox needs a Mac with Apple silicon and macOS 15 or later.'
+  return undefined
+}
+
+/** docker --memory format (2g, 1536m) in MiB, as pacenote-vm takes it */
+export function memoryMiB(text: string): number {
+  const match = /^(\d+(?:\.\d+)?)([bkmg]?)$/i.exec(text.trim())
+  if (!match) return 2048
+  const bytes =
+    Number(match[1]) *
+    { '': 1, b: 1, k: 1024, m: 1024 ** 2, g: 1024 ** 3 }[
+      match[2]!.toLowerCase() as '' | 'b' | 'k' | 'm' | 'g'
+    ]
+  return Math.max(256, Math.round(bytes / 1024 ** 2))
+}
+
+/** pacenote-vm run arguments for one process */
+export function vmRunArgs(
+  options: Pick<VmSandboxOptions, 'root' | 'image' | 'memoryMiB' | 'cpus'>,
+  run: Pick<SandboxRun, 'command' | 'args' | 'env' | 'mounts' | 'cwd'>,
+  egress?: string
+): string[] {
+  const args = [
+    'run',
+    '--root',
+    options.root,
+    '--image',
+    options.image,
+    '--cpus',
+    String(Math.max(1, Math.ceil(options.cpus))),
+    '--memory',
+    String(options.memoryMiB),
+  ]
+  for (const tmpfs of TMPFS) args.push('--tmpfs', tmpfs)
+  if (egress) args.push('--egress', egress)
+  // Values come from pacenote-vm's environment, which keeps them out of
+  // process listings.
+  for (const name of Object.keys(run.env ?? {})) args.push('--env', name)
+  for (const mount of run.mounts ?? [])
+    args.push(
+      '--mount',
+      `${mount.host}:${mount.at}${mount.writable ? ':rw' : ''}`
+    )
+  if (run.cwd)
+    args.push(
+      '--mount',
+      `${run.cwd.host}:${run.cwd.at}`,
+      '--workdir',
+      run.cwd.at
+    )
+  else args.push('--workdir', SANDBOX_PATHS.empty)
+  args.push('--', run.command, ...run.args)
+  return args
+}
+
+export class VmSandbox implements Sandbox {
+  readonly kind = 'vm' as const
+  readonly isolated = true
+  private egress?: Promise<EgressProxy>
+  private allowlist: { mtimeMs: number; domains: string[] } = {
+    mtimeMs: -1,
+    domains: [],
+  }
+  /** Set once a VM has started here: the whole chain works */
+  private started = false
+
+  constructor(
+    private readonly options: VmSandboxOptions,
+    private readonly log?: Logger
+  ) {}
+
+  pathIn(mount: Mount, hostFile: string): string {
+    return path.posix.join(
+      mount.at,
+      path.relative(mount.host, hostFile).split(path.sep).join('/')
+    )
+  }
+
+  async run(run: SandboxRun): Promise<RunResult> {
+    const egress = await this.openEgress()
+    const result = await runProcess(
+      this.options.bin,
+      vmRunArgs(this.options, run, egress.socket),
+      {
+        cwd: process.cwd(),
+        input: run.input,
+        timeoutMs: run.timeoutMs,
+        signal: run.signal,
+        env: { ...process.env, ...run.env },
+        onStdoutLine: run.onOutputLine,
+      }
+    )
+    this.started = true
+    return result
+  }
+
+  /** Without the way out: someone else's PDF needs no network. */
+  async extractPdfText(pdfPath: string): Promise<string> {
+    const { stdout } = await runProcess(
+      this.options.bin,
+      vmRunArgs(
+        { ...this.options, memoryMiB: 512, cpus: 1 },
+        {
+          command: 'pdftotext',
+          args: [...PDFTOTEXT_ARGS, `/in/${path.basename(pdfPath)}`, '-'],
+          mounts: [{ host: path.dirname(pdfPath), at: '/in' }],
+        }
+      ),
+      { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
+    )
+    return stdout
+  }
+
+  async verify(): Promise<string[]> {
+    const unsupported = vmUnsupported()
+    if (unsupported) return [unsupported]
+    const status = await vmStatus(this.options)
+    const problems = vmProblems(status)
+    if (!existsSync(this.options.allowlistFile))
+      problems.push(
+        `The allowed domains list is missing (${this.options.allowlistFile}): ${jobHint('vm')}.`
+      )
+    if (problems.length > 0 || this.started) return problems
+    // One VM, once, to know the whole chain works: the helper may start, the
+    // kernel boots, the image runs.
+    try {
+      await runProcess(
+        this.options.bin,
+        vmRunArgs(
+          { ...this.options, memoryMiB: 256, cpus: 1 },
+          {
+            command: 'true',
+            args: [],
+          }
+        ),
+        { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
+      )
+      this.started = true
+      return []
+    } catch (err) {
+      return [`A VM did not start: ${(err as Error).message}`]
+    }
+  }
+
+  /** Stops the way out, at shutdown */
+  async close(): Promise<void> {
+    const egress = this.egress
+    this.egress = undefined
+    await (await egress?.catch(() => undefined))?.close()
+  }
+
+  private openEgress(): Promise<EgressProxy> {
+    this.egress ??= (async () => {
+      const proxy = new EgressProxy({
+        socket: path.join(tmpdir(), `pacenote-egress-${process.pid}.sock`),
+        allowed: () => this.allowedDomains(),
+        resolve: this.options.resolve,
+        log: this.log,
+      })
+      await proxy.listen()
+      return proxy
+    })()
+    this.egress.catch(() => (this.egress = undefined))
+    return this.egress
+  }
+
+  /** The allowed domains file, read again only when it changed */
+  private allowedDomains(): string[] {
+    try {
+      const { mtimeMs } = statSync(this.options.allowlistFile)
+      if (mtimeMs !== this.allowlist.mtimeMs)
+        this.allowlist = {
+          mtimeMs,
+          domains: parseAllowlist(
+            readFileSync(this.options.allowlistFile, 'utf8')
+          ),
+        }
+      return this.allowlist.domains
+    } catch {
+      return []
+    }
+  }
+}
+
+/** What pacenote-vm has ready, from its status */
+export async function vmStatus(
+  options: Pick<VmSandboxOptions, 'bin' | 'root' | 'image'>
+): Promise<VmStatus> {
+  const status: VmStatus = {
+    unsupported: vmUnsupported(),
+    helper: { path: options.bin, ok: false },
+    kernel: false,
+    initfs: false,
+  }
+  if (status.unsupported) return status
+  try {
+    const { stdout } = await runProcess(
+      options.bin,
+      ['status', '--root', options.root],
+      { cwd: process.cwd(), input: '', timeoutMs: 15_000 }
+    )
+    const report = JSON.parse(stdout) as {
+      version?: number
+      kernel?: boolean
+      initfs?: boolean
+      images?: Record<string, { created?: string; base?: string }>
+    }
+    status.helper.ok = report.version === VM_FORMAT
+    if (!status.helper.ok)
+      status.helper.error = `pacenote-vm speaks version ${report.version}, Pacenote ${VM_FORMAT}.`
+    status.kernel = report.kernel === true
+    status.initfs = report.initfs === true
+    const image = report.images?.[options.image]
+    if (image?.created)
+      status.image = { createdAt: image.created, base: image.base ?? '' }
+  } catch (err) {
+    status.helper.error = existsSync(options.bin)
+      ? (err as Error).message
+      : `pacenote-vm not found at ${options.bin}.`
+  }
+  return status
+}
+
+/** What keeps the built-in sandbox from running, from its status */
+export function vmProblems(status: VmStatus): string[] {
+  if (status.unsupported) return [status.unsupported]
+  if (!status.helper.ok) return [status.helper.error ?? 'pacenote-vm failed.']
+  const missing = [
+    !status.kernel && 'the Linux kernel',
+    !status.initfs && 'the init filesystem',
+    !status.image && 'the reasoner image',
+  ].filter(Boolean)
+  return missing.length > 0
+    ? [`The built-in sandbox lacks ${missing.join(', ')}: ${jobHint('vm')}.`]
+    : []
+}

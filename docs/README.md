@@ -5,7 +5,7 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
 - [Architecture](architecture.md): the design in six diagrams: the pieces, one mention, your tasks and AI tools, the
   team hub, the layers (messenger, reasoner, sandbox), the code layout
 - [How it works](how-it-works.md): the path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs
-- [Reasoner sandbox](sandbox.md): where answers run: on this Mac and what the CLI may read there, or the Docker sandbox
+- [Reasoner sandbox](sandbox.md): where answers run: on this Mac and what the CLI may read there, the built-in VM sandbox, or the Docker sandbox
   with its egress proxy, allowed domains and login
 - [Ops tools](ops-tools.md): ops-broker for hosts, k8s, the work directory, GitHub and Jira, and code changes as draft PRs
 - [Team hub](team-hub.md): one Slack app for a team, with each member's desktop answering their own mentions

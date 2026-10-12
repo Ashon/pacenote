@@ -10,7 +10,9 @@ Pace, the bot, runs on your Mac as a process the desktop app manages, in four la
 mention pipeline, the reasoner that calls your `claude` or `codex` CLI, and the sandbox the CLI runs in. Slack reaches
 it over Socket Mode, so nothing listens on a public port. With the Docker sandbox, each answer is reasoned in a new,
 hardened container whose only ways out are the egress proxy (the model APIs and the domains you allow) and ops-broker
-(ops tools, with the credentials kept in the broker); without it, the CLI runs on your Mac with your own login.
+(ops tools, with the credentials kept in the broker). The built-in sandbox does the same in a Linux VM of its own,
+started by the app with no network device, whose one way out is Pace's own egress proxy. Without either, the CLI runs
+on your Mac with your own login.
 Diagrams are rendered in a container of their own, with no network. The app also offers an MCP server to the AI tools
 on your Mac, for your tasks and the run history ([below](#your-tasks-and-ai-tools)). Settings and everything Pace keeps
 live in `~/.pacenote`.

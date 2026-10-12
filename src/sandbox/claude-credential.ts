@@ -17,7 +17,9 @@ export interface ClaudeCredential {
   apiKey?: string
 }
 
-const MODELS_URL = 'https://api.anthropic.com/v1/models?limit=1'
+/** The model list, at ANTHROPIC_BASE_URL when set, as claude itself does */
+const modelsUrl = () =>
+  `${process.env.ANTHROPIC_BASE_URL?.trim().replace(/\/$/, '') || 'https://api.anthropic.com'}/v1/models?limit=1`
 /** How long an answer is reused, so screens that refresh do not ask again */
 const CACHE_MS = 10 * 60_000
 const cache = new Map<string, { state: CredentialState; at: number }>()
@@ -58,7 +60,7 @@ export async function checkClaudeCredential(
   }
   let state: CredentialState
   try {
-    const res = await (options.fetchImpl ?? fetch)(MODELS_URL, {
+    const res = await (options.fetchImpl ?? fetch)(modelsUrl(), {
       headers,
       signal: AbortSignal.timeout(10_000),
     })

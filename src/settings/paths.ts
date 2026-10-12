@@ -41,6 +41,18 @@ export function allowlistPath(
 }
 
 /**
+ * The built-in VM sandbox's folder: kernel, init filesystem, images
+ * (PACENOTE_VM_ROOT for tests)
+ */
+export function vmRootPath(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir()
+): string {
+  const root = env.PACENOTE_VM_ROOT?.trim()
+  return root ? path.resolve(root) : path.join(pacenoteHome(env, home), 'vm')
+}
+
+/**
  * Generated files the broker mounts (hosts.json, kubeconfig) and empty
  * placeholders for unset mounts (unset/)
  */

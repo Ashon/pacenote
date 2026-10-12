@@ -71,7 +71,7 @@ export function failureAdvice(
 ): FailureAdvice | undefined {
   switch (cause) {
     case 'auth':
-      if (sandbox !== 'docker')
+      if (sandbox === 'host')
         return {
           text: `${backend}'s sign-in on this Mac was rejected. Sign in again in a terminal (${backend === 'codex' ? 'codex login' : 'claude, then /login'}).`,
           lasting: true,

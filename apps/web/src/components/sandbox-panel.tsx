@@ -205,6 +205,93 @@ export function SandboxStatusCard({ sandbox }: { sandbox: Sandbox }) {
   )
 }
 
+/**
+ * The built-in VM sandbox: whether this Mac runs it, and what it has ready.
+ * Its way out is Pacenote's own proxy, so there is no container to show.
+ */
+export function VmStatusCard({ sandbox }: { sandbox: Sandbox }) {
+  const { status, loading, refresh } = sandbox
+  const vm = status?.vm
+  // Only what the built-in sandbox needs: Pace's restart, and the login. The
+  // Docker proxy and broker have their own lines when Docker is chosen.
+  const pending = status?.pending.filter((item) => item.component === 'bot')
+  const checks = status?.checks.filter((check) => check.login) ?? []
+  return (
+    <Card
+      title="Built-in sandbox"
+      help={
+        status
+          ? `A lightweight Linux VM for each request. Checked ${formatRelative(status.checkedAt)}`
+          : 'Checking'
+      }
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={refresh}
+          disabled={loading}
+        >
+          <RefreshCw className={cn(loading && 'animate-spin')} />
+          Refresh
+        </Button>
+      }
+    >
+      {vm && (
+        <div className="divide-y divide-border">
+          {pending && pending.length > 0 && (
+            <PendingList pending={pending} sandbox={sandbox} />
+          )}
+          {vm.unsupported ? (
+            <Line label="This Mac">
+              <Dot ok={false} />
+              {vm.unsupported}
+            </Line>
+          ) : (
+            <>
+              <Line label="pacenote-vm">
+                <Dot ok={vm.helper.ok} />
+                <span className="break-all select-text">
+                  {vm.helper.ok ? vm.helper.path : vm.helper.error}
+                </span>
+              </Line>
+              <Line label="Linux">
+                <span className="flex items-center gap-1.5">
+                  <Dot ok={vm.kernel} warn />
+                  Kernel {vm.kernel ? 'ready' : 'missing'}
+                </span>
+                <span className="ml-4 flex items-center gap-1.5">
+                  <Dot ok={vm.initfs} warn />
+                  Init {vm.initfs ? 'ready' : 'missing'}
+                </span>
+              </Line>
+              <Line label="Reasoner image">
+                <Dot ok={Boolean(vm.image)} warn />
+                {vm.image
+                  ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}`
+                  : 'Not built yet: run Set up built-in sandbox below'}
+              </Line>
+            </>
+          )}
+          {checks.map((check) => (
+            <Line key={check.label} label={check.label}>
+              {check.ok ? (
+                <CircleCheck className="size-3.5 shrink-0 text-status-succeeded" />
+              ) : (
+                <CircleX className="size-3.5 shrink-0 text-status-failed" />
+              )}
+              <span
+                className={cn('break-all', !check.ok && 'text-status-failed')}
+              >
+                <span className="select-text">{check.detail}</span>
+              </span>
+            </Line>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function Line({
   label,
   children,
@@ -291,7 +378,17 @@ export function PendingList({
 }
 
 /** Edits the domains allowed for outbound access */
-export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
+export function AllowlistCard({
+  sandbox,
+  builtIn,
+}: {
+  sandbox: Sandbox
+  /**
+   * The built-in sandbox reads the list on every request; Docker's proxy only
+   * when it restarts.
+   */
+  builtIn?: boolean
+}) {
   const status = sandbox.status
   const saved = status?.allowlist.domains ?? []
   const required = status?.allowlist.required ?? []
@@ -316,7 +413,11 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
         setIssues(found)
         if (found.length === 0) {
           setDraft(undefined)
-          setNotice('Saved. Restart the proxy to apply.')
+          setNotice(
+            builtIn
+              ? 'Saved. The next request uses it.'
+              : 'Saved. Restart the proxy to apply.'
+          )
           sandbox.refresh()
         }
       })
@@ -327,18 +428,20 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
       title="Allowed outbound domains"
       help={
         <>
-          Domains the reasoner container can reach directly through the proxy.
+          Domains the reasoner sandbox can reach directly through the proxy.
           Only HTTPS (443) and only exact name matches are allowed.
-          <span className="ml-1 whitespace-nowrap text-status-interrupted">
-            Apply: Restart proxy
-          </span>
+          {!builtIn && (
+            <span className="ml-1 whitespace-nowrap text-status-interrupted">
+              Apply: Restart proxy
+            </span>
+          )}
         </>
       }
     >
       <div className="space-y-3 px-4 py-3">
         <p className="flex items-start gap-1.5 rounded-lg bg-status-interrupted/10 px-3 py-2 text-xs text-status-interrupted">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
-          Opening a domain lets the reasoner container send data there directly.
+          Opening a domain lets the reasoner sandbox send data there directly.
           For internal systems that need tokens (GitHub etc.), connect them as
           ops-broker tools instead of opening the domain. (The tokens stay out
           of the sandbox)
@@ -437,7 +540,14 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
 const JOB_ORDER: SandboxJobKind[] = ['images', 'kubeconfig', 'proxy', 'broker']
 
 /** Runs apply jobs and shows their output */
-export function JobsCard({ sandbox }: { sandbox: Sandbox }) {
+export function JobsCard({
+  sandbox,
+  kinds = JOB_ORDER,
+}: {
+  sandbox: Sandbox
+  /** The jobs to offer, in order */
+  kinds?: SandboxJobKind[]
+}) {
   const { job, run, error, status } = sandbox
   const running = job?.state === 'running'
   const active = status?.activeRequests ?? 0
@@ -452,7 +562,7 @@ export function JobsCard({ sandbox }: { sandbox: Sandbox }) {
       help="Runs the sandbox jobs from the app; from the repository, each is the pnpm script shown. One job runs at a time, and secrets in the output are masked."
     >
       <div className="divide-y divide-border">
-        {JOB_ORDER.map((kind) => {
+        {kinds.map((kind) => {
           const disruptive = kind === 'proxy' || kind === 'broker'
           return (
             <div key={kind} className="flex items-center gap-3 px-4 py-2.5">

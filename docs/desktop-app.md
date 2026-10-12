@@ -115,7 +115,7 @@ Settings:
   | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
-  | Sandbox | Run environment (on this Mac or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |
+  | Sandbox | Run environment (on this Mac, the built-in sandbox or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |
   | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
   | History & logs | Run history and retention, log level |
 
@@ -145,7 +145,11 @@ Settings:
 
 Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
 
-- The sandbox has three components, and each applies settings differently. Each section says how its settings apply.
+- The built-in sandbox (a VM per request, [Reasoner sandbox](sandbox.md#built-in-sandbox)) has one card of its own: whether
+  this Mac runs it, pacenote-vm, the kernel and init filesystem, and when the reasoner image was built, with "Set up
+  built-in sandbox" (`sandbox:vm`) beside it. Its allowed domains apply from the next request, with nothing to restart.
+  Settings that need Pace's restart (`SANDBOX_*`) show as pending there too.
+- The Docker sandbox has three components, and each applies settings differently. Each section says how its settings apply.
 
   | Component | Settings | Applied by |
   | --- | --- | --- |

@@ -19,6 +19,7 @@ describe('app paths', () => {
       sandboxDir: '/repo/sandbox',
       jobRunner: '/repo/build/tools/sandbox-job.mjs',
       historyMcp: '/repo/build/tools/history-mcp.mjs',
+      vmBin: '/repo/apps/vm/.build/release/pacenote-vm',
       repoRoot: '/repo',
     })
     const app = '/Applications/Pacenote.app/Contents/Resources/app'
@@ -29,6 +30,7 @@ describe('app paths', () => {
       sandboxDir: `${app}/sandbox`,
       jobRunner: `${app}/tools/sandbox-job.mjs`,
       historyMcp: `${app}/tools/history-mcp.mjs`,
+      vmBin: '/Applications/Pacenote.app/Contents/MacOS/pacenote-vm',
     })
   })
 })
@@ -84,6 +86,9 @@ describe('sandbox jobs', () => {
       args: expect.not.arrayContaining(['--env-file']),
     })
     expect(planJob('kubeconfig', ctx)).toEqual([{ kind: 'kubeconfig' }])
+    // The built-in sandbox needs no Docker: the allowed domains list, then its
+    // own setup.
+    expect(planJob('vm', ctx)).toEqual([{ kind: 'allowlist' }, { kind: 'vm' }])
   })
 
   it('layers the environment over the config file and expands PACENOTE_HOME for compose', () => {

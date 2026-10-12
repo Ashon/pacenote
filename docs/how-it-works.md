@@ -8,7 +8,7 @@ What happens between a mention and its answer: context, attachments, diagrams an
   -> check allowed users / public channel
   -> Pace reacts to the mention with 👀 (and ⏳ after 90 seconds)
   -> collect thread context (the whole thread, or the last 10 messages outside a thread)
-  -> Reasoner: claude -p or codex exec (a disposable container when REASONER_SANDBOX=docker)
+  -> Reasoner: claude -p or codex exec (a disposable VM or container when REASONER_SANDBOX=vm or docker)
   -> post the answer as a new reply (long answers continue in more messages), and take the reactions off
 ```
 

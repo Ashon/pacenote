@@ -24,6 +24,8 @@
     "docs:diagrams": "node scripts/diagrams.mjs",
     "check": "pnpm typecheck && pnpm --filter @pacenote/web typecheck && pnpm --filter @pacenote/desktop typecheck && pnpm lint && pnpm format:check && pnpm test",
     "sandbox:build": "tsx src/tools/sandbox-job.ts images",
+    "vm:build": "cd apps/vm && swift build -c release && codesign -s - -f --entitlements vm.entitlements .build/release/pacenote-vm",
+    "sandbox:vm": "pnpm vm:build && tsx src/tools/sandbox-job.ts vm",
     "sandbox:up": "tsx src/tools/sandbox-job.ts proxy",
     "sandbox:down": "docker compose -f sandbox/compose.yaml down",
     "slack:check": "tsx src/tools/check-slack.ts",

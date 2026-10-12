@@ -35,7 +35,7 @@ export const SETTING_SECTIONS: {
   {
     id: 'sandbox',
     label: 'Sandbox',
-    help: 'Where the reasoner CLI runs for each request. Allowed domains apply when the proxy restarts, everything else when Pace restarts.',
+    help: 'Where the reasoner CLI runs for each request. Allowed domains apply at once in the built-in sandbox and when the proxy restarts in Docker; everything else when Pace restarts.',
   },
   {
     id: 'ops',
@@ -96,10 +96,10 @@ export interface SettingField {
    */
   applies?: SandboxComponent | 'app'
   /**
-   * Shown only while another field has this value (e.g. sandbox limits only for
-   * the docker run environment). Hidden values stay in .env.
+   * Shown only while another field has this value, or one of these values
+   * (e.g. sandbox limits only for the sandboxes). Hidden values stay in .env.
    */
-  shownWhen?: { key: string; equals: string }
+  shownWhen?: { key: string; equals: string | readonly string[] }
   /**
    * Saved and validated like any field but never shown as a row; the screen
    * sets it some other way (e.g. hub pairing)
@@ -167,7 +167,7 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     id: 'credentials',
     section: 'sandbox',
     label: 'Reasoner login',
-    help: 'Passed into the sandbox container for the selected reasoner CLI. Your own CLI login on this Mac is not used there.',
+    help: 'Passed into the sandbox for the selected reasoner CLI. Your own CLI login on this Mac is not used there.',
   },
   {
     id: 'ops',
@@ -426,6 +426,11 @@ export const SETTING_FIELDS: SettingField[] = [
         help: 'The CLI runs directly with your own login. Quick to set up, but nothing isolates it from this Mac.',
       },
       {
+        value: 'vm',
+        label: 'Built-in sandbox',
+        help: 'A lightweight Linux VM for each request, built into Pacenote: no Docker to install. It has only the login set below, and its only way out leads to the allowed domains. Needs Apple silicon and macOS 15 or later.',
+      },
+      {
         value: 'docker',
         label: 'Docker sandbox',
         help: 'A fresh container for each request, with only the login set below and outbound traffic limited to allowed domains. Ops tools need it.',
@@ -440,7 +445,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'docker --memory format (e.g. 2g, 1536m)',
     type: 'text',
     default: '2g',
-    shownWhen: { key: 'REASONER_SANDBOX', equals: 'docker' },
+    shownWhen: { key: 'REASONER_SANDBOX', equals: ['docker', 'vm'] },
   },
   {
     key: 'SANDBOX_CPUS',
@@ -448,7 +453,7 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'CPU limit',
     type: 'text',
     default: '2',
-    shownWhen: { key: 'REASONER_SANDBOX', equals: 'docker' },
+    shownWhen: { key: 'REASONER_SANDBOX', equals: ['docker', 'vm'] },
   },
   {
     key: 'SANDBOX_IMAGE',
@@ -808,4 +813,14 @@ export function maskSecret(value: string): string {
   const prefix =
     /^(xox[a-z]-|xapp-|sk-ant-[a-z0-9]+-|sk-)/i.exec(value)?.[0] ?? ''
   return `${prefix}...${value.slice(-4)}`
+}
+
+/** Whether a field's shownWhen holds for this value of the field it names */
+export function shownFor(
+  shownWhen: NonNullable<SettingField['shownWhen']>,
+  value: string
+): boolean {
+  return typeof shownWhen.equals === 'string'
+    ? value === shownWhen.equals
+    : shownWhen.equals.includes(value)
 }

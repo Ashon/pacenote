@@ -5,12 +5,18 @@ import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
 import { defaultHome } from './settings/home.js'
-import { pacenoteHome } from './settings/paths.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
 import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
 import type { DockerSandboxOptions } from './sandbox/docker.js'
+import {
+  defaultVmBin,
+  memoryMiB,
+  VM_IMAGE,
+  type VmSandboxOptions,
+} from './sandbox/vm.js'
+import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
 
@@ -127,7 +133,7 @@ export const EnvSchema = z.object({
   REASONER_TIMEOUT_SEC: z.coerce.number().int().positive().default(900),
   CLAUDE_BIN: z.string().default('claude'),
   CODEX_BIN: z.string().default('codex'),
-  REASONER_SANDBOX: z.enum(['none', 'docker']).default('none'),
+  REASONER_SANDBOX: z.enum(['none', 'docker', 'vm']).default('none'),
   DOCKER_BIN: z.string().default('docker'),
   SANDBOX_IMAGE: z.string().default('pacenote-reasoner:latest'),
   SANDBOX_NETWORK: z.string().default('pacenote-sandbox'),
@@ -231,6 +237,8 @@ export interface Config {
     commands: Record<ReasonerId, string>
     /** If set, runs the CLI inside a disposable docker container. */
     sandbox?: DockerSandboxOptions
+    /** If set, runs the CLI in a lightweight VM of its own (sandbox/vm.ts). */
+    vm?: VmSandboxOptions
   }
   /**
    * Renders mermaid/dot/vega-lite/svg blocks in answers to PNG and uploads
@@ -417,6 +425,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       codexHome: env.CODEX_HOME
         ? expandHome(env.CODEX_HOME)
         : path.join(homedir(), '.codex'),
+      vm: {
+        bin: defaultVmBin(env),
+        root: vmRootPath(env),
+        allowlistFile: allowlistPath(env),
+      },
     }),
     render: {
       enabled: e.RENDER_DIAGRAMS === 'on',
@@ -497,6 +510,8 @@ function buildReasonerConfig(
     deniedReads: string[]
     /** codex's own folder on this Mac (CODEX_HOME), for its config.toml */
     codexHome: string
+    /** Where the built-in VM sandbox's parts are */
+    vm: Pick<VmSandboxOptions, 'bin' | 'root' | 'allowlistFile'>
   }
 ): Config['reasoner'] {
   const base: Config['reasoner'] = {
@@ -521,7 +536,7 @@ function buildReasonerConfig(
     }
     base.mcpServers = [{ name: 'ops', url: e.OPS_BROKER_URL }]
   }
-  if (e.REASONER_SANDBOX !== 'docker') {
+  if (e.REASONER_SANDBOX === 'none') {
     // codex on this Mac does not load the user's config.toml (its MCP servers
     // and sandbox settings stay out of answers), so the model it names comes
     // along as arguments, as in the container.
@@ -535,8 +550,8 @@ function buildReasonerConfig(
     return { ...base, deniedReads: host.deniedReads }
   }
 
-  // The container has no host keychain or config, so credentials are passed
-  // explicitly.
+  // The container or VM has no host keychain or config, so credentials are
+  // passed explicitly.
   const claudeEnv: Record<string, string> = {}
   if (e.SANDBOX_CLAUDE_OAUTH_TOKEN) {
     claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = e.SANDBOX_CLAUDE_OAUTH_TOKEN
@@ -546,7 +561,7 @@ function buildReasonerConfig(
   if (e.REASONER === 'claude' && Object.keys(claudeEnv).length === 0) {
     throw new MissingSettingError(
       'SANDBOX_CLAUDE_OAUTH_TOKEN',
-      'Using claude with REASONER_SANDBOX=docker requires SANDBOX_CLAUDE_OAUTH_TOKEN (claude setup-token) or SANDBOX_ANTHROPIC_API_KEY.',
+      `Using claude with REASONER_SANDBOX=${e.REASONER_SANDBOX} requires SANDBOX_CLAUDE_OAUTH_TOKEN (claude setup-token) or SANDBOX_ANTHROPIC_API_KEY.`,
       'sk-ant-oat01-stand-in'
     )
   }
@@ -555,7 +570,7 @@ function buildReasonerConfig(
   if (e.REASONER === 'codex') {
     if (!path.isAbsolute(codexAuthFile) || !existsSync(codexAuthFile)) {
       throw new Error(
-        `Using codex with REASONER_SANDBOX=docker requires a codex login file: ${codexAuthFile}`
+        `Using codex with REASONER_SANDBOX=${e.REASONER_SANDBOX} requires a codex login file: ${codexAuthFile}`
       )
     }
     if (!e.REASONER_MODEL) {
@@ -567,11 +582,23 @@ function buildReasonerConfig(
     }
   }
 
+  // Only the selected CLI's credentials go into its runs.
+  const auth =
+    e.REASONER === 'claude' ? { env: claudeEnv } : { file: codexAuthFile }
+  if (e.REASONER_SANDBOX === 'vm')
+    return {
+      ...base,
+      auth,
+      vm: {
+        ...host.vm,
+        image: VM_IMAGE,
+        memoryMiB: memoryMiB(e.SANDBOX_MEMORY),
+        cpus: Number(e.SANDBOX_CPUS),
+      },
+    }
   return {
     ...base,
-    // Only the selected CLI's credentials go into its runs.
-    auth:
-      e.REASONER === 'claude' ? { env: claudeEnv } : { file: codexAuthFile },
+    auth,
     sandbox: {
       dockerBin: e.DOCKER_BIN,
       image: e.SANDBOX_IMAGE,
