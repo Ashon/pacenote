@@ -23,6 +23,7 @@ import { HistoryStore } from '../../../src/history/recorder.js'
 import { handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import { DESKTOP_LOG_FILE, readBotStatus } from '../../../src/runtime/status.js'
+import type { LoginItemState } from '../../../src/runtime/types.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
 import {
   defaultHome,
@@ -439,6 +440,21 @@ function createTray(): void {
   setInterval(updateTray, 2_000).unref()
 }
 
+/**
+ * Whether the app opens when you log in. macOS keeps the setting (Login Items),
+ * and only the installed app can be one: a dev run would add Electron itself.
+ */
+function loginItem(): LoginItemState {
+  if (!app.isPackaged)
+    return { available: false, on: false, needsApproval: false }
+  const item = app.getLoginItemSettings()
+  return {
+    available: true,
+    on: item.openAtLogin,
+    needsApproval: item.status === 'requires-approval',
+  }
+}
+
 /** Bot control from the UI. Accepts requests only from the main window. */
 function registerBotIpc(): void {
   const fromMainWindow = (event: Electron.IpcMainInvokeEvent) =>
@@ -470,6 +486,23 @@ function registerBotIpc(): void {
     log.error(
       `The window hit an error: ${String(message).slice(0, 2_000)}${typeof stack === 'string' ? `\n${stack.slice(0, 8_000)}` : ''}`
     )
+  })
+  ipcMain.handle('pacenote:app:login-item', (event) =>
+    fromMainWindow(event) ? loginItem() : null
+  )
+  ipcMain.handle('pacenote:app:set-login-item', (event, value: unknown) => {
+    if (!fromMainWindow(event)) return null
+    if (app.isPackaged && typeof value === 'boolean') {
+      app.setLoginItemSettings({ openAtLogin: value })
+      log.info(`Open at login ${value ? 'on' : 'off'}`)
+    }
+    return loginItem()
+  })
+  ipcMain.handle('pacenote:app:open-login-items', (event) => {
+    if (fromMainWindow(event))
+      void shell.openExternal(
+        'x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
+      )
   })
   ipcMain.handle('pacenote:bot:open-logs', (event) => {
     if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
@@ -781,7 +814,11 @@ if (!app.requestSingleInstanceLock()) {
       ) {
         void supervisor.start()
       }
-      await createWindow()
+      // Opened at login, it stays in the menu bar until you open it.
+      const atLogin =
+        app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin
+      if (atLogin) log.info('Opened at login; the window waits')
+      else await createWindow()
       app.on('activate', () => showMainWindow())
     })
     .catch(reportStartupError)

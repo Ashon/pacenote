@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { SupervisorState } from '@runtime/types'
+import type { LoginItemState, SupervisorState } from '@runtime/types'
 import type {
   HubTeam,
   HubUser,
@@ -48,6 +48,12 @@ declare global {
       dev?: boolean
       /** Writes a screen's render error to the app's log */
       reportError(report: { message: string; stack?: string }): Promise<void>
+      /** Opening the app when you log in */
+      loginItem: {
+        get(): Promise<LoginItemState | null>
+        set(on: boolean): Promise<LoginItemState | null>
+        openSystemSettings(): Promise<void>
+      }
       bot: {
         state(): Promise<SupervisorState | null>
         start(): Promise<void>

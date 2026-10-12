@@ -1,4 +1,4 @@
-import type { SupervisorState } from '@runtime/types'
+import type { LoginItemState, SupervisorState } from '@runtime/types'
 import type {
   SandboxJob,
   SandboxJobKind,
@@ -22,6 +22,30 @@ export function useSupervisor(): SupervisorState | undefined {
 }
 
 export const botControl = () => window.pacenoteDesktop?.bot
+
+/**
+ * Whether the app opens when you log in. Read again when the window comes back,
+ * since System Settings can change it too.
+ */
+export function useLoginItem() {
+  const bridge = window.pacenoteDesktop?.loginItem
+  const [state, setState] = useState<LoginItemState>()
+  useEffect(() => {
+    if (!bridge) return
+    const read = () =>
+      void bridge.get().then((value) => value && setState(value))
+    read()
+    window.addEventListener('focus', read)
+    return () => window.removeEventListener('focus', read)
+  }, [bridge])
+  const set = (on: boolean) =>
+    void bridge?.set(on).then((value) => value && setState(value))
+  return {
+    state,
+    set,
+    openSystemSettings: () => void bridge?.openSystemSettings(),
+  }
+}
 
 /** Sandbox status and apply jobs. Reloads the status when a job finishes. */
 export function useSandbox() {

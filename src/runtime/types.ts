@@ -101,3 +101,12 @@ export interface SupervisorState {
    */
   canBuild: boolean
 }
+
+/** Whether the desktop app opens when you log in (macOS Login Items) */
+export interface LoginItemState {
+  /** Only the installed app can be one; a dev run would add Electron */
+  available: boolean
+  on: boolean
+  /** macOS 13 and later hold a new login item until you allow it */
+  needsApproval: boolean
+}

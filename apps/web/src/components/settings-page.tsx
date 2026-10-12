@@ -53,7 +53,12 @@ import {
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { botControl, useSandbox, useSupervisor } from '@/lib/desktop'
+import {
+  botControl,
+  useLoginItem,
+  useSandbox,
+  useSupervisor,
+} from '@/lib/desktop'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { McpConnections } from './mcp-connections'
@@ -156,6 +161,7 @@ interface Hint {
 export function SettingsPage() {
   const settings = bridge()
   const supervisor = useSupervisor()
+  const loginItem = useLoginItem()
   const sandbox = useSandbox()
   const [section, go] = useSection()
   const [view, setView] = useState<SettingsView>()
@@ -694,6 +700,38 @@ export function SettingsPage() {
             >
               <ThemePicker />
             </Row>
+            {loginItem.state && (
+              <Row
+                label="Open Pacenote when you log in"
+                help={
+                  loginItem.state.available
+                    ? 'It opens in the menu bar, without a window. macOS keeps this in Login Items.'
+                    : 'Only the installed Pacenote can open at login.'
+                }
+                warning={
+                  loginItem.state.needsApproval
+                    ? 'macOS is waiting for you to allow Pacenote in System Settings > General > Login Items.'
+                    : undefined
+                }
+              >
+                <div className="flex items-center gap-2">
+                  {loginItem.state.needsApproval && (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={loginItem.openSystemSettings}
+                    >
+                      Open Login Items
+                    </Button>
+                  )}
+                  <Switch
+                    checked={loginItem.state.on}
+                    disabled={!loginItem.state.available}
+                    onChange={loginItem.set}
+                  />
+                </div>
+              </Row>
+            )}
             {supervisor && (
               <Row
                 label="Start Pace when the app opens"
@@ -1922,18 +1960,21 @@ function ThemePicker() {
 function Switch({
   checked,
   onChange,
+  disabled,
 }: {
   checked: boolean
   onChange: (value: boolean) => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-5 w-9 rounded-full transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
+        'relative h-5 w-9 rounded-full transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none disabled:opacity-50',
         checked ? 'bg-primary' : 'bg-input'
       )}
     >

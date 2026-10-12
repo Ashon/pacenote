@@ -75,7 +75,10 @@ Bot management:
   Pace's mark beside its name looks around while Pace starts or stops, and turns while it is connected: once in 16 seconds,
   four times as fast while it answers. With reduced motion it stays still. Stopped, a gray stop sign (a circle and a bar) takes its place. The status bar's dot pings only while Pace starts or stops.
 - The menu bar (tray) holds only "Open Pacenote" at the top, then the bot status ("Pace: ...") with "Start Pace" (when stopped) or "Restart Pace", and "Quit Pacenote".
-  App settings (automatic start, run history folder) are in Settings.
+  App settings (opening at login, automatic start, run history folder) are in Settings.
+- "Open Pacenote when you log in" (Settings > General, installed app only) adds Pacenote to macOS Login Items. Opened at
+  login, it stays in the menu bar without a window and starts Pace if automatic start is on. On macOS 13 and later, a new
+  login item may wait for your approval; the row says so and opens System Settings > General > Login Items.
 - While requests are in progress, the app keeps the Mac from going to sleep (`powerSaveBlocker`, system sleep only), so an
   answer is not cut off halfway. The display still sleeps, and closing the lid still sleeps the Mac.
 - Stop and app quit send SIGTERM. The bot gives requests in progress up to 15 seconds, then stops their reasoner runs (the CLI
@@ -101,7 +104,7 @@ Settings:
 
   | Section | What it holds |
   | --- | --- |
-  | General | Theme, starting the bot with the app, the settings file and run history folder |
+  | General | Theme, opening the app at login, starting the bot with the app, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
   | Sandbox | Run environment (on this Mac or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |
