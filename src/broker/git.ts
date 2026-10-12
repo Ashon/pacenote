@@ -134,6 +134,8 @@ export interface GitWorkspaceOptions {
   authorEmail: string
   allowedOwners: string[]
   timeoutMs: number
+  /** The way out (HTTPS_PROXY and the like), when the broker needs one */
+  proxyEnv?: NodeJS.ProcessEnv
 }
 
 export class GitWorkspaces {
@@ -149,6 +151,7 @@ export class GitWorkspaces {
     return {
       PATH: process.env.PATH,
       HOME: '/tmp',
+      ...this.options.proxyEnv,
       GIT_TERMINAL_PROMPT: '0',
       // Passes the token only through this process environment, never via
       // arguments or config files.

@@ -123,7 +123,7 @@ describe('loadConfig', () => {
     )
   })
 
-  it('enables ops tools only with the docker sandbox and an allowed user list', () => {
+  it('enables ops tools only in a sandbox and with an allowed user list', () => {
     const codexAuth = path.join(dir, 'auth.json')
     writeFileSync(codexAuth, '{}')
     const base = {
@@ -134,7 +134,7 @@ describe('loadConfig', () => {
       OPS_TOOLS: 'on',
     }
     expect(() => loadConfig({ ...base, MENTION_ALLOWED_USERS: 'U1' })).toThrow(
-      /REASONER_SANDBOX=docker/
+      /requires a sandbox: REASONER_SANDBOX=vm or docker/
     )
     expect(() =>
       loadConfig({ ...base, REASONER_SANDBOX: 'docker', MENTION_ANYONE: 'on' })

@@ -76,6 +76,12 @@ export class EgressProxy {
       socket: string
       /** The host names it lets through, asked again for every connection */
       allowed: () => Iterable<string>
+      /**
+       * Where a connection may go, by host (a name or an address) and port, in
+       * place of the allowed names on 443: the broker's VM goes where its
+       * settings name (vm-broker.ts)
+       */
+      permit?: (host: string, port: number) => boolean
       /** How names are looked up (tests point them at local servers) */
       resolve?: Resolve
       log?: Logger
@@ -125,6 +131,13 @@ export class EgressProxy {
     rmSync(this.options.socket, { force: true })
   }
 
+  /** Whether a connection may go to the host and port */
+  private permits(host: string, port: number, tunnel: boolean): boolean {
+    const bare = host.replace(/^\[|\]$/g, '').toLowerCase()
+    if (this.options.permit) return this.options.permit(bare, port)
+    return (!tunnel || port === TLS_PORT) && this.allows(bare)
+  }
+
   /** Whether the host is on the list (exact names, never an address) */
   allows(host: string): boolean {
     const name = normalizeDomain(host.replace(/^\[|\]$/g, ''))
@@ -142,7 +155,10 @@ export class EgressProxy {
   private async address(host: string, what: string) {
     let addresses: string[]
     try {
-      addresses = await (this.options.resolve ?? resolveAll)(host)
+      const bare = host.replace(/^\[|\]$/g, '')
+      addresses = net.isIP(bare)
+        ? [bare]
+        : await (this.options.resolve ?? resolveAll)(host)
     } catch (err) {
       this.refuse(what, `lookup failed: ${(err as Error).message}`)
       return undefined
@@ -175,10 +191,12 @@ export class EgressProxy {
     client.on('error', () => undefined)
     const forbid = () =>
       client.end('HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n')
-    if (!target || port !== TLS_PORT || !this.allows(host)) {
+    if (!target || !this.permits(host, port, true)) {
       this.refuse(
         req.url ?? '?',
-        target && port !== TLS_PORT ? 'only port 443' : 'not allowed'
+        target && port !== TLS_PORT && !this.options.permit
+          ? 'only port 443'
+          : 'not allowed'
       )
       forbid()
       return
@@ -214,7 +232,11 @@ export class EgressProxy {
     } catch {
       // A request for the proxy itself, not one to pass on
     }
-    if (!url || url.protocol !== 'http:' || !this.allows(url.hostname)) {
+    if (
+      !url ||
+      url.protocol !== 'http:' ||
+      !this.permits(url.hostname, Number(url.port || 80), false)
+    ) {
       this.refuse(req.url ?? '?', 'not allowed')
       forbid()
       return

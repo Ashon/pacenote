@@ -169,7 +169,7 @@ describe('setting fields', () => {
     ).toEqual([
       {
         key: 'OPS_TOOLS',
-        message: expect.stringContaining('REASONER_SANDBOX=docker'),
+        message: expect.stringContaining('REASONER_SANDBOX=vm or docker'),
       },
     ])
   })

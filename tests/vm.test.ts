@@ -23,8 +23,10 @@ import {
 import {
   fetchKernel,
   kernelPath,
+  kubectlVersion,
   reasonerVersions,
 } from '../src/sandbox/vm-setup.js'
+import { brokerDestinations } from '../src/sandbox/vm-broker.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-vm-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -238,11 +240,105 @@ describe('built-in sandbox runs', () => {
   })
 })
 
+describe('the ops broker in its own VM', () => {
+  it('may go only where its settings name', () => {
+    const dir = mkdtempSync(path.join(root, 'broker-'))
+    const hostsFile = path.join(dir, 'hosts.json')
+    const kubeconfigFile = path.join(dir, 'kubeconfig')
+    writeFileSync(
+      hostsFile,
+      JSON.stringify({ 'web-01': '10.0.0.5', 'db-01': '10.0.0.6' })
+    )
+    writeFileSync(
+      kubeconfigFile,
+      JSON.stringify({
+        clusters: [
+          { name: 'prod', cluster: { server: 'https://10.0.1.1:6443' } },
+          {
+            name: 'eks',
+            cluster: { server: 'https://ABC.gr7.eks.amazonaws.com' },
+          },
+        ],
+      })
+    )
+    expect(
+      [
+        ...brokerDestinations({
+          hostsFile,
+          kubeconfigFile,
+          ssh: true,
+          github: true,
+          jiraUrl: 'https://acme.atlassian.net',
+        }),
+      ].sort()
+    ).toEqual(
+      [
+        '10.0.0.5:22',
+        '10.0.0.6:22',
+        '10.0.1.1:6443',
+        'abc.gr7.eks.amazonaws.com:443',
+        'github.com:443',
+        'api.github.com:443',
+        'acme.atlassian.net:443',
+      ].sort()
+    )
+    // What is off opens nothing, and an empty kubeconfig is no cluster.
+    writeFileSync(kubeconfigFile, '')
+    expect([
+      ...brokerDestinations({
+        hostsFile,
+        kubeconfigFile,
+        ssh: false,
+        github: false,
+      }),
+    ]).toEqual([])
+  })
+
+  it('reaches addresses its rules name, but never this computer', async () => {
+    const proxy = new EgressProxy({
+      socket: path.join(tmpdir(), `pv-permit-${process.pid}.sock`),
+      allowed: () => [],
+      permit: (host, port) =>
+        ['10.0.0.5:22', '127.0.0.1:22', 'github.com:443'].includes(
+          `${host}:${port}`
+        ),
+      resolve: async () => ['192.0.2.1'],
+    })
+    await proxy.listen()
+    try {
+      const connect = (target: string) =>
+        ask(
+          proxy.socket,
+          `CONNECT ${target} HTTP/1.1\r\nHost: ${target}\r\n\r\n`
+        )
+      // Named, but this computer: refused before any connection is tried
+      expect(await connect('127.0.0.1:22')).toBe('HTTP/1.1 403 Forbidden')
+      // Not named
+      expect(await connect('10.0.0.5:443')).toBe('HTTP/1.1 403 Forbidden')
+      expect(await connect('example.com:443')).toBe('HTTP/1.1 403 Forbidden')
+    } finally {
+      await proxy.close()
+    }
+  })
+
+  it("gives each reasoner VM the broker's socket", () => {
+    expect(
+      vmRunArgs(
+        { root: '/vm', image: 'reasoner', memoryMiB: 512, cpus: 1 },
+        { command: 'claude', args: [] },
+        '/tmp/egress.sock',
+        '/tmp/broker.sock'
+      )
+    ).toContain('/tmp/broker.sock:broker.sock')
+  })
+})
+
 describe('built-in sandbox setup', () => {
-  it('builds with the CLI versions the Docker image uses', () => {
+  it('builds with the CLI and kubectl versions the Docker images use', () => {
     const versions = reasonerVersions(path.resolve('sandbox'))
     expect(versions.claude).toMatch(/^\d+\.\d+\.\d+$/)
     expect(versions.codex).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(kubectlVersion(path.resolve('sandbox'))).toMatch(/^v\d+\.\d+\.\d+$/)
   })
 
   it('keeps the kernel only from an archive whose hash matches', async () => {
@@ -321,19 +417,35 @@ describe('config', () => {
     })
   })
 
-  it('needs the sandbox login, and keeps ops tools to Docker', () => {
+  it('needs the sandbox login', () => {
     expect(() => loadConfig({ ...base, REASONER_SANDBOX: 'vm' })).toThrow(
       /REASONER_SANDBOX=vm requires SANDBOX_CLAUDE_OAUTH_TOKEN/
     )
-    expect(() =>
-      loadConfig({
-        ...base,
-        REASONER_SANDBOX: 'vm',
-        SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
-        OPS_TOOLS: 'on',
-        MENTION_ANYONE: 'off',
-        MENTION_ALLOWED_USERS: 'U1',
-      })
-    ).toThrow(/OPS_TOOLS=on requires REASONER_SANDBOX=docker/)
+  })
+
+  it('reaches the ops broker in a VM of its own at a local address', () => {
+    const ops = {
+      ...base,
+      SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
+      OPS_TOOLS: 'on',
+      MENTION_ANYONE: 'off',
+      MENTION_ALLOWED_USERS: 'U1',
+      PACENOTE_SANDBOX_DIR:
+        '/Applications/Pacenote.app/Contents/Resources/app/sandbox',
+    }
+    const config = loadConfig({ ...ops, REASONER_SANDBOX: 'vm' })
+    expect(config.reasoner.mcpServers).toEqual([
+      { name: 'ops', url: 'http://127.0.0.1:8080/mcp' },
+    ])
+    expect(config.reasoner.vm?.broker).toMatchObject({
+      image: 'broker',
+      bundleDir:
+        '/Applications/Pacenote.app/Contents/Resources/app/sandbox/ops-broker/dist',
+      workDir: '/home/me/.pacenote/vm/broker-work',
+    })
+    // Not without a sandbox
+    expect(() => loadConfig({ ...ops, REASONER_SANDBOX: 'none' })).toThrow(
+      /OPS_TOOLS=on requires a sandbox/
+    )
   })
 })

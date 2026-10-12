@@ -433,7 +433,7 @@ export const SETTING_FIELDS: SettingField[] = [
       {
         value: 'docker',
         label: 'Docker sandbox',
-        help: 'A fresh container for each request, with only the login set below and outbound traffic limited to allowed domains. Ops tools need it.',
+        help: 'A fresh container for each request, with only the login set below and outbound traffic limited to allowed domains. Needs Docker running.',
       },
     ],
     default: 'none',

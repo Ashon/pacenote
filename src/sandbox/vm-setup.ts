@@ -37,6 +37,14 @@ export const KERNEL = {
 export const VM_BASE_IMAGE = 'docker.io/library/node:24-bookworm-slim'
 /** Where the image build may go: Debian's and npm's package hosts */
 export const BUILD_DOMAINS = ['deb.debian.org', 'registry.npmjs.org']
+/** The broker image's build: Debian's packages and kubectl's downloads */
+export const BROKER_BUILD_DOMAINS = [
+  'deb.debian.org',
+  'dl.k8s.io',
+  'cdn.dl.k8s.io',
+]
+/** The broker's image, built when ops tools are on */
+export const VM_BROKER_IMAGE = 'broker'
 
 /**
  * pacenote-vm build options: the image's settings from then on, as the Docker
@@ -67,6 +75,16 @@ export interface VmSetupOptions {
   log: (line: string) => void
   /** Where the kernel comes from (tests point it at a local copy) */
   kernel?: typeof KERNEL
+  /** Builds the ops broker's image too (OPS_TOOLS=on) */
+  broker?: boolean
+}
+
+/** A build arg the Docker images are built with (sandbox/compose.yaml) */
+function composeArg(sandboxDir: string, name: string): string {
+  const compose = readFileSync(path.join(sandboxDir, 'compose.yaml'), 'utf8')
+  const found = new RegExp(`${name}:\\s*"?([^"\\s]+)"?`).exec(compose)?.[1]
+  if (!found) throw new Error(`${name} is not in sandbox/compose.yaml.`)
+  return found
 }
 
 /** The CLI versions the Docker image is built with (sandbox/compose.yaml) */
@@ -74,17 +92,15 @@ export function reasonerVersions(sandboxDir: string): {
   claude: string
   codex: string
 } {
-  const compose = readFileSync(path.join(sandboxDir, 'compose.yaml'), 'utf8')
-  const version = (name: string) => {
-    const found = new RegExp(`${name}:\\s*"([^"]+)"`).exec(compose)?.[1]
-    if (!found) throw new Error(`${name} is not in sandbox/compose.yaml.`)
-    return found
-  }
   return {
-    claude: version('CLAUDE_CODE_VERSION'),
-    codex: version('CODEX_VERSION'),
+    claude: composeArg(sandboxDir, 'CLAUDE_CODE_VERSION'),
+    codex: composeArg(sandboxDir, 'CODEX_VERSION'),
   }
 }
+
+/** The kubectl the Docker broker image is built with */
+export const kubectlVersion = (sandboxDir: string) =>
+  composeArg(sandboxDir, 'KUBECTL_VERSION')
 
 /** Everything the built-in sandbox needs, fetched or built where missing */
 export async function setupVm(options: VmSetupOptions): Promise<void> {
@@ -95,6 +111,8 @@ export async function setupVm(options: VmSetupOptions): Promise<void> {
   log('Init filesystem (vminitd)')
   await helper(options, ['prepare', '--root', options.root])
   await buildImage(options)
+  if (options.broker) await buildBrokerImage(options)
+  else log('Ops broker image: not built (ops tools are off)')
 }
 
 export const kernelPath = (root: string) => path.join(root, 'kernel/vmlinux')
@@ -197,6 +215,57 @@ export async function buildImage(
     await proxy.close()
   }
   options.log('Reasoner image: ready')
+}
+
+/**
+ * Builds the ops broker's image in a VM, its way out open only to the Debian
+ * and Kubernetes download hosts
+ */
+export async function buildBrokerImage(options: VmSetupOptions): Promise<void> {
+  const kubectl = kubectlVersion(options.sandboxDir)
+  options.log(
+    `Ops broker image: building on ${VM_BASE_IMAGE} with kubectl ${kubectl}`
+  )
+  const proxy = new EgressProxy({
+    socket: path.join(tmpdir(), `pacenote-build-${process.pid}.sock`),
+    allowed: () => BROKER_BUILD_DOMAINS,
+  })
+  await proxy.listen()
+  try {
+    await helper(options, [
+      'build',
+      '--root',
+      options.root,
+      '--base',
+      VM_BASE_IMAGE,
+      '--name',
+      VM_BROKER_IMAGE,
+      '--set-user',
+      '1000:1000',
+      '--set-workdir',
+      '/app',
+      '--set-entrypoint',
+      '/usr/local/bin/sandbox-entrypoint',
+      '--set-env',
+      'HOME=/tmp',
+      '--mount',
+      `${path.join(options.sandboxDir, 'vm')}:/pacenote`,
+      '--egress',
+      proxy.socket,
+      '--env',
+      `KUBECTL_VERSION=${kubectl}`,
+      '--cpus',
+      '4',
+      '--memory',
+      '2048',
+      '--',
+      '/bin/sh',
+      '/pacenote/broker-build.sh',
+    ])
+  } finally {
+    await proxy.close()
+  }
+  options.log('Ops broker image: ready')
 }
 
 /** Runs pacenote-vm, passing its output on line by line */

@@ -4,11 +4,11 @@ import ContainerizationOCI
 import Foundation
 import SystemPackage
 
-/// Where the egress socket appears in the guest, on a tmpfs of its own, since
+/// Where sockets relayed into the guest appear, on a tmpfs of its own, since
 /// the root filesystem is read-only. The image's entrypoint forwards
-/// 127.0.0.1:3128 to it.
-let guestEgressDirectory = "/run/pacenote"
-let guestEgressSocket = "\(guestEgressDirectory)/egress.sock"
+/// 127.0.0.1:3128 to the egress socket, and 127.0.0.1:8080 to the broker's.
+let guestRelayDirectory = "/run/pacenote"
+let guestEgressSocket = "\(guestRelayDirectory)/egress.sock"
 
 /// What a run gets besides its command: shares, tmpfs, environment, user, size
 /// and the way out
@@ -41,6 +41,27 @@ struct RunOptions: ParsableArguments {
     @Option(help: "A unix socket on the host to relay into the guest as \(guestEgressSocket)")
     var egress: String?
 
+    @Option(
+        name: .customLong("relay"),
+        help: "A unix socket on the host to relay into the guest (HOST:NAME, appearing as \(guestRelayDirectory)/NAME). Repeatable."
+    )
+    var relays: [String] = []
+
+    @Option(
+        name: .customLong("publish"),
+        help: "A unix socket a process in the guest listens on, relayed out to the host (GUEST:HOST). Repeatable."
+    )
+    var publishes: [String] = []
+
+    /// Sockets relayed in: the egress socket and the others, by guest path
+    var relaysIn: [(host: String, guest: String)] {
+        (egress.map { [($0, guestEgressSocket)] } ?? [])
+            + relays.map { relay in
+                let parts = relay.split(separator: ":", maxSplits: 1).map(String.init)
+                return (parts[0], "\(guestRelayDirectory)/\(parts[1])")
+            }
+    }
+
     func validate() throws {
         for mount in mounts {
             let parts = mount.split(separator: ":", omittingEmptySubsequences: false)
@@ -49,6 +70,17 @@ struct RunOptions: ParsableArguments {
             }
         }
         if let user { _ = try parseUser(user) }
+        for relay in relays {
+            let parts = relay.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2, !parts[1].contains("/") else {
+                throw ValidationError("--relay takes HOST:NAME, not \(relay)")
+            }
+        }
+        for publish in publishes {
+            guard publish.split(separator: ":").count == 2, publish.hasPrefix("/") else {
+                throw ValidationError("--publish takes GUEST:HOST, not \(publish)")
+            }
+        }
     }
 
     /// The mounts for the container: the defaults, the shares, the tmpfs, and
@@ -80,10 +112,10 @@ struct RunOptions: ParsableArguments {
             out.append(
                 .any(type: "tmpfs", source: "tmpfs", destination: parts[0], options: ["nosuid", "nodev"] + options))
         }
-        if egress != nil {
+        if !relaysIn.isEmpty {
             out.append(
                 .any(
-                    type: "tmpfs", source: "tmpfs", destination: guestEgressDirectory,
+                    type: "tmpfs", source: "tmpfs", destination: guestRelayDirectory,
                     options: ["nosuid", "nodev", "noexec", "mode=0755", "size=1m"]))
         }
         return out
@@ -142,16 +174,25 @@ func runInVM(
     config.mounts = try options.containerMounts(runDirectory: runDirectory)
     config.useInit = true
     config.bootLog = .file(path: runDirectory.appendingPathComponent("boot.log"))
-    if let egress = options.egress {
-        config.sockets = [
+    config.sockets =
+        options.relaysIn.map { relay in
             UnixSocketConfiguration(
-                source: URL(fileURLWithPath: egress),
-                destination: URL(fileURLWithPath: guestEgressSocket),
+                source: URL(fileURLWithPath: relay.host),
+                destination: URL(fileURLWithPath: relay.guest),
                 permissions: FilePermissions(rawValue: 0o777),
                 direction: .into
             )
-        ]
-    }
+        }
+        + options.publishes.map { publish in
+            let parts = publish.split(separator: ":").map(String.init)
+            // Only this account reaches it on the host.
+            return UnixSocketConfiguration(
+                source: URL(fileURLWithPath: parts[0]),
+                destination: URL(fileURLWithPath: parts[1]),
+                permissions: FilePermissions(rawValue: 0o600),
+                direction: .outOf
+            )
+        }
     let container = try LinuxContainer(
         id,
         rootfs: rootfs,

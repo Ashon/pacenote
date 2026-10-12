@@ -41,6 +41,11 @@ export interface JobContext {
   sandboxDir: string
   /** Config file. If present, it is also passed to compose as --env-file. */
   envFile?: string
+  /**
+   * The built-in VM sandbox is the run environment: the broker runs in a VM of
+   * Pace's, so its job only prepares its files.
+   */
+  builtIn?: boolean
 }
 
 export type JobStep =
@@ -50,6 +55,7 @@ export type JobStep =
   | { kind: 'kubeconfig' }
   | { kind: 'credentials' }
   | { kind: 'vm' }
+  | { kind: 'note'; text: string }
   | { kind: 'compose'; args: string[] }
 
 /** Turns a job into steps. (Does not run them) */
@@ -67,6 +73,15 @@ export function planJob(kind: JobKind, ctx: JobContext): JobStep[] {
         compose('up', '-d', '--build', '--force-recreate', 'egress-proxy'),
       ]
     case 'broker':
+      if (ctx.builtIn)
+        return [
+          { kind: 'broker-bundle' },
+          { kind: 'broker-files' },
+          {
+            kind: 'note',
+            text: "Restart Pace to apply: the broker's VM starts with it.",
+          },
+        ]
       return [
         { kind: 'broker-bundle' },
         { kind: 'allowlist' },
@@ -149,6 +164,7 @@ async function main(): Promise<void> {
   const steps = planJob(kind as JobKind, {
     sandboxDir,
     envFile: existsSync(envFile) ? envFile : undefined,
+    builtIn: env.REASONER_SANDBOX === 'vm',
   })
 
   for (const step of steps) {
@@ -199,11 +215,21 @@ async function main(): Promise<void> {
         log(`$ docker ${step.args.join(' ')}`)
         if (!dryRun) await run('docker', step.args, env)
         break
+      case 'note':
+        log(step.text)
+        break
       case 'vm': {
         const root = vmRootPath(env)
         const bin = defaultVmBin(env)
         log(`Built-in sandbox: ${root} (pacenote-vm ${bin})`)
-        if (!dryRun) await setupVm({ bin, root, sandboxDir, log })
+        if (!dryRun)
+          await setupVm({
+            bin,
+            root,
+            sandboxDir,
+            log,
+            broker: env.OPS_TOOLS === 'on',
+          })
         break
       }
     }

@@ -56,7 +56,9 @@ Then:
    - **Built-in sandbox**: a lightweight Linux VM for each answer, reaching only allowed domains, with nothing to
      install (Apple silicon, macOS 15 or later). Run "Set up built-in sandbox" in Settings > Sandbox.
    - **Docker sandbox**: a new container for each answer, reaching only allowed domains. Run Docker (Docker Desktop,
-     OrbStack or colima), then "Build sandbox images" and "Restart proxy" in Settings > Sandbox. Ops tools need it.
+     OrbStack or colima), then "Build sandbox images" and "Restart proxy" in Settings > Sandbox.
+
+   Ops tools need one of the two sandboxes.
 5. Invite `@Pace` to a public channel and mention it.
 
 `brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across

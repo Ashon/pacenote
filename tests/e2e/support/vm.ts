@@ -49,7 +49,7 @@ function imageInputs(): string {
   return hash.digest('hex')
 }
 
-/** The kernel, the init filesystem and the test image, where missing */
+/** The kernel, the init filesystem and the test images, where missing */
 export async function prepare(): Promise<void> {
   mkdirSync(ROOT, { recursive: true })
   const log = (line: string) => console.log(`[vm] ${line}`)
@@ -65,29 +65,45 @@ export async function prepare(): Promise<void> {
   if (!existsSync(path.join(ROOT, 'initfs.ext4')))
     helper(['prepare', '--root', ROOT])
   const inputs = imageInputs()
-  const stamp = path.join(ROOT, 'images/reasoner/e2e-inputs')
-  if (existsSync(stamp) && readFileSync(stamp, 'utf8') === inputs) return
-  log('building the test image')
-  helper([
-    'build',
-    '--root',
-    ROOT,
-    '--base',
-    'docker.io/library/node:24-alpine',
-    '--name',
-    'reasoner',
-    '--size',
-    '1',
-    ...VM_IMAGE_SETTINGS,
-    '--mount',
-    `${path.join(REPO, 'sandbox/vm')}:/pacenote`,
-    '--mount',
-    `${path.join(SUPPORT, 'vm')}:/fake`,
-    '--mount',
-    `${SUPPORT}:/support`,
-    '--',
-    '/bin/sh',
-    '/fake/image.sh',
-  ])
-  writeFileSync(stamp, inputs)
+  const build = (name: string, base: string, script: string) => {
+    const stamp = path.join(ROOT, 'images', name, 'e2e-inputs')
+    if (existsSync(stamp) && readFileSync(stamp, 'utf8') === inputs) return
+    log(`building the test image ${name}`)
+    helper([
+      'build',
+      '--root',
+      ROOT,
+      '--base',
+      base,
+      '--name',
+      name,
+      '--size',
+      '1',
+      // As vm-setup.ts sets each image
+      ...(name === 'broker'
+        ? [
+            '--set-user',
+            '1000:1000',
+            '--set-workdir',
+            '/app',
+            '--set-entrypoint',
+            '/usr/local/bin/sandbox-entrypoint',
+            '--set-env',
+            'HOME=/tmp',
+          ]
+        : VM_IMAGE_SETTINGS),
+      '--mount',
+      `${path.join(REPO, 'sandbox/vm')}:/pacenote`,
+      '--mount',
+      `${path.join(SUPPORT, 'vm')}:/fake`,
+      '--mount',
+      `${SUPPORT}:/support`,
+      '--',
+      '/bin/sh',
+      script,
+    ])
+    writeFileSync(stamp, inputs)
+  }
+  build('reasoner', 'docker.io/library/node:24-alpine', '/fake/image.sh')
+  build('broker', 'docker.io/library/node:24-alpine', '/fake/broker-image.sh')
 }

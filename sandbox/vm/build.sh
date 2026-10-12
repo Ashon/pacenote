@@ -6,7 +6,7 @@
 # the Debian and npm package hosts.
 set -eu
 . /pacenote/egress.sh
-start_egress /pacenote/egress-forward.mjs
+start_relays /pacenote/egress-forward.mjs
 export HTTP_PROXY=http://127.0.0.1:3128 HTTPS_PROXY=http://127.0.0.1:3128
 export http_proxy="$HTTP_PROXY" https_proxy="$HTTPS_PROXY"
 

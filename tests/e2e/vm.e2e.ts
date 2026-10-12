@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -15,12 +16,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ProcessExitError } from '../../src/sandbox/process.js'
 import { VmSandbox } from '../../src/sandbox/vm.js'
 import { BIN, prepare, ROOT, skip } from './support/vm.js'
+import { REPO } from './support/processes.js'
 import { World } from './support/world.js'
 
 /**
  * The built-in VM sandbox for real (support/vm.ts): runs in Linux VMs on this
  * Mac, the way out, cutting a run off, and a mention answered from a VM.
  */
+/** The broker's bundle (pnpm bundle), which its VM runs */
+const BROKER_BUNDLE = path.join(REPO, 'sandbox/ops-broker/dist/server.mjs')
+
 describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
   const work = mkdtempSync(path.join(tmpdir(), 'pacenote-e2e-vm-run-'))
   const allowlistFile = path.join(work, 'allowed-domains.txt')
@@ -155,6 +160,70 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
       .filter((line) => line.includes(`pacenote-vm run --root ${ROOT}`))
     expect(left).toEqual([])
   })
+
+  it.skipIf(!existsSync(BROKER_BUNDLE))(
+    'reaches the ops broker in a VM of its own, which keeps its files',
+    async () => {
+      const home = path.join(work, 'broker-home')
+      const files = path.join(work, 'ops-files')
+      mkdirSync(path.join(files, 'notes'), { recursive: true })
+      writeFileSync(path.join(files, 'notes/runbook.md'), 'Restart with care.')
+      writeFileSync(allowlistFile, 'api.anthropic.com\n')
+      const withBroker = new VmSandbox({
+        bin: BIN,
+        root: ROOT,
+        image: 'reasoner',
+        memoryMiB: 512,
+        cpus: 1,
+        allowlistFile,
+        broker: {
+          image: 'broker',
+          bundleDir: path.dirname(BROKER_BUNDLE),
+          workDir: path.join(home, 'vm/broker-work'),
+          env: {
+            PATH: process.env.PATH,
+            PACENOTE_HOME: home,
+            OPS_FS_ROOT: files,
+          },
+        },
+      })
+      const mcp = async (tool: string, args: object) =>
+        (
+          await withBroker.run({
+            command: 'node',
+            args: ['/opt/fake/mcp.mjs', tool, JSON.stringify(args)],
+            input: '',
+            timeoutMs: 60_000,
+          })
+        ).stdout
+      try {
+        // Starting the sandbox starts the broker's VM.
+        expect(await withBroker.verify()).toEqual([])
+        expect(await mcp('fs_read', { path: 'notes/runbook.md' })).toContain(
+          'Restart with care.'
+        )
+        // The files stay in the broker's VM: the reasoner's has none of them.
+        const own = await withBroker
+          .run({
+            command: 'ls',
+            args: ['/workspace', '/run/secrets', '/etc/ops'],
+            input: '',
+            timeoutMs: 60_000,
+          })
+          .catch((err: ProcessExitError) => err)
+        expect((own as ProcessExitError).stderr).toMatch(/No such file/)
+      } finally {
+        await withBroker.close()
+      }
+      // Its socket goes with it.
+      expect(
+        await mcp('fs_read', { path: 'notes/runbook.md' }).catch(
+          (err: Error) => err.message
+        )
+      ).toMatch(/error|ECONNREFUSED|ENOENT/)
+    },
+    120_000
+  )
 
   it('answers a mention from a VM of its own', async () => {
     world = await World.create()

@@ -81,8 +81,10 @@ const distDir = path.dirname(fileURLToPath(import.meta.url))
  * uses the bundled files inside the app.
  */
 const paths = resolveAppPaths(distDir, app.isPackaged)
-// Pace and the sandbox jobs find the built-in sandbox's helper here.
+// Pace and the sandbox jobs find the built-in sandbox's helper here, and Pace
+// the ops broker's bundle.
 process.env.PACENOTE_VM_BIN ??= paths.vmBin
+process.env.PACENOTE_SANDBOX_DIR ??= paths.sandboxDir
 const webDistDir = paths.webDist
 /**
  * The settings file lives outside the repository. (PACENOTE_HOME, default

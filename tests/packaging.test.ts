@@ -89,6 +89,10 @@ describe('sandbox jobs', () => {
     // The built-in sandbox needs no Docker: the allowed domains list, then its
     // own setup.
     expect(planJob('vm', ctx)).toEqual([{ kind: 'allowlist' }, { kind: 'vm' }])
+    // There, the broker runs in a VM of Pace's: its job prepares its files.
+    expect(
+      planJob('broker', { ...ctx, builtIn: true }).map((step) => step.kind)
+    ).toEqual(['broker-bundle', 'broker-files', 'note'])
   })
 
   it('layers the environment over the config file and expands PACENOTE_HOME for compose', () => {

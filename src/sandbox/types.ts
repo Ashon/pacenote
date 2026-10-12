@@ -97,7 +97,7 @@ export const SANDBOX_JOBS: Record<
   broker: {
     label: 'Recreate broker',
     script: 'sandbox:ops-up',
-    help: 'Fetches the host list and GitHub token again, then rebuilds the image and starts it.',
+    help: "Fetches the host list and GitHub token again, then rebuilds the image and starts it. In the built-in sandbox, it prepares the broker's files for Pace's next start.",
   },
   images: {
     label: 'Build sandbox images',

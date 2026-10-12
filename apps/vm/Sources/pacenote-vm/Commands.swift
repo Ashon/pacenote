@@ -11,6 +11,8 @@ extension PacenoteVM {
         )
 
         @Option(help: "A built image's name") var image: String
+        @Flag(help: "Lets the process write over the image, in this run's copy only")
+        var writableRoot = false
         @OptionGroup var options: RunOptions
         @Argument(parsing: .captureForPassthrough, help: "The command and its arguments")
         var command: [String] = []
@@ -34,7 +36,9 @@ extension PacenoteVM {
             let rootfs = try cloneFile(dir.appendingPathComponent("rootfs.ext4"), into: runDirectory)
             let code = try await runInVM(
                 root: root,
-                rootfs: .block(format: "ext4", source: rootfs.path, destination: "/", options: ["ro"]),
+                rootfs: .block(
+                    format: "ext4", source: rootfs.path, destination: "/",
+                    options: writableRoot ? [] : ["ro"]),
                 workload: Workload(
                     arguments: arguments,
                     environment: config.environment + (try options.environment()),

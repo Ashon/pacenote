@@ -26,10 +26,31 @@ reasoner container --MCP(http, internal network)--> ops-broker     --ssh OPS_SSH
 - GitHub is queried only with the broker's token (`gh auth token`). The reasoner container cannot reach GitHub and has no token.
   codex's ChatGPT app connectors (`codex_apps`, including the GitHub connector) have a different permission scope and send data
   over a different path, so they are turned off in sandbox runs. (`codex exec --disable apps`)
-- Every call is logged by the broker (`docker logs pacenote-sandbox-ops-broker-1`).
-- Because it uses credentials, the bot does not start without `REASONER_SANDBOX=docker` and `MENTION_ALLOWED_USERS`, with
-  `MENTION_ANYONE` off.
+- Every call is logged by the broker (`docker logs pacenote-sandbox-ops-broker-1`; in the built-in sandbox, Pace's own log).
+- Because it uses credentials, the bot does not start without a sandbox (`REASONER_SANDBOX=vm` or `docker`) and
+  `MENTION_ALLOWED_USERS`, with `MENTION_ANYONE` off.
 - To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts` and rebuild the broker.
+
+## In the built-in sandbox
+
+With `REASONER_SANDBOX=vm`, the broker runs in a Linux VM of its own while Pace runs (`src/sandbox/vm-broker.ts`), not in
+a container:
+
+```
+reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:3128--> Pace's broker egress --> what its settings name
+ (no network device)                                   (keys, tokens, /work)          (refuses anything else)
+```
+
+- The VMs share no network: Pace relays the broker's MCP socket into each reasoner VM, where it is 127.0.0.1:8080.
+- The broker's VM has no network device either. Its way out is an egress proxy in Pace that lets it reach only what its
+  settings name: the hosts in `hosts.json` on port 22 (ssh goes through it with a ProxyCommand), each kubeconfig
+  cluster's API server, `github.com` and `api.github.com` when the GitHub tools are on, and the Jira site. The Docker
+  broker can reach anything; this one cannot. It never reaches this Mac's own addresses.
+- It gets the same files and settings as the Docker broker: `hosts.json` is built from the inventory and the GitHub
+  token read with `gh auth token` each time Pace starts. Its work folder (mirrors and worktrees) is `~/.pacenote/vm/broker-work`.
+- Its image (ssh, git, ripgrep and the same kubectl) is built by "Set up built-in sandbox" when ops tools are on; the
+  broker's code is mounted from the app at each start, so a newer Pacenote needs no new image.
+- Settings apply when Pace restarts. "Recreate broker" only prepares the broker's files then.
 
 ## Code changes and PRs
 

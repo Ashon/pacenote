@@ -411,7 +411,7 @@ export function SettingsPage() {
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
   const pending = sandbox.status?.pending ?? []
-  const opsReady = docker && isSet('MENTION_ALLOWED_USERS')
+  const opsReady = (docker || builtIn) && isSet('MENTION_ALLOWED_USERS')
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
@@ -448,7 +448,7 @@ export function SettingsPage() {
       ? { tone: 'muted', text: 'Off' }
       : !opsReady
         ? { tone: 'warn', text: 'Needs setup' }
-        : pending.some((item) => item.component === 'broker')
+        : docker && pending.some((item) => item.component === 'broker')
           ? { tone: 'warn', text: 'Apply needed' }
           : undefined,
   }
@@ -634,7 +634,10 @@ export function SettingsPage() {
               help="The Linux kernel, the init filesystem and the reasoner image. Setting up fetches the kernel once and builds the image in a VM; run it again for newer CLIs."
             />
             <VmStatusCard sandbox={sandbox} />
-            <JobsCard sandbox={sandbox} kinds={['vm']} />
+            <JobsCard
+              sandbox={sandbox}
+              kinds={opsOn ? ['vm', 'kubeconfig', 'broker'] : ['vm']}
+            />
           </>
         )}
         {!builtIn && sandbox.available && (
@@ -656,14 +659,17 @@ export function SettingsPage() {
             <Requirements
               items={[
                 {
-                  ok: docker,
-                  label: 'Docker sandbox',
-                  detail: docker
-                    ? 'Requests run in the docker sandbox.'
-                    : 'Choose the docker sandbox as the run environment.',
-                  action: docker
-                    ? undefined
-                    : { label: 'Open Sandbox', section: 'sandbox' },
+                  ok: docker || builtIn,
+                  label: 'A sandbox',
+                  detail: builtIn
+                    ? 'Requests run in the built-in sandbox, and the broker in a VM of its own.'
+                    : docker
+                      ? 'Requests run in the docker sandbox.'
+                      : 'Choose the built-in or docker sandbox as the run environment.',
+                  action:
+                    docker || builtIn
+                      ? undefined
+                      : { label: 'Open Sandbox', section: 'sandbox' },
                 },
                 {
                   ok: isSet('MENTION_ALLOWED_USERS'),
@@ -680,7 +686,7 @@ export function SettingsPage() {
             />
           ),
         })}
-        {pending.some((item) => item.component === 'broker') && (
+        {docker && pending.some((item) => item.component === 'broker') && (
           <section className="surface-group">
             <PendingList
               pending={pending.filter((item) => item.component === 'broker')}
@@ -690,7 +696,7 @@ export function SettingsPage() {
         )}
         <SubHeading
           title="Integrations"
-          help={`Each one turns on once its fields are filled in. Changes apply when the broker is recreated ("${APPLY_LABEL.broker}").${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
+          help={`Each one turns on once its fields are filled in. ${builtIn ? "Changes apply when Pace restarts, as its broker's VM starts with it." : `Changes apply when the broker is recreated ("${APPLY_LABEL.broker}").`}${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
         />
         {integration('files')}
         {integration('github')}

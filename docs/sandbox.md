@@ -61,8 +61,9 @@ Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in 
 3. The reasoner image, built in a VM from `node:24-bookworm-slim` by `sandbox/vm/build.sh`, with the CLI versions pinned in
    `sandbox/compose.yaml`. The build's own way out goes only to `deb.debian.org` and `registry.npmjs.org`.
 
-Run it again to build the image anew, with newer CLIs. Ops tools still need the Docker sandbox, and diagram rendering
-uses Docker in any run environment.
+Run it again to build the image anew, with newer CLIs. With ops tools on, it also builds the ops broker's image: the
+broker then runs in a VM of its own while Pace runs, its way out limited to what its settings name (see
+[Ops tools](ops-tools.md#in-the-built-in-sandbox)). Diagram rendering uses Docker in any run environment.
 
 ## Docker sandbox
 

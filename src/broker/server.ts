@@ -3,6 +3,7 @@ import {
   copyFileSync,
   mkdirSync,
   readdirSync,
+  rmSync,
   statSync,
 } from 'node:fs'
 import {
@@ -10,6 +11,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from 'node:http'
+import path from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
@@ -61,6 +63,17 @@ import { redactSecrets } from './redact.js'
  */
 const Env = z.object({
   BROKER_PORT: z.coerce.number().int().positive().default(8080),
+  /**
+   * A unix socket to listen on instead of the port: in the built-in VM
+   * sandbox, pacenote-vm relays it out to Pace and into each reasoner VM.
+   */
+  BROKER_SOCKET: z.string().optional(),
+  /**
+   * In the built-in VM sandbox the broker's VM has no network device: ssh
+   * reaches hosts through this command (proxy-connect.mjs %h %p), and the
+   * other tools and fetch through HTTPS_PROXY.
+   */
+  SSH_PROXY_COMMAND: z.string().optional(),
   HOSTS_FILE: z.string().default('/etc/ops/hosts.json'),
   SSH_KEY_FILE: z.string().default('/run/secrets/ssh-key'),
   KNOWN_HOSTS_FILE: z.string().default('/run/secrets/known_hosts'),
@@ -83,6 +96,20 @@ const Env = z.object({
   MAX_CONCURRENT: z.coerce.number().int().positive().default(4),
 })
 const env = Env.parse(process.env)
+
+/** The way out, when the broker has one other than a network of its own */
+const PROXY_ENV: NodeJS.ProcessEnv = Object.fromEntries(
+  [
+    'HTTPS_PROXY',
+    'HTTP_PROXY',
+    'NO_PROXY',
+    'https_proxy',
+    'http_proxy',
+    'no_proxy',
+  ]
+    .filter((name) => process.env[name])
+    .map((name) => [name, process.env[name]])
+)
 
 const SSH_DIR = '/tmp/ssh'
 const KEY = `${SSH_DIR}/id`
@@ -152,6 +179,7 @@ const git =
         authorEmail: env.GIT_AUTHOR_EMAIL,
         allowedOwners,
         timeoutMs: env.GIT_TIMEOUT_SEC * 1000,
+        proxyEnv: PROXY_ENV,
       })
     : undefined
 
@@ -181,9 +209,13 @@ let running = 0
 /**
  * Environment variables for external commands (ssh, kubectl, rg). The broker
  * environment holds credentials such as GH_TOKEN and JIRA_TOKEN, so it is not
- * passed down.
+ * passed down; only the way out is.
  */
-const TOOL_ENV: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: '/tmp' }
+const TOOL_ENV: NodeJS.ProcessEnv = {
+  PATH: process.env.PATH,
+  HOME: '/tmp',
+  ...PROXY_ENV,
+}
 
 /**
  * Runs an external command. A nonzero exit is also returned as a result, and
@@ -324,6 +356,9 @@ function registerHostTools(server: McpServer): void {
           'StrictHostKeyChecking=accept-new',
           '-o',
           `UserKnownHostsFile=${KNOWN_HOSTS}`,
+          ...(env.SSH_PROXY_COMMAND
+            ? ['-o', `ProxyCommand=${env.SSH_PROXY_COMMAND}`]
+            : []),
           '-i',
           KEY,
           '-l',
@@ -1185,15 +1220,20 @@ async function start(): Promise<void> {
       .map((line) => line.trim())
       .filter(Boolean)
   }
-  createServer((req, res) => {
+  const server = createServer((req, res) => {
     handle(req, res).catch((err: unknown) => {
       audit({ error: (err as Error).message })
       if (!res.headersSent) res.writeHead(500).end()
     })
-  }).listen(env.BROKER_PORT, () => {
+  })
+  if (env.BROKER_SOCKET) {
+    mkdirSync(path.dirname(env.BROKER_SOCKET), { recursive: true })
+    rmSync(env.BROKER_SOCKET, { force: true })
+  }
+  server.listen(env.BROKER_SOCKET ?? env.BROKER_PORT, () => {
     audit({
       event: 'start',
-      port: env.BROKER_PORT,
+      port: env.BROKER_SOCKET ?? env.BROKER_PORT,
       sshHosts: hosts.size,
       k8sClusters: clusters,
       fsRoot: fsEnabled ? env.FS_ROOT : null,

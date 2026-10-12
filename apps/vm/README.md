@@ -14,9 +14,12 @@ pacenote-vm status --root R                        what is ready, as JSON
 
 Run options: `--mount HOST:GUEST[:rw]` (read-only unless `:rw`; a file is copied in alone), `--tmpfs GUEST[:OPTIONS]`,
 `--env NAME` (the value from pacenote-vm's own environment) or `--env NAME=VALUE`, `--workdir`, `--user UID[:GID]`,
-`--cpus`, `--memory` (MiB), and `--egress SOCKET`: a unix socket on the host the guest sees as
-`/run/pacenote/egress.sock`, its only way out (the VM has no network device). `run` gives the command its stdin, stdout
-and stderr and exits with its code; SIGTERM or SIGINT stops the VM. Each run boots from APFS clones of the image and init
+`--cpus`, `--memory` (MiB), and the sockets: `--egress SOCKET`, a unix socket on the host the guest sees as
+`/run/pacenote/egress.sock`, its only way out (the VM has no network device); `--relay HOST:NAME`, another one
+appearing as `/run/pacenote/NAME` (the ops broker's, in reasoner VMs); and `--publish GUEST:HOST`, a socket a process in
+the guest listens on, appearing on the host (the broker's MCP server). `run --writable-root` lets the process write over
+its copy of the image. `run` gives the command its stdin, stdout and stderr and exits with its code; SIGTERM or SIGINT
+stops the VM. Each run boots from APFS clones of the image and init
 filesystem, so runs at the same time do not share a disk.
 
 Building needs Swift 6.2 or later (Xcode 26), and running needs Apple silicon with macOS 15 or later:

@@ -11,11 +11,13 @@ import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
 import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
 import type { DockerSandboxOptions } from './sandbox/docker.js'
 import {
+  defaultSandboxDir,
   defaultVmBin,
   memoryMiB,
   VM_IMAGE,
   type VmSandboxOptions,
 } from './sandbox/vm.js'
+import { VM_BROKER_IMAGE } from './sandbox/vm-setup.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
@@ -429,6 +431,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         bin: defaultVmBin(env),
         root: vmRootPath(env),
         allowlistFile: allowlistPath(env),
+        broker: {
+          image: VM_BROKER_IMAGE,
+          bundleDir: path.join(defaultSandboxDir(env), 'ops-broker/dist'),
+          workDir: path.join(vmRootPath(env), 'broker-work'),
+          env,
+        },
       },
     }),
     render: {
@@ -510,8 +518,10 @@ function buildReasonerConfig(
     deniedReads: string[]
     /** codex's own folder on this Mac (CODEX_HOME), for its config.toml */
     codexHome: string
-    /** Where the built-in VM sandbox's parts are */
-    vm: Pick<VmSandboxOptions, 'bin' | 'root' | 'allowlistFile'>
+    /** Where the built-in VM sandbox's parts are, and its broker's */
+    vm: Pick<VmSandboxOptions, 'bin' | 'root' | 'allowlistFile'> & {
+      broker: NonNullable<VmSandboxOptions['broker']>
+    }
   }
 ): Config['reasoner'] {
   const base: Config['reasoner'] = {
@@ -526,15 +536,27 @@ function buildReasonerConfig(
   if (e.OPS_TOOLS === 'on') {
     // ops-broker uses SSH keys, a cluster read token, and the work directory.
     // It stays off without the sandbox and an allowed user list.
-    if (e.REASONER_SANDBOX !== 'docker') {
-      throw new Error('OPS_TOOLS=on requires REASONER_SANDBOX=docker.')
+    if (e.REASONER_SANDBOX === 'none') {
+      throw new Error(
+        'OPS_TOOLS=on requires a sandbox: REASONER_SANDBOX=vm or docker.'
+      )
     }
     if (e.MENTION_ALLOWED_USERS.length === 0 || e.MENTION_ANYONE === 'on') {
       throw new Error(
         'OPS_TOOLS=on requires MENTION_ALLOWED_USERS to list who may use it, with MENTION_ANYONE off.'
       )
     }
-    base.mcpServers = [{ name: 'ops', url: e.OPS_BROKER_URL }]
+    // In the built-in sandbox the broker is relayed into each VM at this
+    // address (vm-broker.ts).
+    base.mcpServers = [
+      {
+        name: 'ops',
+        url:
+          e.REASONER_SANDBOX === 'vm'
+            ? 'http://127.0.0.1:8080/mcp'
+            : e.OPS_BROKER_URL,
+      },
+    ]
   }
   if (e.REASONER_SANDBOX === 'none') {
     // codex on this Mac does not load the user's config.toml (its MCP servers
@@ -585,17 +607,20 @@ function buildReasonerConfig(
   // Only the selected CLI's credentials go into its runs.
   const auth =
     e.REASONER === 'claude' ? { env: claudeEnv } : { file: codexAuthFile }
-  if (e.REASONER_SANDBOX === 'vm')
+  if (e.REASONER_SANDBOX === 'vm') {
+    const { broker, ...vm } = host.vm
     return {
       ...base,
       auth,
       vm: {
-        ...host.vm,
+        ...vm,
+        ...(e.OPS_TOOLS === 'on' ? { broker } : {}),
         image: VM_IMAGE,
         memoryMiB: memoryMiB(e.SANDBOX_MEMORY),
         cpus: Number(e.SANDBOX_CPUS),
       },
     }
+  }
   return {
     ...base,
     auth,

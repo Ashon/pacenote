@@ -14,6 +14,7 @@ import {
   type SandboxRun,
 } from './runtime.js'
 import { jobHint, type VmStatus } from './types.js'
+import { VmBroker, type VmBrokerOptions } from './vm-broker.js'
 
 /**
  * The reasoner sandbox built into Pacenote: each run is one process in a
@@ -39,6 +40,11 @@ export interface VmSandboxOptions {
   allowlistFile: string
   /** How the way out looks names up (tests point them at local servers) */
   resolve?: Resolve
+  /**
+   * The ops broker, in a VM of its own while Pace runs (vm-broker.ts), when
+   * ops tools are on
+   */
+  broker?: Omit<VmBrokerOptions, 'bin' | 'root' | 'log'>
 }
 
 /** The image the setup job builds, and runs use */
@@ -62,6 +68,19 @@ export function defaultVmBin(env: NodeJS.ProcessEnv = process.env): string {
     fileURLToPath(
       new URL('../../apps/vm/.build/release/pacenote-vm', import.meta.url)
     )
+  )
+}
+
+/**
+ * The repository's sandbox folder (vm/, ops-broker/dist), or the app's, which
+ * the desktop app passes as PACENOTE_SANDBOX_DIR
+ */
+export function defaultSandboxDir(
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  return (
+    env.PACENOTE_SANDBOX_DIR?.trim() ||
+    fileURLToPath(new URL('../../sandbox', import.meta.url))
   )
 }
 
@@ -90,11 +109,15 @@ export function memoryMiB(text: string): number {
   return Math.max(256, Math.round(bytes / 1024 ** 2))
 }
 
-/** pacenote-vm run arguments for one process */
+/**
+ * pacenote-vm run arguments for one process: egress is the way out's socket,
+ * broker the ops broker's (127.0.0.1:8080 in the VM)
+ */
 export function vmRunArgs(
   options: Pick<VmSandboxOptions, 'root' | 'image' | 'memoryMiB' | 'cpus'>,
   run: Pick<SandboxRun, 'command' | 'args' | 'env' | 'mounts' | 'cwd'>,
-  egress?: string
+  egress?: string,
+  broker?: string
 ): string[] {
   const args = [
     'run',
@@ -109,6 +132,7 @@ export function vmRunArgs(
   ]
   for (const tmpfs of TMPFS) args.push('--tmpfs', tmpfs)
   if (egress) args.push('--egress', egress)
+  if (broker) args.push('--relay', `${broker}:broker.sock`)
   // Values come from pacenote-vm's environment, which keeps them out of
   // process listings.
   for (const name of Object.keys(run.env ?? {})) args.push('--env', name)
@@ -139,6 +163,9 @@ export class VmSandbox implements Sandbox {
   }
   /** Set once a VM has started here: the whole chain works */
   private started = false
+  /** The ops broker's VM, once started */
+  private broker?: VmBroker
+  private brokerStarting?: Promise<void>
 
   constructor(
     private readonly options: VmSandboxOptions,
@@ -156,7 +183,12 @@ export class VmSandbox implements Sandbox {
     const egress = await this.openEgress()
     const result = await runProcess(
       this.options.bin,
-      vmRunArgs(this.options, run, egress.socket),
+      vmRunArgs(
+        this.options,
+        run,
+        egress.socket,
+        this.broker && !this.broker.problem ? this.broker.socket : undefined
+      ),
       {
         cwd: process.cwd(),
         input: run.input,
@@ -196,7 +228,10 @@ export class VmSandbox implements Sandbox {
       problems.push(
         `The allowed domains list is missing (${this.options.allowlistFile}): ${jobHint('vm')}.`
       )
-    if (problems.length > 0 || this.started) return problems
+    if (problems.length > 0) return problems
+    const broker = await this.brokerProblem()
+    if (broker) problems.push(broker)
+    if (this.started) return problems
     // One VM, once, to know the whole chain works: the helper may start, the
     // kernel boots, the image runs.
     try {
@@ -212,14 +247,37 @@ export class VmSandbox implements Sandbox {
         { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
       )
       this.started = true
-      return []
+      return problems
     } catch (err) {
-      return [`A VM did not start: ${(err as Error).message}`]
+      return [...problems, `A VM did not start: ${(err as Error).message}`]
     }
   }
 
-  /** Stops the way out, at shutdown */
+  /**
+   * Starts the ops broker's VM the first time, and says what is wrong with it
+   * then and later, if anything
+   */
+  private async brokerProblem(): Promise<string | undefined> {
+    const settings = this.options.broker
+    if (!settings) return undefined
+    if (!this.broker) {
+      this.broker = new VmBroker({
+        ...settings,
+        bin: this.options.bin,
+        root: this.options.root,
+        log: this.log,
+      })
+      this.brokerStarting = this.broker.start().catch((err: unknown) => {
+        this.broker!.problem ??= (err as Error).message
+      })
+    }
+    await this.brokerStarting
+    return this.broker.problem && `Ops tools: ${this.broker.problem}`
+  }
+
+  /** Stops the broker's VM and the way out, at shutdown */
   async close(): Promise<void> {
+    await this.broker?.stop()
     const egress = this.egress
     this.egress = undefined
     await (await egress?.catch(() => undefined))?.close()
