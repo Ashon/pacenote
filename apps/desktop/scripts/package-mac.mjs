@@ -34,9 +34,15 @@ import { parseArgs } from 'node:util'
  * the installed Pacenote. The target arch defaults to this Mac's; the other
  * arch's Electron is downloaded, since the bundles themselves are plain JS.
  *
- * The app gets an ad-hoc signature, good for this Mac (pnpm install:mac).
- * Release builds are signed and notarized from this zip outside this
- * repository, with scripts/entitlements.plist for the app and its helper.
+ * The Apple silicon app also carries pacenote-vm (apps/vm, built here with
+ * Swift) beside its executable, for the built-in VM sandbox; Intel Macs cannot
+ * run it, so the Intel app goes without.
+ *
+ * The app gets an ad-hoc signature, good for this Mac (pnpm install:mac), and
+ * pacenote-vm its own, with apps/vm/vm.entitlements. Release builds are signed
+ * and notarized from this zip outside this repository, with
+ * scripts/entitlements.plist for the app and its helper, and vm.entitlements
+ * for pacenote-vm.
  */
 if (process.platform !== 'darwin')
   throw new Error('The macOS app can only be built on a Mac.')
@@ -219,7 +225,45 @@ for (const name of await readdir(frameworksDir)) {
   await rename(helperDir, path.join(frameworksDir, `${newName}.app`))
 }
 
+// The built-in VM sandbox's helper, on Apple silicon only
+const vmDir = path.join(root, 'apps/vm')
+const vmBin = path.join(appPath, 'Contents/MacOS/pacenote-vm')
+if (arch === 'arm64') {
+  run('swift', ['build', '-c', 'release', '--arch', 'arm64'], { cwd: vmDir })
+  const binDir = execFileSync(
+    'swift',
+    ['build', '-c', 'release', '--arch', 'arm64', '--show-bin-path'],
+    { cwd: vmDir, encoding: 'utf8' }
+  ).trim()
+  // Signed where it was built as well: the build output is what dev runs use,
+  // and without the entitlement it starts no VM.
+  run('/usr/bin/codesign', [
+    '--force',
+    '--sign',
+    '-',
+    '--entitlements',
+    path.join(vmDir, 'vm.entitlements'),
+    path.join(binDir, 'pacenote-vm'),
+  ])
+  await cp(path.join(binDir, 'pacenote-vm'), vmBin)
+  // Debug symbols take half its size, and nobody debugs the shipped one.
+  run('/usr/bin/strip', ['-S', '-x', vmBin])
+}
+
 run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', appPath])
+if (arch === 'arm64') {
+  // --deep signs nested code without entitlements; pacenote-vm needs its own
+  // to start VMs, and the app is sealed again around it.
+  run('/usr/bin/codesign', [
+    '--force',
+    '--sign',
+    '-',
+    '--entitlements',
+    path.join(vmDir, 'vm.entitlements'),
+    vmBin,
+  ])
+  run('/usr/bin/codesign', ['--force', '--sign', '-', appPath])
+}
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath])
 
 // ditto rather than zip: it keeps the signature intact.
