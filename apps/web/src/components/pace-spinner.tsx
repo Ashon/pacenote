@@ -34,9 +34,10 @@ const RAMP_MS = 600
  * When active turns off, it eases back into the logo from wherever it was;
  * when it turns on, the loop starts again from the logo, still for its first
  * 0.3 seconds, so a short load never moves.
- * With turn, the whole mark goes round at a steady pace instead: Pace on duty
- * (slow) or answering (fast). A change of speed eases in without a jump, and
- * when turn ends the mark turns back to the logo the short way.
+ * With turn, the whole mark goes round at a steady pace instead, gradient and
+ * all: Pace on duty (slow) or answering (fast). The compositor turns it, so it
+ * never repaints. A change of speed eases in without a jump, and when turn
+ * ends the mark turns back to the logo the short way.
  * Meant for 24 pixels and up: smaller, the dot and the gap blur together.
  */
 export function PaceSpinner({
@@ -78,22 +79,27 @@ export function PaceSpinner({
 
   useLayoutEffect(() => {
     const element = svg.current
-    const group = element?.querySelector<SVGGElement>('.pace-spinner-turn')
-    if (!element || !group) return
+    if (!element) return
     if (turn) {
       turnBack.current?.cancel()
       const starting = element.dataset.turn === undefined
       element.dataset.turn = ''
       // The CSS animation, once the style is read; none with reduced motion
-      const animation = group.getAnimations()[0]
+      const animation = element
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSAnimation &&
+            animation.animationName === 'pace-spinner-turn'
+        )
       if (!animation) return
       if (starting) animation.playbackRate = TURN_RATE[turn]
       else return ramp(animation, TURN_RATE[turn])
     } else if (element.dataset.turn !== undefined) {
-      const angle = angleOf(getComputedStyle(group).transform)
+      const angle = angleOf(getComputedStyle(element).transform)
       delete element.dataset.turn
       const { keyframes, duration } = homing(angle)
-      turnBack.current = group.animate(keyframes, { duration })
+      turnBack.current = element.animate(keyframes, { duration })
     }
   }, [turn])
 
@@ -130,20 +136,18 @@ export function PaceSpinner({
           {/* Both are dashes on one circle that starts at the pupil: the
               track's dash leaves the opening, and the pupil's dash is the
               dot, or an arc while it focuses. (dash lengths: the CSS) */}
-          <g className="pace-spinner-turn">
-            <g className="pace-spinner-eye">
-              <path className="pace-spinner-track" {...RING} />
-              <path className="pace-spinner-pupil" {...RING} />
-            </g>
-            {/* The pupil facing you, in the middle while it reads */}
-            <circle
-              className="pace-spinner-front"
-              cx="256"
-              cy="256"
-              r="42"
-              fill="#fff"
-            />
+          <g className="pace-spinner-eye">
+            <path className="pace-spinner-track" {...RING} />
+            <path className="pace-spinner-pupil" {...RING} />
           </g>
+          {/* The pupil facing you, in the middle while it reads */}
+          <circle
+            className="pace-spinner-front"
+            cx="256"
+            cy="256"
+            r="42"
+            fill="#fff"
+          />
         </mask>
       </defs>
       <rect

@@ -387,8 +387,9 @@ def css(seed):
  * The rules without animation are the logo: PaceSpinner stops the loop
  * (data-still) and eases back to them from wherever the loop was.
  * Apart from the loop, the turn: the whole mark going round at a steady pace
- * (data-turn), while Pace is connected. PaceSpinner speeds it up while Pace
- * answers.
+ * (data-turn), while Pace is connected. It turns the svg itself, gradient and
+ * all, so the compositor runs it without repainting. PaceSpinner speeds it up
+ * while Pace answers.
  */
 .pace-spinner-eye {{
   transform-box: view-box;
@@ -416,11 +417,7 @@ def css(seed):
 .pace-spinner[data-still] :is(.pace-spinner-eye, .pace-spinner-track, .pace-spinner-pupil, .pace-spinner-front) {{
   animation: none;
 }}
-.pace-spinner-turn {{
-  transform-box: view-box;
-  transform-origin: 256px 256px;
-}}
-.pace-spinner[data-turn] .pace-spinner-turn {{
+.pace-spinner[data-turn] {{
   animation: pace-spinner-turn {TURN_SECONDS}s linear infinite;
 }}
 @keyframes pace-spinner-turn {{
@@ -438,7 +435,7 @@ def css(seed):
   .pace-spinner-track,
   .pace-spinner-pupil,
   .pace-spinner-front,
-  .pace-spinner[data-turn] .pace-spinner-turn {{
+  .pace-spinner[data-turn] {{
     animation: none;
   }}
   .pace-spinner:not([data-still]) {{
