@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { loadConfig } from '../src/config.js'
 import { parseCodexDefaults } from '../src/reasoners/codex.js'
+import { hostEnv } from '../src/sandbox/host.js'
 import {
   dockerRunArgs,
   DockerSandbox,
@@ -123,6 +124,7 @@ describe('loadConfig sandbox', () => {
   const env = {
     SLACK_BOT_TOKEN: 'xoxb-1',
     SLACK_APP_TOKEN: 'xapp-1',
+    MENTION_ALLOWED_USERS: 'U1',
   }
 
   it('does not start the claude sandbox without container credentials', () => {
@@ -176,10 +178,32 @@ describe('loadConfig commands', () => {
     const config = loadConfig({
       SLACK_BOT_TOKEN: 'xoxb-1',
       SLACK_APP_TOKEN: 'xapp-1',
+      MENTION_ALLOWED_USERS: 'U1',
       CLAUDE_BIN: '/opt/claude',
     })
     expect(config.reasoner.sandbox).toBeUndefined()
     expect(config.reasoner.commands.claude).toBe('/opt/claude')
     expect(config.reasoner.commands.codex).toBeTruthy()
+  })
+})
+
+describe('the host sandbox', () => {
+  it("keeps Pacenote's secret settings out of the CLI's environment", () => {
+    const env = hostEnv({
+      PATH: '/usr/bin',
+      HOME: '/Users/me',
+      SLACK_BOT_TOKEN: 'xoxb-1',
+      SLACK_APP_TOKEN: 'xapp-1',
+      HUB_TOKEN: 'a'.repeat(64),
+      SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
+      OPS_JIRA_TOKEN: 'ATATT-x',
+      ANTHROPIC_API_KEY: 'sk-ant-api-own',
+    })
+    expect(env).toEqual({
+      PATH: '/usr/bin',
+      HOME: '/Users/me',
+      // The CLI's own login stays.
+      ANTHROPIC_API_KEY: 'sk-ant-api-own',
+    })
   })
 })

@@ -17,10 +17,15 @@ export class SandboxHealth {
   private running?: Promise<void>
   private timer?: NodeJS.Timeout
 
+  /**
+   * label: what is checked, for the log: the sandbox, or the reasoner CLI when
+   * it runs on this Mac
+   */
   constructor(
     private readonly verify: () => Promise<string[]>,
     private readonly onChange: (problems: string[]) => void,
-    private readonly log: Logger
+    private readonly log: Logger,
+    private readonly label = 'Sandbox'
   ) {}
 
   get current(): readonly string[] {
@@ -50,15 +55,17 @@ export class SandboxHealth {
 
   private async run(): Promise<void> {
     const next = await this.verify().catch((err: unknown) => [
-      `Sandbox check failed: ${(err as Error).message}`,
+      `${this.label} check failed: ${(err as Error).message}`,
     ])
     if (next.join('\n') === this.problems.join('\n')) return
     const before = this.problems
     this.problems = next
     if (next.length === 0 && before.length > 0)
-      this.log.info('Sandbox ready: the earlier check issues are resolved.')
+      this.log.info(
+        `${this.label} ready: the earlier check issues are resolved.`
+      )
     for (const problem of next.filter((p) => !before.includes(p)))
-      this.log.error(`Sandbox: ${problem}`)
+      this.log.error(`${this.label}: ${problem}`)
     this.onChange(next)
   }
 }

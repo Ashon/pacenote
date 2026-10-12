@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { runProcess } from '../sandbox/process.js'
+import { jobHint } from '../sandbox/types.js'
 
 /**
  * Renders the diagram/chart code blocks in an answer to PNG.
@@ -206,7 +207,7 @@ export class DiagramRenderer {
       return []
     } catch {
       return [
-        `Renderer image ${this.options.image} not found. (pnpm sandbox:build)`,
+        `Renderer image ${this.options.image} not found: ${jobHint('images')}.`,
       ]
     }
   }

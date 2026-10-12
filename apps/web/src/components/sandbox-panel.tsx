@@ -449,7 +449,7 @@ export function JobsCard({ sandbox }: { sandbox: Sandbox }) {
   return (
     <Card
       title="Apply jobs"
-      help="Runs the repository's pnpm scripts from the app. One job runs at a time, and secrets in the output are masked."
+      help="Runs the sandbox jobs from the app; from the repository, each is the pnpm script shown. One job runs at a time, and secrets in the output are masked."
     >
       <div className="divide-y divide-border">
         {JOB_ORDER.map((kind) => {

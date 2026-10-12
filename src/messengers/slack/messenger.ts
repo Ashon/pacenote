@@ -107,10 +107,14 @@ export class SlackMessenger implements Messenger {
 
   /**
    * An app_mention event as a Mention. None for mentions the bot does not
-   * answer: from other bots and integrations.
+   * answer: from other bots and integrations. team: the bot's workspace, to
+   * tell people from other organizations in shared channels.
    */
-  static mention(event: AppMentionEvent): Mention | undefined {
+  static mention(event: AppMentionEvent, team?: string): Mention | undefined {
     if (!event.user || event.bot_id) return undefined
+    const external = Boolean(
+      team && event.user_team && event.user_team !== team
+    )
     return {
       messenger: 'slack',
       conversation: event.channel,
@@ -118,6 +122,7 @@ export class SlackMessenger implements Messenger {
       thread: event.thread_ts ?? event.ts,
       inThread: Boolean(event.thread_ts),
       userId: event.user,
+      ...(external ? { external } : {}),
       text: event.text,
       files: ((event.files ?? []) as SlackFileRef[]).map(toMessageFile),
     }

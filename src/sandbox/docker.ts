@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { runProcess, type RunResult } from './process.js'
+import { jobHint } from './types.js'
 import {
   PDFTOTEXT_ARGS,
   SANDBOX_PATHS,
@@ -198,7 +199,7 @@ export class DockerSandbox implements Sandbox {
       return [`Cannot connect to the docker daemon: ${(err as Error).message}`]
     }
     await docker(['image', 'inspect', image]).catch(() =>
-      problems.push(`Sandbox image ${image} not found. (pnpm sandbox:build)`)
+      problems.push(`Sandbox image ${image} not found: ${jobHint('images')}.`)
     )
     try {
       const { stdout } = await docker([
@@ -214,7 +215,9 @@ export class DockerSandbox implements Sandbox {
         )
       }
     } catch {
-      problems.push(`Sandbox network ${network} not found. (pnpm sandbox:up)`)
+      problems.push(
+        `Sandbox network ${network} not found: ${jobHint('proxy')}.`
+      )
     }
     const { stdout: proxies } = await docker([
       'ps',
@@ -226,7 +229,7 @@ export class DockerSandbox implements Sandbox {
       '{{.Names}}',
     ]).catch(() => ({ stdout: '' }))
     if (!proxies.trim()) {
-      problems.push('The egress proxy is not running. (pnpm sandbox:up)')
+      problems.push(`The egress proxy is not running: ${jobHint('proxy')}.`)
     }
     for (const service of this.options.requiredServices ?? []) {
       const { stdout } = await docker([
@@ -239,7 +242,7 @@ export class DockerSandbox implements Sandbox {
         '{{.Names}}',
       ]).catch(() => ({ stdout: '' }))
       if (!stdout.trim())
-        problems.push(`${service} is not running. (pnpm sandbox:ops-up)`)
+        problems.push(`${service} is not running: ${jobHint('broker')}.`)
     }
     return problems
   }

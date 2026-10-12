@@ -11,13 +11,20 @@ import {
 } from './sandbox/claude-credential.js'
 import { connectSlack } from './messengers/slack/connect.js'
 import { createReasoner } from './reasoners/cli.js'
+import { hostCliProblems } from './reasoners/host-check.js'
 import { DockerSandbox } from './sandbox/docker.js'
 import { HostSandbox } from './sandbox/host.js'
 import type { Sandbox } from './sandbox/runtime.js'
 import { DiagramRenderer } from './render/diagrams.js'
 import { RECHECK_SANDBOX, SandboxHealth } from './runtime/sandbox-health.js'
 import { BotStatusFile, LOG_FILE } from './runtime/status.js'
-import { botLockDirs } from './settings/home.js'
+import {
+  botLockDirs,
+  securePrivateDir,
+  securePrivateFile,
+} from './settings/home.js'
+import { envFilePath, pacenoteHome } from './settings/paths.js'
+import { secretValues } from './settings/fields.js'
 import { loadEnv } from './settings/load-env.js'
 
 /**
@@ -42,6 +49,10 @@ let running = false
 async function main(): Promise<void> {
   loadEnv()
   const config = loadConfig()
+  // Settings, run history and logs stay with this account.
+  securePrivateDir(pacenoteHome())
+  securePrivateDir(config.dataDir)
+  securePrivateFile(envFilePath())
   // Logs to PACENOTE_DATA_DIR/logs/bot.log as well as the console. The desktop
   // app shows this file.
   const log = createLogger(config.logLevel, 'pacenote', [
@@ -86,15 +97,25 @@ async function main(): Promise<void> {
   // the host. The check repeats while the bot runs, and right away when the
   // desktop app finishes a sandbox job, so the status (and the status bar)
   // follows a proxy that is started or stopped later.
+  // On this Mac, the CLI itself is what to check: installed, signed in, and
+  // recent enough, before a mention fails on it.
+  const checked = sandbox.kind === 'host' ? 'Reasoner' : 'Sandbox'
   const allProblems = () => [
-    ...sandboxHealth.current.map((problem) => `Sandbox: ${problem}`),
+    ...sandboxHealth.current.map((problem) => `${checked}: ${problem}`),
     ...(reasonerProblem ? [`Reasoner: ${reasonerProblem}`] : []),
     ...problems,
   ]
   const sandboxHealth = new SandboxHealth(
-    () => sandbox.verify(),
+    sandbox.kind === 'host'
+      ? () =>
+          hostCliProblems(
+            reasoner.backend,
+            config.reasoner.commands[reasoner.backend]
+          )
+      : () => sandbox.verify(),
     () => status.update({ problems: allProblems() }),
-    log
+    log,
+    checked
   )
   await sandboxHealth.check()
   if (config.mention.workspace && !reasoner.canReadFiles) {
@@ -145,8 +166,12 @@ async function main(): Promise<void> {
     renderer,
     inflight: new InflightStore(path.join(config.dataDir, 'inflight.json')),
     history,
+    secrets: secretValues(process.env),
     onActivity: (requests) => status.update({ requests }),
     onReasoner: (problem) => {
+      // An answer that went through settles what the check said before.
+      if (!problem && sandboxHealth.current.length > 0)
+        void sandboxHealth.check()
       if (problem === reasonerProblem) return
       reasonerProblem = problem
       status.update({ problems: allProblems() })
@@ -175,12 +200,12 @@ async function main(): Promise<void> {
   await connection.start((mention) => responder.handle(mention))
   status.update({ state: 'running' })
   running = true
-  if (sandbox.kind === 'docker') sandboxHealth.start(30_000)
+  // The CLI's sign-in changes rarely; the sandbox's proxy may stop any time.
+  sandboxHealth.start(sandbox.kind === 'docker' ? 30_000 : 5 * 60_000)
   // Messages from the desktop app
   parentPort()?.on('message', (event) => {
     const type = (event.data as { type?: string } | undefined)?.type
-    if (type === RECHECK_SANDBOX && sandbox.kind === 'docker')
-      void sandboxHealth.check()
+    if (type === RECHECK_SANDBOX) void sandboxHealth.check()
   })
   await responder.resumePending()
   const allowed = config.mention.allowedUserIds

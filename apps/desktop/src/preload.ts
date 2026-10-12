@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   platform: process.platform,
   // Runs from the repository (Pacenote Dev), as opposed to the installed app.
   dev: process.argv.includes('--pacenote-dev'),
+  // The error screen tells the app's log what broke.
+  reportError: (report: { message: string; stack?: string }) =>
+    ipcRenderer.invoke('pacenote:app:report-error', report),
   bot: {
     state: () => ipcRenderer.invoke('pacenote:bot:state'),
     start: () => ipcRenderer.invoke('pacenote:bot:start'),

@@ -309,7 +309,7 @@ describe('CLI handoff', () => {
       source: { type: 'base64', media_type: 'image/png', data: 'iVBORw==' },
     })
     expect(line.message.content[1]).toEqual({ type: 'text', text: 'question' })
-    const args = claudeArgs({ system: 's', readOnly: false, streamInput: true })
+    const args = claudeArgs({ system: 's', streamInput: true })
     expect(args).toEqual(
       expect.arrayContaining(['--input-format', 'stream-json', '--verbose'])
     )

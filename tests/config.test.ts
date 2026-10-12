@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { checkConfig, loadConfig } from '../src/config.js'
@@ -8,7 +8,11 @@ import { defaultHome } from '../src/settings/home.js'
 const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-ws-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-const env = { SLACK_BOT_TOKEN: 'xoxb-1', SLACK_APP_TOKEN: 'xapp-1' }
+const env = {
+  SLACK_BOT_TOKEN: 'xoxb-1',
+  SLACK_APP_TOKEN: 'xapp-1',
+  MENTION_ALLOWED_USERS: 'U0ME',
+}
 
 describe('loadConfig', () => {
   it('fills in defaults', () => {
@@ -19,7 +23,7 @@ describe('loadConfig', () => {
     })
     expect(config.reasoner.sandbox).toBeUndefined()
     expect(config.mention).toEqual({
-      allowedUserIds: [],
+      allowedUserIds: ['U0ME'],
       workspace: undefined,
       concurrency: 2,
     })
@@ -54,6 +58,41 @@ describe('loadConfig', () => {
     )
   })
 
+  it('answers no one through your own Slack app until you say who may ask', () => {
+    const noList = { ...env, MENTION_ALLOWED_USERS: '' }
+    expect(() => loadConfig(noList)).toThrow(/Choose who may ask Pace/)
+    expect(checkConfig(noList)).toEqual([
+      expect.objectContaining({ key: 'MENTION_ALLOWED_USERS', missing: true }),
+    ])
+    // Anyone in the workspace, said outright; the list then has no say.
+    expect(
+      loadConfig({ ...noList, MENTION_ANYONE: 'on' }).mention.allowedUserIds
+    ).toEqual([])
+    expect(
+      loadConfig({ ...env, MENTION_ANYONE: 'on' }).mention.allowedUserIds
+    ).toEqual([])
+    // A hub desktop gets only its own member's mentions.
+    expect(
+      loadConfig({
+        HUB_URL: 'https://hub.example.com',
+        HUB_TOKEN: 'a'.repeat(64),
+        SLACK_CONNECTION: 'hub',
+      }).mention.allowedUserIds
+    ).toEqual([])
+  })
+
+  it("never lets the reasoner read Pacenote's folders or credentials on this Mac", () => {
+    const config = loadConfig({ ...env, PACENOTE_DATA_DIR: dir })
+    expect(config.reasoner.deniedReads).toEqual(
+      expect.arrayContaining([
+        dir,
+        defaultHome(),
+        path.join(homedir(), '.ssh'),
+        path.join(homedir(), '.codex'),
+      ])
+    )
+  })
+
   it('requires the reference directory to be an existing absolute path', () => {
     expect(
       loadConfig({ ...env, MENTION_WORKSPACE: dir }).mention.workspace
@@ -66,10 +105,22 @@ describe('loadConfig', () => {
     ).toThrow(/MENTION_WORKSPACE/)
   })
 
-  it('uses the codex config for codex when no model is set', () => {
-    const config = loadConfig({ ...env, REASONER: 'codex' })
-    expect(config.reasoner.backend).toBe('codex')
-    expect(config.reasoner.model).toBeUndefined()
+  it("passes codex's own model along when no model is set, since its config is not loaded", () => {
+    const codexHome = mkdtempSync(path.join(dir, 'codex-'))
+    const codex = { ...env, REASONER: 'codex', CODEX_HOME: codexHome }
+    expect(loadConfig(codex).reasoner).toMatchObject({ backend: 'codex' })
+    expect(loadConfig(codex).reasoner.model).toBeUndefined()
+    writeFileSync(
+      path.join(codexHome, 'config.toml'),
+      'model = "gpt-x"\nmodel_reasoning_effort = "high"\n'
+    )
+    expect(loadConfig(codex).reasoner).toMatchObject({
+      model: 'gpt-x',
+      reasoningEffort: 'high',
+    })
+    expect(loadConfig({ ...codex, REASONER_MODEL: 'm' }).reasoner.model).toBe(
+      'm'
+    )
   })
 
   it('enables ops tools only with the docker sandbox and an allowed user list', () => {
@@ -85,9 +136,9 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...base, MENTION_ALLOWED_USERS: 'U1' })).toThrow(
       /REASONER_SANDBOX=docker/
     )
-    expect(() => loadConfig({ ...base, REASONER_SANDBOX: 'docker' })).toThrow(
-      /MENTION_ALLOWED_USERS/
-    )
+    expect(() =>
+      loadConfig({ ...base, REASONER_SANDBOX: 'docker', MENTION_ANYONE: 'on' })
+    ).toThrow(/MENTION_ALLOWED_USERS/)
     const config = loadConfig({
       ...base,
       REASONER_SANDBOX: 'docker',
@@ -138,6 +189,18 @@ describe('checkConfig', () => {
           missing,
         })
       )
+    ).toEqual([
+      { key: 'SLACK_BOT_TOKEN', missing: true },
+      { key: 'SLACK_APP_TOKEN', missing: true },
+      { key: 'MENTION_ALLOWED_USERS', missing: true },
+      { key: 'SANDBOX_CLAUDE_OAUTH_TOKEN', missing: true },
+    ])
+    expect(
+      checkConfig({
+        REASONER_SANDBOX: 'docker',
+        OPS_TOOLS: 'on',
+        MENTION_ANYONE: 'on',
+      }).map(({ key, missing }) => ({ key, missing }))
     ).toEqual([
       { key: 'SLACK_BOT_TOKEN', missing: true },
       { key: 'SLACK_APP_TOKEN', missing: true },

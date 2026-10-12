@@ -12,12 +12,19 @@ brew tap ashon/tap
 brew install --cask pacenote
 ```
 
-- The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs Docker
-  (Docker Desktop, OrbStack or colima) for the sandbox, a `claude` or `codex` CLI login, and `gh` and `git` for the ops tools.
-- After creating the Slack app, open Pacenote, enter the Slack tokens in Settings > Messengers > Slack, then run "Build sandbox images"
-  and "Restart proxy" in Settings > Sandbox.
+- The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
+  `codex` CLI login (codex 0.138 or later), Docker (Docker Desktop, OrbStack or colima) only for the Docker sandbox and
+  diagrams, and `gh` and `git` for the ops tools.
+- Open Pacenote. Settings > Messengers > Slack opens Slack with Pacenote's manifest filled in ("Create the Slack app") and
+  takes the app's two tokens; "Who can ask" takes your Slack member ID. Pace answers no one until you name who may ask,
+  or turn on "Anyone in the workspace may ask".
+- Answers run on this Mac by default (Settings > Sandbox > Run environment). For the Docker sandbox, choose it there, then
+  run "Build sandbox images" and "Restart proxy" in Settings > Sandbox.
+- At startup Pace checks that the CLI is installed, signed in and, for codex, new enough; what is missing shows in the
+  status bar with what to do.
 - Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive
-  upgrades and uninstall.
+  upgrades and uninstall. The folder is kept to your account (700, and `.env` 600), and the app's own log is
+  `logs/desktop.log`, beside Pace's `logs/bot.log`.
 - `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 20 seconds to finish its requests, and the rest
   resume on the next start) and reopens it. `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
 
@@ -30,12 +37,14 @@ brew install --cask pacenote
    - Event Subscriptions > bot events: `app_mention`
    - Turn on Socket Mode
 2. Basic Information -> App-Level Tokens: create a token with `connections:write` -> `SLACK_APP_TOKEN`
-3. Invite the bot to the public channels where it should answer. (`/invite @botname`)
+3. Invite the bot to the public channels where it should answer. (`/invite @botname`) Put your own Slack member ID (your
+   profile > ⋮ > Copy member ID) in `MENTION_ALLOWED_USERS`: with your own app, the bot does not start until it knows who
+   may ask, or `MENTION_ANYONE=on` lets anyone in the workspace ask.
 4. Write the config file and check it. Config lives outside the repository in `~/.pacenote/.env`. (`PACENOTE_HOME` changes the location)
    The bot (app, terminal), the setup commands and the sandbox compose all read this file, so values of the target environment never land in the repository.
 
    ```sh
-   mkdir -p ~/.pacenote && cp .env.example ~/.pacenote/.env   # fill in SLACK_*, REASONER, REASONER_SANDBOX
+   mkdir -p ~/.pacenote && cp .env.example ~/.pacenote/.env   # fill in SLACK_*, MENTION_ALLOWED_USERS, REASONER, REASONER_SANDBOX
    pnpm install
    pnpm slack:check        # check tokens, scopes, app match, Socket Mode
    ```

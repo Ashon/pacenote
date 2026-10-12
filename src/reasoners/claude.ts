@@ -3,26 +3,28 @@ import { clip, contentText, splitToolName } from '../history/events.js'
 import type { RunEvent } from '../history/types.js'
 import { claudeResultUsage } from '../history/usage.js'
 import { SANDBOX_PATHS } from '../sandbox/runtime.js'
+import { DENIED_GLOBS, readScope, type ReadScope } from './reads.js'
 import type { CliAdapter, McpServerRef, ReasonImage } from './types.js'
 
 /**
- * Claude Code (claude -p). Reads the reference directory with read-only tools,
- * takes images as stream-json input, and gets its login in an isolated sandbox
- * from CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
+ * Claude Code (claude -p). Reads the reference directory, and only it, with
+ * read-only tools, takes images as stream-json input, and gets its login in an
+ * isolated sandbox from CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
  */
 export const claudeAdapter: CliAdapter = {
   id: 'claude',
 
   canReadFiles: () => true,
 
-  async invocation(request, { options, readOnlyDir }) {
+  async invocation(request, { sandbox, options, readOnlyDir }) {
     const images = request.images ?? []
+    const reads = readScope(sandbox, options, readOnlyDir)
     return {
       command: 'claude',
       args: claudeArgs({
         system: request.system,
         model: options.model,
-        readOnly: readOnlyDir !== undefined,
+        reads: reads.dir ? reads : undefined,
         mcpServers: options.mcpServers,
         streamInput: images.length > 0,
       }),
@@ -58,15 +60,24 @@ export const claudeAdapter: CliAdapter = {
 const READ_ONLY_TOOLS = 'Read,Grep,Glob'
 
 /**
+ * A path rule for an absolute path: Read(//abs/path). A rule without the
+ * double slash is relative to the working directory.
+ */
+const readRule = (absolute: string, suffix = '') =>
+  `Read(/${absolute}${suffix})`
+
+/**
  * claude -p arguments. An isolated run that does not read user settings, hooks,
- * or MCP config. With readOnly, only read tools are allowed and other
- * permission requests are denied automatically (dontAsk). Shell, web, and file
- * write tools are never granted.
+ * or MCP config. With reads, only read tools are available, allowed in the
+ * reference directory alone, and other permission requests are denied
+ * automatically (dontAsk): a bare Read rule would allow any path on disk.
+ * Shell, web, and file write tools are never granted.
  */
 export function claudeArgs(options: {
   system: string
   model?: string
-  readOnly: boolean
+  /** The reference directory to read, and what never to read */
+  reads?: ReadScope
   mcpServers?: McpServerRef[]
   /** With images, passes stdin as stream-json (including image blocks). */
   streamInput?: boolean
@@ -89,22 +100,29 @@ export function claudeArgs(options: {
     '--system-prompt',
     options.system,
   ]
+  const { reads } = options
   if (options.model) args.push('--model', options.model)
-  args.push('--tools', options.readOnly ? READ_ONLY_TOOLS : '')
+  args.push('--tools', reads ? READ_ONLY_TOOLS : '')
 
   // Only allowlisted tools are used, and other permission requests are denied
-  // automatically (dontAsk).
+  // automatically (dontAsk). Read rules cover Grep and Glob as well; deny rules
+  // win over allow rules.
   const allowed = [
-    ...(options.readOnly ? [READ_ONLY_TOOLS] : []),
+    ...(reads?.dir ? [readRule(reads.dir, '/**')] : []),
     ...mcpServers.map((server) => `mcp__${server.name}`),
   ]
   if (allowed.length > 0) {
-    args.push(
-      '--allowedTools',
-      allowed.join(','),
-      '--permission-mode',
-      'dontAsk'
-    )
+    args.push('--allowedTools', ...allowed)
+    if (reads)
+      args.push(
+        '--disallowedTools',
+        ...DENIED_GLOBS.map((glob) => `Read(${glob})`),
+        ...reads.denied.flatMap((denied) => [
+          readRule(denied),
+          readRule(denied, '/**'),
+        ])
+      )
+    args.push('--permission-mode', 'dontAsk')
   }
   if (mcpServers.length > 0) {
     const config = Object.fromEntries(

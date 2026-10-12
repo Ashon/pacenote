@@ -8,10 +8,21 @@
 //                 "tools": [{ "name": "mcp__ops__host_check", "input": {},
 //                            "result": "..." }] }],
 //     "answer": "default answer" }
+// The bot's startup check (claude --version, claude auth status) is answered
+// without a record: a fake that is installed and signed in.
 import { appendFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout } from 'node:timers/promises'
+
+if (process.argv[2] === '--version') {
+  process.stdout.write('2.1.0 (Claude Code)\n')
+  process.exit(0)
+}
+if (process.argv[2] === 'auth') {
+  process.stdout.write(`${JSON.stringify({ loggedIn: true })}\n`)
+  process.exit(0)
+}
 
 const dir = process.env.FAKE_CLAUDE_DIR
 if (!dir) {

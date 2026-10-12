@@ -22,8 +22,13 @@ What happens between a mention and its answer: context, attachments, diagrams an
   fault, so the status bar does not count it.
 
 - A mention inside a thread also passes the bot's earlier answers as context, so it continues from them.
-- With `MENTION_ALLOWED_USERS` set, the bot answers only those users. Anyone else gets a message only they
-  can see (ephemeral): "I only answer specific people here."
+- On its own Slack app, the bot answers only the users in `MENTION_ALLOWED_USERS`, and does not start until it is set.
+  `MENTION_ANYONE=on` answers anyone in the workspace instead, but not people from other organizations in a shared
+  channel (Slack Connect). Anyone else gets a message only they can see (ephemeral): "I only answer specific people
+  here." On the [team hub](team-hub.md), each desktop gets only its own member's mentions.
+- Before an answer is posted, the secrets the bot holds (its Slack tokens, the hub token, the sandbox login) and
+  common secret formats (API keys, private keys, tokens) are replaced with `[REDACTED ...]`. The run history keeps
+  the answer as posted, with a note of how many were redacted.
 - It does not answer in private channels or DMs.
 - It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it tells the asker, in a
   message only they can see, that it is busy.
@@ -89,5 +94,5 @@ Illustrations and photo-like images are made with codex's image generation (`ima
 
 | REASONER | Runs | Limits |
 | --- | --- | --- |
-| `claude` (default) | `claude -p --output-format json` | Does not read user settings, hooks or MCP. No tools by default; with `MENTION_WORKSPACE`, only `Read,Grep,Glob` |
-| `codex` | `codex exec --sandbox read-only --ephemeral` | The shell tool cannot be turned off, so it is limited by the read-only sandbox and `approval_policy=never` |
+| `claude` (default) | `claude -p --output-format stream-json` | Does not read user settings, hooks or MCP. No tools by default; with `MENTION_WORKSPACE`, only `Read,Grep,Glob`, allowed in that directory alone (`Read(//dir/**)`, `dontAsk`), never on `.env` files, Pacenote's folders or the usual credential folders |
+| `codex` | `codex exec --ephemeral --ignore-user-config` | On this Mac its shell runs under a permission profile that reads the platform's basics and `MENTION_WORKSPACE` alone (no `.env` files, no writes, no network), and the user's `config.toml` is not loaded; its model comes along as arguments. Needs codex 0.138 or later. In the Docker sandbox, `--sandbox read-only`, where its shell does not run. `approval_policy=never` in both |

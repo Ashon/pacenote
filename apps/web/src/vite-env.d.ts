@@ -46,6 +46,8 @@ declare global {
        * Runs from the repository (Pacenote Dev) rather than the installed app
        */
       dev?: boolean
+      /** Writes a screen's render error to the app's log */
+      reportError(report: { message: string; stack?: string }): Promise<void>
       bot: {
         state(): Promise<SupervisorState | null>
         start(): Promise<void>

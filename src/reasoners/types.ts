@@ -75,6 +75,11 @@ export interface ReasonerOptions {
   timeoutMs: number
   mcpServers?: McpServerRef[]
   auth?: ReasonerAuth
+  /**
+   * Paths the CLI never reads on this Mac, even inside the reference directory
+   * (hostDeniedReads in reads.ts)
+   */
+  deniedReads?: string[]
 }
 
 /** What an adapter asks the sandbox to run for one request */

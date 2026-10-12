@@ -98,7 +98,7 @@ Settings:
   | Section | What it holds |
   | --- | --- |
   | General | Theme, starting the bot with the app, the settings file and run history folder |
-  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens) with "Check connection", allowed users, Socket Mode keepalive (advanced) |
+  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
   | Sandbox | Run environment (on this Mac or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |
   | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
@@ -159,7 +159,14 @@ Status and logs:
   sandbox check problems, a reasoner whose sign-in was rejected or that reached its usage limit, and limits of the setup such
   as a Slack app without `reactions:write`) to `PACENOTE_DATA_DIR/bot.json`.
   The status bar counts the problems; the limits show only on the Pace screen. The app reads it the same way no matter who started the bot.
-- Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`)
+- With its own Slack app, the bot needs to know who may ask: until "Who can ask" names someone (or anyone in the workspace
+  may ask), the Overview shows "Set up Pace" with a way to Settings, and the bot does not start.
+- On this Mac, the status also says when the reasoner CLI is missing, signed out or (codex) too old, with what to do; it is
+  checked at startup, every 5 minutes, and after an answer that went through.
+- Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`) The app's own
+  log is `logs/desktop.log` beside it: the bot's exits and restarts, builds, and errors in the window. A screen that
+  breaks shows "This screen stopped working" with Reload and Back to Overview, instead of a blank window, and writes the
+  error there. "Open logs folder" on the Pace screen opens both.
   Bolt and Socket Mode client logs go through the same logger, with the scopes `pacenote:socket` and `pacenote:bolt`.
   Connects, reconnects, disconnects and received events (envelope, retry count) are logged.
 - The log file masks token and key formats and the ticket in the Socket Mode connection URL.
@@ -179,7 +186,8 @@ Run history:
 - Statuses are "Running", "Succeeded", "Failed" and "Interrupted". A request resumed after a restart continues in the same record
   ("Resumed after a bot restart (attempt 2)"), and records that will not be resumed are marked "Interrupted" at startup.
 - Date directories older than `HISTORY_RETENTION_DAYS` (default 30 days) are deleted. Change the location with `PACENOTE_DATA_DIR`.
-- Records contain thread context and attachment contents, so they stay local.
+- Records contain thread context and attachment contents, so they stay local: `~/.pacenote` and the data folder are kept to
+  your account (700, `.env` 600), set at every start of the app and the bot.
 - Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
   which are most of the input and cost far less.
 - UI: run list (kind and status filters, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for

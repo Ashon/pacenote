@@ -107,6 +107,8 @@ export class World {
       RENDER_DIAGRAMS: 'off',
       TIMEZONE: 'UTC',
       LOG_LEVEL: 'debug',
+      // Anyone in the fake workspace may ask, unless a test names who may.
+      ...(extra.MENTION_ALLOWED_USERS ? {} : { MENTION_ANYONE: 'on' }),
       ...extra,
     }
   }

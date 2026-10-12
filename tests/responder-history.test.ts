@@ -99,6 +99,7 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
     config: loadConfig({
       SLACK_BOT_TOKEN: 'xoxb-1',
       SLACK_APP_TOKEN: 'xapp-1',
+      MENTION_ANYONE: 'on',
     }),
     messengers: [messenger],
     reasoner,
@@ -287,11 +288,17 @@ class MarkingMessenger extends MemoryMessenger {
 }
 
 describe('answering through any messenger', () => {
-  const base = (messenger: MemoryMessenger, answer = 'short') =>
+  const base = (
+    messenger: MemoryMessenger,
+    answer = 'short',
+    secrets: string[] = []
+  ) =>
     new MentionResponder({
+      secrets,
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ANYONE: 'on',
       }),
       messengers: [messenger],
       reasoner: {
@@ -332,10 +339,35 @@ describe('answering through any messenger', () => {
     expect(messenger.updates).toEqual([])
   })
 
+  it('redacts the secrets it holds and secret formats before posting the answer', async () => {
+    const messenger = new MemoryMessenger()
+    const held = 'a1b2c3d4e5f6a7b8c9d0'
+    const responder = base(
+      messenger,
+      `The hub token is ${held}, the bot's xoxb-12345678901-abcdef.`,
+      [held]
+    )
+    await responder.handle(ask('hi'))
+    expect(await responder.drain(5_000)).toBe(true)
+    const posted = messenger.posts.join('')
+    expect(posted).not.toContain(held)
+    expect(posted).not.toContain('xoxb-')
+    expect(posted).toContain('[REDACTED SECRET]')
+    expect(posted).toContain('[REDACTED SLACK TOKEN]')
+  })
+
   it('tells the asker when they are not allowed or the venue is not answered', async () => {
     const closed = new MemoryMessenger(['u2'])
     await base(closed).handle(ask('hi'))
     expect(closed.notices[0]).toMatch(/^I only answer specif/)
+
+    // Anyone in the workspace, but not someone from another organization
+    const shared = new MemoryMessenger()
+    await base(shared).handle({ ...ask('hi'), external: true })
+    expect(shared.notices).toEqual([
+      expect.stringMatching(/^I only answer people/),
+    ])
+    expect(shared.posts).toEqual([])
 
     const elsewhere = new MemoryMessenger()
     elsewhere.answerable = false
@@ -352,6 +384,7 @@ describe('answering through any messenger', () => {
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ANYONE: 'on',
         MENTION_CONCURRENCY: '1',
       }),
       messengers: [messenger],
@@ -405,6 +438,7 @@ describe('marking a mention instead of posting a placeholder', () => {
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ANYONE: 'on',
       }),
       messengers: [messenger],
       reasoner: {

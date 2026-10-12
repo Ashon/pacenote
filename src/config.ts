@@ -5,6 +5,8 @@ import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
 import { defaultHome } from './settings/home.js'
+import { pacenoteHome } from './settings/paths.js'
+import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
 import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
@@ -107,7 +109,16 @@ export const EnvSchema = z.object({
   SOCKET_PING_PONG_LOG: z.enum(['on', 'off']).default('off'),
   TIMEZONE: z.string().default('Asia/Seoul'),
 
+  /**
+   * Who may ask Pace through your own Slack app. Required unless MENTION_ANYONE
+   * is on; with the team hub, each desktop answers only its own member.
+   */
   MENTION_ALLOWED_USERS: userIds,
+  /**
+   * Answers anyone in your workspace instead of a list, but not people from
+   * other organizations in shared channels (Slack Connect)
+   */
+  MENTION_ANYONE: z.enum(['on', 'off']).default('off'),
   MENTION_WORKSPACE: z.string().optional(),
   MENTION_CONCURRENCY: z.coerce.number().int().positive().default(2),
 
@@ -195,7 +206,11 @@ export interface Config {
       }
   timezone: string
   mention: {
-    /** Answers mentions only from these users. Empty means all users */
+    /**
+     * Answers mentions only from these users. Empty means anyone in the
+     * workspace: MENTION_ANYONE, or a hub desktop, which gets only its own
+     * member's mentions
+     */
     allowedUserIds: string[]
     /** Directory to consult read-only when answering */
     workspace?: string
@@ -370,24 +385,46 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     )
   }
 
+  const slack = slackConnection(e)
+  // Your own Slack app answers no one until you say who: a mention in a public
+  // channel drives a model on this Mac, as you.
+  if (
+    slack.kind === 'app' &&
+    e.MENTION_ANYONE !== 'on' &&
+    e.MENTION_ALLOWED_USERS.length === 0
+  )
+    throw new MissingSettingError(
+      'MENTION_ALLOWED_USERS',
+      'Choose who may ask Pace: list their Slack user IDs in MENTION_ALLOWED_USERS, or set MENTION_ANYONE=on to answer anyone in your workspace.',
+      'U0STANDIN'
+    )
+
+  const dataDir = e.PACENOTE_DATA_DIR
+    ? path.resolve(expandHome(e.PACENOTE_DATA_DIR))
+    : defaultHome()
+
   return {
-    slack: slackConnection(e),
+    slack,
     timezone: e.TIMEZONE,
     mention: {
-      allowedUserIds: [...new Set(e.MENTION_ALLOWED_USERS)],
+      allowedUserIds:
+        e.MENTION_ANYONE === 'on' ? [] : [...new Set(e.MENTION_ALLOWED_USERS)],
       workspace,
       concurrency: e.MENTION_CONCURRENCY,
     },
-    reasoner: buildReasonerConfig(e),
+    reasoner: buildReasonerConfig(e, {
+      deniedReads: hostDeniedReads([dataDir, pacenoteHome(env)]),
+      codexHome: env.CODEX_HOME
+        ? expandHome(env.CODEX_HOME)
+        : path.join(homedir(), '.codex'),
+    }),
     render: {
       enabled: e.RENDER_DIAGRAMS === 'on',
       dockerBin: e.DOCKER_BIN,
       image: e.RENDERER_IMAGE,
       generatedMaxPx: e.GENERATED_IMAGE_MAX_PX,
     },
-    dataDir: e.PACENOTE_DATA_DIR
-      ? path.resolve(expandHome(e.PACENOTE_DATA_DIR))
-      : defaultHome(),
+    dataDir,
     history:
       e.HISTORY === 'on'
         ? { retentionDays: e.HISTORY_RETENTION_DAYS }
@@ -453,7 +490,15 @@ function expandHome(file: string): string {
 
 type Env = z.infer<typeof EnvSchema>
 
-function buildReasonerConfig(e: Env): Config['reasoner'] {
+function buildReasonerConfig(
+  e: Env,
+  host: {
+    /** What the CLI never reads on this Mac */
+    deniedReads: string[]
+    /** codex's own folder on this Mac (CODEX_HOME), for its config.toml */
+    codexHome: string
+  }
+): Config['reasoner'] {
   const base: Config['reasoner'] = {
     mcpServers: [],
     backend: e.REASONER,
@@ -469,14 +514,26 @@ function buildReasonerConfig(e: Env): Config['reasoner'] {
     if (e.REASONER_SANDBOX !== 'docker') {
       throw new Error('OPS_TOOLS=on requires REASONER_SANDBOX=docker.')
     }
-    if (e.MENTION_ALLOWED_USERS.length === 0) {
+    if (e.MENTION_ALLOWED_USERS.length === 0 || e.MENTION_ANYONE === 'on') {
       throw new Error(
-        'OPS_TOOLS=on requires MENTION_ALLOWED_USERS to list who may use it.'
+        'OPS_TOOLS=on requires MENTION_ALLOWED_USERS to list who may use it, with MENTION_ANYONE off.'
       )
     }
     base.mcpServers = [{ name: 'ops', url: e.OPS_BROKER_URL }]
   }
-  if (e.REASONER_SANDBOX !== 'docker') return base
+  if (e.REASONER_SANDBOX !== 'docker') {
+    // codex on this Mac does not load the user's config.toml (its MCP servers
+    // and sandbox settings stay out of answers), so the model it names comes
+    // along as arguments, as in the container.
+    if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
+      const defaults = readCodexDefaults(
+        path.join(host.codexHome, 'config.toml')
+      )
+      base.model = defaults.model
+      base.reasoningEffort = defaults.reasoningEffort
+    }
+    return { ...base, deniedReads: host.deniedReads }
+  }
 
   // The container has no host keychain or config, so credentials are passed
   // explicitly.

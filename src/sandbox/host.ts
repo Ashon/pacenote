@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { SECRET_SETTINGS } from '../settings/fields.js'
 import { runProcess, type RunResult } from './process.js'
 import {
   PDFTOTEXT_ARGS,
@@ -10,9 +11,20 @@ import {
 } from './runtime.js'
 
 /**
- * Runs the CLI directly on this computer, with the user's own login and files.
- * No isolation: mounts are only the host paths themselves, and the CLI's own
- * sandboxing (read-only tools, codex's read-only mode) is all there is.
+ * The environment a CLI gets on this Mac: the bot's own, without Pacenote's
+ * secret settings (its Slack tokens, the hub token), which only the bot needs.
+ */
+export function hostEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env }
+  for (const key of SECRET_SETTINGS) delete out[key]
+  return out
+}
+
+/**
+ * Runs the CLI directly on this computer, with the user's own login. No
+ * container: mounts are only the host paths themselves, and the CLI's own
+ * sandboxing is all there is, which the adapters keep to the reference
+ * directory (claude's read rules, codex's permission profile).
  */
 export class HostSandbox implements Sandbox {
   readonly kind = 'host' as const
@@ -48,7 +60,7 @@ export class HostSandbox implements Sandbox {
         input: run.input,
         timeoutMs: run.timeoutMs,
         signal: run.signal,
-        env: run.env ? { ...process.env, ...run.env } : undefined,
+        env: { ...hostEnv(process.env), ...run.env },
         onStdoutLine: run.onOutputLine,
       })
     if (run.cwd) return exec(run.cwd.host)

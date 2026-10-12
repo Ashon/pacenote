@@ -160,7 +160,7 @@ export async function connectSlack(
     limits: () => messenger.limits,
     async start(onMention) {
       app.event('app_mention', async ({ event }) => {
-        const mention = SlackMessenger.mention(event)
+        const mention = SlackMessenger.mention(event, auth.team_id)
         if (mention) await onMention(mention)
       })
       app.error(async (err) => {

@@ -45,6 +45,18 @@ export function setupProblem(
     SLACK_NEEDS[env.SLACK_CONNECTION?.trim() === 'hub' ? 'hub' : 'app']
   if (needs.keys.some((key) => !env[key]?.trim()))
     return { kind: 'slack', message: needs.message, issues: [] }
+  // Your own Slack app answers no one until you say who (src/config.ts).
+  if (
+    issues.every(
+      (issue) => issue.key === 'MENTION_ALLOWED_USERS' && issue.missing
+    )
+  )
+    return {
+      kind: 'config',
+      message:
+        'Choose who may ask Pace: add your Slack member ID in Settings > Messengers > Slack, or let anyone in the workspace ask.',
+      issues,
+    }
   return {
     kind: 'config',
     message: 'Some settings need fixing before Pace can start.',

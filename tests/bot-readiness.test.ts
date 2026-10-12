@@ -4,7 +4,11 @@ import {
   startFailureProblem,
 } from '../apps/desktop/src/bot-readiness.js'
 
-const TOKENS = { SLACK_BOT_TOKEN: 'xoxb-1-abc', SLACK_APP_TOKEN: 'xapp-1-abc' }
+const TOKENS = {
+  SLACK_BOT_TOKEN: 'xoxb-1-abc',
+  SLACK_APP_TOKEN: 'xapp-1-abc',
+  MENTION_ALLOWED_USERS: 'U1',
+}
 
 describe('bot readiness', () => {
   it('a first run without Slack tokens needs setup, not a crash', () => {
@@ -19,6 +23,22 @@ describe('bot readiness', () => {
 
   it('valid settings are ready to start', () => {
     expect(setupProblem(TOKENS)).toBeUndefined()
+    expect(
+      setupProblem({
+        ...TOKENS,
+        MENTION_ALLOWED_USERS: '',
+        MENTION_ANYONE: 'on',
+      })
+    ).toBeUndefined()
+  })
+
+  it('your own Slack app needs to know who may ask before it starts', () => {
+    const problem = setupProblem({ ...TOKENS, MENTION_ALLOWED_USERS: '' })
+    expect(problem).toMatchObject({ kind: 'config' })
+    expect(problem?.message).toMatch(/^Choose who may ask Pace/)
+    expect(problem?.issues.map((issue) => issue.key)).toEqual([
+      'MENTION_ALLOWED_USERS',
+    ])
   })
 
   it("other invalid values list the bot's own validation issues", () => {

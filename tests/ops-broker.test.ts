@@ -24,7 +24,7 @@ import {
   logsArgs,
   topArgs,
 } from '../src/broker/k8s.js'
-import { redactSecrets } from '../src/broker/redact.js'
+import { redactAnswer, redactSecrets } from '../src/broker/redact.js'
 
 const clusters = ['main', 'staging']
 
@@ -311,5 +311,27 @@ describe('redactSecrets', () => {
     expect(out).not.toContain('AAAA')
     expect(out).not.toContain('LS0tLS1CRUdJTiBSU0E=')
     expect(out).toContain('normal line')
+  })
+})
+
+describe('redactAnswer', () => {
+  it('redacts held secrets by value and secret formats, and counts them', () => {
+    const held = 'f00dfeedf00dfeedf00d'
+    expect(
+      redactAnswer(`hub ${held} and ${held}, slack xoxb-12345678901-abc`, [
+        held,
+        'short',
+      ])
+    ).toEqual({
+      text: 'hub [REDACTED SECRET] and [REDACTED SECRET], slack [REDACTED SLACK TOKEN]',
+      count: 3,
+    })
+  })
+
+  it('leaves ordinary code alone', () => {
+    const code = 'const password = process.env.DB_PASSWORD // token: getToken()'
+    expect(redactAnswer(code)).toEqual({ text: code, count: 0 })
+    // Tool output and logs still redact what follows such keys.
+    expect(redactSecrets('password=hunter2hunter2')).toBe('password=[REDACTED]')
   })
 })

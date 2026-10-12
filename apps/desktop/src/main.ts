@@ -21,9 +21,14 @@ import {
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
 import { handleLocalApi } from '../../../src/local-api.js'
-import { readBotStatus } from '../../../src/runtime/status.js'
+import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
+import { DESKTOP_LOG_FILE, readBotStatus } from '../../../src/runtime/status.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
-import { defaultHome } from '../../../src/settings/home.js'
+import {
+  defaultHome,
+  securePrivateDir,
+  securePrivateFile,
+} from '../../../src/settings/home.js'
 import { envFilePath } from '../../../src/settings/paths.js'
 import { BotSupervisor, type SupervisorState } from './bot.js'
 import { SandboxService } from './sandbox.js'
@@ -68,6 +73,20 @@ const webDevUrl = app.isPackaged ? undefined : process.env.PACENOTE_WEB_DEV_URL
 /** Saves the window as a PNG and quits. (for checking builds) */
 const captureFile = process.env.PACENOTE_DESKTOP_CAPTURE
 const dataDir = resolveDataDir()
+// Settings, run history and logs stay with this account: other accounts on
+// this Mac cannot list or read them.
+securePrivateDir(path.dirname(envFile))
+securePrivateDir(dataDir)
+securePrivateFile(envFile)
+/**
+ * The app's own log, kept beside Pace's in the data folder so the installed
+ * app's messages are not lost with its console. Open logs folder shows both.
+ */
+const log = createLogger('info', 'desktop', [
+  consoleSink,
+  fileSink(path.join(dataDir, DESKTOP_LOG_FILE)),
+])
+log.info(`Starting ${app.getVersion()} (pid ${process.pid})`)
 const reader = new HistoryReader(dataDir)
 /**
  * The app writes the task collections it runs into the run history (the bot
@@ -215,7 +234,7 @@ const supervisor = manageBot
       envFile,
       dataDir,
       toolPath,
-      log: (message) => console.log(`[pacenote-desktop] ${message}`),
+      log: (message) => log.info(message),
     })
   : undefined
 
@@ -439,6 +458,17 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:bot:auto-start', (event, value: unknown) => {
     if (fromMainWindow(event) && typeof value === 'boolean')
       supervisor?.setAutoStart(value)
+  })
+  // The window's error screen reports what broke, for the log.
+  ipcMain.handle('pacenote:app:report-error', (event, report: unknown) => {
+    if (!fromMainWindow(event)) return
+    const { message, stack } = (report ?? {}) as {
+      message?: unknown
+      stack?: unknown
+    }
+    log.error(
+      `The window hit an error: ${String(message).slice(0, 2_000)}${typeof stack === 'string' ? `\n${stack.slice(0, 8_000)}` : ''}`
+    )
   })
   ipcMain.handle('pacenote:bot:open-logs', (event) => {
     if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
@@ -666,6 +696,11 @@ async function createWindow(route = ''): Promise<void> {
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
   })
+  window.webContents.on('render-process-gone', (_event, details) =>
+    log.error(
+      `The window's process ended (${details.reason}, exit code ${details.exitCode})`
+    )
+  )
   // External addresses such as Slack links open in the default browser.
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
@@ -720,7 +755,7 @@ async function capture(window: BrowserWindow, file: string): Promise<void> {
 
 function reportStartupError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error)
-  console.error(message)
+  log.error(`Could not start: ${message}`)
   dialog.showErrorBox(`${appName} could not start`, message)
   app.quit()
 }

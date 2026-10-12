@@ -24,7 +24,9 @@ voice of the app.
 ## What it does
 
 - Answers mentions in the thread, with the thread and its attachments (text, images, PDFs) as context.
-- Reasons with your own `claude` or `codex` CLI login, in a disposable Docker sandbox that reaches only allowed domains.
+- Reasons with your own `claude` or `codex` CLI login: on your Mac, reading only a folder you choose, or in a
+  disposable Docker sandbox that reaches only allowed domains.
+- Answers only the people you name, and keeps its own tokens and other secrets out of what it posts.
 - Optional ops tools: read-only lookups on servers, k8s clusters and a work directory, GitHub and Jira, and code
   changes as draft PRs, through a broker that keeps credentials out of the reasoner.
 - Renders diagrams and charts to images, and keeps a run history with every tool step in the desktop app.
@@ -42,12 +44,17 @@ brew install --cask pacenote
 
 Then:
 
-1. Run Docker (Docker Desktop, OrbStack or colima), and log in to `claude` or `codex`.
-2. Create the Slack app: [api.slack.com/apps](https://api.slack.com/apps) > Create New App > From an app manifest >
-   paste [`slack-app-manifest.yaml`](slack-app-manifest.yaml), install it to your workspace, and create an app-level
-   token with `connections:write`. (On a team with a hub, pair with the hub instead: see [Team hub](docs/team-hub.md).)
-3. Open Pacenote. In Settings > Messengers > Slack, save the app token and the bot token. Allowed users limits who can ask.
-4. In Settings > Sandbox, run "Build sandbox images" and "Restart proxy".
+1. Log in to `claude` or `codex` (0.138 or later) on your Mac.
+2. Open Pacenote. In Settings > Messengers > Slack, click "Create the Slack app": Slack opens with Pacenote's
+   [manifest](slack-app-manifest.yaml) filled in. Install the app, then save its app token and bot token in Pacenote.
+   (On a team with a hub, pair with the hub instead: see [Team hub](docs/team-hub.md).)
+3. Under "Who can ask", add your Slack member ID (in Slack: your profile > ⋮ > Copy member ID). Pace answers no one
+   until you name who may ask, or let anyone in your workspace ask.
+4. Choose where answers run, in Settings > Sandbox > Run environment:
+   - **On this Mac** (the default): the CLI runs with your login and reads only the reference directory set in
+     Settings > Answers, never its `.env` files, Pacenote's folder or the usual credential folders.
+   - **Docker sandbox**: a new container for each answer, reaching only allowed domains. Run Docker (Docker Desktop,
+     OrbStack or colima), then "Build sandbox images" and "Restart proxy" in Settings > Sandbox. Ops tools need it.
 5. Invite `@Pace` to a public channel and mention it.
 
 `brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across
@@ -59,7 +66,7 @@ upgrades and uninstalls. To run from source instead, see [Installation](docs/ins
 | --- | --- |
 | [Architecture](docs/architecture.md) | The design in six diagrams: the pieces, one mention, your tasks and AI tools, the team hub, the layers, the code layout |
 | [How it works](docs/how-it-works.md) | The path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs |
-| [Reasoner sandbox](docs/sandbox.md) | The Docker sandbox, the egress proxy and allowed domains, the sandbox's claude or codex login |
+| [Reasoner sandbox](docs/sandbox.md) | Where answers run: on this Mac and what the CLI may read there, or the Docker sandbox with its egress proxy, allowed domains and login |
 | [Ops tools](docs/ops-tools.md) | ops-broker: hosts, k8s, work directory, GitHub, Jira, and code changes as draft PRs |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
 | [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: Claude Code, Codex and other tools on your Mac reading what Pace did |

@@ -148,7 +148,11 @@ describe('setting fields', () => {
   })
 
   it('returns validation issues per environment variable', () => {
-    const base = { SLACK_BOT_TOKEN: 'xoxb-1', SLACK_APP_TOKEN: 'xapp-1' }
+    const base = {
+      SLACK_BOT_TOKEN: 'xoxb-1',
+      SLACK_APP_TOKEN: 'xapp-1',
+      MENTION_ALLOWED_USERS: 'U1',
+    }
     expect(checkConfig(base)).toEqual([])
     expect(
       checkConfig({

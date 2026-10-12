@@ -27,7 +27,8 @@ reasoner container --MCP(http, internal network)--> ops-broker     --ssh OPS_SSH
   codex's ChatGPT app connectors (`codex_apps`, including the GitHub connector) have a different permission scope and send data
   over a different path, so they are turned off in sandbox runs. (`codex exec --disable apps`)
 - Every call is logged by the broker (`docker logs pacenote-sandbox-ops-broker-1`).
-- Because it uses credentials, the bot does not start without `REASONER_SANDBOX=docker` and `MENTION_ALLOWED_USERS`.
+- Because it uses credentials, the bot does not start without `REASONER_SANDBOX=docker` and `MENTION_ALLOWED_USERS`, with
+  `MENTION_ANYONE` off.
 - To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts` and rebuild the broker.
 
 ## Code changes and PRs

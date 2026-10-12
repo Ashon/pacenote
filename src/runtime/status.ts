@@ -11,6 +11,11 @@ import type { BotStatus, BotStatusView, SocketState } from './types.js'
 
 export const STATUS_FILE = 'bot.json'
 export const LOG_FILE = path.join('logs', 'bot.log')
+/**
+ * The desktop app's own log, beside the bot's: Pace's exits and restarts,
+ * builds, and errors in the window
+ */
+export const DESKTOP_LOG_FILE = path.join('logs', 'desktop.log')
 
 export function isAlive(pid: number): boolean {
   try {

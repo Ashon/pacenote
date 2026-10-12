@@ -2,7 +2,7 @@ import {
   existsSync,
   readFileSync,
   renameSync,
-  statSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { parseEnv } from 'node:util'
@@ -87,12 +87,12 @@ export function updateEnvText(
 }
 
 /**
- * Replaces the file so no half-written file is left. Keeps the existing file's
- * mode, 600 for a new file
+ * Replaces the file so no half-written file is left. Always 600: it holds the
+ * Slack tokens and logins.
  */
 export function writeEnvFile(file: string, text: string): void {
-  const mode = existsSync(file) ? statSync(file).mode & 0o777 : 0o600
-  writeFileSync(`${file}.tmp`, text, { mode })
+  rmSync(`${file}.tmp`, { force: true })
+  writeFileSync(`${file}.tmp`, text, { mode: 0o600 })
   renameSync(`${file}.tmp`, file)
 }
 

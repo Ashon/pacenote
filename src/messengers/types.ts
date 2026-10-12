@@ -32,6 +32,11 @@ export interface Mention {
    */
   inThread: boolean
   userId: string
+  /**
+   * Asked by someone from another organization, in a channel shared with it
+   * (Slack Connect)
+   */
+  external?: boolean
   /** The text in the messenger's own markup */
   text: string
   files: MessageFile[]

@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -12,7 +19,13 @@ import {
   STATUS_FILE,
 } from '../src/runtime/status.js'
 import { loadBrokerEnv } from '../src/sandbox/env.js'
-import { botLockDirs, defaultHome } from '../src/settings/home.js'
+import { writeEnvFile } from '../src/settings/env-file.js'
+import {
+  botLockDirs,
+  defaultHome,
+  securePrivateDir,
+  securePrivateFile,
+} from '../src/settings/home.js'
 import { pacenoteHome } from '../src/settings/paths.js'
 import { jobEnv } from '../src/tools/sandbox-job.js'
 
@@ -149,5 +162,34 @@ describe('the sandbox', () => {
     expect(
       loadBrokerEnv({ OPS_K8S_SA: 'ops-ro', OPS_K8S_SA_NAMESPACE: 'ops' })
     ).toMatchObject({ OPS_K8S_SA: 'ops-ro', OPS_K8S_SA_NAMESPACE: 'ops' })
+  })
+})
+
+describe('private folders', () => {
+  it('creates them for this account alone, and tightens ones open to all', () => {
+    const fresh = path.join(root, 'private', 'new')
+    securePrivateDir(fresh)
+    expect(statSync(fresh).mode & 0o777).toBe(0o700)
+
+    const open = path.join(root, 'private', 'open')
+    mkdirSync(open, { mode: 0o755 })
+    chmodSync(open, 0o755)
+    securePrivateDir(open)
+    expect(statSync(open).mode & 0o777).toBe(0o700)
+
+    const env = path.join(open, '.env')
+    writeFileSync(env, 'SLACK_BOT_TOKEN=xoxb-1\n', { mode: 0o644 })
+    chmodSync(env, 0o644)
+    securePrivateFile(env)
+    expect(statSync(env).mode & 0o777).toBe(0o600)
+    securePrivateFile(path.join(open, 'missing'))
+  })
+
+  it('writes the settings file for this account alone, whatever it was', () => {
+    const env = path.join(root, 'private', 'settings.env')
+    writeFileSync(env, 'A=1\n', { mode: 0o644 })
+    chmodSync(env, 0o644)
+    writeEnvFile(env, 'A=2\n')
+    expect(statSync(env).mode & 0o777).toBe(0o600)
   })
 })

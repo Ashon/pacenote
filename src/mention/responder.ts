@@ -3,6 +3,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Config } from '../config.js'
 import type { HistoryStore, RunHandle } from '../history/recorder.js'
+import { redactAnswer } from '../broker/redact.js'
 import type { Logger } from '../logger.js'
 import {
   mentionKey,
@@ -61,6 +62,11 @@ export interface MentionResponderDeps {
   inflight?: InflightStore
   /** Run history. Viewed in the desktop app. */
   history?: HistoryStore
+  /**
+   * Secret values this Pacenote holds (secretValues in src/settings/fields.ts),
+   * redacted from answers before they are posted
+   */
+  secrets?: readonly string[]
   /** When a mention gets the slow mark. Default SLOW_AFTER_MS (for tests) */
   slowAfterMs?: number
   /**
@@ -85,11 +91,18 @@ export interface MentionResponderDeps {
  */
 const STALE_ATTACHMENTS_MS = 60 * 60_000
 
+/**
+ * Whether Pace answers this asker. An empty list means anyone in the workspace,
+ * but not people from other organizations in shared channels; a list names
+ * whoever may ask, from anywhere.
+ */
 export function isAllowedUser(
-  userId: string,
+  mention: Pick<Mention, 'userId' | 'external'>,
   allowedUserIds: readonly string[]
 ): boolean {
-  return allowedUserIds.length === 0 || allowedUserIds.includes(userId)
+  return allowedUserIds.length === 0
+    ? !mention.external
+    : allowedUserIds.includes(mention.userId)
 }
 
 interface Resume {
@@ -158,13 +171,17 @@ export class MentionResponder {
       this.seen.delete(this.seen.values().next().value!)
 
     const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
-    if (!isAllowedUser(mention.userId, messenger.allowedUsers)) {
+    if (!isAllowedUser(mention, messenger.allowedUsers)) {
       log.info(
-        `Ignoring mention from a user not on the allowlist: ${mention.userId} in ${mention.conversation}`
+        `Ignoring mention from ${mention.external ? 'someone outside the workspace' : 'a user not on the allowlist'}: ${mention.userId} in ${mention.conversation}`
       )
       await messenger.notice(
         mention,
-        say('I only answer specific people here.')
+        say(
+          mention.external
+            ? 'I only answer people in this workspace.'
+            : 'I only answer specific people here.'
+        )
       )
       return
     }
@@ -332,7 +349,7 @@ export class MentionResponder {
       })
       run?.setPrompt(system, prompt)
       reasoning = true
-      const answer = await reasoner.complete({
+      const written = await reasoner.complete({
         system,
         prompt,
         readOnlyDir,
@@ -345,6 +362,22 @@ export class MentionResponder {
       })
       reasoning = false
       this.deps.onReasoner?.(undefined)
+      // The thread is public: secrets go before anything is posted, and the
+      // run keeps the answer as posted.
+      const { text: answer, count: redacted } = redactAnswer(
+        written,
+        this.deps.secrets
+      )
+      if (redacted > 0) {
+        log.warn(
+          `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer to ${key}`
+        )
+        run?.event({
+          kind: 'note',
+          at: new Date().toISOString(),
+          text: `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer before posting it.`,
+        })
+      }
       run?.patch({ answer })
       log.info(`Answered mention ${key} (${where}, ${Date.now() - started}ms)`)
 

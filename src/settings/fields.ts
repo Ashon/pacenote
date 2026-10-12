@@ -137,7 +137,7 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     section: 'messengers',
     messenger: 'slack',
     label: 'Who can ask',
-    help: 'Mentions from anyone else are ignored.',
+    help: 'Mentions from anyone else get a note that only they see. With the team hub, Pace answers only you.',
   },
   {
     id: 'reasoner',
@@ -336,9 +336,19 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'MENTION_ALLOWED_USERS',
     group: 'access',
     label: 'Allowed users',
-    help: 'Comma-separated Slack user IDs (U...). Leave empty to answer everyone. Required when ops tools are on.',
+    help: 'Slack user IDs of the people who may ask Pace, separated by commas. Start with your own: in Slack, open your profile, click ⋮ and Copy member ID. Pace answers no one until this is set, unless anyone in the workspace may ask. Required when ops tools are on.',
     type: 'text',
     placeholder: 'U0123ABCD, U0456EFGH',
+    shownWhen: { key: 'MENTION_ANYONE', equals: 'off' },
+  },
+  {
+    key: 'MENTION_ANYONE',
+    group: 'access',
+    label: 'Anyone in the workspace may ask',
+    help: 'Answers anyone in your Slack workspace instead of the people listed, but not people from other organizations in shared channels. Each answer runs on this Mac and uses your plan. Ops tools stay off while this is on.',
+    type: 'toggle',
+    default: 'off',
+    shownWhen: { key: 'SLACK_CONNECTION', equals: 'app' },
   },
   {
     key: 'REASONER',
@@ -758,6 +768,35 @@ export interface SettingsView {
 export interface SettingsIssue {
   key?: string
   message: string
+}
+
+/**
+ * The CLIs' own login variables, which may be in the environment Pacenote runs
+ * in
+ */
+const CLI_SECRETS = [
+  'ANTHROPIC_API_KEY',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'CODEX_API_KEY',
+]
+
+/** Pacenote's secret settings (Slack and hub tokens, logins, Jira token) */
+export const SECRET_SETTINGS = SETTING_FIELDS.filter(
+  (field) => field.type === 'secret'
+).map((field) => field.key)
+
+/**
+ * The secret values in an environment: Pacenote's secret settings and the CLIs'
+ * login variables. Answers are redacted of them before they are posted.
+ */
+export function secretValues(
+  env: Record<string, string | undefined>
+): string[] {
+  return [...SECRET_SETTINGS, ...CLI_SECRETS].flatMap((key) => {
+    const value = env[key]?.trim()
+    return value ? [value] : []
+  })
 }
 
 export function maskSecret(value: string): string {

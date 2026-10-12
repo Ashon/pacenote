@@ -10,6 +10,7 @@ import {
 } from '../history/events.js'
 import type { RunEvent } from '../history/types.js'
 import { SANDBOX_PATHS, type Mount } from '../sandbox/runtime.js'
+import { DENIED_GLOBS, readScope, type ReadScope } from './reads.js'
 import type { CliAdapter, McpServerRef } from './types.js'
 
 /**
@@ -55,6 +56,11 @@ export const codexAdapter: CliAdapter = {
         model: options.model,
         reasoningEffort: options.reasoningEffort,
         mcpServers: options.mcpServers,
+        // On this Mac, codex's own sandbox keeps its shell to the reference
+        // directory; in the container, its shell does not run at all.
+        reads: sandbox.isolated
+          ? undefined
+          : readScope(sandbox, options, readOnlyDir),
         images: images.map((image) =>
           attachments ? sandbox.pathIn(attachments, image.path) : image.path
         ),
@@ -86,14 +92,45 @@ export const codexAdapter: CliAdapter = {
   },
 }
 
+/** The permission profile codex runs its shell under on this Mac */
+const PROFILE = 'pacenote'
+
+/**
+ * codex's permission profile for a run on this Mac (codex 0.138 or later): its
+ * shell reads the platform's basics and the reference directory, without
+ * dotenv files, and nothing else, with no writes and no network. codex's
+ * read-only sandbox would let it read the whole disk.
+ */
+export function codexProfile(reads: ReadScope): string {
+  const entries: [string, string][] = [[':minimal', '"read"']]
+  if (reads.dir)
+    entries.push([
+      reads.dir,
+      `{${[['.', 'read'], ...DENIED_GLOBS.map((glob) => [glob, 'deny'])]
+        .map(
+          ([key, value]) => `${JSON.stringify(key)}=${JSON.stringify(value)}`
+        )
+        .join(',')}}`,
+    ])
+  for (const denied of reads.denied) entries.push([denied, '"deny"'])
+  return `permissions.${PROFILE}.filesystem={${entries
+    .map(([key, value]) => `${JSON.stringify(key)}=${value}`)
+    .join(',')}}`
+}
+
 /**
  * codex exec arguments. The prompt goes through stdin (-) and progress events
  * (JSONL) come back on stdout. App connectors linked to the ChatGPT account
  * (codex_apps, e.g. GitHub) are disabled. Their permission scope differs and
  * data leaves through another path, so external systems are queried only with
- * ops-broker tools. codex cannot disable its shell tool, so it is restricted
- * with the read-only sandbox (no writes, no network) and approval_policy=never
- * (no escalation requests).
+ * ops-broker tools. The shell stays on, restricted by codex's sandbox (no
+ * writes, no network) and approval_policy=never (no escalation requests).
+ *
+ * With reads (on this Mac), the shell runs under a permission profile that
+ * reads only the reference directory, and the user's config.toml (its MCP
+ * servers, profiles, sandbox settings) is not loaded, as claude does not load
+ * the user's settings; config.ts passes its model along. Without (in the
+ * container, where nothing else is there to read), the read-only sandbox.
  */
 export function codexArgs(options: {
   model?: string
@@ -101,13 +138,22 @@ export function codexArgs(options: {
   mcpServers?: McpServerRef[]
   /** Image paths as seen from the container (or host) */
   images?: string[]
+  reads?: ReadScope
 }): string[] {
   const args = [
     'exec',
     '--skip-git-repo-check',
     '--ephemeral',
-    '--sandbox',
-    'read-only',
+    ...(options.reads
+      ? [
+          '--ignore-user-config',
+          '--ignore-rules',
+          '-c',
+          `default_permissions="${PROFILE}"`,
+          '-c',
+          codexProfile(options.reads),
+        ]
+      : ['--sandbox', 'read-only']),
     '-c',
     'approval_policy="never"',
     '--color',

@@ -226,6 +226,38 @@ describe('bot on its own Slack app', () => {
     expect(world.claudeCalls()).toEqual([])
   })
 
+  it("keeps the bot's own secrets out of the answer it posts", async () => {
+    world = await World.create()
+    const { slack, ops, alice } = world
+    world.script([
+      {
+        match: 'token',
+        answer: `The app token is ${slack.appToken} and the bot's ${slack.botToken}.`,
+      },
+    ])
+    await world.startBot()
+
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> show me the token`,
+    })
+    const [reply] = await world.answered(ops.id, ts)
+    expect(reply!.text).not.toContain(slack.appToken)
+    expect(reply!.text).not.toContain(slack.botToken)
+    expect(reply!.text).toContain('[REDACTED')
+    const run = await eventually('the finished run', () =>
+      world!.runs().find((r) => r.status !== 'running')
+    )
+    expect(run!.answer).not.toContain(slack.botToken)
+    expect(run!.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'note',
+        text: 'Redacted 2 secrets from the answer before posting it.',
+      })
+    )
+  })
+
   it('does not answer in a private channel', async () => {
     world = await World.create()
     const { slack, secret, alice } = world

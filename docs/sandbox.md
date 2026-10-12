@@ -1,8 +1,30 @@
 # Reasoner sandbox
 The requester's message and the thread content become model input as they are. With `REASONER_SANDBOX=docker`, each
 request runs the reasoner in a new container that is removed when it finishes. In the code this is `DockerSandbox`
-(`src/sandbox/docker.ts`), one implementation of the `Sandbox` interface; `REASONER_SANDBOX=none` is `HostSandbox`,
-which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
+(`src/sandbox/docker.ts`), one implementation of the `Sandbox` interface; `REASONER_SANDBOX=none`, the default, is
+`HostSandbox`, which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
+
+## On this Mac
+
+Nothing isolates the CLI's process here, so its own controls keep it to the reference directory (`MENTION_WORKSPACE`),
+or to nothing without one:
+
+- `claude` gets only `Read`, `Grep` and `Glob`, allowed in the reference directory alone (`Read(//dir/**)`); everything
+  else is denied without asking (`dontAsk`). Without a reference directory it gets no tools.
+- `codex` (0.138 or later) runs its shell under a permission profile that reads the platform's basics (`:minimal`) and the
+  reference directory, with no writes and no network; codex's read-only sandbox would read the whole disk. `/tmp` stays
+  readable, as codex's macOS sandbox always allows it. Your `~/.codex/config.toml` is not loaded (its MCP servers and
+  sandbox settings stay out of answers); its `model` and `model_reasoning_effort` are passed along.
+- Neither reads `.env` files in the reference directory, Pacenote's folders (`PACENOTE_HOME`, `PACENOTE_DATA_DIR`), or
+  `~/.ssh`, `~/.aws`, `~/.config/gh`, `~/.claude`, `~/.codex` and the other usual credential folders, even when the
+  reference directory holds them (`src/reasoners/reads.ts`).
+- The CLI's environment leaves out Pacenote's secret settings: the Slack and hub tokens, the sandbox login, the Jira token.
+- At startup and every 5 minutes, Pace checks that the CLI is installed, signed in and, for codex, new enough. What is
+  missing shows in the status bar with what to do.
+
+What leaves the Mac is not limited to allowed domains here; that is what the Docker sandbox below is for.
+
+## Docker sandbox
 
 ```
 bot (host) --docker run--> reasoner container --(internal network)--> egress-proxy --> allowed domains only
@@ -50,8 +72,8 @@ the command (under `script`, which gives it the terminal it needs), you approve 
 saved to `SANDBOX_CLAUDE_OAUTH_TOKEN` without being shown, then checked with the API: the screen says whether Claude accepts it.
 The token is checked the same way, with a call that uses no quota (the model list), when Pace starts (a rejected one shows
 in the status bar's check issues) and in Settings > Sandbox's status ("Sandbox claude token"). The token is a one-year token for your own Claude subscription
-(Pro, Max, Team or Enterprise); to keep the bot to your own requests, put your own Slack user ID in `MENTION_ALLOWED_USERS`,
-or use the [team hub](team-hub.md), where each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
+(Pro, Max, Team or Enterprise); the bot answers only the people in `MENTION_ALLOWED_USERS` (start with yourself), and on
+the [team hub](team-hub.md) each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
 is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
 
 The CLI versions are pinned by build args in `sandbox/compose.yaml`. When you upgrade the host CLI, bump them too and rebuild.

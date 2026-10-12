@@ -58,6 +58,7 @@ import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { McpConnections } from './mcp-connections'
 import { PaceSpinner } from './pace-spinner'
+import { SlackAppSetup } from './slack-app-setup'
 import {
   AllowlistCard,
   APPLY_LABEL,
@@ -334,6 +335,12 @@ export function SettingsPage() {
               (key) => key !== field.key && !view.secrets[key]?.set
             )
           : undefined
+        // With both tokens in, your own app still answers no one until it
+        // knows who may ask.
+        const askers =
+          SLACK_APP_TOKENS.includes(field.key) &&
+          !isSet('MENTION_ALLOWED_USERS') &&
+          valueOf('MENTION_ANYONE') !== 'on'
         setNotice(
           field.applies === 'broker'
             ? {
@@ -345,11 +352,16 @@ export function SettingsPage() {
                   tone: 'ok',
                   text: `Saved the ${label}. Enter the ${FIELD.get(other)?.label.toLowerCase()} next.`,
                 }
-              : {
-                  tone: 'warn',
-                  text: `Saved the ${label}. ${botLive ? 'Restart' : 'Start'} Pace to use it.`,
-                  restart: true,
-                }
+              : askers
+                ? {
+                    tone: 'ok',
+                    text: `Saved the ${label}. Next, add your Slack member ID under Who can ask.`,
+                  }
+                : {
+                    tone: 'warn',
+                    text: `Saved the ${label}. ${botLive ? 'Restart' : 'Start'} Pace to use it.`,
+                    restart: true,
+                  }
         )
       })
       .finally(() => setSaving(false))
@@ -536,6 +548,8 @@ export function SettingsPage() {
                 })
               }}
             />
+          ) : !isSet('SLACK_APP_TOKEN') || !isSet('SLACK_BOT_TOKEN') ? (
+            <SlackAppSetup />
           ) : undefined,
         })}
         {card('access')}

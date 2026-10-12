@@ -3,6 +3,7 @@ import { ConcurrencyLimiter } from '../src/mention/limiter.js'
 import { systemPrompt, userPrompt } from '../src/mention/prompt.js'
 import { isAllowedUser } from '../src/mention/responder.js'
 import { stripBotMention } from '../src/messengers/slack/format.js'
+import { SlackMessenger } from '../src/messengers/slack/messenger.js'
 import type { MessengerProfile } from '../src/messengers/types.js'
 
 const slack: MessengerProfile = {
@@ -22,10 +23,41 @@ describe('stripBotMention', () => {
 })
 
 describe('isAllowedUser', () => {
-  it('allows everyone when the list is empty, otherwise only listed users', () => {
-    expect(isAllowedUser('U1', [])).toBe(true)
-    expect(isAllowedUser('U1', ['U1'])).toBe(true)
-    expect(isAllowedUser('U2', ['U1'])).toBe(false)
+  it('allows the workspace when the list is empty, otherwise only listed users', () => {
+    expect(isAllowedUser({ userId: 'U1' }, [])).toBe(true)
+    expect(isAllowedUser({ userId: 'U1' }, ['U1'])).toBe(true)
+    expect(isAllowedUser({ userId: 'U2' }, ['U1'])).toBe(false)
+  })
+
+  it('leaves out other organizations unless they are listed', () => {
+    const outsider = { userId: 'U9', external: true }
+    expect(isAllowedUser(outsider, [])).toBe(false)
+    expect(isAllowedUser(outsider, ['U9'])).toBe(true)
+  })
+})
+
+describe('SlackMessenger.mention', () => {
+  const event = {
+    type: 'app_mention',
+    user: 'U9',
+    text: '<@UBOT> hi',
+    ts: '1.0',
+    channel: 'C1',
+    event_ts: '1.0',
+  } as const
+
+  it('marks a mention from another organization in a shared channel', () => {
+    expect(
+      SlackMessenger.mention({ ...event, user_team: 'T2' }, 'T1')?.external
+    ).toBe(true)
+    expect(
+      SlackMessenger.mention({ ...event, user_team: 'T1' }, 'T1')?.external
+    ).toBeUndefined()
+    // Without the teams to compare, nobody is taken for an outsider.
+    expect(SlackMessenger.mention(event, 'T1')?.external).toBeUndefined()
+    expect(
+      SlackMessenger.mention({ ...event, user_team: 'T2' })?.external
+    ).toBeUndefined()
   })
 })
 

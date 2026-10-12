@@ -11,7 +11,7 @@ cask "pacenote" do
 
   url "https://github.com/Ashon/pacenote/releases/download/v#{version}/Pacenote-v#{version}-macos-#{arch}.app.zip"
   name "Pacenote"
-  desc "Slack bot that answers mentions with local claude or codex CLIs in a sandbox"
+  desc "Slack bot that answers mentions with local claude or codex CLIs"
   homepage "https://github.com/Ashon/pacenote"
 
   # Electron 38 and later need macOS 12.
@@ -34,12 +34,14 @@ cask "pacenote" do
   ]
 
   caveats <<~EOS
-    Pacenote runs each answer in a Docker sandbox and uses your local claude or codex CLI login.
+    Pacenote answers your Slack mentions with your local claude or codex CLI login.
     Before the first mention:
-      - run Docker (Docker Desktop, OrbStack or colima)
-      - log in to claude or codex
-      - open Pacenote, connect Slack in Settings > Messengers > Slack (pair with your team's hub, or enter
-        your own Slack app's tokens), then build the sandbox images in Settings > Sandbox
+      - log in to claude or codex (codex 0.138 or later)
+      - open Pacenote and connect Slack in Settings > Messengers > Slack: pair with your team's hub,
+        or create your own Slack app from there and save its tokens
+      - with your own app, add your Slack member ID under Who can ask
+    Answers run on this Mac by default, reading only the reference directory you set. For a Docker
+    sandbox, run Docker, choose it in Settings > Sandbox and build its images there.
     Config and run history are in ~/.pacenote and are kept when the app is removed.
   EOS
 end

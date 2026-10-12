@@ -119,7 +119,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .getByText('Saved the app token. Enter the bot token next.')
       .waitFor()
     await enterSecret(page, 'SLACK_BOT_TOKEN', slack.botToken, 'click')
-    await page.getByText('Saved the bot token. Start Pace to use it.').waitFor()
+    // Your own app answers no one until it knows who may ask.
+    await page
+      .getByText(
+        'Saved the bot token. Next, add your Slack member ID under Who can ask.'
+      )
+      .waitFor()
     expect(
       await page.locator('[data-setting="SLACK_BOT_TOKEN"]').textContent()
     ).toContain('xoxb-...-bot')
@@ -128,7 +133,10 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('button', { name: 'Check connection' }).click()
     await page.getByText('Socket Mode', { exact: true }).waitFor()
 
-    await page.getByRole('button', { name: 'Start Pace' }).click()
+    await page
+      .locator('[data-setting="MENTION_ALLOWED_USERS"] input')
+      .fill(alice.id)
+    await page.getByRole('button', { name: 'Save and start Pace' }).click()
     await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
 
     const ts = await slack.mention({

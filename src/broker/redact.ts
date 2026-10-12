@@ -22,15 +22,54 @@ const PATTERNS: [RegExp, string][] = [
     /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
     '[REDACTED JWT]',
   ],
-  [
-    /((?:client-key-data|client-certificate-data|token|password|passwd|secret)\s*[:=]\s*)["']?[^\s"']{8,}["']?/gi,
-    '$1[REDACTED]',
-  ],
+]
+
+/**
+ * A value after a secret-sounding key (token: ..., password=...). Right for
+ * tool output and logs, but in an answer it would also hit ordinary code
+ * (password: process.env.DB_PASSWORD), so answers leave it out.
+ */
+const KEYED: [RegExp, string] = [
+  /((?:client-key-data|client-certificate-data|token|password|passwd|secret)\s*[:=]\s*)["']?[^\s"']{8,}["']?/gi,
+  '$1[REDACTED]',
 ]
 
 export function redactSecrets(text: string): string {
-  return PATTERNS.reduce(
+  return [...PATTERNS, KEYED].reduce(
     (acc, [pattern, replacement]) => acc.replace(pattern, replacement),
     text
   )
+}
+
+/** Values shorter than this are not redacted by value: they match too much. */
+const MIN_KNOWN_LENGTH = 12
+
+/**
+ * Redacts an answer before it is posted: the secrets this Pacenote holds (its
+ * Slack tokens, the sandbox's login, the hub token), by value, and the secret
+ * formats. Answers go to public channels; what the model can read is limited
+ * first (src/reasoners), and this catches what slips past. count: how many were
+ * redacted.
+ */
+export function redactAnswer(
+  text: string,
+  known: readonly string[] = []
+): { text: string; count: number } {
+  let count = 0
+  const values = [...new Set(known.map((value) => value.trim()))]
+    .filter((value) => value.length >= MIN_KNOWN_LENGTH)
+    // Longer first, so a value holding another is redacted whole.
+    .sort((a, b) => b.length - a.length)
+  let out = text
+  for (const value of values) {
+    const parts = out.split(value)
+    count += parts.length - 1
+    out = parts.join('[REDACTED SECRET]')
+  }
+  for (const [pattern, replacement] of PATTERNS)
+    out = out.replace(pattern, () => {
+      count += 1
+      return replacement
+    })
+  return { text: out, count }
 }

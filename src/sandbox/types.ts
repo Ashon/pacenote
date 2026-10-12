@@ -95,6 +95,15 @@ export const SANDBOX_JOBS: Record<
   },
 }
 
+/**
+ * Where to fix a sandbox problem: the job's button in Settings > Sandbox, and
+ * its pnpm script for a run from the repository
+ */
+export function jobHint(kind: SandboxJobKind): string {
+  const job = SANDBOX_JOBS[kind]
+  return `run "${job.label}" in Settings > Sandbox (pnpm ${job.script})`
+}
+
 export interface SandboxJob {
   kind: SandboxJobKind
   state: 'running' | 'succeeded' | 'failed'
