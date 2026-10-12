@@ -55,6 +55,7 @@ export class CliReasoner implements Reasoner {
         ...invocation,
         timeoutMs: this.options.timeoutMs,
         signal: request.signal,
+        requester: request.requester,
         onOutputLine: onEvent
           ? (line) =>
               this.adapter.events(line).forEach((event) => onEvent(event))

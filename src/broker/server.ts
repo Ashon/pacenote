@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import {
   chmodSync,
   copyFileSync,
@@ -74,6 +75,12 @@ const Env = z.object({
    * other tools and fetch through HTTPS_PROXY.
    */
   SSH_PROXY_COMMAND: z.string().optional(),
+  /**
+   * 1 where only Pace's doors reach the broker (the built-in VM sandbox): it
+   * then logs who is asking from their x-pacenote-* headers. Elsewhere the
+   * reasoner could write them itself, so they are ignored.
+   */
+  TRUST_REQUESTER: z.enum(['0', '1']).default('0'),
   HOSTS_FILE: z.string().default('/etc/ops/hosts.json'),
   SSH_KEY_FILE: z.string().default('/run/secrets/ssh-key'),
   KNOWN_HOSTS_FILE: z.string().default('/run/secrets/known_hosts'),
@@ -115,8 +122,34 @@ const SSH_DIR = '/tmp/ssh'
 const KEY = `${SSH_DIR}/id`
 const KNOWN_HOSTS = `${SSH_DIR}/known_hosts`
 
+/** Who is asking, for the request being handled (TRUST_REQUESTER) */
+const asking = new AsyncLocalStorage<Record<string, string> | undefined>()
+
+/** Who is asking, from the headers Pace's door sets */
+function requesterOf(req: IncomingMessage): Record<string, string> | undefined {
+  if (env.TRUST_REQUESTER !== '1') return undefined
+  const by: Record<string, string> = {}
+  for (const key of ['user', 'conversation', 'label', 'thread', 'run']) {
+    const value = req.headers[`x-pacenote-${key}`]
+    if (typeof value !== 'string') continue
+    try {
+      by[key] = decodeURIComponent(value).slice(0, 200)
+    } catch {
+      // Not what a door writes
+    }
+  }
+  return Object.keys(by).length ? by : undefined
+}
+
 function audit(entry: Record<string, unknown>): void {
-  console.log(JSON.stringify({ ts: new Date().toISOString(), ...entry }))
+  const by = asking.getStore()
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      ...entry,
+      ...(by && { by }),
+    })
+  )
 }
 
 // ------------------------------------------------------------------
@@ -1193,7 +1226,10 @@ async function handle(
     void server.close()
   })
   await server.connect(transport)
-  await transport.handleRequest(req, res, await readBody(req))
+  const body = await readBody(req)
+  await asking.run(requesterOf(req), () =>
+    transport.handleRequest(req, res, body)
+  )
 }
 
 async function start(): Promise<void> {

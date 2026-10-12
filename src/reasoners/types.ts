@@ -1,5 +1,10 @@
 import type { RunEvent } from '../history/types.js'
-import type { Sandbox, SandboxKind, SandboxRun } from '../sandbox/runtime.js'
+import type {
+  Requester,
+  Sandbox,
+  SandboxKind,
+  SandboxRun,
+} from '../sandbox/runtime.js'
 import type { ReasonerId } from './ids.js'
 
 /**
@@ -37,6 +42,8 @@ export interface ReasonRequest {
    * Called whenever the CLI prints a progress step (message, tool call, usage).
    */
   onEvent?: (event: RunEvent) => void
+  /** Who the answer is for, which the ops broker's audit log records */
+  requester?: Requester
 }
 
 /** Runs one inference with a local CLI and returns the final text. */
@@ -85,7 +92,7 @@ export interface ReasonerOptions {
 /** What an adapter asks the sandbox to run for one request */
 export interface CliInvocation extends Omit<
   SandboxRun,
-  'timeoutMs' | 'signal' | 'onOutputLine'
+  'timeoutMs' | 'signal' | 'onOutputLine' | 'requester'
 > {
   /**
    * Runs after the process ends, success or not: for outputs the CLI leaves

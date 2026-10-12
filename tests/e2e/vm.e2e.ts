@@ -14,6 +14,7 @@ import { networkInterfaces, tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ProcessExitError } from '../../src/sandbox/process.js'
+import { createLogger } from '../../src/logger.js'
 import { VmSandbox } from '../../src/sandbox/vm.js'
 import { BIN, prepare, ROOT, skip } from './support/vm.js'
 import { REPO } from './support/processes.js'
@@ -169,24 +170,32 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
       mkdirSync(path.join(files, 'notes'), { recursive: true })
       writeFileSync(path.join(files, 'notes/runbook.md'), 'Restart with care.')
       writeFileSync(allowlistFile, 'api.anthropic.com\n')
-      const withBroker = new VmSandbox({
-        bin: BIN,
-        root: ROOT,
-        image: 'reasoner',
-        memoryMiB: 512,
-        cpus: 1,
-        allowlistFile,
-        broker: {
-          image: 'broker',
-          bundleDir: path.dirname(BROKER_BUNDLE),
-          workDir: path.join(home, 'vm/broker-work'),
-          env: {
-            PATH: process.env.PATH,
-            PACENOTE_HOME: home,
-            OPS_FS_ROOT: files,
+      // What the broker logs, through Pace's logger
+      const logged: string[] = []
+      const log = createLogger('info', 'pace', [
+        (_level, line) => logged.push(line),
+      ])
+      const withBroker = new VmSandbox(
+        {
+          bin: BIN,
+          root: ROOT,
+          image: 'reasoner',
+          memoryMiB: 512,
+          cpus: 1,
+          allowlistFile,
+          broker: {
+            image: 'broker',
+            bundleDir: path.dirname(BROKER_BUNDLE),
+            workDir: path.join(home, 'vm/broker-work'),
+            env: {
+              PATH: process.env.PATH,
+              PACENOTE_HOME: home,
+              OPS_FS_ROOT: files,
+            },
           },
         },
-      })
+        log
+      )
       const mcp = async (tool: string, args: object) =>
         (
           await withBroker.run({
@@ -194,6 +203,13 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
             args: ['/opt/fake/mcp.mjs', tool, JSON.stringify(args)],
             input: '',
             timeoutMs: 60_000,
+            requester: {
+              user: 'U0ALICE',
+              conversation: 'C0OPS',
+              label: '#ops',
+              thread: '1791443475.275049',
+              run: 'run-1',
+            },
           })
         ).stdout
       try {
@@ -202,6 +218,22 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
         expect(await mcp('fs_read', { path: 'notes/runbook.md' })).toContain(
           'Restart with care.'
         )
+        // The broker's audit line says who asked, as Pace's door told it.
+        const call = logged
+          .map((line) => /\{"ts".*\}$/.exec(line)?.[0])
+          .filter((json): json is string => Boolean(json))
+          .map((json) => JSON.parse(json) as Record<string, unknown>)
+          .find((entry) => entry.tool === 'fs_read')
+        expect(call).toMatchObject({
+          path: 'notes/runbook.md',
+          by: {
+            user: 'U0ALICE',
+            conversation: 'C0OPS',
+            label: '#ops',
+            thread: '1791443475.275049',
+            run: 'run-1',
+          },
+        })
         // The files stay in the broker's VM: the reasoner's has none of them.
         const own = await withBroker
           .run({

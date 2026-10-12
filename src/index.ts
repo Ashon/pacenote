@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   const sandbox: Sandbox = config.reasoner.sandbox
     ? new DockerSandbox(config.reasoner.sandbox)
     : config.reasoner.vm
-      ? new VmSandbox(config.reasoner.vm, log.child('egress'))
+      ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
       : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
   const reasoner = createReasoner(config.reasoner, sandbox)

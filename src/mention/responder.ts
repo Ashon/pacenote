@@ -416,6 +416,13 @@ export class MentionResponder {
         outputDir,
         signal: cutOff.signal,
         onEvent: run ? (step) => run?.event(step) : undefined,
+        requester: {
+          user: mention.userId,
+          conversation: mention.conversation,
+          label,
+          thread: mention.thread,
+          run: run?.id,
+        },
       })
       reasoning = false
       this.deps.onReasoner?.(undefined)

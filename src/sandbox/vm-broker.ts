@@ -1,12 +1,14 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import http from 'node:http'
+import type net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Logger } from '../logger.js'
 import { EgressProxy } from './egress.js'
 import { brokerExpected, loadBrokerEnv } from './env.js'
 import { prepareBrokerFiles } from './prepare.js'
+import type { Requester } from './runtime.js'
 import { jobHint } from './types.js'
 import { brokerRuntimeDir } from '../settings/paths.js'
 
@@ -94,6 +96,72 @@ export function brokerDestinations(input: {
   return out
 }
 
+/**
+ * The headers the broker reads as who is asking (TRUST_REQUESTER): set by
+ * the door in front of it (openBrokerDoor), never by the reasoner
+ */
+export const REQUESTER_HEADERS: Record<keyof Requester, string> = {
+  user: 'x-pacenote-user',
+  conversation: 'x-pacenote-conversation',
+  label: 'x-pacenote-label',
+  thread: 'x-pacenote-thread',
+  run: 'x-pacenote-run',
+}
+
+/**
+ * A door to the broker for one run: a socket of its own that passes each
+ * request on to the broker, with who is asking in REQUESTER_HEADERS, and drops
+ * any such header the reasoner sent itself. Each reasoner VM gets its run's
+ * door, never the broker's own socket, so what the broker logs about who asked
+ * comes from Pace.
+ */
+export async function openBrokerDoor(
+  broker: string,
+  socket: string,
+  requester?: Requester
+): Promise<{ socket: string; close(): Promise<void> }> {
+  const connections = new Set<net.Socket>()
+  const server = http.createServer((req, res) => {
+    const headers = { ...req.headers }
+    for (const name of Object.keys(headers))
+      if (name.startsWith('x-pacenote-')) delete headers[name]
+    for (const [key, name] of Object.entries(REQUESTER_HEADERS)) {
+      const value = requester?.[key as keyof Requester]
+      if (value) headers[name] = encodeURIComponent(value)
+    }
+    const upstream = http.request(
+      { socketPath: broker, method: req.method, path: req.url, headers },
+      (reply) => {
+        res.writeHead(reply.statusCode ?? 502, reply.headers)
+        reply.pipe(res)
+      }
+    )
+    upstream.on('error', () => {
+      if (!res.headersSent) res.writeHead(502, { 'Content-Length': '0' })
+      res.end()
+    })
+    req.pipe(upstream)
+  })
+  server.on('connection', (connection) => {
+    connections.add(connection)
+    connection.on('close', () => connections.delete(connection))
+  })
+  rmSync(socket, { force: true })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(socket, () => resolve())
+  })
+  chmodSync(socket, 0o600)
+  return {
+    socket,
+    async close() {
+      for (const connection of connections) connection.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      rmSync(socket, { force: true })
+    },
+  }
+}
+
 export class VmBroker {
   /** Where the broker's MCP server appears on this Mac */
   readonly socket = path.join(tmpdir(), `pacenote-broker-${process.pid}.sock`)
@@ -103,6 +171,7 @@ export class VmBroker {
   private restarts = 0
   /** What the broker's VM said last, to say why it did not start */
   private lastLine?: string
+  private doors = 0
   /** Why the broker is not answering, if it is not */
   problem?: string
 
@@ -170,6 +239,15 @@ export class VmBroker {
     await this.egress?.close()
   }
 
+  /** A door to the broker for one run (openBrokerDoor) */
+  door(requester?: Requester) {
+    return openBrokerDoor(
+      this.socket,
+      path.join(tmpdir(), `pacenote-door-${process.pid}-${++this.doors}.sock`),
+      requester
+    )
+  }
+
   /** Whether the broker answers now, over its socket */
   check(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -229,6 +307,8 @@ export class VmBroker {
     const { options } = this
     const settings = {
       BROKER_SOCKET: GUEST_SOCKET,
+      // Only Pace's doors reach it, and they say who is asking.
+      TRUST_REQUESTER: '1',
       HTTPS_PROXY: 'http://127.0.0.1:3128',
       HTTP_PROXY: 'http://127.0.0.1:3128',
       NO_PROXY: 'localhost,127.0.0.1',

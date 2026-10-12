@@ -41,7 +41,10 @@ reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:312
  (no network device)                                   (keys, tokens, /work)          (refuses anything else)
 ```
 
-- The VMs share no network: Pace relays the broker's MCP socket into each reasoner VM, where it is 127.0.0.1:8080.
+- The VMs share no network: each reasoner VM gets a door to the broker of its run's own, where it is 127.0.0.1:8080.
+  The door is Pace's: it adds who the run answers (the Slack user, the channel, the thread and the run) to every call
+  and drops any such header the reasoner sent, so the broker's audit lines say who asked, in Pace's log
+  (`"by":{"user":"U0...","label":"#ops",...}`). The Docker broker cannot know: the reasoner reaches it directly.
 - The broker's VM has no network device either. Its way out is an egress proxy in Pace that lets it reach only what its
   settings name: the hosts in `hosts.json` on port 22 (ssh goes through it with a ProxyCommand), each kubeconfig
   cluster's API server, `github.com` and `api.github.com` when the GitHub tools are on, and the Jira site. The Docker

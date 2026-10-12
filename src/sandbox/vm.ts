@@ -181,25 +181,29 @@ export class VmSandbox implements Sandbox {
 
   async run(run: SandboxRun): Promise<RunResult> {
     const egress = await this.openEgress()
-    const result = await runProcess(
-      this.options.bin,
-      vmRunArgs(
-        this.options,
-        run,
-        egress.socket,
-        this.broker && !this.broker.problem ? this.broker.socket : undefined
-      ),
-      {
-        cwd: process.cwd(),
-        input: run.input,
-        timeoutMs: run.timeoutMs,
-        signal: run.signal,
-        env: { ...process.env, ...run.env },
-        onStdoutLine: run.onOutputLine,
-      }
-    )
-    this.started = true
-    return result
+    // The broker through a door of the run's own, which says who is asking
+    const door =
+      this.broker && !this.broker.problem
+        ? await this.broker.door(run.requester)
+        : undefined
+    try {
+      const result = await runProcess(
+        this.options.bin,
+        vmRunArgs(this.options, run, egress.socket, door?.socket),
+        {
+          cwd: process.cwd(),
+          input: run.input,
+          timeoutMs: run.timeoutMs,
+          signal: run.signal,
+          env: { ...process.env, ...run.env },
+          onStdoutLine: run.onOutputLine,
+        }
+      )
+      this.started = true
+      return result
+    } finally {
+      await door?.close()
+    }
   }
 
   /** Without the way out: someone else's PDF needs no network. */
@@ -265,7 +269,7 @@ export class VmSandbox implements Sandbox {
         ...settings,
         bin: this.options.bin,
         root: this.options.root,
-        log: this.log,
+        log: this.log?.child('broker'),
       })
       this.brokerStarting = this.broker.start().catch((err: unknown) => {
         this.broker!.problem ??= (err as Error).message
@@ -289,7 +293,7 @@ export class VmSandbox implements Sandbox {
         socket: path.join(tmpdir(), `pacenote-egress-${process.pid}.sock`),
         allowed: () => this.allowedDomains(),
         resolve: this.options.resolve,
-        log: this.log,
+        log: this.log?.child('egress'),
       })
       await proxy.listen()
       return proxy

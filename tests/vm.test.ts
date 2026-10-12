@@ -26,7 +26,7 @@ import {
   kubectlVersion,
   reasonerVersions,
 } from '../src/sandbox/vm-setup.js'
-import { brokerDestinations } from '../src/sandbox/vm-broker.js'
+import { brokerDestinations, openBrokerDoor } from '../src/sandbox/vm-broker.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-vm-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -318,6 +318,60 @@ describe('the ops broker in its own VM', () => {
       expect(await connect('example.com:443')).toBe('HTTP/1.1 403 Forbidden')
     } finally {
       await proxy.close()
+    }
+  })
+
+  it('puts who is asking on each call to the broker, which the reasoner cannot forge', async () => {
+    // A broker that answers with the headers it got
+    const brokerSocket = path.join(tmpdir(), `pv-broker-${process.pid}.sock`)
+    const broker = http
+      .createServer((req, res) =>
+        res.end(
+          JSON.stringify(
+            Object.fromEntries(
+              Object.entries(req.headers).filter(([name]) =>
+                name.startsWith('x-pacenote-')
+              )
+            )
+          )
+        )
+      )
+      .listen(brokerSocket)
+    await new Promise((resolve) => broker.once('listening', resolve))
+    const door = await openBrokerDoor(
+      brokerSocket,
+      path.join(tmpdir(), `pv-door-${process.pid}.sock`),
+      { user: 'U0ALICE', conversation: 'C0OPS', label: '#운영', thread: '1.0' }
+    )
+    try {
+      const headers = await new Promise<Record<string, string>>(
+        (resolve, reject) => {
+          const req = http.request(
+            {
+              socketPath: door.socket,
+              path: '/mcp',
+              method: 'POST',
+              headers: { 'x-pacenote-user': 'U0ADMIN', 'x-pacenote-run': 'x' },
+            },
+            (res) => {
+              let body = ''
+              res.on('data', (chunk) => (body += chunk))
+              res.on('end', () => resolve(JSON.parse(body)))
+            }
+          )
+          req.on('error', reject)
+          req.end('{}')
+        }
+      )
+      expect(headers).toEqual({
+        'x-pacenote-user': 'U0ALICE',
+        'x-pacenote-conversation': 'C0OPS',
+        'x-pacenote-label': encodeURIComponent('#운영'),
+        'x-pacenote-thread': '1.0',
+      })
+    } finally {
+      await door.close()
+      broker.close()
     }
   })
 

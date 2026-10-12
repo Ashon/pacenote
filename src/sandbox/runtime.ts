@@ -43,6 +43,21 @@ export interface Mount {
   writable?: boolean
 }
 
+/**
+ * Who a run answers. The built-in sandbox puts it on each of the run's calls to
+ * the ops broker, which logs them with it (vm-broker.ts).
+ */
+export interface Requester {
+  /** The asker, by the messenger's user id */
+  user: string
+  /** The conversation's id, and its label (#ops) */
+  conversation: string
+  label?: string
+  thread: string
+  /** The run in the history */
+  run?: string
+}
+
 /** One process to run */
 export interface SandboxRun {
   /**
@@ -68,6 +83,8 @@ export interface SandboxRun {
   signal?: AbortSignal
   /** Receives stdout line by line, for progress events */
   onOutputLine?: (line: string) => void
+  /** Who the run answers */
+  requester?: Requester
 }
 
 export interface Sandbox {
