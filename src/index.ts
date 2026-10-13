@@ -13,7 +13,7 @@ import { connectSlack } from './messengers/slack/connect.js'
 import { createReasoner } from './reasoners/cli.js'
 import { hostCliProblems } from './reasoners/host-check.js'
 import { HostSandbox } from './sandbox/host.js'
-import { VmSandbox } from './sandbox/vm.js'
+import { defaultSandboxDir, VmSandbox, vmOutdated } from './sandbox/vm.js'
 import type { Sandbox } from './sandbox/runtime.js'
 import { DiagramRenderer } from './render/diagrams.js'
 import { RECHECK_SANDBOX, SandboxHealth } from './runtime/sandbox-health.js'
@@ -110,7 +110,8 @@ async function main(): Promise<void> {
   const { messenger, bot } = connection
   /**
    * Problems fixed for this process's life (diagram rendering); the sandbox's
-   * come from sandboxHealth
+   * come from sandboxHealth, and images built by another version from
+   * imageHealth
    */
   const problems: string[] = []
   /** Why the reasoner cannot answer, until it answers again */
@@ -121,6 +122,40 @@ async function main(): Promise<void> {
     : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
   const reasoner = createReasoner(config.reasoner, sandbox)
+
+  let renderer: DiagramRenderer | undefined
+  if (config.render.enabled) {
+    const candidate = new DiagramRenderer({
+      ...config.render.vm,
+      timeoutMs: 60_000,
+    })
+    const rendererProblems = await candidate.verify()
+    for (const problem of rendererProblems) {
+      log.warn(`Diagram rendering disabled: ${problem}`)
+      problems.push(`Diagram rendering disabled: ${problem}`)
+    }
+    if (rendererProblems.length === 0) renderer = candidate
+  }
+  // An image built by another version of Pacenote still runs, so it is a
+  // check issue of its own rather than a sandbox problem: setting the built-in
+  // sandbox up again builds it anew.
+  const images = [
+    ...(config.reasoner.vm ? [config.reasoner.vm.image] : []),
+    ...(config.reasoner.vm?.broker ? [config.reasoner.vm.broker.image] : []),
+    ...(renderer ? [config.render.vm.image] : []),
+  ]
+  const imageHealth = new SandboxHealth(
+    () =>
+      vmOutdated({
+        bin: config.render.vm.bin,
+        root: config.render.vm.root,
+        sandboxDir: defaultSandboxDir(),
+        images,
+      }),
+    () => status.update({ problems: allProblems() }),
+    log,
+    'Sandbox images'
+  )
   // If the sandbox is not ready, reasoner calls fail. They do not fall back to
   // the host. The check repeats while the bot runs, and right away when the
   // desktop app finishes a sandbox job, so the status (and the status bar)
@@ -131,6 +166,7 @@ async function main(): Promise<void> {
   const allProblems = () => [
     ...sandboxHealth.current.map((problem) => `${checked}: ${problem}`),
     ...(reasonerProblem ? [`Reasoner: ${reasonerProblem}`] : []),
+    ...imageHealth.current,
     ...problems,
   ]
   const sandboxHealth = new SandboxHealth(
@@ -146,24 +182,11 @@ async function main(): Promise<void> {
     checked
   )
   await sandboxHealth.check()
+  await imageHealth.check()
   if (config.mention.workspace && !reasoner.canReadFiles) {
     log.warn(
       `${reasoner.backend} cannot read files in the ${sandbox.kind} sandbox, so MENTION_WORKSPACE is not used.`
     )
-  }
-
-  let renderer: DiagramRenderer | undefined
-  if (config.render.enabled) {
-    const candidate = new DiagramRenderer({
-      ...config.render.vm,
-      timeoutMs: 60_000,
-    })
-    const rendererProblems = await candidate.verify()
-    for (const problem of rendererProblems) {
-      log.warn(`Diagram rendering disabled: ${problem}`)
-      problems.push(`Diagram rendering disabled: ${problem}`)
-    }
-    if (rendererProblems.length === 0) renderer = candidate
   }
 
   const history = config.history
@@ -230,10 +253,13 @@ async function main(): Promise<void> {
   running = true
   // The CLI's sign-in and the sandbox's parts change rarely.
   sandboxHealth.start(5 * 60_000)
+  imageHealth.start(5 * 60_000)
   // Messages from the desktop app
   parentPort()?.on('message', (event) => {
     const type = (event.data as { type?: string } | undefined)?.type
-    if (type === RECHECK_SANDBOX) void sandboxHealth.check()
+    if (type !== RECHECK_SANDBOX) return
+    void sandboxHealth.check()
+    void imageHealth.check()
   })
   await responder.resumePending()
   const allowed = config.mention.allowedUserIds

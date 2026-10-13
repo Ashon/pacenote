@@ -424,7 +424,9 @@ export function SettingsPage() {
           !vmStatus.initfs ||
           !vmStatus.image)
         ? { tone: 'warn', text: 'Set up' }
-        : undefined
+        : (vmStatus?.outdated ?? []).length > 0
+          ? { tone: 'warn', text: 'Update' }
+          : undefined
       : { tone: 'muted', text: 'Off' },
     ops: !opsOn
       ? { tone: 'muted', text: 'Off' }

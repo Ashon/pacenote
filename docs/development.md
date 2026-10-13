@@ -77,8 +77,8 @@ A model's CLI is a `CliAdapter` in `src/reasoners`; the runner (`cli.ts`) and th
      prints.
 3. Register it in `ADAPTERS` in `src/reasoners/cli.ts`.
 4. In `src/config.ts`, give it a binary setting in `commands` and, for the built-in sandbox, its credentials in `auth`.
-5. Install the CLI in `sandbox/vm/build.sh` (its version in `VERSIONS`, `src/sandbox/vm-setup.ts`) and allow its API's domain
-   in `sandbox/allowed-domains.txt`.
+5. Install the CLI in `sandbox/vm/build.sh` (its version in `VERSIONS`, `src/sandbox/vm-images.ts`) and allow its API's
+   domain in `sandbox/allowed-domains.txt`.
 
 A model reached without a CLI can implement `Reasoner` directly and be returned from `createReasoner`.
 

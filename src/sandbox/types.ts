@@ -39,9 +39,28 @@ export interface VmStatus {
   kernel: boolean
   initfs: boolean
   /** The reasoner image, once built */
-  image?: { createdAt: string; base: string }
+  image?: VmImageStatus
   /** The diagram renderer's image, once built */
-  renderer?: { createdAt: string; base: string }
+  renderer?: VmImageStatus
+  /** The ops broker's image, once built */
+  broker?: VmImageStatus
+  /**
+   * The images the settings use (the renderer's with diagrams on, the
+   * broker's with ops tools on) that were built for another version of
+   * Pacenote: the setup builds them anew
+   */
+  outdated?: string[]
+}
+
+/** A built image of the built-in sandbox */
+export interface VmImageStatus {
+  createdAt: string
+  base: string
+  /**
+   * Built from this Pacenote's recipe: an image from an older one still runs,
+   * until the setup builds it anew
+   */
+  current: boolean
 }
 
 export interface AllowlistIssue {
@@ -63,7 +82,7 @@ export const SANDBOX_JOBS: Record<
   vm: {
     label: 'Set up built-in sandbox',
     script: 'sandbox:vm',
-    help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with ops tools on, the broker. Run it again to update the CLIs.',
+    help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with ops tools on, the broker. After an update, it builds the images that changed.',
   },
 }
 

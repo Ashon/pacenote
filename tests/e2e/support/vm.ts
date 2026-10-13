@@ -10,11 +10,12 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultVmBin, vmUnsupported } from '../../../src/sandbox/vm.js'
+import { fetchKernel, kernelPath } from '../../../src/sandbox/vm-setup.js'
 import {
-  fetchKernel,
-  kernelPath,
-  VM_IMAGE_SETTINGS,
-} from '../../../src/sandbox/vm-setup.js'
+  IMAGE_RECIPES,
+  RECIPE_LABEL,
+  recipeHash,
+} from '../../../src/sandbox/vm-images.js'
 import { REPO } from './processes.js'
 
 /**
@@ -48,9 +49,15 @@ function imageInputs(): string {
       .sort((a, b) => a.name.localeCompare(b.name)))
       hash.update(entry.name).update(readFileSync(path.join(dir, entry.name)))
   hash.update(readFileSync(path.join(SUPPORT, 'fake-claude.mjs')))
-  hash.update(JSON.stringify(VM_IMAGE_SETTINGS))
+  for (const name of ['reasoner', 'broker']) hash.update(recipe(name))
   return hash.digest('hex')
 }
+
+/**
+ * The recipe hash the setup would label the image with: a test image stands
+ * in for the one the setup builds, so Pace takes it as up to date
+ */
+const recipe = (name: string) => recipeHash(name, path.join(REPO, 'sandbox'))
 
 /** The kernel, the init filesystem and the test images, where missing */
 export async function prepare(): Promise<void> {
@@ -82,19 +89,10 @@ export async function prepare(): Promise<void> {
       name,
       '--size',
       '1',
-      // As vm-setup.ts sets each image
-      ...(name === 'broker'
-        ? [
-            '--set-user',
-            '1000:1000',
-            '--set-workdir',
-            '/app',
-            '--set-entrypoint',
-            '/usr/local/bin/sandbox-entrypoint',
-            '--set-env',
-            'HOME=/tmp',
-          ]
-        : VM_IMAGE_SETTINGS),
+      // As the setup sets each image
+      ...IMAGE_RECIPES[name]!.settings,
+      '--label',
+      `${RECIPE_LABEL}=${recipe(name)}`,
       '--mount',
       `${path.join(REPO, 'sandbox/vm')}:/pacenote`,
       '--mount',

@@ -7,7 +7,7 @@ the VM can and cannot do.
 
 ```
 pacenote-vm prepare --root R                       the init filesystem (vminitd), once the kernel is in R/kernel
-pacenote-vm build --root R --base REF --name N [run options] -- SCRIPT ARGS...
+pacenote-vm build --root R --base REF --name N [--label K=V] [run options] -- SCRIPT ARGS...
 pacenote-vm run --root R --image N [run options] -- COMMAND ARGS...
 pacenote-vm status --root R                        what is ready, as JSON
 ```
@@ -20,7 +20,8 @@ appearing as `/run/pacenote/NAME` (the ops broker's, in reasoner VMs); and `--pu
 the guest listens on, appearing on the host (the broker's MCP server). `run --writable-root` lets the process write over
 its copy of the image. `run` gives the command its stdin, stdout and stderr and exits with its code; SIGTERM or SIGINT
 stops the VM. Each run boots from APFS clones of the image and init
-filesystem, so runs at the same time do not share a disk.
+filesystem, so runs at the same time do not share a disk. `build --label KEY=VALUE` keeps a value with the image, which
+`status` reports: Pacenote keeps the hash of the image's recipe there, to tell an image built by another version.
 
 Building needs Swift 6.2 or later (Xcode 26), and running needs Apple silicon with macOS 15 or later:
 

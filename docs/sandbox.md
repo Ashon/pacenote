@@ -69,9 +69,10 @@ That is why the sandbox keeps a setup where shell tools do not work (claude has 
 Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in the repository. It keeps everything in
 `~/.pacenote/vm`:
 
-1. The Linux kernel: Kata Containers' build, the one Containerization is tested with. It comes in Kata's release archive
-   (about 290 MB), downloaded once and checked against a pinned SHA-256 (`KERNEL` in `src/sandbox/vm-setup.ts`); only the
-   14 MB kernel is kept.
+1. The Linux kernel: Kata Containers' build, the one Containerization is tested with. It is downloaded once (about
+   14 MB) from `ghcr.io/ashon/pacenote-kernel`, by its pinned SHA-256 (`KERNEL` in `src/sandbox/vm-setup.ts`), where the
+   `kernel` workflow publishes it from Kata's release archive. When ghcr.io cannot give it, the setup takes it from that
+   archive itself (about 290 MB), checked against its own pinned hash and then the kernel's.
 2. The init filesystem: vminitd, from `ghcr.io/apple/containerization/vminit`.
 3. The reasoner image, built in a VM from `node:24-bookworm-slim` by `sandbox/vm/build.sh`. The build's own way out goes
    only to `deb.debian.org` and `registry.npmjs.org`.
@@ -80,8 +81,11 @@ Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in 
 5. With ops tools on, the ops broker's image: the broker then runs in a VM of its own while Pace runs, its way out
    limited to what its settings name (see [Ops tools](ops-tools.md#in-the-built-in-sandbox)).
 
-What goes into the images is pinned in `VERSIONS` in `src/sandbox/vm-setup.ts`. When you upgrade the host CLI, bump it
-there too and run the setup again, which builds the images anew.
+Each image is built from a recipe (`src/sandbox/vm-images.ts`): its script and the other files of `sandbox/vm` it
+installs, the versions it pins in `VERSIONS`, and its settings. The image keeps its recipe's hash, so when a newer
+Pacenote changes a recipe, Settings > Sandbox says "Update needed" and the status bar says which images were built for
+another version. They still run until the setup builds them anew; running it again builds only those. When you upgrade
+the host CLI, bump it in `VERSIONS` too.
 
 Diagrams and charts in answers render in a VM of the renderer's image with no way out at all, seeing only the folder with
 the block and its PNG; generated images are shrunk there too. That works whatever the run environment, once the built-in

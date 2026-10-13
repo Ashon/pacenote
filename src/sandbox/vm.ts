@@ -13,8 +13,9 @@ import {
   type Sandbox,
   type SandboxRun,
 } from './runtime.js'
-import { jobHint, type VmStatus } from './types.js'
+import { jobHint, type VmImageStatus, type VmStatus } from './types.js'
 import { VmBroker, type VmBrokerOptions } from './vm-broker.js'
+import { IMAGE_RECIPES, imageCurrent } from './vm-images.js'
 
 /**
  * The reasoner sandbox built into Pacenote: each run is one process in a
@@ -45,8 +46,6 @@ export interface VmSandboxOptions {
   broker?: Omit<VmBrokerOptions, 'bin' | 'root' | 'log'>
 }
 
-/** The image the setup job builds, and runs use */
-export const VM_IMAGE = 'reasoner'
 /** What pacenote-vm says and takes (its formatVersion) */
 export const VM_FORMAT = 1
 
@@ -234,8 +233,8 @@ export class VmSandbox implements Sandbox {
   async verify(): Promise<string[]> {
     const unsupported = vmUnsupported()
     if (unsupported) return [unsupported]
-    const status = await vmStatus(this.options)
-    const problems = vmProblems(status)
+    const { bin, root, image } = this.options
+    const problems = vmProblems(await vmStatus({ bin, root, image }))
     if (!existsSync(this.options.allowlistFile))
       problems.push(
         `The allowed domains list is missing (${this.options.allowlistFile}): ${jobHint('vm')}.`
@@ -328,13 +327,38 @@ export class VmSandbox implements Sandbox {
   }
 }
 
+/** What pacenote-vm status says */
+export interface VmReport {
+  version?: number
+  kernel?: boolean
+  initfs?: boolean
+  images?: Record<
+    string,
+    { created?: string; base?: string; labels?: Record<string, string> }
+  >
+}
+
+export function readVmReport(
+  options: Pick<VmSandboxOptions, 'bin' | 'root'>
+): Promise<VmReport> {
+  return runProcess(options.bin, ['status', '--root', options.root], {
+    cwd: process.cwd(),
+    input: '',
+    timeoutMs: 15_000,
+  }).then(({ stdout }) => JSON.parse(stdout) as VmReport)
+}
+
 /**
  * What pacenote-vm has ready, from its status: image is the one runs use, and
- * renderer, if named, the diagram renderer's
+ * renderer and broker, if named, the diagram renderer's and the ops broker's.
+ * With sandboxDir, each image says whether it was built from this Pacenote's
+ * recipe.
  */
 export async function vmStatus(
   options: Pick<VmSandboxOptions, 'bin' | 'root' | 'image'> & {
     renderer?: string
+    broker?: string
+    sandboxDir?: string
   }
 ): Promise<VmStatus> {
   const status: VmStatus = {
@@ -345,36 +369,71 @@ export async function vmStatus(
   }
   if (status.unsupported) return status
   try {
-    const { stdout } = await runProcess(
-      options.bin,
-      ['status', '--root', options.root],
-      { cwd: process.cwd(), input: '', timeoutMs: 15_000 }
-    )
-    const report = JSON.parse(stdout) as {
-      version?: number
-      kernel?: boolean
-      initfs?: boolean
-      images?: Record<string, { created?: string; base?: string }>
-    }
+    const report = await readVmReport(options)
     status.helper.ok = report.version === VM_FORMAT
     if (!status.helper.ok)
       status.helper.error = `pacenote-vm speaks version ${report.version}, Pacenote ${VM_FORMAT}.`
     status.kernel = report.kernel === true
     status.initfs = report.initfs === true
-    const built = (name: string) => {
+    const built = (name: string): VmImageStatus | undefined => {
       const image = report.images?.[name]
       return image?.created
-        ? { createdAt: image.created, base: image.base ?? '' }
+        ? {
+            createdAt: image.created,
+            base: image.base ?? '',
+            current: imageCurrent(name, image.labels, options.sandboxDir),
+          }
         : undefined
     }
     status.image = built(options.image)
     if (options.renderer) status.renderer = built(options.renderer)
+    if (options.broker) status.broker = built(options.broker)
   } catch (err) {
     status.helper.error = existsSync(options.bin)
       ? (err as Error).message
       : `pacenote-vm not found at ${options.bin}.`
   }
   return status
+}
+
+/**
+ * The images, of those named, that were built from another recipe than this
+ * Pacenote's, as a check issue: they still run, and setting the built-in
+ * sandbox up again builds them anew. What keeps the sandbox from running at
+ * all is vmProblems', so a helper that does not answer (or is not there, on a
+ * Mac that cannot run it) says nothing here.
+ */
+export async function vmOutdated(
+  options: Pick<VmSandboxOptions, 'bin' | 'root'> & {
+    sandboxDir: string
+    images: string[]
+  }
+): Promise<string[]> {
+  if (options.images.length === 0) return []
+  let report: VmReport
+  try {
+    report = await readVmReport(options)
+  } catch {
+    return []
+  }
+  const outdated = options.images.filter((name) => {
+    const image = report.images?.[name]
+    return (
+      image?.created && !imageCurrent(name, image.labels, options.sandboxDir)
+    )
+  })
+  if (outdated.length === 0) return []
+  const names = outdated.map(
+    (name) => `the ${(IMAGE_RECIPES[name]?.title ?? name).toLowerCase()}`
+  )
+  const list =
+    names.length === 1
+      ? names[0]!
+      : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+  const one = names.length === 1
+  return [
+    `${list[0]!.toUpperCase()}${list.slice(1)} ${one ? 'was' : 'were'} built for another version of Pacenote: ${jobHint('vm')} to update ${one ? 'it' : 'them'}.`,
+  ]
 }
 
 /**

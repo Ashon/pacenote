@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
+  appendFileSync,
+  cpSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -16,14 +19,28 @@ import { loadConfig } from '../src/config.js'
 import { EgressProxy, isLocalAddress } from '../src/sandbox/egress.js'
 import {
   memoryMiB,
+  vmOutdated,
   vmProblems,
   vmRunArgs,
   vmUnsupported,
 } from '../src/sandbox/vm.js'
-import { fetchKernel, kernelPath, VERSIONS } from '../src/sandbox/vm-setup.js'
+import {
+  fetchKernel,
+  KERNEL,
+  kernelPath,
+  setupVm,
+} from '../src/sandbox/vm-setup.js'
+import {
+  IMAGE_RECIPES,
+  imageCurrent,
+  RECIPE_LABEL,
+  recipeHash,
+  VERSIONS,
+} from '../src/sandbox/vm-images.js'
 import { brokerDestinations, openBrokerDoor } from '../src/sandbox/vm-broker.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-vm-'))
+const REPO = path.resolve(import.meta.dirname, '..')
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 /** This computer's address on its network, if it has one */
@@ -216,9 +233,13 @@ describe('built-in sandbox runs', () => {
       helper: { path: '/bin/pacenote-vm', ok: true },
       kernel: true,
       initfs: true,
-      image: { createdAt: '2026-10-12T00:00:00Z', base: 'node' },
+      image: { createdAt: '2026-10-12T00:00:00Z', base: 'node', current: true },
     }
     expect(vmProblems(ready)).toEqual([])
+    // An image built for another version still runs.
+    expect(
+      vmProblems({ ...ready, image: { ...ready.image, current: false } })
+    ).toEqual([])
     expect(vmProblems({ ...ready, kernel: false, image: undefined })).toEqual([
       'The built-in sandbox lacks the Linux kernel, the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
     ])
@@ -390,46 +411,151 @@ describe('built-in sandbox setup', () => {
     expect(VERSIONS.mermaidCli).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
-  it('keeps the kernel only from an archive whose hash matches', async () => {
-    // An archive shaped like Kata's, served locally
-    const source = path.join(root, 'kata')
-    const member = 'opt/kata/share/kata-containers/vmlinux-test'
+  /**
+   * A registry and Kata's archive, served locally: the registry asks for a
+   * token as ghcr.io does, and gives the blob for it
+   */
+  async function kernelSources(blob: Buffer, archive: Buffer) {
+    const asked: string[] = []
+    const server = http
+      .createServer((req, res) => {
+        const url = new URL(req.url!, 'http://local')
+        asked.push(url.pathname)
+        const port = (server.address() as net.AddressInfo).port
+        if (url.pathname === '/token') {
+          expect(url.searchParams.get('scope')).toBe(
+            'repository:test/kernel:pull'
+          )
+          return res.end(JSON.stringify({ token: 'pull-token' }))
+        }
+        if (url.pathname.startsWith('/v2/test/kernel/blobs/')) {
+          if (req.headers.authorization !== 'Bearer pull-token') {
+            res.writeHead(401, {
+              'www-authenticate': `Bearer realm="http://127.0.0.1:${port}/token",service="test",scope="repository:test/kernel:pull"`,
+            })
+            return res.end()
+          }
+          return res.end(blob)
+        }
+        if (url.pathname === '/kata.tar.xz') return res.end(archive)
+        res.writeHead(404).end()
+      })
+      .listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const base = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}`
+    return { asked, server, base }
+  }
+
+  /** An archive shaped like Kata's, holding the kernel */
+  function kataArchive(kernel: string, member: string): Buffer {
+    const source = mkdtempSync(path.join(root, 'kata-'))
     mkdirSync(path.join(source, path.dirname(member)), { recursive: true })
-    writeFileSync(path.join(source, member), 'a kernel')
-    const archive = path.join(root, 'kata.tar.xz')
+    writeFileSync(path.join(source, member), kernel)
+    const archive = path.join(source, 'kata.tar.xz')
     expect(
       spawnSync('tar', ['-cJf', archive, '-C', source, 'opt']).status
     ).toBe(0)
-    const bytes = readFileSync(archive)
-    const sha256 = createHash('sha256').update(bytes).digest('hex')
-    const server = http
-      .createServer((_req, res) => res.end(bytes))
-      .listen(0, '127.0.0.1')
-    await new Promise((resolve) => server.once('listening', resolve))
-    const url = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}/kata.tar.xz`
+    return readFileSync(archive)
+  }
+
+  const sha256 = (bytes: Buffer | string) =>
+    createHash('sha256').update(bytes).digest('hex')
+  const member = 'opt/kata/share/kata-containers/vmlinux-test'
+
+  it('takes the kernel from the registry by its hash, with a pull token', async () => {
+    const archive = kataArchive('a kernel', member)
+    const { asked, server, base } = await kernelSources(
+      Buffer.from('a kernel'),
+      archive
+    )
     const lines: string[] = []
     try {
-      const vm = path.join(root, 'vm')
-      await expect(
-        fetchKernel({
-          bin: '',
-          root: vm,
-          sandboxDir: '',
-          log: (line) => lines.push(line),
-          kernel: { url, sha256: '0'.repeat(64), member },
-        })
-      ).rejects.toThrow(/hash/)
-      expect(() => readFileSync(kernelPath(vm))).toThrow()
-
+      const vm = path.join(root, 'vm-registry')
       await fetchKernel({
         bin: '',
         root: vm,
         sandboxDir: '',
         log: (line) => lines.push(line),
-        kernel: { url, sha256, member },
+        kernel: {
+          sha256: sha256('a kernel'),
+          registry: base,
+          repository: 'test/kernel',
+          archive: {
+            url: `${base}/kata.tar.xz`,
+            sha256: sha256(archive),
+            member,
+          },
+        },
       })
       expect(readFileSync(kernelPath(vm), 'utf8')).toBe('a kernel')
+      expect(lines).toEqual([
+        `Linux kernel: downloading from ${new URL(base).host}/test/kernel`,
+        'Linux kernel: ready (hash checked)',
+      ])
+      expect(asked).not.toContain('/kata.tar.xz')
+    } finally {
+      server.close()
+    }
+  })
+
+  it("falls back to Kata's archive, and keeps only a kernel whose hashes match", async () => {
+    const archive = kataArchive('a kernel', member)
+    // The registry gives something else than the kernel.
+    const { asked, server, base } = await kernelSources(
+      Buffer.from('not the kernel'),
+      archive
+    )
+    const kernel = {
+      sha256: sha256('a kernel'),
+      registry: base,
+      repository: 'test/kernel',
+      archive: { url: `${base}/kata.tar.xz`, sha256: sha256(archive), member },
+    }
+    const options = (vm: string, lines: string[] = []) => ({
+      bin: '',
+      root: path.join(root, vm),
+      sandboxDir: '',
+      log: (line: string) => lines.push(line),
+    })
+    try {
+      await expect(
+        fetchKernel({
+          ...options('vm-bad-archive'),
+          kernel: {
+            ...kernel,
+            archive: { ...kernel.archive, sha256: '0'.repeat(64) },
+          },
+        })
+      ).rejects.toThrow(/archive's hash/)
+      expect(() =>
+        readFileSync(kernelPath(path.join(root, 'vm-bad-archive')))
+      ).toThrow()
+
+      // An archive whose kernel is not the one pinned
+      await expect(
+        fetchKernel({
+          ...options('vm-bad-kernel'),
+          kernel: { ...kernel, sha256: '1'.repeat(64) },
+        })
+      ).rejects.toThrow(/The kernel's hash/)
+
+      const lines: string[] = []
+      await fetchKernel({ ...options('vm-fallback', lines), kernel })
+      expect(
+        readFileSync(kernelPath(path.join(root, 'vm-fallback')), 'utf8')
+      ).toBe('a kernel')
+      expect(lines[1]).toMatch(
+        /test\/kernel did not give it \(its hash is [0-9a-f]{64}\); from Kata's release archive instead$/
+      )
       expect(lines.at(-1)).toBe('Linux kernel: ready (hash checked)')
+      expect(asked).toContain('/kata.tar.xz')
+
+      // A registry without the kernel at all
+      await fetchKernel({
+        ...options('vm-missing', lines),
+        kernel: { ...kernel, repository: 'test/missing' },
+      })
+      expect(lines.some((line) => line.includes('(HTTP 404)'))).toBe(true)
     } finally {
       server.close()
     }
@@ -438,12 +564,7 @@ describe('built-in sandbox setup', () => {
   it('fails, not hangs, when tar gives up on the archive early', async () => {
     // Larger than a pipe's buffer, so tar exits while the download goes on
     const bytes = Buffer.alloc(4 * 1024 * 1024, 'not an archive ')
-    const sha256 = createHash('sha256').update(bytes).digest('hex')
-    const server = http
-      .createServer((_req, res) => res.end(bytes))
-      .listen(0, '127.0.0.1')
-    await new Promise((resolve) => server.once('listening', resolve))
-    const url = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}/kata.tar.xz`
+    const { server, base } = await kernelSources(Buffer.from(''), bytes)
     try {
       const vm = path.join(root, 'vm-bad')
       await expect(
@@ -452,13 +573,166 @@ describe('built-in sandbox setup', () => {
           root: vm,
           sandboxDir: '',
           log: () => {},
-          kernel: { url, sha256, member: 'vmlinux' },
+          kernel: {
+            sha256: sha256('a kernel'),
+            registry: base,
+            repository: 'test/missing',
+            archive: {
+              url: `${base}/kata.tar.xz`,
+              sha256: sha256(bytes),
+              member: 'vmlinux',
+            },
+          },
         })
       ).rejects.toThrow(/tar failed/)
       expect(() => readFileSync(kernelPath(vm))).toThrow()
     } finally {
       server.close()
     }
+  })
+
+  it('pins a kernel published to ghcr.io by the kernel workflow', () => {
+    const workflow = readFileSync(
+      path.join(REPO, '.github/workflows/kernel.yml'),
+      'utf8'
+    )
+    for (const line of [
+      `KERNEL_SHA256: ${KERNEL.sha256}`,
+      `ARCHIVE_URL: ${KERNEL.archive.url}`,
+      `ARCHIVE_SHA256: ${KERNEL.archive.sha256}`,
+      `MEMBER: ${KERNEL.archive.member}`,
+      `REPOSITORY: ${KERNEL.repository}`,
+    ])
+      expect(workflow).toContain(line)
+    expect(KERNEL.registry).toBe('https://ghcr.io')
+  })
+})
+
+describe('images built for another version', () => {
+  const sandboxDir = path.join(REPO, 'sandbox')
+
+  it('covers every file of sandbox/vm in some recipe', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(path.join(sandboxDir, 'vm', dir), {
+        withFileTypes: true,
+      }).flatMap((entry) =>
+        entry.isDirectory()
+          ? files(path.join(dir, entry.name))
+          : [path.join(dir, entry.name)]
+      )
+    const used = new Set(
+      Object.values(IMAGE_RECIPES).flatMap((r) => [r.script, ...r.files])
+    )
+    expect(files('').filter((file) => !used.has(file))).toEqual([])
+  })
+
+  it("changes an image's recipe hash with its files, not with others'", () => {
+    const copy = mkdtempSync(path.join(root, 'sandbox-'))
+    cpSync(sandboxDir, copy, { recursive: true })
+    const before = Object.fromEntries(
+      Object.keys(IMAGE_RECIPES).map((name) => [name, recipeHash(name, copy)])
+    )
+    appendFileSync(path.join(copy, 'vm/renderer/render.sh'), '\n# changed\n')
+    expect(recipeHash('renderer', copy)).not.toBe(before.renderer)
+    expect(recipeHash('reasoner', copy)).toBe(before.reasoner)
+    expect(recipeHash('broker', copy)).toBe(before.broker)
+    appendFileSync(path.join(copy, 'vm/egress.sh'), '\n# changed\n')
+    for (const name of Object.keys(IMAGE_RECIPES))
+      expect(recipeHash(name, copy)).not.toBe(before[name])
+
+    const label = { [RECIPE_LABEL]: recipeHash('reasoner', sandboxDir) }
+    expect(imageCurrent('reasoner', label, sandboxDir)).toBe(true)
+    expect(imageCurrent('reasoner', label, copy)).toBe(false)
+    // Built before images kept their recipe
+    expect(imageCurrent('reasoner', undefined, sandboxDir)).toBe(false)
+    // Nothing to compare with
+    expect(imageCurrent('reasoner', undefined, undefined)).toBe(true)
+    expect(imageCurrent('test-image', undefined, sandboxDir)).toBe(true)
+  })
+
+  /** A pacenote-vm that reports these images, and records what it is asked */
+  function fakeHelper(images: Record<string, string | undefined>) {
+    const dir = mkdtempSync(path.join(root, 'helper-'))
+    const report = {
+      version: 1,
+      kernel: true,
+      initfs: true,
+      images: Object.fromEntries(
+        Object.entries(images).map(([name, recipe]) => [
+          name,
+          {
+            created: '2026-10-13T00:00:00Z',
+            base: 'node',
+            ...(recipe ? { labels: { [RECIPE_LABEL]: recipe } } : {}),
+          },
+        ])
+      ),
+    }
+    writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report))
+    const bin = path.join(dir, 'pacenote-vm')
+    writeFileSync(
+      bin,
+      `#!/bin/sh\necho "$*" >> "${dir}/calls"\n[ "$1" = status ] && cat "${dir}/report.json"\nexit 0\n`,
+      { mode: 0o755 }
+    )
+    const calls = () =>
+      readFileSync(path.join(dir, 'calls'), 'utf8').trim().split('\n')
+    return { bin, calls }
+  }
+
+  it('builds only the images whose recipe changed, and labels them', async () => {
+    const { bin, calls } = fakeHelper({
+      reasoner: 'an older recipe',
+      renderer: recipeHash('renderer', sandboxDir),
+    })
+    const vm = path.join(root, 'vm-setup')
+    mkdirSync(path.dirname(kernelPath(vm)), { recursive: true })
+    writeFileSync(kernelPath(vm), 'a kernel')
+    const lines: string[] = []
+    await setupVm({
+      bin,
+      root: vm,
+      sandboxDir,
+      log: (line) => lines.push(line),
+      renderer: true,
+    })
+    const builds = calls().filter((call) => call.startsWith('build '))
+    expect(builds).toHaveLength(1)
+    expect(builds[0]).toContain('--name reasoner')
+    expect(builds[0]).toContain(
+      `--label ${RECIPE_LABEL}=${recipeHash('reasoner', sandboxDir)}`
+    )
+    expect(builds[0]).toContain(`CODEX_VERSION=${VERSIONS.codex}`)
+    expect(lines).toContain('Diagram renderer image: up to date')
+    expect(lines).toContain('Ops broker image: not built (ops tools are off)')
+  })
+
+  it('names the images built for another version as one check issue', async () => {
+    const { bin } = fakeHelper({
+      reasoner: 'an older recipe',
+      renderer: undefined,
+      broker: recipeHash('broker', sandboxDir),
+    })
+    const options = { bin, root, sandboxDir }
+    expect(
+      await vmOutdated({ ...options, images: ['reasoner', 'broker'] })
+    ).toEqual([
+      'The reasoner image was built for another version of Pacenote: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm) to update it.',
+    ])
+    expect(
+      await vmOutdated({ ...options, images: ['reasoner', 'renderer'] })
+    ).toEqual([
+      'The reasoner image and the diagram renderer image were built for another version of Pacenote: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm) to update them.',
+    ])
+    expect(await vmOutdated({ ...options, images: ['broker'] })).toEqual([])
+    // A helper that does not answer is the sandbox check's to report.
+    expect(
+      await vmOutdated({
+        ...options,
+        bin: '/nonexistent',
+        images: ['reasoner'],
+      })
+    ).toEqual([])
   })
 })
 

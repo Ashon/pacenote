@@ -4,7 +4,7 @@
 // egress socket the host relays in, which Pacenote's allowlist proxy serves.
 //
 //   pacenote-vm prepare --root R              the init filesystem (vminitd)
-//   pacenote-vm build --root R --base REF --name N [run options] -- SCRIPT ARGS...
+//   pacenote-vm build --root R --base REF --name N [--label K=V] [run options] -- SCRIPT ARGS...
 //   pacenote-vm run --root R --image N [run options] -- COMMAND ARGS...
 //   pacenote-vm status --root R               what is ready, as JSON
 //
@@ -71,6 +71,8 @@ struct ImageConfig: Codable {
     var environment: [String]
     var entrypoint: [String]
     var created: String
+    /// What the build was told to keep with the image (build --label)
+    var labels: [String: String]?
 }
 
 /// Writes one line of JSON to stdout, for Pacenote to read

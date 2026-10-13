@@ -1,0 +1,65 @@
+name: kernel
+
+# Publishes the Linux kernel the built-in sandbox boots to ghcr.io/ashon/pacenote-kernel, so the app downloads the 14 MB
+# kernel by its hash instead of Kata's 290 MB release archive (KERNEL in src/sandbox/vm-setup.ts, which falls back to the
+# archive). The kernel is taken from that archive here, both hashes checked against the pins below, which
+# tests/vm.test.ts keeps equal to KERNEL. It runs when this file changes on main, as a new kernel is a new pin here and
+# in KERNEL, or by hand (Actions > kernel > Run workflow).
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/kernel.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARCHIVE_URL: https://github.com/kata-containers/kata-containers/releases/download/3.17.0/kata-static-3.17.0-arm64.tar.xz
+  ARCHIVE_SHA256: 647c7612e6edf789d5e14698c48c99d8bac15ad139ffaa1c8bb7d229f748d181
+  MEMBER: opt/kata/share/kata-containers/vmlinux-6.12.28-153
+  KERNEL_SHA256: 67bac9f416af4cdc9b151e4ba4962d6515e0ad7acc53816761cf964aa6af6ea0
+  REPOSITORY: ashon/pacenote-kernel
+  TAG: 6.12.28-153
+
+jobs:
+  kernel:
+    name: publish the kernel
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push the kernel to ghcr.io
+    steps:
+      - name: take the kernel from Kata's archive
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o kata.tar.xz "$ARCHIVE_URL"
+          echo "$ARCHIVE_SHA256  kata.tar.xz" | sha256sum -c -
+          tar -xJOf kata.tar.xz --wildcards --wildcards-match-slash "*$MEMBER" > vmlinux
+          echo "$KERNEL_SHA256  vmlinux" | sha256sum -c -
+      - uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
+      # The file is the one layer, so its digest is the kernel's hash, which the app asks for.
+      - name: push it
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$TOKEN" | oras login ghcr.io --username "$ACTOR" --password-stdin
+          oras push "ghcr.io/$REPOSITORY:$TAG" \
+            --artifact-type application/vnd.pacenote.kernel \
+            --annotation "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --annotation "org.opencontainers.image.description=The Linux kernel Pacenote's built-in sandbox boots, from Kata Containers 3.17.0" \
+            vmlinux:application/vnd.pacenote.kernel.vmlinux
+          oras logout ghcr.io
+      # As the app gets it: anonymously, by its hash. A package that is not public fails here.
+      - name: check that anyone can download it
+        run: |
+          set -euo pipefail
+          token=$(curl -fsS "https://ghcr.io/token?service=ghcr.io&scope=repository:$REPOSITORY:pull" | jq -r .token)
+          if ! curl -fsSL -H "Authorization: Bearer $token" -o pulled \
+            "https://ghcr.io/v2/$REPOSITORY/blobs/sha256:$KERNEL_SHA256"; then
+            echo "::error::ghcr.io/$REPOSITORY is not public: make it public in the package's settings."
+            exit 1
+          fi
+          echo "$KERNEL_SHA256  pulled" | sha256sum -c -

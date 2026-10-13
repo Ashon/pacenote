@@ -17,8 +17,8 @@ import {
   REQUIRED_DOMAINS,
 } from './allowlist.js'
 import { brokerExpected } from './env.js'
-import { defaultVmBin, VM_IMAGE, vmStatus } from './vm.js'
-import { VM_RENDERER_IMAGE } from './vm-setup.js'
+import { defaultVmBin, vmStatus } from './vm.js'
+import { VM_BROKER_IMAGE, VM_IMAGE, VM_RENDERER_IMAGE } from './vm-images.js'
 import type { PendingApply, SandboxCheck, SandboxStatus } from './types.js'
 
 /** Settings Pace has not picked up: .env changed after it started */
@@ -266,7 +266,17 @@ export async function collectSandboxStatus(options: {
       root: vmRootPath(options.env, home),
       image: VM_IMAGE,
       renderer: VM_RENDERER_IMAGE,
+      broker: VM_BROKER_IMAGE,
+      sandboxDir,
     })
+    const { image, renderer, broker } = status.vm
+    status.vm.outdated = [
+      image?.current === false && 'reasoner',
+      values.RENDER_DIAGRAMS !== 'off' &&
+        renderer?.current === false &&
+        'diagram renderer',
+      opsOn && broker?.current === false && 'ops broker',
+    ].filter((name) => typeof name === 'string')
   }
 
   const bot = readBotStatus(options.dataDir)

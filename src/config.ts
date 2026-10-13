@@ -13,10 +13,13 @@ import {
   defaultSandboxDir,
   defaultVmBin,
   memoryMiB,
-  VM_IMAGE,
   type VmSandboxOptions,
 } from './sandbox/vm.js'
-import { VM_BROKER_IMAGE, VM_RENDERER_IMAGE } from './sandbox/vm-setup.js'
+import {
+  VM_BROKER_IMAGE,
+  VM_IMAGE,
+  VM_RENDERER_IMAGE,
+} from './sandbox/vm-images.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'

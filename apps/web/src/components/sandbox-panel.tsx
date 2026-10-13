@@ -6,6 +6,7 @@ import {
   type SandboxJob,
   type SandboxJobKind,
   type SandboxStatus,
+  type VmImageStatus,
 } from '@src/sandbox/types'
 import {
   CircleCheck,
@@ -144,14 +145,18 @@ export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
         </span>
       </span>
     )
-  const ready = vm.kernel && vm.initfs && Boolean(vm.image)
+  const set = vm.kernel && vm.initfs && Boolean(vm.image)
+  // Images built for another version of Pacenote still run; the setup builds
+  // them anew.
+  const outdated = set && (vm.outdated ?? []).length > 0
+  const ready = set && !outdated
   return (
     <>
       <Readiness
         busy={job?.state === 'running' && job.kind === 'vm'}
         ready={ready}
         busyText="Setting up"
-        needs="Needs setup"
+        needs={outdated ? 'Update needed' : 'Needs setup'}
       />
       <span className="ml-auto">
         <JobButton sandbox={sandbox} kind="vm" primary={!ready} />
@@ -207,24 +212,30 @@ export function EnvironmentDetails({
                   <Dot ok={vm.kernel} warn />
                   {vm.kernel
                     ? 'Ready'
-                    : 'Not downloaded yet (about 290 MB, once)'}
+                    : 'Not downloaded yet (about 14 MB, once)'}
                 </Line>
                 <Line label="Init filesystem">
                   <Dot ok={vm.initfs} warn />
                   {vm.initfs ? 'Ready' : 'Not prepared yet'}
                 </Line>
                 <Line label="Reasoner image">
-                  <Dot ok={Boolean(vm.image)} warn />
+                  <Dot ok={Boolean(vm.image?.current)} warn />
                   {vm.image
-                    ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}`
+                    ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}${forAnother(vm.image)}`
                     : 'Not built yet'}
                 </Line>
                 <Line label="Diagram image">
-                  <Dot ok={Boolean(vm.renderer)} warn />
+                  <Dot ok={Boolean(vm.renderer?.current)} warn />
                   {vm.renderer
-                    ? `Built ${formatRelative(vm.renderer.createdAt)}`
+                    ? `Built ${formatRelative(vm.renderer.createdAt)}${forAnother(vm.renderer)}`
                     : 'Not built yet (with diagrams on, setup builds it)'}
                 </Line>
+                {vm.broker && (
+                  <Line label="Broker image">
+                    <Dot ok={vm.broker.current} warn />
+                    {`Built ${formatRelative(vm.broker.createdAt)}${forAnother(vm.broker)}`}
+                  </Line>
+                )}
                 <Line label="pacenote-vm">
                   <Dot ok={vm.helper.ok} />
                   <span className="break-all select-text">
@@ -238,6 +249,13 @@ export function EnvironmentDetails({
       )}
     </>
   )
+}
+
+/** What a built image's line adds when another version of Pacenote built it */
+function forAnother(image: VmImageStatus): string {
+  return image.current
+    ? ''
+    : ', for another version of Pacenote: set up again to update it'
 }
 
 /** A check's result as a line: a credential, a file, a login */

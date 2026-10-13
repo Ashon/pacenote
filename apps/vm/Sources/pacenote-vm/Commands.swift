@@ -70,6 +70,8 @@ extension PacenoteVM {
         var setEnv: [String] = []
         @Option(help: "The image's entrypoint from now on (a path in the image)")
         var setEntrypoint: String?
+        @Option(help: "KEY=VALUE kept with the image, which status reports. Repeatable.")
+        var label: [String] = []
         @Option(help: "The image's size in GiB") var size: UInt64 = 6
         @OptionGroup var options: RunOptions
         @Argument(parsing: .captureForPassthrough, help: "The command that changes the image")
@@ -80,6 +82,14 @@ extension PacenoteVM {
             let arguments = Array(command.drop { $0 == "--" })
             guard !arguments.isEmpty else { throw ValidationError("Nothing to run.") }
             if let setUser { _ = try parseUser(setUser) }
+            var labels: [String: String] = [:]
+            for entry in label {
+                let parts = entry.split(separator: "=", maxSplits: 1).map(String.init)
+                guard parts.count == 2, !parts[0].isEmpty else {
+                    throw ValidationError("A label is KEY=VALUE, not \(entry).")
+                }
+                labels[parts[0]] = parts[1]
+            }
 
             let store = try ImageStore(path: root.store)
             let image = try await store.get(reference: base, pull: true)
@@ -115,7 +125,8 @@ extension PacenoteVM {
                 workingDirectory: setWorkdir ?? baseConfig?.workingDir ?? "/",
                 environment: mergeEnvironment(baseEnvironment, setEnv),
                 entrypoint: setEntrypoint.map { [$0] } ?? baseConfig?.entrypoint ?? [],
-                created: ISO8601DateFormatter().string(from: Date())
+                created: ISO8601DateFormatter().string(from: Date()),
+                labels: labels.isEmpty ? nil : labels
             )
             // The new image replaces the old one at once: runs started before
             // keep the old files open.
