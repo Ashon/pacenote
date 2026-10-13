@@ -118,6 +118,18 @@ export async function setupVm(options: VmSetupOptions): Promise<void> {
 export const kernelPath = (root: string) => path.join(root, 'kernel/vmlinux')
 
 /**
+ * tar, reading an .xz archive on stdin, extracting only the member (named
+ * with or without ./): macOS's own bsdtar, or GNU tar elsewhere, where the
+ * tests run on Linux
+ */
+function extractMember(work: string, member: string): [string, string[]] {
+  const read = ['-xJf', '-', '-C', work]
+  return process.platform === 'darwin'
+    ? ['/usr/bin/tar', [...read, '--include', `*${member}`]]
+    : ['tar', [...read, '--wildcards', '--wildcards-match-slash', `*${member}`]]
+}
+
+/**
  * Downloads Kata's release archive and keeps its kernel, if the archive's hash
  * matches
  */
@@ -131,25 +143,35 @@ export async function fetchKernel(options: VmSetupOptions): Promise<void> {
     if (!response.ok || !response.body)
       throw new Error(`Download failed: HTTP ${response.status}`)
     const hash = createHash('sha256')
-    const tar = spawn(
-      'tar',
-      ['-xJf', '-', '-C', work, '--include', `*${kernel.member}`],
-      { stdio: ['pipe', 'ignore', 'pipe'] }
-    )
+    const [command, args] = extractMember(work, kernel.member)
+    const tar = spawn(command, args, { stdio: ['pipe', 'ignore', 'pipe'] })
     let stderr = ''
     tar.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
     const done = new Promise<number | null>((resolve) =>
       tar.on('close', resolve)
     )
+    // A tar that exits early (an archive it cannot read) closes its input:
+    // the rest of the download is still hashed, and its exit code says why.
+    let tarGone = false
+    tar.stdin.on('error', () => (tarGone = true))
+    const writable = () =>
+      new Promise<void>((resolve) => {
+        const go = () => {
+          tar.stdin.off('drain', go)
+          tar.stdin.off('close', go)
+          resolve()
+        }
+        tar.stdin.on('drain', go)
+        tar.stdin.on('close', go)
+      })
     const body = Readable.fromWeb(
       response.body as import('node:stream/web').ReadableStream
     )
     for await (const chunk of body) {
       hash.update(chunk as Buffer)
-      if (!tar.stdin.write(chunk))
-        await new Promise((resolve) => tar.stdin.once('drain', resolve))
+      if (!tarGone && !tar.stdin.write(chunk)) await writable()
     }
-    tar.stdin.end()
+    if (!tarGone) tar.stdin.end()
     const code = await done
     const digest = hash.digest('hex')
     if (digest !== kernel.sha256)

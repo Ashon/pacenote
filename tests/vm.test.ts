@@ -439,6 +439,32 @@ describe('built-in sandbox setup', () => {
       server.close()
     }
   })
+
+  it('fails, not hangs, when tar gives up on the archive early', async () => {
+    // Larger than a pipe's buffer, so tar exits while the download goes on
+    const bytes = Buffer.alloc(4 * 1024 * 1024, 'not an archive ')
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
+    const server = http
+      .createServer((_req, res) => res.end(bytes))
+      .listen(0, '127.0.0.1')
+    await new Promise((resolve) => server.once('listening', resolve))
+    const url = `http://127.0.0.1:${(server.address() as net.AddressInfo).port}/kata.tar.xz`
+    try {
+      const vm = path.join(root, 'vm-bad')
+      await expect(
+        fetchKernel({
+          bin: '',
+          root: vm,
+          sandboxDir: '',
+          log: () => {},
+          kernel: { url, sha256, member: 'vmlinux' },
+        })
+      ).rejects.toThrow(/tar failed/)
+      expect(() => readFileSync(kernelPath(vm))).toThrow()
+    } finally {
+      server.close()
+    }
+  })
 })
 
 describe('config', () => {
