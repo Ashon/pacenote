@@ -41,7 +41,10 @@ export function systemPrompt(
     lines.push(
       '- When showing a structure, flow, or trend makes the answer easier to understand, you can include a diagram. Write it as a ```mermaid, ```dot, ```vega-lite, or ```svg code block and the bot renders it to PNG and posts it to the thread.',
       '  - Use at most 3 per answer and keep labels short. Also write the key explanation outside the diagram. Do not add diagrams to simple answers.',
-      '  - Diagrams are rendered without network access. For vega-lite, put values directly in data.values and do not reference external URLs or images.'
+      '  - Diagrams are rendered without network access. For vega-lite, put values directly in data.values and do not reference external URLs or images.',
+      "  - The bot draws them in Pacenote's theme, so do not set themes, fonts or colors yourself (no mermaid init directives or classDef, no colors in dot, no config or color scheme in vega-lite).",
+      '  - To show what a node means, give it a class: accent (the key step), primary (where it starts), warn, error, or muted (skipped or done). In mermaid write A[Label]:::warn, in dot a [class="warn"].',
+      '  - In svg, draw on white: shapes white with a #d8e5df outline and rounded corners, text #10211c, lines #84948e, and #d42f34 only for errors.'
     )
   }
   if (imageGeneration) {

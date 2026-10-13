@@ -1,0 +1,33 @@
+/*
+ * Pacenote's theme for dot, before render.sh's defaults: groups (clusters) as
+ * the app's wells, where a block leaves them unstyled, and a node's class
+ * (class="accent", "primary", "warn", "error" or "muted") as the app shows
+ * that meaning. render.sh runs it as gvpr -c -f dot.gvpr.
+ */
+BEGIN {
+  void wells(graph_t g) {
+    graph_t s;
+    for (s = fstsubg(g); s != NULL; s = nxtsubg(s)) {
+      if (s.name == "cluster*") {
+        if (s.style == "") s.style = "rounded,filled";
+        if (s.fillcolor == "") s.fillcolor = "#f1f8f5";
+        if (s.color == "") s.color = "#f1f8f5";
+      }
+      wells(s);
+    }
+  }
+}
+BEG_G { wells($G); }
+N [class == "*accent*"] { fillcolor = "#f0f7f5"; color = "#80bdad"; }
+N [class == "*primary*"] {
+  fillcolor = "#007c5c"; color = "#007c5c"; fontcolor = "#ffffff";
+}
+N [class == "*warn*"] {
+  fillcolor = "#f8f1e5"; color = "#f8f1e5"; fontcolor = "#be7100";
+}
+N [class == "*error*"] {
+  fillcolor = "#fbeaeb"; color = "#fbeaeb"; fontcolor = "#d42f34";
+}
+N [class == "*muted*"] {
+  fillcolor = "#e8f1ed"; color = "#e8f1ed"; fontcolor = "#4f665e";
+}

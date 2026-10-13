@@ -29,6 +29,8 @@ export const VERSIONS = {
   mermaidCli: '12.0.0',
   vlConvert: '1.9.0.post1',
   pillow: '12.3.0',
+  /** The diagrams' typeface, as the app's (apps/web/src/index.css) */
+  pretendard: '1.3.9',
 }
 
 /** What the images are built on */
@@ -104,13 +106,15 @@ export const IMAGE_RECIPES: Record<string, ImageRecipe> = {
   },
   [VM_RENDERER_IMAGE]: {
     title: 'Diagram renderer image',
-    versions: `mermaid-cli ${VERSIONS.mermaidCli}`,
+    versions: `mermaid-cli ${VERSIONS.mermaidCli} and Pretendard ${VERSIONS.pretendard}`,
     script: 'renderer-build.sh',
     files: [
       'egress.sh',
       'egress-forward.mjs',
       'renderer/render.sh',
       'renderer/mermaid.json',
+      'renderer/vega-lite.json',
+      'renderer/dot.gvpr',
       'renderer/puppeteer.json',
     ],
     settings: [
@@ -130,6 +134,7 @@ export const IMAGE_RECIPES: Record<string, ImageRecipe> = {
       MERMAID_CLI_VERSION: VERSIONS.mermaidCli,
       VL_CONVERT_VERSION: VERSIONS.vlConvert,
       PILLOW_VERSION: VERSIONS.pillow,
+      PRETENDARD_VERSION: VERSIONS.pretendard,
     },
     domains: RENDERER_BUILD_DOMAINS,
     memoryMiB: 4096,

@@ -1,0 +1,167 @@
+{
+  "background": "#ffffff",
+  "padding": 12,
+  "font": "Pretendard, Noto Sans CJK KR, sans-serif",
+  "title": {
+    "color": "#10211c",
+    "subtitleColor": "#4f665e",
+    "fontSize": 15,
+    "fontWeight": 600,
+    "anchor": "start",
+    "offset": 12
+  },
+  "view": {
+    "stroke": null
+  },
+  "axis": {
+    "domainColor": "#d0dfd8",
+    "gridColor": "#e8f1ed",
+    "tickColor": "#d0dfd8",
+    "labelColor": "#4f665e",
+    "labelFontSize": 12,
+    "labelPadding": 4,
+    "titleColor": "#10211c",
+    "titleFontSize": 12,
+    "titleFontWeight": 600,
+    "titlePadding": 8,
+    "labelFontWeight": 400
+  },
+  "axisBand": {
+    "labelAngle": 0,
+    "ticks": false,
+    "grid": false
+  },
+  "axisQuantitative": {
+    "domain": false,
+    "ticks": false
+  },
+  "legend": {
+    "labelColor": "#4f665e",
+    "labelFontSize": 12,
+    "titleColor": "#10211c",
+    "titleFontSize": 12,
+    "titleFontWeight": 600,
+    "symbolType": "circle",
+    "symbolSize": 80
+  },
+  "header": {
+    "labelColor": "#4f665e",
+    "labelFontSize": 12,
+    "titleColor": "#10211c",
+    "titleFontSize": 13,
+    "titleFontWeight": 600
+  },
+  "range": {
+    "category": [
+      "#0cb67e",
+      "#007c5c",
+      "#eeb154",
+      "#20a89b",
+      "#f66c6d",
+      "#758c84",
+      "#46c99b",
+      "#a8e7d3"
+    ],
+    "ramp": [
+      "#e7fff4",
+      "#46c99b",
+      "#007c5c",
+      "#003e2a"
+    ],
+    "heatmap": [
+      "#e7fff4",
+      "#46c99b",
+      "#007c5c",
+      "#003e2a"
+    ],
+    "ordinal": [
+      "#a8e7d3",
+      "#46c99b",
+      "#0cb67e",
+      "#007c5c",
+      "#003e2a"
+    ],
+    "diverging": [
+      "#be7100",
+      "#eeb154",
+      "#f1f8f5",
+      "#46c99b",
+      "#007c5c"
+    ]
+  },
+  "mark": {
+    "color": "#0cb67e"
+  },
+  "line": {
+    "strokeWidth": 2,
+    "strokeCap": "round",
+    "strokeJoin": "round"
+  },
+  "point": {
+    "filled": true,
+    "size": 44
+  },
+  "rule": {
+    "color": "#4f665e"
+  },
+  "text": {
+    "color": "#10211c"
+  },
+  "arc": {
+    "stroke": "#ffffff",
+    "strokeWidth": 2
+  },
+  "scale": {
+    "bandPaddingInner": 0.4,
+    "bandPaddingOuter": 0.2,
+    "offsetBandPaddingInner": 0.1
+  },
+  "bar": {
+    "color": {
+      "gradient": "linear",
+      "x1": 0,
+      "y1": 1,
+      "x2": 0,
+      "y2": 0,
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#01ab78"
+        },
+        {
+          "offset": 0.46,
+          "color": "#1fc289"
+        },
+        {
+          "offset": 1,
+          "color": "#48c89c"
+        }
+      ]
+    },
+    "cornerRadiusEnd": 5
+  },
+  "area": {
+    "color": {
+      "gradient": "linear",
+      "x1": 0,
+      "y1": 1,
+      "x2": 0,
+      "y2": 0,
+      "stops": [
+        {
+          "offset": 0,
+          "color": "#01ab78"
+        },
+        {
+          "offset": 0.46,
+          "color": "#1fc289"
+        },
+        {
+          "offset": 1,
+          "color": "#48c89c"
+        }
+      ]
+    },
+    "opacity": 0.85
+  }
+}

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { systemPrompt } from '../src/mention/prompt.js'
 import type { MessengerProfile } from '../src/messengers/types.js'
@@ -108,6 +110,71 @@ describe('systemPrompt', () => {
   it('adds diagram instructions only when a renderer is available', () => {
     expect(systemPrompt(slack)).not.toContain('```mermaid')
     expect(systemPrompt(slack, { diagrams: true })).toContain('```mermaid')
+  })
+})
+
+describe("the renderer's theme", () => {
+  const renderer = path.resolve(import.meta.dirname, '../sandbox/vm/renderer')
+  const read = (file: string) => readFileSync(path.join(renderer, file), 'utf8')
+
+  it('keeps a mermaid block from changing the theme', () => {
+    const config = JSON.parse(read('mermaid.json')) as {
+      theme: string
+      secure: string[]
+    }
+    expect(config.theme).toBe('base')
+    expect(config.secure).toEqual(
+      expect.arrayContaining([
+        'secure',
+        'securityLevel',
+        'theme',
+        'themeVariables',
+        'themeCSS',
+        'fontFamily',
+      ])
+    )
+  })
+
+  it('gives svg the colors the other formats are drawn in', () => {
+    const colors =
+      systemPrompt(slack, { diagrams: true }).match(/#[0-9a-f]{6}/g) ?? []
+    expect(colors.length).toBeGreaterThan(0)
+    const theme = read('mermaid.json') + read('render.sh')
+    for (const color of colors) expect(theme).toContain(color)
+  })
+
+  it('draws as the app looks', () => {
+    const css = readFileSync(
+      path.resolve(import.meta.dirname, '../apps/web/src/index.css'),
+      'utf8'
+    )
+    const vegaLite = JSON.parse(read('vega-lite.json')) as {
+      range: { category: string[] }
+      bar: { color: { stops: { color: string }[] } }
+    }
+    // Shapes are the app's choice cards: white on a border hairline.
+    expect(css).toContain('--border: oklch(0.91 0.016 168)')
+    expect(read('mermaid.json')).toContain('"primaryBorderColor": "#d8e5df"')
+    expect(read('render.sh')).toContain("-Ncolor='#d8e5df'")
+    // Bars are filled with the logo's gradient, and series lead with the
+    // logo's emerald and the primary color.
+    for (const { color } of vegaLite.bar.color.stops)
+      expect(css).toContain(color)
+    expect(css).toContain('--chart-1: #0cb67e')
+    expect(css).toContain('--primary: #007c5c')
+    expect(vegaLite.range.category.slice(0, 2)).toEqual(['#0cb67e', '#007c5c'])
+  })
+
+  it('has the classes the model is told about, in mermaid and dot', () => {
+    const prompt = systemPrompt(slack, { diagrams: true })
+    const mermaid = (JSON.parse(read('mermaid.json')) as { themeCSS: string })
+      .themeCSS
+    const dot = read('dot.gvpr')
+    for (const name of ['accent', 'primary', 'warn', 'error', 'muted']) {
+      expect(prompt).toContain(name)
+      expect(mermaid).toContain(`.node.${name} > rect`)
+      expect(dot).toContain(`class == "*${name}*"`)
+    }
   })
 })
 

@@ -59,8 +59,15 @@ When a diagram helps, the model writes a ` ```mermaid `, ` ```dot ` (graphviz), 
 The bot renders the block as a PNG, posts it to the thread (`files:write`), and leaves only a "(Figure N: image below)" marker in the text.
 
 - Rendering runs in a disposable VM of the built-in sandbox with no way out, which sees only the block's folder
-  (`sandbox/vm/renderer`: mermaid-cli + chromium, graphviz, vl-convert, librsvg, Noto CJK fonts). It needs the built-in
-  sandbox set up, whatever the run environment: Apple silicon and macOS 15.
+  (`sandbox/vm/renderer`: mermaid-cli + chromium, graphviz, vl-convert, librsvg, Pretendard and Noto CJK fonts). It needs
+  the built-in sandbox set up, whatever the run environment: Apple silicon and macOS 15.
+- Every format is drawn as the app looks, in its light theme and typeface, Pretendard: shapes are its choice cards
+  (white, a hairline, rounded), groups its wells, lines and secondary text its muted foreground, and charts its rounded
+  bars in the logo's gradient (`mermaid.json`, `vega-lite.json`, `dot.gvpr` and the dot defaults in `render.sh`). A node's
+  class gives it the app's look for that meaning: `accent` (the checked choice), `primary` (the primary button), `warn`
+  (a notice), `error` and `muted`, as `A[Label]:::warn` in mermaid or `[class="warn"]` in dot. A dot or vega-lite block
+  can still set its own colors; a mermaid block cannot change the theme. The model is told to leave styling to the
+  theme, and given its colors for svg.
 - Up to 3 per answer. A block that cannot be rendered keeps its source with a note, and if the upload fails the source is posted to the thread.
 - vega-lite cannot load external data, so values go directly into `data.values`. Without a size, it renders at 520x260.
 - `RENDER_DIAGRAMS=off` turns it off. If the renderer image is missing, the startup log and the status bar say so, and the bot
