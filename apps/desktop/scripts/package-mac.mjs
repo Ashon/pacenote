@@ -93,9 +93,31 @@ const plistSet = (file, values) => {
   }
 }
 
-/** Electron.app: this install's own */
-function electronApp() {
-  return path.resolve(require('electron'), '../../..')
+/** Where electronApp() unpacked Electron, removed after packaging */
+let extractedElectron
+
+/**
+ * Electron.app, unpacked with ditto from electron's own download of its
+ * release zip (checksum-verified, cached). The install's copy is not used: its
+ * installer unpacks with extract-zip, which stops after the first file on
+ * Node 26.
+ */
+async function electronApp() {
+  // @electron/get is electron's own downloader.
+  const electronRequire = createRequire(require.resolve('electron'))
+  const { downloadArtifact } = electronRequire('@electron/get')
+  const { version: electronVersion } = electronRequire('./package.json')
+  const zip = await downloadArtifact({
+    version: electronVersion,
+    platform: 'darwin',
+    arch,
+    artifactName: 'electron',
+  })
+  const dir = path.join(stagingDir, `electron-${electronVersion}-${arch}`)
+  extractedElectron = dir
+  await rm(dir, { recursive: true, force: true })
+  run('/usr/bin/ditto', ['-x', '-k', zip, dir])
+  return path.join(dir, 'Electron.app')
 }
 
 // Outputs of pnpm desktop:build (package:mac runs it first)
@@ -121,7 +143,7 @@ for (const file of required) {
 
 await rm(outputDir, { recursive: true, force: true })
 await mkdir(outputDir, { recursive: true })
-run('/usr/bin/ditto', [electronApp(), appPath])
+run('/usr/bin/ditto', [await electronApp(), appPath])
 await rm(path.join(resourcesDir, 'default_app.asar'), { force: true })
 await rm(path.join(resourcesDir, 'electron.icns'), { force: true })
 await mkdir(appDir, { recursive: true })
@@ -257,6 +279,8 @@ await writeFile(`${zipPath}.sha256`, `${sha256}  ${zipName}\n`)
 // Only the zip stays: an unpacked Pacenote.app here would show up next to the
 // installed one.
 await rm(outputDir, { recursive: true, force: true })
+if (extractedElectron)
+  await rm(extractedElectron, { recursive: true, force: true })
 // Fails while staging still holds another build in progress
 await rmdir(stagingDir).catch(() => {})
 console.log(`\nZip: ${zipPath}\nInstall locally: pnpm install:mac`)
