@@ -67,6 +67,11 @@ export interface Task {
    */
   summary?: string
   /**
+   * What later collections changed as its thread went on (a new due date, a
+   * sharper ask, the repository named), or filled in, oldest first
+   */
+  updates?: TaskUpdate[]
+  /**
    * Closed by itself: you replied in its thread after it, its message got a
    * check mark, or it was resolved in Slack some other way. An AI tool that
    * closes it (a session you continued it in) can say what it did and leave
@@ -82,6 +87,21 @@ export interface Task {
     /** A reply drafted for you to send in the thread */
     reply?: string
   }
+}
+
+/** A field update_task can change */
+export type TaskField =
+  'title' | 'due' | 'summary' | 'action' | 'repo' | 'confidence'
+
+/** One change to a task after it was added, and why */
+export interface TaskUpdate {
+  at: string
+  /** Why, in a line: "mina moved it to Wednesday" */
+  why: string
+  /** The AI tool that changed it ("claude-code") */
+  by?: string
+  /** What changed: from (none when it was filled in) and to (none: cleared) */
+  changed: { field: TaskField; from?: string; to?: string }[]
 }
 
 export interface TasksFile {

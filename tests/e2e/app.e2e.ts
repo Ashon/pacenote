@@ -403,17 +403,16 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .getByText('Review the retry config change')
       .waitFor()
     await line('Last time')
-      .getByText('Done in Claude Code · 2 comments')
+      .getByText(/^Done in Claude Code · 2 comments · /)
       .waitFor()
     await line('Your work').getByText('Claude Code session').waitFor()
-    await line('Your work').getByText(checkout).waitFor()
     await row.getByRole('button', { name: '1 more earlier' }).click()
+    // A run's request opens it in Runs.
     await line('In this thread')
-      .getByText('any retry timeouts in payments-worker?')
+      .getByRole('link', { name: 'any retry timeouts in payments-worker?' })
       .waitFor()
-    await line('In this thread')
-      .getByRole('link', { name: 'View run' })
-      .waitFor()
+    // Said once: what kind of task it is is the button, not a chip too.
+    expect(await row.getByText('Code', { exact: true }).count()).toBe(0)
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-open.png'),
     })
@@ -433,7 +432,10 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
     // Its log, read from Claude Code's own transcript, in a panel over the
     // list; Esc puts it away and leaves the row open.
-    await line('Your work').getByRole('link', { name: 'Log' }).click()
+    // The session's name opens its log.
+    await line('Your work')
+      .getByRole('link', { name: 'Claude Code session' })
+      .click()
     const log = page.getByRole('dialog', { name: 'Session log' })
     await log.getByText('Here is the task as I understand it.').waitFor()
     await log.getByText('Continue where we left off.').waitFor()
@@ -471,6 +473,29 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(body.earlier.inRepo).toMatchObject([
       { id: earlier.id, outcome: 'Done in Claude Code · 2 comments' },
     ])
+    // A later collection finds the thread moved the due date: the open row
+    // says so, and the row in the list says it was updated.
+    await client.callTool({
+      name: 'update_task',
+      arguments: {
+        task: current.id,
+        why: 'mina moved it to Wednesday',
+        due: 'Wednesday',
+      },
+    })
+    await line('Changed')
+      .getByText('mina moved it to Wednesday')
+      .waitFor({ timeout: 15_000 })
+    await row.getByText('Wednesday', { exact: true }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-updated.png'),
+    })
+    // Closed, the row says it was updated; open, the Changed line does.
+    await title.click()
+    await row.getByText(/^Updated /).waitFor()
+    await title.click()
+    await line('Changed').waitFor()
+
     await client.callTool({
       name: 'close_task',
       arguments: {
@@ -512,7 +537,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
     // The earlier review's session can be continued from the line about it.
     await line('Last time')
-      .getByRole('button', { name: 'Continue that session' })
+      .getByRole('button', { name: 'Continue', exact: true })
       .click()
     await eventually('the earlier session continued', () =>
       world!

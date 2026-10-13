@@ -69,6 +69,7 @@ describe('collecting from the app with Claude Code', () => {
     expect(allowed).toEqual(expect.arrayContaining(readTools(['slack'])))
     expect(allowed).toContain('mcp__claude_ai_Slack__slack_read_thread')
     expect(allowed).toContain('mcp__pacenote__add_tasks')
+    expect(allowed).toContain('mcp__pacenote__update_task')
     expect(allowed.some((tool) => writeTools().includes(tool))).toBe(false)
     expect(between('--disallowedTools', '--no-session-persistence')).toEqual(
       writeTools()

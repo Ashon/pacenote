@@ -6,6 +6,7 @@ import type {
   RelatedTask,
   SessionItem,
   TaskDetail,
+  TaskUpdate,
   TaskView,
   WorkTool,
 } from '@src/tasks/types'
@@ -92,6 +93,52 @@ function closedBy(client: string | undefined): string | undefined {
 
 type Session = Extract<TaskDetail['work'][number], { kind: 'session' }>
 
+type Change = TaskUpdate['changed'][number]
+
+/**
+ * News in an update: a field it had that changed, or a due date, title or
+ * certainty; filling in what an older task lacked is not
+ */
+const isNews = (change: Change) =>
+  change.from !== undefined ||
+  ['due', 'title', 'confidence'].includes(change.field)
+
+/** The latest update that changed the task as its thread went on */
+function lastChange(task: TaskView): TaskUpdate | undefined {
+  return (task.updates ?? []).filter((u) => u.changed.some(isNews)).slice(-1)[0]
+}
+
+const ACTION_WORD: Record<string, string> = {
+  code: 'a code task',
+  reply: 'a reply',
+  other: 'neither code nor a reply',
+}
+
+/** A change in words: "Due Thursday → Wednesday" */
+function changeWords(change: Change): string {
+  const { from, to } = change
+  switch (change.field) {
+    case 'due':
+      return from && to
+        ? `Due ${from} → ${to}`
+        : to
+          ? `Due ${to}`
+          : `No longer due ${from}`
+    case 'title':
+      return `Was \u201c${from}\u201d`
+    case 'confidence':
+      return to === 'sure' ? 'Now a task, no longer a Maybe' : 'Now a Maybe'
+    case 'repo':
+      return to ? `Repository ${to}` : 'No repository'
+    case 'action':
+      return `Now ${ACTION_WORD[to ?? ''] ?? to}`
+    case 'summary':
+      return 'Summary updated'
+  }
+}
+
+const WEEK = 7 * 24 * 60 * 60_000
+
 export type TaskDecision = {
   status: 'done' | 'dismissed' | 'kept'
   reason?: DismissReason
@@ -168,6 +215,9 @@ export function TaskRow({
         ? SETTLED_LABEL[task.dismissReason ?? 'dismissed']
         : SETTLED_LABEL[task.status]
   const settled = !['open', 'maybe'].includes(task.status)
+  const change = settled ? undefined : lastChange(task)
+  const recent =
+    change && Date.now() - Date.parse(change.at) < WEEK ? change : undefined
 
   // The steps the row's own button does not take
   const more: { label: string; icon: React.ReactNode; run: () => void }[] = [
@@ -244,17 +294,15 @@ export function TaskRow({
                   {settledLabel}
                 </span>
               )}
-              {(task.action === 'code' || task.action === 'reply') && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-px font-medium">
-                  {task.action === 'code' ? (
-                    <SquareTerminal className="size-3" />
-                  ) : (
-                    <MessageSquare className="size-3" />
-                  )}
-                  {task.action === 'code' ? 'Code' : 'Reply'}
+              {task.repo && <span className="font-mono">{task.repo}</span>}
+              {recent && !open && (
+                <span
+                  title={recent.why}
+                  className="rounded-full bg-primary/12 px-2 py-px font-medium text-primary"
+                >
+                  Updated {formatRelative(recent.at)}
                 </span>
               )}
-              {task.repo && <span className="font-mono">{task.repo}</span>}
             </p>
             {dismissing && (
               <div
@@ -501,6 +549,7 @@ function TaskOpen({
   const replyId = useId()
   const summary = task.summary ?? task.reason
   const settled = !['open', 'maybe'].includes(task.status)
+  const change = settled ? undefined : lastChange(task)
 
   const sessions = (detail?.work ?? []).filter(
     (entry): entry is Session => entry.kind === 'session'
@@ -532,6 +581,19 @@ function TaskOpen({
           <p className="mb-1.5 max-w-[44rem] text-[13.5px] leading-relaxed select-text">
             {summary}
           </p>
+        )}
+        {change && (
+          <Line label="Changed">
+            <span
+              title={change.changed.filter(isNews).map(changeWords).join(' · ')}
+              className="select-text"
+            >
+              {change.why}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatRelative(change.at)}
+            </span>
+          </Line>
         )}
         {!detail ? (
           <p className="flex min-h-[30px] items-center text-xs text-muted-foreground">
@@ -683,7 +745,7 @@ function Line({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid min-h-[30px] grid-cols-[6.5rem_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
+    <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1">
         {children}
@@ -695,7 +757,11 @@ function Line({
 
 const LINK = 'text-primary hover:text-primary'
 
-/** An earlier task, Pace's run or one of your sessions, on one line */
+/**
+ * An earlier task, Pace's run or one of your sessions, on one line: its name
+ * opens what is behind it (the run, the session's log), and a session can be
+ * continued
+ */
 function EarlierLine({
   line,
   taskId,
@@ -707,84 +773,71 @@ function EarlierLine({
 }) {
   const { task, run } = line
   const session = line.session ?? task?.session
-  const logHash = (entryId: string) =>
-    taskHash(taskId, `/log/${encodeURIComponent(entryId)}`)
-  const sessionActions = session?.session ? (
-    <>
-      <Button
-        size="xs"
-        variant="ghost"
-        className={LINK}
-        onClick={() => onResume(session.id)}
-      >
-        <SquareTerminal />
-        {line.session ? 'Continue' : 'Continue that session'}
-      </Button>
-      <Button size="xs" variant="ghost" className={LINK} asChild>
-        <a href={logHash(session.id)}>Log</a>
-      </Button>
-    </>
+  const log = session?.session
+    ? taskHash(taskId, `/log/${encodeURIComponent(session.id)}`)
+    : undefined
+  const action = session?.session ? (
+    <Button
+      size="xs"
+      variant="ghost"
+      className={LINK}
+      onClick={() => onResume(session.id)}
+    >
+      Continue
+    </Button>
   ) : line.session ? (
     <span className="text-xs text-muted-foreground">
       Waiting for {TOOL[line.session.tool]} to start it
     </span>
   ) : undefined
+  const name = (text: string, href?: string, hint?: string) =>
+    href ? (
+      <a
+        href={href}
+        title={hint}
+        className="font-semibold underline-offset-2 hover:underline"
+      >
+        {text}
+      </a>
+    ) : (
+      <span className="font-semibold">{text}</span>
+    )
+  const quiet = (text: string) => (
+    <span className="text-xs text-muted-foreground">{text}</span>
+  )
 
   if (run)
     return (
-      <Line
-        label={line.label}
-        actions={
-          <Button size="xs" variant="ghost" className={LINK} asChild>
-            <a href={`#/runs/${encodeURIComponent(run.id)}`}>View run</a>
-          </Button>
-        }
-      >
-        <span className="font-semibold">{run.request || 'A mention'}</span>
-        <span className="text-xs text-muted-foreground">
-          Pace · {formatShortDay(run.at)} · {run.status}
-        </span>
+      <Line label={line.label}>
+        {name(
+          run.request || 'A mention',
+          `#/runs/${encodeURIComponent(run.id)}`,
+          'Open the run'
+        )}
+        {quiet(`Pace · ${formatShortDay(run.at)}`)}
       </Line>
     )
   if (task)
     return (
-      <Line label={line.label} actions={sessionActions}>
-        <span className="font-semibold">{task.title}</span>
-        <span className="text-xs text-muted-foreground">
-          {[task.askedBy, task.where, formatShortDay(task.postedAt)]
+      <Line label={line.label} actions={action}>
+        {name(task.title, log, 'Read its session')}
+        {quiet(
+          [task.outcome, formatShortDay(task.postedAt)]
             .filter(Boolean)
-            .join(' · ')}
-        </span>
-        {task.outcome && (
-          <span className="rounded-full bg-card px-2 text-[11px] leading-[18px] font-medium">
-            {task.outcome}
-          </span>
+            .join(' · ')
         )}
       </Line>
     )
   if (!line.session) return null
   const own = line.session as Session
   return (
-    <Line label={line.label} actions={sessionActions}>
-      <span className="font-semibold">
-        {TOOL[own.tool]} session
-        {own.found && (
-          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-            started by you
-          </span>
-        )}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {own.lastActiveAt
+    <Line label={line.label} actions={action}>
+      {name(`${TOOL[own.tool]} session`, log, 'Read the session')}
+      {quiet(
+        own.lastActiveAt
           ? `last active ${formatRelative(own.lastActiveAt)}`
-          : `started ${formatRelative(own.startedAt)}`}
-      </span>
-      <span
-        title={own.cwd}
-        className="max-w-[20rem] truncate font-mono text-xs text-muted-foreground"
-      >
-        {own.cwd}
-      </span>
+          : `started ${formatRelative(own.startedAt)}`
+      )}
     </Line>
   )
 }

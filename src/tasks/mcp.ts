@@ -14,7 +14,7 @@ import {
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskView } from './types.js'
 import { readWork } from './work.js'
-import { addTasks, closeTask } from './write.js'
+import { addTasks, closeTask, updateTask } from './write.js'
 
 /**
  * Your tasks over MCP: an AI tool with a Slack connector (Claude Code, Codex)
@@ -61,7 +61,7 @@ export function collectPrompt(): string {
     '1. Call collect_context: the rules, what to leave out, since when to read, and the open tasks.',
     '2. With your Slack tools, read only: never send, edit, react or schedule anything. Find, since then: messages that mention the user; threads they took part in whose last word is not theirs; in DMs (only if DMs count), what the other person said after the user last wrote; and the user’s own messages saying they will do something. Leave out the channels collect_context lists.',
     '3. Decide for each: a task, a Maybe, or nothing, by the rules.',
-    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way, "resolved".',
+    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, fill them in with update_task.',
     '5. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished.',
     '',
     NOTE,
@@ -118,6 +118,11 @@ export function registerTaskTools(
               id: task.id,
               title: task.title,
               kind: task.kind,
+              confidence: task.confidence,
+              due: task.due,
+              action: task.action,
+              repo: task.repo,
+              summary: task.summary,
               link: task.source.permalink,
             })),
         }
@@ -194,6 +199,83 @@ export function registerTaskTools(
           })),
           skipped: result.skipped,
         }
+      })
+  )
+
+  server.registerTool(
+    'update_task',
+    {
+      description:
+        'Updates an open task or Maybe when its thread changed it since it ' +
+        'was added: a new due date, a sharper or different ask, the ' +
+        'repository named, a Maybe now asked of the user by name (confidence ' +
+        '"sure") or a task no longer clearly theirs ("maybe"). Send only what ' +
+        'changed, and why in a line. Also fills in action, repo and summary ' +
+        'for tasks that lack them. Tasks the user settled are left as they ' +
+        'are; settled in Slack, close_task closes it instead.',
+      inputSchema: {
+        task: z.string().describe("The task id or its message's link"),
+        why: z
+          .string()
+          .describe('Why, in a line: "mina moved it to Wednesday"'),
+        title: z
+          .string()
+          .optional()
+          .describe('Only when the ask itself changed'),
+        due: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('A due hint in words; null when it no longer has one'),
+        summary: z
+          .string()
+          .optional()
+          .describe('The thread in two or three sentences, as it is now'),
+        action: z.enum(['code', 'reply', 'other']).optional(),
+        repo: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('The repository it is about, as owner/name'),
+        confidence: z.enum(['sure', 'maybe']).optional(),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ task, why, ...changes }) =>
+      respond(options, () => {
+        const result = updateTask(
+          options.dataDir,
+          task,
+          changes,
+          why,
+          new Date(),
+          client()
+        )
+        if (!result) throw new Error(`No task ${task}`)
+        if ('refused' in result)
+          return {
+            unchanged: {
+              id: result.task.id,
+              title: result.task.title,
+              why: `Left as it is: ${result.refused}`,
+            },
+          }
+        return result.changed.length
+          ? {
+              updated: {
+                id: result.task.id,
+                title: result.task.title,
+                why,
+                changed: result.changed.map((change) => change.field),
+              },
+            }
+          : {
+              unchanged: {
+                id: result.task.id,
+                title: result.task.title,
+                why: 'Nothing differs from what it has',
+              },
+            }
       })
   )
 
@@ -289,6 +371,15 @@ export function registerTaskTools(
             link: view.source.permalink,
             status: view.status,
             outcome: outcomeOf(view, work),
+            // How the thread changed it since it was added
+            changes: view.updates
+              ?.filter((update) => update.changed.some((c) => c.from))
+              .slice(-3)
+              .map((update) => ({
+                at: update.at,
+                why: update.why,
+                changed: update.changed.map((c) => c.field),
+              })),
           },
           earlier: {
             inThread: earlier(context.thread.tasks),

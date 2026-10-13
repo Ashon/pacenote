@@ -1,10 +1,24 @@
 import type { TasksSettings } from './settings.js'
 import { findMessage, SOURCES, sourceNames, type SourceId } from './sources.js'
-import { HISTORY_MS, readTasks, writeTasks } from './store.js'
-import type { Task, TaskAction, TaskConfidence, TaskKind } from './types.js'
+import {
+  HISTORY_MS,
+  readDecisions,
+  readTasks,
+  viewOf,
+  writeTasks,
+} from './store.js'
+import type {
+  Task,
+  TaskAction,
+  TaskConfidence,
+  TaskField,
+  TaskKind,
+  TaskUpdate,
+} from './types.js'
 
 /**
- * Adding and closing tasks, as the MCP server does for an AI tool. A task is
+ * Adding, updating and closing tasks, as the MCP server does for an AI tool.
+ * A task is
  * keyed by its message, read from its link by its source (sources.ts), so the
  * same message is never added twice, and the settings (DMs, channels left out)
  * hold whatever the tool sends.
@@ -175,4 +189,86 @@ export function closeTask(
     tasks: file.tasks.map((t) => (t.id === id ? closed : t)),
   })
   return closed
+}
+
+/** What update_task can change; null clears a due date or a repository */
+export interface TaskChanges {
+  title?: string
+  due?: string | null
+  summary?: string
+  action?: TaskAction
+  repo?: string | null
+  confidence?: TaskConfidence
+}
+
+/** The updates a task keeps, newest last */
+const UPDATES_KEPT = 10
+
+/**
+ * Updates an open task or Maybe as its thread changed it, or fills in what an
+ * older task lacks, keeping what changed and why. A task you settled (done,
+ * dismissed) or that closed is left as it is, and a Maybe you kept stays a
+ * task. undefined when there is no such task.
+ */
+export function updateTask(
+  dataDir: string,
+  ref: string,
+  changes: TaskChanges,
+  why: string,
+  now = new Date(),
+  by?: string
+):
+  | { task: Task; changed: TaskUpdate['changed'] }
+  | { task: Task; refused: string }
+  | undefined {
+  const source = findMessage(ref)
+  const id = source ? SOURCES[source.app].taskId(source) : ref
+  const file = readTasks(dataDir)
+  const task = file.tasks.find((t) => t.id === id)
+  if (!task) return undefined
+  const decisions = readDecisions(dataDir)
+  const decision = decisions[id]
+  const status = viewOf(task, decisions).status
+  if (status !== 'open' && status !== 'maybe')
+    return { task, refused: `it is ${status}` }
+
+  const next: Partial<Record<TaskField, string | undefined>> = {}
+  if (changes.title !== undefined && changes.title.trim())
+    next.title = changes.title.trim().slice(0, 120)
+  if (changes.due !== undefined) next.due = changes.due?.trim() || undefined
+  if (changes.summary !== undefined && changes.summary.trim())
+    next.summary = changes.summary.trim().slice(0, 600)
+  if (changes.action) next.action = changes.action
+  if (changes.repo === null) next.repo = undefined
+  else if (changes.repo !== undefined && REPO.test(changes.repo.trim()))
+    next.repo = changes.repo.trim()
+  // A Maybe you kept is yours: a collection does not make it a Maybe again.
+  if (changes.confidence && decision?.status !== 'kept')
+    next.confidence = changes.confidence
+
+  const changed: TaskUpdate['changed'] = []
+  for (const [field, to] of Object.entries(next) as [
+    TaskField,
+    string | undefined,
+  ][]) {
+    const from = task[field] as string | undefined
+    if (from !== to) changed.push({ field, from, to })
+  }
+  if (!changed.length) return { task, changed }
+  const update: TaskUpdate = {
+    at: now.toISOString(),
+    why: why.trim().slice(0, 300),
+    by,
+    changed,
+  }
+  const updated: Task = {
+    ...task,
+    ...Object.fromEntries(changed.map(({ field, to }) => [field, to])),
+    updates: [...(task.updates ?? []), update].slice(-UPDATES_KEPT),
+  }
+  writeTasks(dataDir, {
+    ...file,
+    tasks: file.tasks.map((t) => (t.id === id ? updated : t)),
+  })
+  return { task: updated, changed }
 }

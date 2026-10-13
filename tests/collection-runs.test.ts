@@ -353,6 +353,14 @@ describe('a collection on screen', () => {
         0.1,
         '{"closed":{"id":"t0","title":"Share the draft","why":"replied"}}'
       ),
+      call(
+        'g',
+        'pacenote',
+        'update_task',
+        9,
+        0.1,
+        '{"updated":{"id":"t9","title":"Review the PR","why":"due moved to Wednesday","changed":["due"]}}'
+      ),
     ])
     const groups = lookupGroups(record)
     expect(groups.map((group) => [group.label, group.count])).toEqual([
@@ -361,6 +369,7 @@ describe('a collection on screen', () => {
       ['Searched messages', 1],
       ['Added tasks', 1],
       ['Closed a task', 1],
+      ['Updated a task', 1],
     ])
     expect(groups[1]).toMatchObject({
       offsetMs: 1000,
@@ -380,6 +389,10 @@ describe('a collection on screen', () => {
     expect(result.closed).toEqual([
       { id: 't0', title: 'Share the draft', why: 'replied' },
     ])
+    expect(result.updated).toEqual([
+      { id: 't9', title: 'Review the PR', why: 'due moved to Wednesday' },
+    ])
+    expect(groups[5]!.note).toBe('Review the PR: due moved to Wednesday')
     expect(result.skipped).toEqual([{ link: 'x', why: '#random is left out' }])
     expect(result.rules).toContain('leaveOut')
   })

@@ -57,9 +57,9 @@ export function createHistoryServer({
         'recent_runs or search_runs to find a run, then get_run for its ' +
         'steps. ' +
         (tasks
-          ? 'collect_context, add_tasks and close_task keep the user\u2019s ' +
-            'tasks from Slack, my_tasks lists them, and task_context gives ' +
-            'one with what came before it, to work on it. '
+          ? 'collect_context, add_tasks, update_task and close_task keep ' +
+            'the user\u2019s tasks from Slack, my_tasks lists them, and ' +
+            'task_context gives one with what came before it, to work on it. '
           : '') +
         NOTE,
     }

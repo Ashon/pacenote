@@ -14,6 +14,7 @@ import {
   ListPlus,
   Lock,
   MessageSquare,
+  PencilLine,
   Plug,
   Search,
   Smile,
@@ -169,18 +170,18 @@ const STATE: Record<TaskStatus, { label: string; className: string }> = {
   closed: { label: 'Closed', className: 'text-muted-foreground' },
 }
 
-/** What it added, closed and left out, with where each task is now */
+/** What it added, updated, closed and left out, with where each task is now */
 function Result({ run }: { run: CollectionRunRecord }) {
   const tasks = useTasks().data?.tasks ?? []
   const now = new Map(tasks.map((task) => [task.id, task.status]))
   if (run.status === 'running')
     return <Empty>Collecting: {run.reads ?? 0} lookups so far.</Empty>
   if (!run.found) return <Stopped run={run} />
-  const { added, closed, skipped } = collectionResult(run)
-  if (!added.length && !closed.length && !skipped.length)
+  const { added, closed, updated, skipped } = collectionResult(run)
+  if (!added.length && !closed.length && !updated.length && !skipped.length)
     return (
       <p className="text-sm text-muted-foreground">
-        Nothing new to add, and no open task to close.
+        Nothing new to add, and no open task changed or closed.
       </p>
     )
   const maybes = added.filter((task) => task.confidence === 'maybe').length
@@ -200,6 +201,7 @@ function Result({ run }: { run: CollectionRunRecord }) {
           {added.map((task) => (
             <TaskRow
               key={task.id}
+              id={task.id}
               title={task.title}
               meta={task.confidence === 'maybe' ? 'Maybe' : undefined}
               state={now.get(task.id)}
@@ -216,8 +218,26 @@ function Result({ run }: { run: CollectionRunRecord }) {
           {closed.map((task) => (
             <TaskRow
               key={task.id}
+              id={task.id}
               title={task.title}
               meta={WHY[task.why] ?? task.why}
+              state={now.get(task.id)}
+            />
+          ))}
+        </Section>
+      )}
+      {updated.length > 0 && (
+        <Section
+          icon={<PencilLine className="text-primary" />}
+          title="Updated"
+          meta={`${updated.length} ${updated.length === 1 ? 'task' : 'tasks'}`}
+        >
+          {updated.map((task, index) => (
+            <TaskRow
+              key={`${task.id}-${index}`}
+              id={task.id}
+              title={task.title}
+              meta={task.why}
               state={now.get(task.id)}
             />
           ))}
@@ -273,10 +293,12 @@ function Section({
 }
 
 function TaskRow({
+  id,
   title,
   meta,
   state,
 }: {
+  id: string
   title: string
   meta?: string
   state?: TaskStatus
@@ -285,7 +307,7 @@ function TaskRow({
     <li className="flex items-start gap-4 border-t border-border py-3">
       <div className="min-w-0 flex-1">
         <a
-          href="#/tasks"
+          href={`#/tasks/${encodeURIComponent(id)}`}
           className="text-sm font-semibold underline-offset-2 hover:underline"
         >
           {title}

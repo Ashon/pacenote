@@ -22,6 +22,7 @@ import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
 const TASK_TOOLS = [
   'collect_context',
   'add_tasks',
+  'update_task',
   'close_task',
   'my_tasks',
 ].map((name) => `mcp__pacenote__${name}`)

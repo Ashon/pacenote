@@ -18,7 +18,9 @@ have to keep it in their head or scroll back to find it.
    the first time), the messages that mention you, threads you took part in, your DMs if they count, and what you said you
    would do. It decides which are tasks, by the rules Pacenote gives it.
 2. **Keep.** It adds them through Pacenote's MCP server (`add_tasks`), keyed by the message's permalink, so a message is
-   never a task twice, and closes the ones you answered (`close_task`).
+   never a task twice, and closes the ones you answered (`close_task`). An open task whose thread changed it since (a new
+   due date, a sharper ask, the repository named, you now asked by name) is updated with what changed and why
+   (`update_task`), which also fills in what older tasks lack; tasks you settled are left as they are.
 3. **Show.** The Tasks screen in the app, and `my_tasks` for the tools; later, a short summary Pace sends you in a DM.
 
 ## Why the connector, not a token of Pacenote's (v0.4.1)
@@ -61,9 +63,10 @@ first lever is picking fewer, better tasks; Dismiss is the safety net.
 ## Design
 
 **MCP.** On Pacenote's MCP server, behind Settings > Tasks > Gather my tasks from Slack (separate from sharing the run
-history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks), `add_tasks`,
-`close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash command. `add_tasks` holds the
-settings whatever the tool sends: it skips messages from channels left out and DMs while they do not count.
+history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks as they are),
+`add_tasks`, `update_task`, `close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash
+command. `add_tasks` holds the settings whatever the tool sends: it skips messages from channels left out and DMs while
+they do not count.
 
 **Sources.** A source is a connector of the AI tool, which holds the access and does the reading; Pacenote holds no
 token for it. `src/tasks/sources.ts` keeps, for each source, only what keeps a collection safe and its results in order:
@@ -86,8 +89,8 @@ kind: asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundA
 - **Where the text goes.** The messages go to the tool's model, as anything the tool reads does.
 - **Noise.** Precision first, Maybe, closing by itself, the dismiss rate.
 - **Workspace policy.** Some workspaces do not allow the tool's Slack connector; tasks then cannot be collected.
-- **Writes from AI tools.** `add_tasks` and `close_task` are the MCP server's first writes; they touch only the task list,
-  and stay closed until you turn tasks on.
+- **Writes from AI tools.** `add_tasks`, `update_task` and `close_task` are the MCP server's first writes; they touch only
+  the task list, and stay closed until you turn tasks on.
 
 ## Phases
 
