@@ -30,9 +30,8 @@ pnpm vm:build      # swift build -c release, then an ad-hoc signature with vm.en
 pnpm sandbox:vm    # sets up ~/.pacenote/vm: the kernel, the init filesystem and the reasoner image
 ```
 
-VMs start only with the `com.apple.security.virtualization` entitlement (`vm.entitlements`). The Apple silicon app
-carries the helper in `Contents/MacOS` (`apps/desktop/scripts/package-mac.mjs`), signed with it; the Intel app goes
-without, since Intel Macs cannot run it.
+VMs start only with the `com.apple.security.virtualization` entitlement (`vm.entitlements`). The app carries the
+helper in `Contents/MacOS` (`apps/desktop/scripts/package-mac.mjs`), signed with it.
 
 `pnpm test:e2e` runs `tests/e2e/vm.e2e.ts` against real VMs when the helper is built (it skips otherwise, and in CI,
 where VMs cannot nest). Its kernel, init filesystem and test image stay in `$TMPDIR/pacenote-e2e-vm` between runs.

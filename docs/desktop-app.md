@@ -23,8 +23,8 @@ includes it. `pnpm desktop:build` and `pnpm package:mac`, which release builds u
 
 Packaging:
 
-- `pnpm package:mac` builds `release/Pacenote-v<version>-macos-<arch>.app.zip` with a `.sha256` file. The arch defaults to
-  this Mac's; `pnpm package:mac --arch x64` builds the Intel app. The app is assembled in `release/staging.noindex` and
+- `pnpm package:mac` builds `release/Pacenote-v<version>-macos-arm64.app.zip` with a `.sha256` file, on and for a Mac
+  with Apple silicon (Intel Macs are not supported since v0.5.7). The app is assembled in `release/staging.noindex` and
   removed once zipped, so Spotlight and Launchpad list only the installed Pacenote.
 - The app is ad-hoc signed, for this Mac only. Release builds are signed and notarized from these zips outside this
   repository, which also publishes them and updates the Homebrew cask. See `deploy/homebrew/README.md` for the steps a

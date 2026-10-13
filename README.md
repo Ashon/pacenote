@@ -35,7 +35,7 @@ voice of the app.
 
 ## Install
 
-The desktop app installs with Homebrew (macOS 12 or later, Apple silicon or Intel):
+The desktop app installs with Homebrew (macOS 12 or later, Apple silicon; Intel Macs are not supported since v0.5.7):
 
 ```sh
 brew tap ashon/tap

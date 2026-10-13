@@ -4,8 +4,8 @@ This directory is the source of Pacenote's cask in the [Ashon/homebrew-tap](http
 repository, which it shares with supragnosis. The tap holds rendered output: every release overwrites
 `Casks/pacenote.rb` from the template here, so a change is made here, never in the tap.
 
-- `Casks/pacenote.rb` - the desktop app. Installs the release's signed and notarized `.app.zip` for the
-  Mac's arch (`arm64` or `x64`). There is no formula: the app carries the bot, the sandbox jobs and
+- `Casks/pacenote.rb` - the desktop app. Installs the release's signed and notarized `.app.zip` for Apple
+  silicon (Intel Macs are not supported since v0.5.7). There is no formula: the app carries the bot, the sandbox jobs and
   Electron's Node, so nothing else needs installing (and no bottle or Xcode check is involved). The
   app is tray-resident, so the cask's `uninstall quit:` quits it around an upgrade (the bot finishes
   its requests first) and brew reopens it afterwards.
@@ -22,7 +22,7 @@ repository, which it shares with supragnosis. The tap holds rendered output: eve
 2. Commit (`release: v<version> - ...`) on main, then push an annotated tag:
    `git tag -a v<version> -m v<version> && git push origin v<version>`.
 3. The release is built from the tag, signed, notarized and published outside this repository: the GitHub
-   Release gets `Pacenote-v<version>-macos-{arm64,x64}.app.zip` with their `.sha256` files, and the tap gets
+   Release gets `Pacenote-v<version>-macos-arm64.app.zip` with its `.sha256` file, and the tap gets
    `Casks/pacenote.rb`, rendered by this tag's `update-tap.sh`.
 
 To render the cask by hand once a release's zips are published, from a checkout of the same tag:
@@ -47,7 +47,7 @@ brew install --cask pacenote
 
 ## Local builds
 
-`pnpm package:mac` builds an ad-hoc signed app for this Mac as a release zip (`pnpm package:mac --arch x64`
-for Intel) and `pnpm install:mac` unpacks it into `/Applications`; it will not replace a Pacenote installed
+`pnpm package:mac` builds an ad-hoc signed app for this Mac as a release zip, on a Mac with Apple silicon,
+and `pnpm install:mac` unpacks it into `/Applications`; it will not replace a Pacenote installed
 with this cask. Only the zip stays in `release/`: the app is assembled in `release/staging.noindex`, which
 Spotlight skips, so the build never shows up next to the installed app.

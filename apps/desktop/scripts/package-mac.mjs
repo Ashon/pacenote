@@ -20,23 +20,22 @@ import { parseArgs } from 'node:util'
  * Builds the installable macOS app (Pacenote.app) and its release zip. (pnpm
  * package:mac)
  *
- *   node apps/desktop/scripts/package-mac.mjs [--arch arm64|x64]
+ *   node apps/desktop/scripts/package-mac.mjs
  *
  * The app carries the UI, the bot bundle, the sandbox job bundle and the
  * sandbox/ files in Contents/Resources/app, so it runs without the repository,
  * Node or pnpm. Config and run history stay outside the app (PACENOTE_HOME,
  * default ~/.pacenote).
  *
- * Output: release/Pacenote-v<version>-macos-<arch>.app.zip with a .sha256
+ * Output: release/Pacenote-v<version>-macos-arm64.app.zip with a .sha256
  * sidecar (the Homebrew cask's source, deploy/homebrew; pnpm install:mac
  * unpacks it). The app is assembled in release/staging.noindex, which Spotlight
  * does not index, and removed once zipped, so Spotlight and Launchpad only list
- * the installed Pacenote. The target arch defaults to this Mac's; the other
- * arch's Electron is downloaded, since the bundles themselves are plain JS.
+ * the installed Pacenote. It is built on, and for, Apple silicon: Intel Macs
+ * are not supported since v0.5.7.
  *
- * The Apple silicon app also carries pacenote-vm (apps/vm, built here with
- * Swift) beside its executable, for the built-in VM sandbox; Intel Macs cannot
- * run it, so the Intel app goes without.
+ * The app carries pacenote-vm (apps/vm, built here with Swift) beside its
+ * executable, for the built-in VM sandbox.
  *
  * The app gets an ad-hoc signature, good for this Mac (pnpm install:mac), and
  * pacenote-vm its own, with apps/vm/vm.entitlements. Release builds are signed
@@ -47,12 +46,15 @@ import { parseArgs } from 'node:util'
 if (process.platform !== 'darwin')
   throw new Error('The macOS app can only be built on a Mac.')
 
+// --arch is still taken, for build scripts that pass it, but only arm64.
 const { values: flags } = parseArgs({
-  options: { arch: { type: 'string', default: process.arch } },
+  options: { arch: { type: 'string', default: 'arm64' } },
 })
 const arch = flags.arch
-if (arch !== 'arm64' && arch !== 'x64')
-  throw new Error(`Unsupported arch: ${arch}`)
+if (arch !== 'arm64')
+  throw new Error(`Pacenote is built for Apple silicon only, not ${arch}.`)
+if (process.arch !== 'arm64')
+  throw new Error('Build Pacenote on a Mac with Apple silicon.')
 
 const desktopDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -91,34 +93,9 @@ const plistSet = (file, values) => {
   }
 }
 
-/**
- * Where electronApp() unpacked the other arch's Electron, removed after
- * packaging.
- */
-let extractedElectron
-
-/**
- * Electron.app for the target arch: this install's own, or the release zip for
- * the other arch.
- */
-async function electronApp() {
-  const binary = require('electron')
-  if (arch === process.arch) return path.resolve(binary, '../../..')
-  // @electron/get is electron's own downloader (checksum-verified, cached).
-  const electronRequire = createRequire(require.resolve('electron'))
-  const { downloadArtifact } = electronRequire('@electron/get')
-  const { version: electronVersion } = electronRequire('./package.json')
-  const zip = await downloadArtifact({
-    version: electronVersion,
-    platform: 'darwin',
-    arch,
-    artifactName: 'electron',
-  })
-  const dir = path.join(stagingDir, `electron-${electronVersion}-${arch}`)
-  extractedElectron = dir
-  await rm(dir, { recursive: true, force: true })
-  run('/usr/bin/ditto', ['-x', '-k', zip, dir])
-  return path.join(dir, 'Electron.app')
+/** Electron.app: this install's own */
+function electronApp() {
+  return path.resolve(require('electron'), '../../..')
 }
 
 // Outputs of pnpm desktop:build (package:mac runs it first)
@@ -144,7 +121,7 @@ for (const file of required) {
 
 await rm(outputDir, { recursive: true, force: true })
 await mkdir(outputDir, { recursive: true })
-run('/usr/bin/ditto', [await electronApp(), appPath])
+run('/usr/bin/ditto', [electronApp(), appPath])
 await rm(path.join(resourcesDir, 'default_app.asar'), { force: true })
 await rm(path.join(resourcesDir, 'electron.icns'), { force: true })
 await mkdir(appDir, { recursive: true })
@@ -225,45 +202,41 @@ for (const name of await readdir(frameworksDir)) {
   await rename(helperDir, path.join(frameworksDir, `${newName}.app`))
 }
 
-// The built-in VM sandbox's helper, on Apple silicon only
+// The built-in VM sandbox's helper
 const vmDir = path.join(root, 'apps/vm')
 const vmBin = path.join(appPath, 'Contents/MacOS/pacenote-vm')
-if (arch === 'arm64') {
-  run('swift', ['build', '-c', 'release', '--arch', 'arm64'], { cwd: vmDir })
-  const binDir = execFileSync(
-    'swift',
-    ['build', '-c', 'release', '--arch', 'arm64', '--show-bin-path'],
-    { cwd: vmDir, encoding: 'utf8' }
-  ).trim()
-  // Signed where it was built as well: the build output is what dev runs use,
-  // and without the entitlement it starts no VM.
-  run('/usr/bin/codesign', [
-    '--force',
-    '--sign',
-    '-',
-    '--entitlements',
-    path.join(vmDir, 'vm.entitlements'),
-    path.join(binDir, 'pacenote-vm'),
-  ])
-  await cp(path.join(binDir, 'pacenote-vm'), vmBin)
-  // Debug symbols take half its size, and nobody debugs the shipped one.
-  run('/usr/bin/strip', ['-S', '-x', vmBin])
-}
+run('swift', ['build', '-c', 'release', '--arch', 'arm64'], { cwd: vmDir })
+const binDir = execFileSync(
+  'swift',
+  ['build', '-c', 'release', '--arch', 'arm64', '--show-bin-path'],
+  { cwd: vmDir, encoding: 'utf8' }
+).trim()
+// Signed where it was built as well: the build output is what dev runs use,
+// and without the entitlement it starts no VM.
+run('/usr/bin/codesign', [
+  '--force',
+  '--sign',
+  '-',
+  '--entitlements',
+  path.join(vmDir, 'vm.entitlements'),
+  path.join(binDir, 'pacenote-vm'),
+])
+await cp(path.join(binDir, 'pacenote-vm'), vmBin)
+// Debug symbols take half its size, and nobody debugs the shipped one.
+run('/usr/bin/strip', ['-S', '-x', vmBin])
 
 run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', appPath])
-if (arch === 'arm64') {
-  // --deep signs nested code without entitlements; pacenote-vm needs its own
-  // to start VMs, and the app is sealed again around it.
-  run('/usr/bin/codesign', [
-    '--force',
-    '--sign',
-    '-',
-    '--entitlements',
-    path.join(vmDir, 'vm.entitlements'),
-    vmBin,
-  ])
-  run('/usr/bin/codesign', ['--force', '--sign', '-', appPath])
-}
+// --deep signs nested code without entitlements; pacenote-vm needs its own to
+// start VMs, and the app is sealed again around it.
+run('/usr/bin/codesign', [
+  '--force',
+  '--sign',
+  '-',
+  '--entitlements',
+  path.join(vmDir, 'vm.entitlements'),
+  vmBin,
+])
+run('/usr/bin/codesign', ['--force', '--sign', '-', appPath])
 run('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath])
 
 // ditto rather than zip: it keeps the signature intact.
@@ -284,8 +257,6 @@ await writeFile(`${zipPath}.sha256`, `${sha256}  ${zipName}\n`)
 // Only the zip stays: an unpacked Pacenote.app here would show up next to the
 // installed one.
 await rm(outputDir, { recursive: true, force: true })
-if (extractedElectron)
-  await rm(extractedElectron, { recursive: true, force: true })
-// Fails while staging still holds another arch's build in progress
+// Fails while staging still holds another build in progress
 await rmdir(stagingDir).catch(() => {})
 console.log(`\nZip: ${zipPath}\nInstall locally: pnpm install:mac`)

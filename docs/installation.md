@@ -5,7 +5,8 @@ Slack app from steps 1-3 under "From source".
 
 ## Install with Homebrew
 
-The desktop app installs from the Homebrew tap (macOS 12 or later, Apple silicon or Intel):
+The desktop app installs from the Homebrew tap (macOS 12 or later, Apple silicon; Intel Macs are not supported since
+v0.5.7):
 
 ```sh
 brew tap ashon/tap

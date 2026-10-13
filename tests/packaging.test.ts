@@ -89,8 +89,10 @@ describe('release', () => {
     )
     expect(cask).toMatch(/^ {2}version "[^"]+"$/m)
     expect(cask).toContain('REPLACE_SHA256_ARM64')
-    expect(cask).toContain('REPLACE_SHA256_X64')
-    expect(cask).toContain('Pacenote-v#{version}-macos-#{arch}.app.zip')
+    // Apple silicon only since 0.5.7
+    expect(cask).not.toContain('REPLACE_SHA256_X64')
+    expect(cask).toContain('depends_on arch: :arm64')
+    expect(cask).toContain('Pacenote-v#{version}-macos-arm64.app.zip')
     expect(cask).toContain('Config and run history are in ~/.pacenote')
   })
 })
