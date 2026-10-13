@@ -149,16 +149,12 @@ export function Overview() {
             label="Last 14 days"
             meta="Runs per day"
           />
-          <div className="mt-5 flex min-h-40 flex-1 gap-5">
-            <div className="flex shrink-0 flex-col justify-end pb-5">
-              <Value
-                value={formatNumber(recentRuns)}
-                unit={recentRuns === 1 ? 'run' : 'runs'}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                {recentFailed > 0 ? `${recentFailed} failed` : 'No failures'}
-              </p>
-            </div>
+          <ChartTotal
+            value={formatNumber(recentRuns)}
+            unit={recentRuns === 1 ? 'run' : 'runs'}
+            hint={recentFailed > 0 ? `${recentFailed} failed` : 'No failures'}
+          />
+          <div className="mt-4 flex min-h-32 flex-1">
             <DayBars
               label="Runs per day for the last 14 days, failures at the top"
               topClassName="bg-status-failed"
@@ -235,18 +231,16 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
           label="Tokens per day"
           meta="New tokens"
         />
-        <div className="mt-5 flex min-h-40 flex-1 gap-5">
-          <div className="flex shrink-0 flex-col justify-end pb-5">
-            <Value
-              value={tokens ? formatTokens(all) : '-'}
-              unit={tokens ? 'new' : undefined}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {cacheRead > 0
-                ? `+${formatTokens(cacheRead)} from cache`
-                : 'None from cache'}
-            </p>
-          </div>
+        <ChartTotal
+          value={tokens ? formatTokens(all) : '-'}
+          unit={tokens ? 'new' : undefined}
+          hint={
+            cacheRead > 0
+              ? `+${formatTokens(cacheRead)} from cache`
+              : 'None from cache'
+          }
+        />
+        <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
             label="New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections on top"
             topClassName="bg-chart-4"
@@ -367,6 +361,28 @@ function LineBar({ share, className }: { share: number; className: string }) {
           style={{ width: `${Math.min(1, share) * 100}%` }}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * The total over a day chart. Above it rather than beside it, so every chart
+ * spans its section and they all line up with each other and the bars beside
+ * them, whatever the totals say.
+ */
+function ChartTotal({
+  value,
+  unit,
+  hint,
+}: {
+  value: string
+  unit?: string
+  hint: string
+}) {
+  return (
+    <div className="mt-5">
+      <Value value={value} unit={unit} />
+      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
   )
 }
