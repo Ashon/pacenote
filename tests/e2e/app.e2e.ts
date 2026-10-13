@@ -11,7 +11,12 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { _electron, type ElectronApplication, type Page } from 'playwright-core'
+import {
+  _electron,
+  type ElectronApplication,
+  type Locator,
+  type Page,
+} from 'playwright-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { addWork } from '../../src/tasks/work.js'
@@ -180,6 +185,21 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     )
   })
 
+  /** Waits for an element to finish fading in, for a screenshot */
+  const faded = (element: Locator, what: string) =>
+    eventually(
+      what,
+      async () =>
+        (await element.evaluate(
+          (el) =>
+            (
+              globalThis as unknown as {
+                getComputedStyle: (el: unknown) => { opacity: string }
+              }
+            ).getComputedStyle(el).opacity
+        )) === '1'
+    )
+
   it('continues a code task in Claude Code with what came before, and drafts a reply to send', async () => {
     world = await World.create([
       {
@@ -313,11 +333,11 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const clipboardText = () =>
       app!.evaluate(({ clipboard }) => clipboard.readText())
 
-    // Todo: each task shows its next step.
+    // Todo: each task shows its next step, and opens in its row.
     await page.evaluate("window.location.hash = '#/tasks'")
-    const row = page.locator('li', { hasText: 'Review the payment retry PR' })
+    const row = page.locator(`[data-task-row="${current.id}"]`)
     await row.getByText('Ashon/payments').waitFor()
-    await row.getByRole('link', { name: 'Continue in Claude Code' }).click()
+    await row.getByRole('button', { name: 'Continue in Claude Code' }).click()
 
     // The first time for the repository, its folder is chosen: the checkout
     // under ~/git is found by its remote.
@@ -330,18 +350,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .waitFor()
     // Enabled once the folder is found, after its fade
     const openHere = page.getByRole('button', { name: 'Open Claude Code here' })
-    await eventually(
-      'the folder ready to open',
-      async () =>
-        (await openHere.evaluate(
-          (el) =>
-            (
-              globalThis as unknown as {
-                getComputedStyle: (el: unknown) => { opacity: string }
-              }
-            ).getComputedStyle(el).opacity
-        )) === '1'
-    )
+    await faded(openHere, 'the folder ready to open')
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-folder.png'),
     })
@@ -375,29 +384,43 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(prompt).toContain('wait for the user before you change anything')
     expect(readFileSync(opened, 'utf8')).toContain('.command')
 
-    // Its detail: what came before, and the session in the work log.
-    await page.getByText('What came before').waitFor()
-    await page.getByText('In this thread').waitFor()
-    await page
-      .getByRole('link', { name: 'any retry timeouts in payments-worker?' })
+    // The row opens in place: a reminder, not a page. Last time: the earlier
+    // review, with its session to continue; your work: the session just
+    // started; the rest of what came before on request.
+    const title = row.getByRole('button', {
+      name: 'Review the payment retry PR',
+    })
+    expect(await title.getAttribute('aria-expanded')).toBe('true')
+    expect(await page.evaluate('window.location.hash')).toBe(
+      `#/tasks/${encodeURIComponent(current.id)}`
+    )
+    await row
+      .getByText('mina wants a review of PR #482 before Thursday.')
       .waitFor()
-    await page.getByText('In Ashon/payments').waitFor()
-    await page.getByText('Done in Claude Code · 2 comments').waitFor()
-    await page.getByRole('button', { name: 'Continue that session' }).waitFor()
-    await page.getByText(checkout).first().waitFor()
-    await page.getByText('Claude Code session').first().waitFor()
+    const line = (label: string) =>
+      row.locator('div.grid', { has: page.getByText(label, { exact: true }) })
+    await line('Last time')
+      .getByText('Review the retry config change')
+      .waitFor()
+    await line('Last time')
+      .getByText('Done in Claude Code · 2 comments')
+      .waitFor()
+    await line('Your work').getByText('Claude Code session').waitFor()
+    await line('Your work').getByText(checkout).waitFor()
+    await row.getByRole('button', { name: '1 more earlier' }).click()
+    await line('In this thread')
+      .getByText('any retry timeouts in payments-worker?')
+      .waitFor()
+    await line('In this thread')
+      .getByRole('link', { name: 'View run' })
+      .waitFor()
     await page.screenshot({
-      path: path.join(REPO, 'test-results/task-detail.png'),
+      path: path.join(REPO, 'test-results/task-open.png'),
     })
 
     // Continuing it opens the same session again.
-    await page
-      .locator('div', { hasText: /^Claude Code session/ })
-      .first()
-      .waitFor()
-    await page
-      .getByRole('button', { name: 'Continue in Claude Code' })
-      .last()
+    await line('Your work')
+      .getByRole('button', { name: 'Continue', exact: true })
       .click()
     await eventually('the session continued', () =>
       world!
@@ -408,16 +431,22 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         )
     )
 
-    // Its log, read from Claude Code's own transcript
-    await page.getByRole('link', { name: 'View log' }).first().click()
-    await page.getByText('Here is the task as I understand it.').waitFor()
-    await page.getByText('Continue where we left off.').waitFor()
+    // Its log, read from Claude Code's own transcript, in a panel over the
+    // list; Esc puts it away and leaves the row open.
+    await line('Your work').getByRole('link', { name: 'Log' }).click()
+    const log = page.getByRole('dialog', { name: 'Session log' })
+    await log.getByText('Here is the task as I understand it.').waitFor()
+    await log.getByText('Continue where we left off.').waitFor()
+    await faded(log, 'the log panel in')
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-session-log.png'),
     })
-    await page
-      .getByRole('link', { name: 'Review the payment retry PR', exact: true })
-      .click()
+    await page.keyboard.press('Escape')
+    await log.waitFor({ state: 'detached' })
+    expect(await page.evaluate('window.location.hash')).toBe(
+      `#/tasks/${encodeURIComponent(current.id)}`
+    )
+    await line('Last time').waitFor()
 
     // The session closes the task through Pacenote's MCP server, as Claude
     // Code would, with a reply for the user to send.
@@ -453,18 +482,16 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
     await client.close()
 
-    await page
+    // Closed in its session, the task stays where it was, struck through,
+    // with how it ended and the reply that is still to be sent.
+    await row
       .getByText('mina is still waiting in the thread')
       .waitFor({ timeout: 15_000 })
-    await page.getByText('Closed by the session').waitFor()
-    await page
-      .getByText(/Left 3 comments on #482/)
-      .first()
+    await row.getByText('Closed: done in Claude Code').waitFor()
+    await line('Result')
+      .getByText('Done in Claude Code · Left 3 comments on #482')
       .waitFor()
-    await page
-      .getByRole('button', { name: 'Copy and open thread' })
-      .first()
-      .click()
+    await row.getByRole('button', { name: 'Copy and open thread' }).click()
     await eventually(
       'the reply copied',
       async () =>
@@ -474,35 +501,41 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await eventually('the thread opened', async () =>
       (await openedLinks()).includes(current.source.permalink!)
     )
-    await page.getByText('Reply copied and thread opened').waitFor()
-    // Copied: the session's reply no longer waits above.
-    await page
+    await row.getByText(/^Your reply, copied/).waitFor()
+    // Copied: the session's reply no longer waits.
+    await row
       .getByText('mina is still waiting in the thread')
       .waitFor({ state: 'detached' })
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-closed.png'),
     })
 
-    // The earlier task opens with how it ended and its session.
-    await page
-      .getByRole('link', {
-        name: 'Review the retry config change',
-        exact: true,
-      })
+    // The earlier review's session can be continued from the line about it.
+    await line('Last time')
+      .getByRole('button', { name: 'Continue that session' })
       .click()
-    await page
-      .getByRole('heading', { name: 'Review the retry config change' })
-      .waitFor()
-    await page.getByText('Closed by the session').waitFor()
-    await page.getByText('Claude Code session').first().waitFor()
+    await eventually('the earlier session continued', () =>
+      world!
+        .claudeCalls()
+        .find(
+          (call) =>
+            call.args.includes('--resume') && call.args.includes(earlierSession)
+        )
+    )
+
+    // Esc closes the row; settled, the task leaves the open ones.
+    await title.focus()
+    await page.keyboard.press('Escape')
+    await eventually(
+      'the row closed',
+      async () => (await page.evaluate('window.location.hash')) === '#/tasks'
+    )
+    await row.waitFor({ state: 'detached' })
 
     // A reply task: a draft from the thread, read only, sent by you.
-    await page.evaluate("window.location.hash = '#/tasks'")
-    await page
-      .locator('li', { hasText: 'Answer hyun about the webhook retry limit' })
-      .getByRole('link', { name: 'Draft a reply' })
-      .click()
-    const draft = page.locator('textarea#reply')
+    const asked = page.locator(`[data-task-row="${question.id}"]`)
+    await asked.getByRole('button', { name: 'Draft a reply' }).click()
+    const draft = asked.locator('textarea')
     await eventually(
       'the draft',
       async () =>
@@ -524,7 +557,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/task-reply.png'),
     })
     await draft.fill('Hi hyun, webhooks retry up to 5 times, with backoff.')
-    await page.getByRole('button', { name: 'Copy and open thread' }).click()
+    await asked.getByRole('button', { name: 'Copy and open thread' }).click()
     await eventually(
       'the edited reply copied',
       async () =>

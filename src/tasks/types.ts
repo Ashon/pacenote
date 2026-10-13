@@ -264,6 +264,8 @@ export interface TaskDetail {
       })
     | Extract<WorkEntry, { kind: 'draft' }>
   )[]
+  /** How it ended, once settled: "Done in Claude Code · 3 comments" */
+  outcome?: string
   /** The task's repository's folder on this Mac, when known */
   folder?: string
   /** Where code tasks continue (Settings > Todo) */

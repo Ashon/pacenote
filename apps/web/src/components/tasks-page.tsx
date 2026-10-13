@@ -1,25 +1,7 @@
 import { newTokens } from '@history/usage'
-import type {
-  CollectionRecord,
-  DismissReason,
-  TaskView,
-  TasksCollect,
-  WorkTool,
-} from '@src/tasks/types'
-import { sourceOf } from '@src/tasks/sources'
-import {
-  ChevronRight,
-  CircleCheck,
-  ExternalLink,
-  History,
-  MessageSquare,
-  RefreshCw,
-  Settings,
-  SquareTerminal,
-  Undo2,
-  X,
-} from 'lucide-react'
-import { useState } from 'react'
+import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
+import { ChevronRight, History, RefreshCw, Settings } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,23 +16,16 @@ import {
 import { useCollect, useDecide, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PaceSpinner } from './pace-spinner'
+import { TaskRow, taskHash } from './task-row'
 
 type Tab = 'open' | 'maybe' | 'done'
 
-const DISMISS_REASONS: { reason: DismissReason; label: string }[] = [
-  { reason: 'not-mine', label: 'Not for me' },
-  { reason: 'done-already', label: 'Already done' },
-  { reason: 'not-worth-it', label: 'Not worth it' },
-]
+/** The tab a task is listed under */
+const tabOf = (task: TaskView): Tab =>
+  task.status === 'open' ? 'open' : task.status === 'maybe' ? 'maybe' : 'done'
 
-const SETTLED_LABEL: Record<string, string> = {
-  done: 'Done',
-  dismissed: 'Dismissed',
-  'not-mine': 'Dismissed: not for me',
-  'done-already': 'Dismissed: already done',
-  'not-worth-it': 'Dismissed: not worth it',
-  replied: 'Closed: you replied in the thread',
-  checked: 'Closed: marked with a check',
+const go = (hash: string) => {
+  window.location.hash = hash
 }
 
 /** The leave-out offers you turned down, per channel, in this browser */
@@ -68,15 +43,40 @@ function declinedOffers(): string[] {
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): the
  * open ones, the Maybes kept aside, and what is settled. An AI tool with a
  * Slack connector collects them through Pacenote's MCP server; Done and
- * Dismiss are one click.
+ * Dismiss are one click. A task opens in its row (#/tasks/<id>), one at a
+ * time: up and down step through the list, Esc closes it.
  */
-export function TasksPage() {
+export function TasksPage({
+  openId,
+  logEntry,
+}: {
+  /** The task open in its row */
+  openId?: string
+  /** A session's log over the list */
+  logEntry?: string
+}) {
   const bridge = window.pacenoteDesktop?.tasks
   const tasks = useTasks()
   const decide = useDecide()
   const [tab, setTab] = useState<Tab>('open')
   const [declined, setDeclined] = useState(declinedOffers)
+  // The open task and the tab it was opened in: settled meanwhile (in its
+  // session, say), it stays where it was until it is closed.
+  const [held, setHeld] = useState<{ id: string; tab: Tab }>()
   const data = tasks.data
+
+  // A task opened from a link shows under its own tab.
+  useEffect(() => {
+    if (!openId) {
+      setHeld(undefined)
+      return
+    }
+    if (held?.id === openId) return
+    const task = data?.tasks.find((each) => each.id === openId)
+    if (!task) return
+    setTab(tabOf(task))
+    setHeld({ id: openId, tab: tabOf(task) })
+  }, [openId, data, held])
 
   if (!bridge)
     return (
@@ -96,12 +96,42 @@ export function TasksPage() {
 
   const open = data.tasks.filter((task) => task.status === 'open')
   const maybe = data.tasks.filter((task) => task.status === 'maybe')
-  const settled = data.tasks
-    .filter((task) => !['open', 'maybe'].includes(task.status))
-    .sort(
-      (a, b) => Date.parse(b.settledAt ?? '') - Date.parse(a.settledAt ?? '')
+  const kept = (task: TaskView) =>
+    task.id === openId && held?.id === openId && held.tab === tab
+  const shown = data.tasks.filter((task) => tabOf(task) === tab || kept(task))
+  if (tab === 'done')
+    shown.sort(
+      (a, b) =>
+        (Date.parse(b.settledAt ?? '') || 0) -
+        (Date.parse(a.settledAt ?? '') || 0)
     )
-  const shown = tab === 'open' ? open : tab === 'maybe' ? maybe : settled
+
+  // Up and down step through the tasks (the open one follows); Esc closes it.
+  const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    const target = event.target as HTMLElement
+    // Keys in a dialog or menu over the list, or while typing, are theirs.
+    if (!event.currentTarget.contains(target)) return
+    if (target.closest('textarea, input, select')) return
+    const titles = [
+      ...event.currentTarget.querySelectorAll<HTMLElement>('[data-task-title]'),
+    ]
+    const rowOf = (element: Element) =>
+      element.closest<HTMLElement>('[data-task-row]')?.dataset.taskRow
+    if (event.key === 'Escape' && openId) {
+      event.preventDefault()
+      titles.find((title) => rowOf(title) === openId)?.focus()
+      go('#/tasks')
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    const at = titles.findIndex((title) => rowOf(title) === rowOf(target))
+    const next = titles[at + (event.key === 'ArrowDown' ? 1 : -1)]
+    if (at < 0 || !next) return
+    event.preventDefault()
+    next.focus()
+    const id = rowOf(next)
+    if (openId && id) go(taskHash(id))
+  }
   const offer =
     data.leaveOut && !declined.includes(data.leaveOut.conversation)
       ? data.leaveOut
@@ -162,12 +192,18 @@ export function TasksPage() {
         </p>
       )}
 
-      <ul className="mt-3">
+      <ul className="mt-3" onKeyDown={onKeyDown}>
         {shown.map((task) => (
           <TaskRow
             key={task.id}
             task={task}
             cli={data.settings.cli}
+            open={task.id === openId}
+            gone={tabOf(task) !== tab}
+            logEntry={task.id === openId ? logEntry : undefined}
+            onToggle={() =>
+              go(task.id === openId ? '#/tasks' : taskHash(task.id))
+            }
             onDecide={(decision) => void decide(task.id, decision)}
           />
         ))}
@@ -473,195 +509,5 @@ function SetupPart({
         {children}
       </p>
     </section>
-  )
-}
-
-function TaskRow({
-  task,
-  cli,
-  onDecide,
-}: {
-  task: TaskView
-  /** Where code tasks continue */
-  cli: WorkTool
-  onDecide: (
-    decision: {
-      status: 'done' | 'dismissed' | 'kept'
-      reason?: DismissReason
-    } | null
-  ) => void
-}) {
-  const [choosing, setChoosing] = useState(false)
-  const who =
-    task.kind === 'promised'
-      ? 'You said you would'
-      : task.askedBy
-        ? `${task.askedBy} asked you`
-        : undefined
-  const source = sourceOf(task)
-  const settledLabel =
-    task.status === 'closed'
-      ? task.closed?.why === 'resolved'
-        ? `Closed: settled in ${source.label}`
-        : SETTLED_LABEL[task.closed?.why ?? '']
-      : task.status === 'dismissed'
-        ? SETTLED_LABEL[task.dismissReason ?? 'dismissed']
-        : SETTLED_LABEL[task.status]
-
-  return (
-    <li
-      className={cn(
-        'flex items-start gap-4 border-t border-border py-3.5',
-        task.faded && 'opacity-60'
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <a
-          href={`#/tasks/${encodeURIComponent(task.id)}`}
-          className="text-[14.5px] leading-snug font-semibold hover:text-primary hover:underline"
-        >
-          {task.title}
-        </a>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {[who, task.source.label, formatRelative(task.postedAt)]
-            .filter(Boolean)
-            .join(' · ')}
-          {task.due && (
-            <span className="rounded-full bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted">
-              {task.due}
-            </span>
-          )}
-          {settledLabel && (
-            <span className="rounded-full bg-muted px-2 py-px font-medium">
-              {settledLabel}
-            </span>
-          )}
-        </p>
-        {task.reason && (
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            {task.reason}
-          </p>
-        )}
-        {(task.action === 'code' || task.action === 'reply') && (
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 leading-[18px] font-medium">
-              {task.action === 'code' ? (
-                <SquareTerminal className="size-3" />
-              ) : (
-                <MessageSquare className="size-3" />
-              )}
-              {task.action === 'code' ? 'Code' : 'Reply'}
-            </span>
-            {task.repo && <span className="font-mono">{task.repo}</span>}
-          </p>
-        )}
-        {choosing && (
-          <div
-            className="mt-2 flex flex-wrap items-center gap-1.5"
-            role="group"
-            aria-label="Why dismiss it"
-          >
-            {DISMISS_REASONS.map(({ reason, label }) => (
-              <Button
-                key={reason}
-                size="xs"
-                variant="outline"
-                onClick={() => onDecide({ status: 'dismissed', reason })}
-              >
-                {label}
-              </Button>
-            ))}
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => onDecide({ status: 'dismissed' })}
-            >
-              Just dismiss
-            </Button>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label="Keep it"
-              onClick={() => setChoosing(false)}
-            >
-              <X />
-            </Button>
-          </div>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {task.status === 'open' && !choosing && (
-          <>
-            {task.action === 'code' && (
-              <Button size="sm" variant="outline" asChild>
-                <a href={`#/tasks/${encodeURIComponent(task.id)}/continue`}>
-                  <SquareTerminal />
-                  Continue in {cli === 'codex' ? 'Codex' : 'Claude Code'}
-                </a>
-              </Button>
-            )}
-            {task.action === 'reply' && (
-              <Button size="sm" variant="outline" asChild>
-                <a href={`#/tasks/${encodeURIComponent(task.id)}/draft`}>
-                  <MessageSquare />
-                  Draft a reply
-                </a>
-              </Button>
-            )}
-            <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
-              <CircleCheck />
-              Done
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setChoosing(true)}
-            >
-              Dismiss
-            </Button>
-          </>
-        )}
-        {task.status === 'maybe' && !choosing && (
-          <>
-            <Button size="sm" onClick={() => onDecide({ status: 'kept' })}>
-              Keep as a task
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setChoosing(true)}
-            >
-              Dismiss
-            </Button>
-          </>
-        )}
-        {(task.status === 'done' ||
-          task.status === 'dismissed' ||
-          task.status === 'closed') && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              onDecide(task.status === 'closed' ? { status: 'kept' } : null)
-            }
-          >
-            <Undo2 />
-            Reopen
-          </Button>
-        )}
-        {task.source.permalink && (
-          <Button size="icon-sm" variant="ghost" asChild>
-            <a
-              href={task.source.permalink}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open in ${source.label}`}
-            >
-              <ExternalLink />
-            </a>
-          </Button>
-        )}
-      </div>
-    </li>
   )
 }

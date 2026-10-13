@@ -64,7 +64,7 @@ import {
   latestCollection,
   recentCollections,
 } from '../../../src/tasks/collections.js'
-import { taskContext, threadOf } from '../../../src/tasks/context.js'
+import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
 import type { TaskDecision, WorkEntry } from '../../../src/tasks/types.js'
 import {
@@ -814,6 +814,7 @@ function registerBotIpc(): void {
     return {
       task,
       context,
+      outcome: outcomeOf(task, work),
       work: workFor(work, id).map((entry) =>
         entry.kind === 'session'
           ? {

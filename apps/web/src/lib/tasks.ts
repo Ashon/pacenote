@@ -1,6 +1,12 @@
 import type { TaskDecision, WorkTool } from '@src/tasks/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+/** A task with what came before it and its work log, from the desktop app */
+export const taskDetailQuery = (id: string) => ({
+  queryKey: ['task', id],
+  queryFn: async () => (await window.pacenoteDesktop?.tasks.detail(id)) ?? null,
+})
+
 /** Your tasks, from the desktop app (none on the dev server) */
 export function useTasks() {
   const bridge = window.pacenoteDesktop?.tasks
@@ -42,13 +48,11 @@ export function useCollect() {
   }
 }
 
-/** A task with what came before it and its work log; refreshed as you work */
-export function useTaskDetail(id: string) {
-  const bridge = window.pacenoteDesktop?.tasks
+/** An open task's detail, refreshed as you work; none while it is closed */
+export function useTaskDetail(id: string, enabled = true) {
   return useQuery({
-    queryKey: ['task', id],
-    queryFn: async () => (await bridge?.detail(id)) ?? null,
-    enabled: Boolean(bridge),
+    ...taskDetailQuery(id),
+    enabled: enabled && Boolean(window.pacenoteDesktop?.tasks),
     refetchInterval: 4_000,
   })
 }
