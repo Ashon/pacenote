@@ -1,6 +1,6 @@
 # Proposal: one reasoner runtime, for answers and for tasks
 
-Status: phase 1 built (2026-10-11), not yet released: collections are runs, Runs lists every job, Todo comes before it.
+Status: phase 1 shipped in v0.4.6 (2026-10-11): collections are runs, Runs lists every job, Todo comes before it.
 Phase 2 and 3 are not started. It builds on [your own tasks](personal-tasks.md) and changes how a collection runs and is
 recorded, not what it collects or how it reads Slack.
 Storyboard: the "Pacenote one runtime storyboard" canvas.
