@@ -115,7 +115,7 @@ Settings:
   | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
-  | Sandbox | Run environment (on this Mac, the built-in sandbox or the docker sandbox), limits, the reasoner login, allowed domains, status and apply jobs |
+  | Sandbox | Run environment (on this Mac, the built-in sandbox or the docker sandbox) with each sandbox's state and setup, limits, the reasoner login, allowed domains |
   | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
   | History & logs | Run history and retention, log level |
 
@@ -145,10 +145,17 @@ Settings:
 
 Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
 
-- The built-in sandbox (a VM per request, [Reasoner sandbox](sandbox.md#built-in-sandbox)) has one card of its own: whether
-  this Mac runs it, pacenote-vm, the kernel and init filesystem, and when the reasoner image was built, with "Set up
-  built-in sandbox" (`sandbox:vm`) beside it. Its allowed domains apply from the next request, with nothing to restart.
-  Settings that need Pace's restart (`SANDBOX_*`) show as pending there too.
+- Each sandbox's choice under Run environment says whether it is ready, beside the job it needs next, so a sandbox can be
+  set up before it is chosen: "Set up built-in sandbox" (`sandbox:vm`) under the built-in sandbox, and "Build sandbox
+  images" (`sandbox:build`), or "Restart proxy" while the proxy is down, under the Docker sandbox. The job's output shows
+  under the choices, then what the chosen sandbox has: for the built-in one (a VM per request,
+  [Reasoner sandbox](sandbox.md#built-in-sandbox)) the kernel, the init filesystem, the reasoner image and pacenote-vm;
+  for Docker, the engine and the reasoner and renderer images. Settings that need Pace's restart (`SANDBOX_*`) show as
+  pending at the top of the card.
+- The reasoner login's check (the claude token, the codex login file) shows in the login card. The allowed domains apply
+  from the next request in the built-in sandbox; for Docker, the domains card shows the proxy and "Restart proxy".
+- The broker's state, its checks (host list, kubeconfig, gh login, PR author) and its jobs ("Rebuild kubeconfig", "Recreate
+  broker") are in the Broker card under Ops tools.
 - The Docker sandbox has three components, and each applies settings differently. Each section says how its settings apply.
 
   | Component | Settings | Applied by |
@@ -157,18 +164,18 @@ Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
   | Allowed outbound domains (egress-proxy) | `~/.pacenote/sandbox/allowed-domains.txt` | Restarting the proxy (`pnpm sandbox:up`) |
   | ops-broker | `OPS_GIT_*`, `OPS_FS_ROOT`, `OPS_SSH_*`, `OPS_K8S_*`, `OPS_JIRA_*` | Recreating the broker (`pnpm sandbox:ops-up`) |
 
-- Status: docker, the 4 images, the proxy and broker containers, broker tools (SSH host count, k8s, files, GitHub, PR, Jira), credential files,
-  gh login and git author. Credential values are not read; only their presence is checked.
-- Pending changes: components whose changed settings are not applied yet are listed with the reason (for example "Restart proxy needed")
-  and can be applied in place.
+- Status: docker and its images beside the run environment, the proxy with the allowed domains, and the broker container and tools
+  (SSH host count, k8s, files, GitHub, PR, Jira) with the broker. Credential values are not read; only their presence is checked.
+- Pending changes: components whose changed settings are not applied yet are listed with the reason (for example "Recreate broker needed")
+  where that component is, and can be applied in place.
   - Bot: when the config fingerprint (`configHash`) the bot wrote to its status file at startup differs from the one computed from the current `.env`
   - Proxy: when the allowlist changed after the proxy started, or when the proxy is not running
   - Broker: when the container settings (SSH user, allowed range, GitHub orgs, mount paths) differ from `.env`, when a newer image exists or
     the `src/broker` code is newer than the image, or when the host list or kubeconfig changed after the broker started
 - Allowed domains accept exact host names only (wildcards, IPs, ports and URLs are rejected). Domains the current reasoner CLI needs cannot be removed.
   Internal systems that need a token are connected as broker tools instead of opening their domains.
-- Apply jobs: "Build sandbox images" (`sandbox:build`), "Rebuild kubeconfig" (`k8s:kubeconfig`), "Restart proxy" and "Recreate broker"
-  run from the app and show their output. Only one runs at a time, and secret values in the output are masked.
+- Jobs: "Build sandbox images" (`sandbox:build`), "Restart proxy", "Rebuild kubeconfig" (`k8s:kubeconfig`) and "Recreate broker"
+  run from the app, each from its card, and show their output there. Only one runs at a time, and secret values in the output are masked.
   Restarting the proxy or the broker cuts off tool calls in progress, so these jobs are blocked while requests are in progress.
 - Paths the broker mounts (`OPS_FS_ROOT`, `OPS_SSH_KEY`, `OPS_SSH_KNOWN_HOSTS`) must be absolute. (compose does not expand `~`)
 

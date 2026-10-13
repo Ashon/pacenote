@@ -74,10 +74,12 @@ import { SlackAppSetup } from './slack-app-setup'
 import {
   AllowlistCard,
   APPLY_LABEL,
-  JobsCard,
+  BrokerCard,
+  DockerFooter,
+  EnvironmentDetails,
+  LoginChecks,
   PendingList,
-  SandboxStatusCard,
-  VmStatusCard,
+  VmFooter,
 } from './sandbox-panel'
 
 const bridge = () => window.pacenoteDesktop?.settings
@@ -411,6 +413,13 @@ export function SettingsPage() {
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
   const pending = sandbox.status?.pending ?? []
+  // A Docker broker left from when ops tools were on, still to stop or apply
+  const brokerAround =
+    docker &&
+    (pending.some((item) => item.component === 'broker') ||
+      sandbox.status?.containers.some(
+        (c) => c.service === 'ops-broker' && c.state !== 'missing'
+      ) === true)
   const opsReady = (docker || builtIn) && isSet('MENTION_ALLOWED_USERS')
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
   const slackReady = hubMode
@@ -453,10 +462,31 @@ export function SettingsPage() {
           : undefined,
   }
 
+  /**
+   * What a choice field shows beside its options: the run environment's
+   * readiness and setup under each sandbox, and what the chosen one has ready
+   */
+  const choiceExtras: Partial<Record<string, ChoiceExtras>> = sandbox.available
+    ? {
+        REASONER_SANDBOX: {
+          footers: {
+            vm: <VmFooter sandbox={sandbox} />,
+            docker: <DockerFooter sandbox={sandbox} />,
+          },
+          below: (
+            <EnvironmentDetails
+              sandbox={sandbox}
+              chosen={builtIn ? 'vm' : docker ? 'docker' : undefined}
+            />
+          ),
+        },
+      }
+    : {}
   const row = (field: SettingField) => (
     <FieldRow
       key={field.key}
       field={field}
+      extras={choiceExtras[field.key]}
       view={view}
       value={draft[field.key] ?? current(field)}
       changed={field.key in changes}
@@ -599,56 +629,45 @@ export function SettingsPage() {
     ),
     sandbox: (
       <>
-        {card('environment')}
+        {card('environment', {
+          // Settings Pace picks up on its restart, such as the limits here
+          children: pending.some((item) => item.component === 'bot') && (
+            <PendingList
+              pending={pending.filter((item) => item.component === 'bot')}
+              sandbox={sandbox}
+            />
+          ),
+        })}
         {(docker || builtIn) &&
           card('credentials', {
             help: credentialsHelp(valueOf('REASONER')),
-            after:
-              valueOf('REASONER') === 'claude' ? (
-                <ClaudeTokenSetup
-                  hasToken={Boolean(
-                    view.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
-                  )}
-                  onRejected={load}
-                  onSaved={(credential) => {
-                    load()
-                    setNotice({
-                      tone: 'warn',
-                      text:
-                        credential === 'accepted'
-                          ? 'Saved a new claude token, and Claude accepts it. Restart Pace to use it.'
-                          : 'Saved a new claude token (Claude could not be reached to check it). Restart Pace to use it.',
-                      restart: true,
-                    })
-                  }}
-                />
-              ) : undefined,
+            after: (
+              <>
+                <LoginChecks sandbox={sandbox} />
+                {valueOf('REASONER') === 'claude' && (
+                  <ClaudeTokenSetup
+                    hasToken={Boolean(
+                      view.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
+                    )}
+                    onRejected={load}
+                    onSaved={(credential) => {
+                      load()
+                      setNotice({
+                        tone: 'warn',
+                        text:
+                          credential === 'accepted'
+                            ? 'Saved a new claude token, and Claude accepts it. Restart Pace to use it.'
+                            : 'Saved a new claude token (Claude could not be reached to check it). Restart Pace to use it.',
+                        restart: true,
+                      })
+                    }}
+                  />
+                )}
+              </>
+            ),
           })}
         {(docker || builtIn) && sandbox.available && (
           <AllowlistCard sandbox={sandbox} builtIn={builtIn} />
-        )}
-        {builtIn && sandbox.available && (
-          <>
-            <SubHeading
-              title="Status and setup"
-              help="The Linux kernel, the init filesystem and the reasoner image. Setting up fetches the kernel once and builds the image in a VM; run it again for newer CLIs."
-            />
-            <VmStatusCard sandbox={sandbox} />
-            <JobsCard
-              sandbox={sandbox}
-              kinds={opsOn ? ['vm', 'kubeconfig', 'broker'] : ['vm']}
-            />
-          </>
-        )}
-        {!builtIn && sandbox.available && (
-          <>
-            <SubHeading
-              title="Status and maintenance"
-              help="Docker, images, and the proxy and broker containers. Diagram rendering uses Docker in either run environment."
-            />
-            <SandboxStatusCard sandbox={sandbox} />
-            <JobsCard sandbox={sandbox} />
-          </>
         )}
       </>
     ),
@@ -686,14 +705,11 @@ export function SettingsPage() {
             />
           ),
         })}
-        {docker && pending.some((item) => item.component === 'broker') && (
-          <section className="surface-group">
-            <PendingList
-              pending={pending.filter((item) => item.component === 'broker')}
-              sandbox={sandbox}
-            />
-          </section>
-        )}
+        {(docker || builtIn) &&
+          sandbox.available &&
+          (opsOn || brokerAround) && (
+            <BrokerCard sandbox={sandbox} builtIn={builtIn} />
+          )}
         <SubHeading
           title="Integrations"
           help={`Each one turns on once its fields are filled in. ${builtIn ? "Changes apply when Pace restarts, as its broker's VM starts with it." : `Changes apply when the broker is recreated ("${APPLY_LABEL.broker}").`}${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
@@ -1655,8 +1671,17 @@ function PathControl({
   )
 }
 
+/** What a choice shows besides its options (see choiceExtras) */
+interface ChoiceExtras {
+  /** Under an option, by its value */
+  footers?: Partial<Record<string, React.ReactNode>>
+  /** Under the options */
+  below?: React.ReactNode
+}
+
 function FieldRow({
   field,
+  extras,
   view,
   value,
   changed,
@@ -1668,6 +1693,7 @@ function FieldRow({
   saving,
 }: {
   field: SettingField
+  extras?: ChoiceExtras
   view: SettingsView
   value: string
   changed: boolean
@@ -1699,7 +1725,12 @@ function FieldRow({
   if (field.type === 'select' && field.options?.some((option) => option.help)) {
     return (
       <div className="px-4 py-3">
-        <Choice field={field} value={value} onChange={onChange} />
+        <Choice
+          field={field}
+          value={value}
+          onChange={onChange}
+          footers={extras?.footers}
+        />
         <div className="mt-2 flex items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground/80">
           <span className="select-text">{field.key}</span>
           {changed && (
@@ -1710,6 +1741,7 @@ function FieldRow({
           )}
         </div>
         <RowNotes warning={warning} issue={issue} />
+        {extras?.below}
       </div>
     )
   }
@@ -1739,10 +1771,13 @@ function Choice({
   field,
   value,
   onChange,
+  footers,
 }: {
   field: SettingField
   value: string
   onChange: (value: string) => void
+  /** Under an option, outside its radio: a state and the action it needs */
+  footers?: Partial<Record<string, React.ReactNode>>
 }) {
   const selected = value || field.default || ''
   return (
@@ -1758,39 +1793,55 @@ function Choice({
     >
       {field.options?.map((option) => {
         const checked = option.value === selected
+        const footer = footers?.[option.value]
         return (
-          <button
+          <div
             key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            onClick={() => onChange(option.value)}
+            data-choice={option.value}
             className={cn(
-              'flex flex-col justify-start rounded-xl border px-3 py-2.5 text-left transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40',
+              'flex flex-col rounded-xl border transition-colors',
               checked
                 ? 'border-primary/50 bg-primary/6'
-                : 'border-border hover:border-primary/30 hover:bg-muted/40'
+                : 'border-border hover:border-primary/30'
             )}
           >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <span
+            <button
+              type="button"
+              role="radio"
+              aria-checked={checked}
+              onClick={() => onChange(option.value)}
+              className="flex flex-1 flex-col justify-start rounded-xl px-3 py-2.5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <span
+                  className={cn(
+                    'grid size-3.5 shrink-0 place-items-center rounded-full border',
+                    checked ? 'border-primary' : 'border-muted-foreground/40'
+                  )}
+                >
+                  {checked && (
+                    <span className="size-1.5 rounded-full bg-primary" />
+                  )}
+                </span>
+                {option.label}
+              </span>
+              {option.help && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {option.help}
+                </span>
+              )}
+            </button>
+            {footer && (
+              <div
                 className={cn(
-                  'grid size-3.5 shrink-0 place-items-center rounded-full border',
-                  checked ? 'border-primary' : 'border-muted-foreground/40'
+                  'flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1.5 border-t px-3 py-2 text-xs',
+                  checked ? 'border-primary/20' : 'border-border'
                 )}
               >
-                {checked && (
-                  <span className="size-1.5 rounded-full bg-primary" />
-                )}
-              </span>
-              {option.label}
-            </span>
-            {option.help && (
-              <span className="mt-1 block text-xs text-muted-foreground">
-                {option.help}
-              </span>
+                {footer}
+              </div>
             )}
-          </button>
+          </div>
         )
       })}
     </div>

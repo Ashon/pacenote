@@ -69,7 +69,11 @@ export function useSandbox() {
   const [status, setStatus] = useState<SandboxStatus>()
   const [loading, setLoading] = useState(false)
   const [job, setJob] = useState<SandboxJob>()
-  const [error, setError] = useState<string>()
+  /** Why the last job could not start, beside that job's button */
+  const [error, setError] = useState<{
+    kind: SandboxJobKind
+    message: string
+  }>()
 
   const refresh = useCallback(() => {
     if (!bridge) return
@@ -93,7 +97,7 @@ export function useSandbox() {
   const run = (kind: SandboxJobKind) => {
     setError(undefined)
     void bridge?.run(kind).then((result) => {
-      if (result.error) setError(result.error)
+      if (result.error) setError({ kind, message: result.error })
       else if (result.job) setJob(result.job)
     })
   }

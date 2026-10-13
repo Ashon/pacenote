@@ -201,14 +201,18 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         'sk-ant-oat01-e2e',
         'enter'
       )
-      // What the built-in sandbox has ready, and the job that sets it up
-      await page.getByText('Kernel ready').waitFor()
-      await page.getByText('Init ready').waitFor()
+      // The built-in sandbox's choice says it is ready, beside the job that
+      // sets it up; under the choices, what it has ready.
+      const builtInChoice = page.locator('[data-choice="vm"]')
+      await builtInChoice.getByText('Ready', { exact: true }).waitFor()
+      await builtInChoice
+        .getByRole('button', { name: 'Set up built-in sandbox' })
+        .waitFor()
+      await page.getByText('Linux kernel').waitFor()
       await page
         .getByText(/^Built .* on docker\.io\/library\/node:24-alpine$/)
         .waitFor()
-      await page.getByText('Set up built-in sandbox').first().waitFor()
-      await page.getByText('Kernel ready').scrollIntoViewIfNeeded()
+      await builtInChoice.scrollIntoViewIfNeeded()
       await page.screenshot({
         path: path.join(REPO, 'test-results/built-in-sandbox.png'),
         fullPage: true,
