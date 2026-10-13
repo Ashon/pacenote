@@ -69,6 +69,25 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     // Collect now: Claude Code reads Slack, read only, in the main process
     collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
     stopCollect: () => ipcRenderer.invoke('pacenote:tasks:collect-stop'),
+    // A task's detail, and continuing it: in a terminal (Claude Code or
+    // Codex), or with a reply drafted for you to send
+    detail: (id: string) => ipcRenderer.invoke('pacenote:tasks:detail', id),
+    folders: (repo: string) =>
+      ipcRenderer.invoke('pacenote:tasks:folders', repo),
+    chooseFolder: (repo?: string) =>
+      ipcRenderer.invoke('pacenote:tasks:choose-folder', repo),
+    repos: () => ipcRenderer.invoke('pacenote:tasks:repos'),
+    setRepo: (repo: string, folder?: string) =>
+      ipcRenderer.invoke('pacenote:tasks:set-repo', repo, folder),
+    continueIn: (id: string, how: { tool: string; folder: string }) =>
+      ipcRenderer.invoke('pacenote:tasks:continue', id, how),
+    resume: (entryId: string) =>
+      ipcRenderer.invoke('pacenote:tasks:resume', entryId),
+    draft: (id: string) => ipcRenderer.invoke('pacenote:tasks:draft', id),
+    copyReply: (id: string, text: string) =>
+      ipcRenderer.invoke('pacenote:tasks:copy-reply', id, text),
+    sessionLog: (entryId: string) =>
+      ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
   },
   // Pacenote's MCP server in Claude Code and Codex: added with their own CLIs
   mcp: {

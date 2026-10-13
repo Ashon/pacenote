@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
@@ -6,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -62,8 +64,33 @@ import {
   latestCollection,
   recentCollections,
 } from '../../../src/tasks/collections.js'
-import { decide, tasksView } from '../../../src/tasks/store.js'
-import type { TaskDecision } from '../../../src/tasks/types.js'
+import { taskContext, threadOf } from '../../../src/tasks/context.js'
+import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
+import type { TaskDecision, WorkEntry } from '../../../src/tasks/types.js'
+import {
+  addWork,
+  readWork,
+  updateWork,
+  workFor,
+} from '../../../src/tasks/work.js'
+import { draftReply } from './drafter.js'
+import {
+  checkFolder,
+  discoverSessions,
+  findCodexSession,
+  findRepoFolders,
+  lastActive,
+  readRepos,
+  readSessionLog,
+  repoFolder,
+  resumeCommand,
+  resumeSession,
+  saveRepo,
+  sessionFile,
+  startSession,
+  type HandoffOptions,
+  type Session,
+} from './handoff.js'
 import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
@@ -688,6 +715,8 @@ function registerBotIpc(): void {
         .split(',')
         .map((part) => part.trim())
         .filter(Boolean),
+      /** Where code tasks continue */
+      cli: env.TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
     }
   }
   ipcMain.handle('pacenote:tasks:list', (event) => {
@@ -728,6 +757,241 @@ function registerBotIpc(): void {
     return settings.save({
       TASKS_EXCLUDE_CHANNELS: [...exclude, label].join(', '),
     })
+  })
+  // A task's detail: what came before it, its work log, and continuing it in
+  // Claude Code or Codex, or drafting a reply to send yourself
+  const env = () => settings.effectiveEnv()
+  const handoff = (): HandoffOptions => ({
+    dataDir,
+    home: homedir(),
+    bin: (tool) =>
+      (tool === 'claude' ? env().CLAUDE_BIN : env().CODEX_BIN)?.trim() || tool,
+    terminal: () => (env().TASKS_TERMINAL === 'iterm' ? 'iterm' : 'terminal'),
+    planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
+  })
+  let lookedForSessions = 0
+  /** Sessions you started yourself, looked for at most once a minute */
+  const findOwnSessions = () => {
+    if (env().TASKS_LINK_SESSIONS !== 'on') return
+    if (Date.now() - lookedForSessions < 60_000) return
+    lookedForSessions = Date.now()
+    const known = new Set(
+      readWork(dataDir).entries.flatMap((entry) =>
+        entry.kind === 'session' && entry.session ? [entry.session] : []
+      )
+    )
+    const tasks = allTaskViews(dataDir).map((task) => ({
+      id: task.id,
+      link: task.source.permalink,
+    }))
+    for (const entry of discoverSessions(homedir(), tasks, known))
+      addWork(dataDir, entry)
+  }
+  const taskDetail = (id: string) => {
+    const all = allTaskViews(dataDir)
+    const task = all.find((t) => t.id === id)
+    if (!task) return null
+    // Codex sessions Pacenote opened get their id once they have started.
+    for (const entry of workFor(readWork(dataDir).entries, id))
+      if (
+        entry.kind === 'session' &&
+        entry.tool === 'codex' &&
+        !entry.session
+      ) {
+        const session = findCodexSession(homedir(), entry)
+        if (session) updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
+      }
+    findOwnSessions()
+    const work = readWork(dataDir).entries
+    const thread = threadOf(task)
+    const at = thread.indexOf(':')
+    const context = taskContext(
+      task,
+      all,
+      work,
+      reader.inThread(thread.slice(0, at), thread.slice(at + 1))
+    )
+    return {
+      task,
+      context,
+      work: workFor(work, id).map((entry) =>
+        entry.kind === 'session'
+          ? {
+              ...entry,
+              lastActiveAt: lastActive(homedir(), entry),
+              resume: resumeCommand(entry),
+            }
+          : entry
+      ),
+      folder: task.repo ? repoFolder(dataDir, task.repo) : undefined,
+      cli:
+        env().TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
+    }
+  }
+  const sessionEntry = (entryId: unknown): Session | undefined => {
+    const entry = readWork(dataDir).entries.find((e) => e.id === entryId)
+    return entry?.kind === 'session' ? entry : undefined
+  }
+  ipcMain.handle('pacenote:tasks:detail', (event, id: unknown) =>
+    fromMainWindow(event) && typeof id === 'string' ? taskDetail(id) : null
+  )
+  ipcMain.handle('pacenote:tasks:folders', (event, repo: unknown) =>
+    fromMainWindow(event) && typeof repo === 'string'
+      ? findRepoFolders(repo, homedir())
+      : []
+  )
+  ipcMain.handle(
+    'pacenote:tasks:choose-folder',
+    async (event, repo: unknown) => {
+      if (!fromMainWindow(event) || !mainWindow) return undefined
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title:
+          typeof repo === 'string' ? `Where is ${repo}?` : 'Choose a folder',
+        defaultPath: homedir(),
+        properties: ['openDirectory'],
+      })
+      const folder = result.filePaths[0]
+      if (result.canceled || !folder) return undefined
+      return checkFolder(folder, typeof repo === 'string' ? repo : undefined)
+    }
+  )
+  ipcMain.handle('pacenote:tasks:repos', (event) =>
+    fromMainWindow(event) ? readRepos(dataDir) : {}
+  )
+  ipcMain.handle(
+    'pacenote:tasks:set-repo',
+    (event, repo: unknown, folder: unknown) => {
+      if (!fromMainWindow(event) || typeof repo !== 'string') return {}
+      return saveRepo(
+        dataDir,
+        repo,
+        typeof folder === 'string' && folder ? folder : undefined
+      )
+    }
+  )
+  ipcMain.handle(
+    'pacenote:tasks:continue',
+    async (event, id: unknown, how: unknown) => {
+      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+      const { tool, folder } = (how ?? {}) as {
+        tool?: unknown
+        folder?: unknown
+      }
+      const detail = taskDetail(id)
+      if (!detail) return { error: 'There is no such task.' }
+      if (typeof folder !== 'string' || !folder)
+        return { error: 'Choose the folder to work in first.' }
+      try {
+        if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
+        const entry = await startSession(
+          handoff(),
+          detail.task,
+          detail.context,
+          tool === 'codex' ? 'codex' : 'claude',
+          folder
+        )
+        addWork(dataDir, entry)
+        return { entry }
+      } catch (error) {
+        return { error: (error as Error).message }
+      }
+    }
+  )
+  ipcMain.handle('pacenote:tasks:resume', async (event, entryId: unknown) => {
+    if (!fromMainWindow(event)) return undefined
+    const entry = sessionEntry(entryId)
+    if (!entry) return { error: 'There is no such session.' }
+    try {
+      await resumeSession(handoff(), entry)
+      updateWork(dataDir, entry.id, (e) =>
+        e.kind === 'session'
+          ? {
+              ...e,
+              resumedAt: [...(e.resumedAt ?? []), new Date().toISOString()],
+            }
+          : e
+      )
+      return {}
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
+  })
+  const drafting = new Set<string>()
+  ipcMain.handle('pacenote:tasks:draft', async (event, id: unknown) => {
+    if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+    const detail = taskDetail(id)
+    if (!detail) return { error: 'There is no such task.' }
+    if (drafting.has(id)) return { error: 'A draft is already being written.' }
+    drafting.add(id)
+    try {
+      const { command, args, env: launchEnv } = mcpLaunch()
+      const draft = await draftReply({
+        bin: env().CLAUDE_BIN?.trim() || 'claude',
+        launch: { command, args, env: launchEnv },
+        toolPath: toolPath(),
+        cwd: dataDir,
+        task: detail.task,
+        context: detail.context,
+      })
+      if ('error' in draft) return draft
+      const entry: WorkEntry = {
+        kind: 'draft',
+        id: randomUUID(),
+        task: id,
+        at: new Date().toISOString(),
+        text: draft.text,
+      }
+      addWork(dataDir, entry)
+      return { entry }
+    } finally {
+      drafting.delete(id)
+    }
+  })
+  ipcMain.handle(
+    'pacenote:tasks:copy-reply',
+    (event, id: unknown, text: unknown) => {
+      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+      if (typeof text !== 'string' || !text.trim())
+        return { error: 'The reply is empty.' }
+      const task = allTaskViews(dataDir).find((t) => t.id === id)
+      if (!task) return { error: 'There is no such task.' }
+      clipboard.writeText(text)
+      const at = new Date().toISOString()
+      const latest = workFor(readWork(dataDir).entries, id).find(
+        (entry) => entry.kind === 'draft'
+      )
+      if (latest)
+        updateWork(dataDir, latest.id, (e) =>
+          e.kind === 'draft' ? { ...e, text, copiedAt: at } : e
+        )
+      else
+        addWork(dataDir, {
+          kind: 'draft',
+          id: randomUUID(),
+          task: id,
+          at,
+          text,
+          copiedAt: at,
+        })
+      const link = task.source.permalink
+      if (link && /^https:\/\//.test(link)) void shell.openExternal(link)
+      return {}
+    }
+  )
+  ipcMain.handle('pacenote:tasks:session-log', (event, entryId: unknown) => {
+    if (!fromMainWindow(event)) return undefined
+    const entry = sessionEntry(entryId)
+    if (!entry) return { error: 'There is no such session.' }
+    const file = sessionFile(homedir(), entry)
+    if (!file)
+      return {
+        error: `${entry.tool === 'claude' ? 'Claude Code' : 'Codex'} has no log of this session on this Mac.`,
+      }
+    try {
+      return { items: readSessionLog(file, entry.tool) }
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
   })
   ipcMain.handle('pacenote:settings:get', (event) =>
     fromMainWindow(event) ? settings.view() : null

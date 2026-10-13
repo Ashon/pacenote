@@ -68,6 +68,7 @@ export type SettingGroup =
   | 'k8s'
   | 'ssh'
   | 'tasks'
+  | 'work'
   | 'history'
   | 'logs'
 
@@ -219,6 +220,12 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     section: 'tasks',
     label: 'Gathering tasks',
     help: 'Collect now on the Todo screen has Claude Code read Slack with its own Slack connector, read only, and keeps what people asked of you and what you said you would do. Pacenote holds no Slack token for this.',
+  },
+  {
+    id: 'work',
+    section: 'tasks',
+    label: 'Continuing work',
+    help: 'A code task continues in Claude Code or Codex, opened in a terminal in its repository with the task and what came before it. The session runs as you, with your own permissions.',
   },
   {
     id: 'history',
@@ -665,6 +672,54 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Comma-separated channel names or IDs.',
     type: 'text',
     placeholder: '#random, #social',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_CLI',
+    group: 'work',
+    label: 'Open code tasks in',
+    help: 'The button on a code task opens a session here, with the task.',
+    type: 'select',
+    options: [
+      { value: 'claude', label: 'Claude Code' },
+      { value: 'codex', label: 'Codex' },
+    ],
+    default: 'claude',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_TERMINAL',
+    group: 'work',
+    label: 'Terminal',
+    help: 'Where the session opens.',
+    type: 'select',
+    options: [
+      { value: 'terminal', label: 'Terminal' },
+      { value: 'iterm', label: 'iTerm' },
+    ],
+    default: 'terminal',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_PLAN_FIRST',
+    group: 'work',
+    label: 'Start with a plan',
+    help: 'The session sums up the task and its plan, then waits for you before it changes anything.',
+    type: 'toggle',
+    default: 'on',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
+    key: 'TASKS_LINK_SESSIONS',
+    group: 'work',
+    label: 'Show sessions you start yourself',
+    help: "Finds the Claude Code and Codex sessions on this Mac that used Pacenote's task tools, and adds them to the task's work log. A session's log is read only when you open it.",
+    type: 'toggle',
+    default: 'off',
     applies: 'app',
     shownWhen: { key: 'TASKS', equals: 'on' },
   },

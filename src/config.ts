@@ -193,6 +193,15 @@ export const EnvSchema = z.object({
   TASKS_DMS: z.enum(['on', 'off']).default('off'),
   /** Channels tasks leave out, by name (#random) or ID */
   TASKS_EXCLUDE_CHANNELS: z.string().optional(),
+  /**
+   * Continuing a task (the desktop app): where code tasks open, in which
+   * terminal, whether the session starts with a plan, and whether sessions
+   * you start yourself are looked for
+   */
+  TASKS_CLI: z.enum(['claude', 'codex']).default('claude'),
+  TASKS_TERMINAL: z.enum(['terminal', 'iterm']).default('terminal'),
+  TASKS_PLAN_FIRST: z.enum(['on', 'off']).default('on'),
+  TASKS_LINK_SESSIONS: z.enum(['on', 'off']).default('off'),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
@@ -281,7 +290,7 @@ const providedValues = (env: NodeJS.ProcessEnv) =>
 /**
  * Values a bot restart does not need: the data location, which the desktop app
  * passes as an absolute path when launching the bot, and sharing the history
- * and the tasks settings, which the MCP server reads on each call.
+ * and the tasks settings, which the MCP server and the app read where used.
  */
 const OUTSIDE_FINGERPRINT = new Set([
   'PACENOTE_DATA_DIR',
@@ -289,6 +298,10 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS',
   'TASKS_DMS',
   'TASKS_EXCLUDE_CHANNELS',
+  'TASKS_CLI',
+  'TASKS_TERMINAL',
+  'TASKS_PLAN_FIRST',
+  'TASKS_LINK_SESSIONS',
 ])
 
 /**

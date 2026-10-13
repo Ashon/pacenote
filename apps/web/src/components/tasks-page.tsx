@@ -4,6 +4,7 @@ import type {
   DismissReason,
   TaskView,
   TasksCollect,
+  WorkTool,
 } from '@src/tasks/types'
 import { sourceOf } from '@src/tasks/sources'
 import {
@@ -11,8 +12,10 @@ import {
   CircleCheck,
   ExternalLink,
   History,
+  MessageSquare,
   RefreshCw,
   Settings,
+  SquareTerminal,
   Undo2,
   X,
 } from 'lucide-react'
@@ -164,6 +167,7 @@ export function TasksPage() {
           <TaskRow
             key={task.id}
             task={task}
+            cli={data.settings.cli}
             onDecide={(decision) => void decide(task.id, decision)}
           />
         ))}
@@ -474,9 +478,12 @@ function SetupPart({
 
 function TaskRow({
   task,
+  cli,
   onDecide,
 }: {
   task: TaskView
+  /** Where code tasks continue */
+  cli: WorkTool
   onDecide: (
     decision: {
       status: 'done' | 'dismissed' | 'kept'
@@ -509,7 +516,12 @@ function TaskRow({
       )}
     >
       <div className="min-w-0 flex-1">
-        <p className="text-[14.5px] leading-snug font-semibold">{task.title}</p>
+        <a
+          href={`#/tasks/${encodeURIComponent(task.id)}`}
+          className="text-[14.5px] leading-snug font-semibold hover:text-primary hover:underline"
+        >
+          {task.title}
+        </a>
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {[who, task.source.label, formatRelative(task.postedAt)]
             .filter(Boolean)
@@ -528,6 +540,19 @@ function TaskRow({
         {task.reason && (
           <p className="mt-1 text-[13px] text-muted-foreground">
             {task.reason}
+          </p>
+        )}
+        {(task.action === 'code' || task.action === 'reply') && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 leading-[18px] font-medium">
+              {task.action === 'code' ? (
+                <SquareTerminal className="size-3" />
+              ) : (
+                <MessageSquare className="size-3" />
+              )}
+              {task.action === 'code' ? 'Code' : 'Reply'}
+            </span>
+            {task.repo && <span className="font-mono">{task.repo}</span>}
           </p>
         )}
         {choosing && (
@@ -567,6 +592,22 @@ function TaskRow({
       <div className="flex shrink-0 items-center gap-1.5">
         {task.status === 'open' && !choosing && (
           <>
+            {task.action === 'code' && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={`#/tasks/${encodeURIComponent(task.id)}/continue`}>
+                  <SquareTerminal />
+                  Continue in {cli === 'codex' ? 'Codex' : 'Claude Code'}
+                </a>
+              </Button>
+            )}
+            {task.action === 'reply' && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={`#/tasks/${encodeURIComponent(task.id)}/draft`}>
+                  <MessageSquare />
+                  Draft a reply
+                </a>
+              </Button>
+            )}
             <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
               <CircleCheck />
               Done

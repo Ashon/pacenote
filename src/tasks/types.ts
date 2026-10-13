@@ -17,6 +17,12 @@ export type TaskKind = 'asked' | 'promised'
 /** maybe: a guess the reasoner is not sure about, kept out of the list */
 export type TaskConfidence = 'sure' | 'maybe'
 
+/**
+ * What doing it takes, as the collection judged it: code (a change or a look
+ * in a repository), reply (an answer in the thread), or other
+ */
+export type TaskAction = 'code' | 'reply' | 'other'
+
 export interface TaskSource {
   /** The source it was found in; tasks from before there were sources: Slack */
   app?: SourceId
@@ -51,11 +57,31 @@ export interface Task {
   foundAt: string
   /** The AI tool that added it ("claude-code") */
   addedBy?: string
+  /** What doing it takes; older tasks have none: other */
+  action?: TaskAction
+  /** The repository it is about, as owner/name */
+  repo?: string
+  /**
+   * The thread in two or three sentences, written when it was collected: who
+   * wants what, and why. Pacenote keeps no messages, so this is the reminder.
+   */
+  summary?: string
   /**
    * Closed by itself: you replied in its thread after it, its message got a
-   * check mark, or it was resolved in Slack some other way
+   * check mark, or it was resolved in Slack some other way. An AI tool that
+   * closes it (a session you continued it in) can say what it did and leave
+   * a reply for you to send.
    */
-  closed?: { at: string; why: 'replied' | 'checked' | 'resolved' }
+  closed?: {
+    at: string
+    why: 'replied' | 'checked' | 'resolved'
+    /** The AI tool that closed it ("claude-code") */
+    by?: string
+    /** What was done, in a line */
+    note?: string
+    /** A reply drafted for you to send in the thread */
+    reply?: string
+  }
 }
 
 export interface TasksFile {
@@ -130,4 +156,116 @@ export type CollectionRecord = CollectOutcome & {
 export interface TasksCollect {
   running?: { startedAt: string; reads: number }
   last?: CollectOutcome
+}
+
+/** Where a task's work went on: Claude Code or Codex on this Mac */
+export type WorkTool = 'claude' | 'codex'
+
+/**
+ * A task's work log, kept by the desktop app (tasks-work.json): the sessions it
+ * opened or found for the task and the replies it drafted. Sessions keep their
+ * id and folder only; their content stays in the tool's own log.
+ */
+export type WorkEntry =
+  | {
+      kind: 'session'
+      /** This entry's id, also the marker in the session's first prompt */
+      id: string
+      task: string
+      tool: WorkTool
+      /** The tool's session id; Codex's is found after it starts */
+      session?: string
+      cwd: string
+      startedAt: string
+      /** When it was opened again to continue */
+      resumedAt?: string[]
+      /** Found in the tool's log (a session you started yourself) */
+      found?: boolean
+    }
+  | {
+      kind: 'draft'
+      id: string
+      task: string
+      at: string
+      /** The reply as drafted, then as you copied it */
+      text: string
+      /** When you copied it and opened the thread */
+      copiedAt?: string
+    }
+
+export interface WorkFile {
+  version: 1
+  entries: WorkEntry[]
+}
+
+/** A run of Pace's in the task's thread, as its detail lists it */
+export interface RelatedRun {
+  id: string
+  request: string
+  at: string
+  status: 'running' | 'succeeded' | 'failed' | 'interrupted'
+}
+
+/** An earlier task, with how it ended */
+export interface RelatedTask {
+  id: string
+  title: string
+  askedBy?: string
+  where: string
+  postedAt: string
+  status: TaskStatus
+  /** How it ended, in words: "Done in Claude Code · 2 comments" */
+  outcome?: string
+  /** Its last session, to continue it */
+  session?: Extract<WorkEntry, { kind: 'session' }>
+}
+
+/**
+ * What came before a task: its thread, its repository, and the person who
+ * asked, each with the earlier tasks and runs that share it
+ */
+export interface TaskContext {
+  thread: { runs: RelatedRun[]; tasks: RelatedTask[] }
+  repo?: { name: string; tasks: RelatedTask[] }
+  person?: { name: string; tasks: RelatedTask[] }
+}
+
+/** A folder checked as a repository's checkout */
+export interface FolderCheck {
+  path: string
+  /** The origin remote, when it has one */
+  remote?: string
+  /** Its remote is the task's repository */
+  matches: boolean
+  /** Changes not committed */
+  changes?: number
+  error?: string
+}
+
+/** One turn or step of a Claude Code or Codex session, as its log shows it */
+export interface SessionItem {
+  role: 'user' | 'assistant' | 'tool'
+  text: string
+  at?: string
+  /** A tool step's name */
+  name?: string
+}
+
+/** A task as its detail shows it, from the desktop app */
+export interface TaskDetail {
+  task: TaskView
+  context: TaskContext
+  /** Its work log, newest first; a session with when it was last active */
+  work: (
+    | (Extract<WorkEntry, { kind: 'session' }> & {
+        lastActiveAt?: string
+        /** The command that continues it, to copy */
+        resume?: string
+      })
+    | Extract<WorkEntry, { kind: 'draft' }>
+  )[]
+  /** The task's repository's folder on this Mac, when known */
+  folder?: string
+  /** Where code tasks continue (Settings > Todo) */
+  cli: WorkTool
 }

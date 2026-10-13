@@ -1,7 +1,7 @@
 import type { TasksSettings } from './settings.js'
 import { findMessage, SOURCES, sourceNames, type SourceId } from './sources.js'
-import { readTasks, writeTasks } from './store.js'
-import type { Task, TaskConfidence, TaskKind } from './types.js'
+import { HISTORY_MS, readTasks, writeTasks } from './store.js'
+import type { Task, TaskAction, TaskConfidence, TaskKind } from './types.js'
 
 /**
  * Adding and closing tasks, as the MCP server does for an AI tool. A task is
@@ -26,7 +26,16 @@ export interface NewTask {
   due?: string
   confidence?: TaskConfidence
   reason?: string
+  /** What doing it takes */
+  action?: TaskAction
+  /** The repository it is about: owner/name */
+  repo?: string
+  /** The thread in two or three sentences */
+  summary?: string
 }
+
+/** owner/name, as GitHub names a repository */
+const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/
 
 export interface Skipped {
   link: string
@@ -111,6 +120,10 @@ export function addTasks(
       due: item.due?.trim() || undefined,
       confidence: item.confidence ?? 'maybe',
       reason: (item.reason ?? '').trim().slice(0, 300),
+      action: item.action,
+      repo:
+        item.repo && REPO.test(item.repo.trim()) ? item.repo.trim() : undefined,
+      summary: item.summary?.trim().slice(0, 600) || undefined,
       postedAt: new Date(
         Number.isNaN(posted)
           ? (SOURCES[source.app].postedAt?.(source) ?? now.getTime())
@@ -124,7 +137,10 @@ export function addTasks(
     writeTasks(dataDir, {
       version: 1,
       collectedAt: options.finished ? now.toISOString() : file.collectedAt,
-      tasks: [...file.tasks, ...added],
+      // Kept as the history earlier tasks are read from, then dropped
+      tasks: [...file.tasks, ...added].filter(
+        (task) => now.getTime() - Date.parse(task.foundAt) < HISTORY_MS
+      ),
     })
   return { added, skipped }
 }
@@ -134,7 +150,9 @@ export function closeTask(
   dataDir: string,
   ref: string,
   why: NonNullable<Task['closed']>['why'],
-  now = new Date()
+  now = new Date(),
+  /** Who closed it, what was done, and a reply to send */
+  more: { by?: string; note?: string; reply?: string } = {}
 ): Task | undefined {
   const source = findMessage(ref)
   const id = source ? SOURCES[source.app].taskId(source) : ref
@@ -142,7 +160,16 @@ export function closeTask(
   const task = file.tasks.find((t) => t.id === id)
   if (!task) return undefined
   if (task.closed) return task
-  const closed = { ...task, closed: { at: now.toISOString(), why } }
+  const closed: Task = {
+    ...task,
+    closed: {
+      at: now.toISOString(),
+      why,
+      by: more.by,
+      note: more.note?.trim().slice(0, 300) || undefined,
+      reply: more.reply?.trim().slice(0, 4000) || undefined,
+    },
+  }
   writeTasks(dataDir, {
     ...file,
     tasks: file.tasks.map((t) => (t.id === id ? closed : t)),

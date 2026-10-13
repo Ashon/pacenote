@@ -22,6 +22,7 @@ import { SearchField } from './components/search-field'
 import { SettingsPage } from './components/settings-page'
 import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
+import { TaskDetailPage } from './components/task-detail'
 import { TasksPage } from './components/tasks-page'
 
 /**
@@ -43,14 +44,21 @@ const showDebug = DebugPage !== undefined && !!window.pacenoteDesktop?.dev
 type Route =
   | { page: 'overview' }
   | { page: 'runs'; id?: string }
-  | { page: 'tasks' }
+  | {
+      page: 'tasks'
+      id?: string
+      /** continue or draft: start that once the task opens; log: a session's */
+      view?: 'continue' | 'draft' | 'log'
+      entry?: string
+    }
   | { page: 'bot' }
   | { page: 'settings' }
   | { page: 'debug' }
 
 /**
- * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks, #/bot:
- * Pace's status and logs,
+ * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
+ * #/tasks/<id>: one task (/continue, /draft: start that; /log/<entry>: a
+ * session's log), #/bot: Pace's status and logs,
  * #/settings: Settings, #/debug: Debug (development builds), otherwise:
  * Overview
  */
@@ -59,6 +67,15 @@ function readRoute(): Route {
   const run = /^#\/runs\/([^/?#]+)/.exec(hash)?.[1]
   if (run) return { page: 'runs', id: decodeURIComponent(run) }
   if (hash.startsWith('#/runs')) return { page: 'runs' }
+  const task =
+    /^#\/tasks\/([^/?#]+)(?:\/(continue|draft|log)(?:\/([^/?#]+))?)?/.exec(hash)
+  if (task)
+    return {
+      page: 'tasks',
+      id: decodeURIComponent(task[1]!),
+      view: task[2] as 'continue' | 'draft' | 'log' | undefined,
+      entry: task[3] ? decodeURIComponent(task[3]) : undefined,
+    }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
   if (hash.startsWith('#/bot')) return { page: 'bot' }
   if (hash.startsWith('#/settings')) return { page: 'settings' }
@@ -156,7 +173,16 @@ export default function App() {
             {route.page === 'bot' ? (
               <BotPage />
             ) : route.page === 'tasks' ? (
-              <TasksPage />
+              route.id ? (
+                <TaskDetailPage
+                  key={route.id}
+                  id={route.id}
+                  view={route.view}
+                  entry={route.entry}
+                />
+              ) : (
+                <TasksPage />
+              )
             ) : route.page === 'settings' ? (
               <SettingsPage />
             ) : route.page === 'debug' ? (

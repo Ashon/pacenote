@@ -1,4 +1,4 @@
-import type { TaskDecision } from '@src/tasks/types'
+import type { TaskDecision, WorkTool } from '@src/tasks/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 /** Your tasks, from the desktop app (none on the dev server) */
@@ -39,5 +39,44 @@ export function useCollect() {
       await window.pacenoteDesktop?.tasks.stopCollect()
       await refresh()
     },
+  }
+}
+
+/** A task with what came before it and its work log; refreshed as you work */
+export function useTaskDetail(id: string) {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: ['task', id],
+    queryFn: async () => (await bridge?.detail(id)) ?? null,
+    enabled: Boolean(bridge),
+    refetchInterval: 4_000,
+  })
+}
+
+/**
+ * Continuing a task: in a terminal (Claude Code or Codex), with a reply
+ * drafted to send yourself, or a session opened again. Each refreshes the task
+ * and the list, and returns the error to show, if any.
+ */
+export function useTaskWork(id: string) {
+  const bridge = window.pacenoteDesktop?.tasks
+  const client = useQueryClient()
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['task', id] })
+    await client.invalidateQueries({ queryKey: ['tasks'] })
+  }
+  const after = async <T extends { error?: string } | undefined>(
+    call: Promise<T> | undefined
+  ): Promise<string | undefined> => {
+    const result = await call
+    await refresh()
+    return result?.error
+  }
+  return {
+    continueIn: (tool: WorkTool, folder: string) =>
+      after(bridge?.continueIn(id, { tool, folder })),
+    resume: (entryId: string) => after(bridge?.resume(entryId)),
+    draft: () => after(bridge?.draft(id)),
+    copyReply: (text: string) => after(bridge?.copyReply(id, text)),
   }
 }

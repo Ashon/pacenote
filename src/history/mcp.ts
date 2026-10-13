@@ -58,7 +58,8 @@ export function createHistoryServer({
         'steps. ' +
         (tasks
           ? 'collect_context, add_tasks and close_task keep the user\u2019s ' +
-            'tasks from Slack, and my_tasks lists them. '
+            'tasks from Slack, my_tasks lists them, and task_context gives ' +
+            'one with what came before it, to work on it. '
           : '') +
         NOTE,
     }
@@ -157,7 +158,13 @@ export function createHistoryServer({
       })
   )
 
-  if (tasks) registerTaskTools(server, tasks)
+  if (tasks)
+    registerTaskTools(server, {
+      // A task's context shows Pace's runs only while the history is shared.
+      runs: (conversation, thread) =>
+        enabled() ? reader.inThread(conversation, thread) : undefined,
+      ...tasks,
+    })
 
   return server
 }

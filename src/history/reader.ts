@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { readCollections } from '../tasks/collections.js'
+import type { RelatedRun } from '../tasks/types.js'
 import {
   ARTIFACTS_DIR,
   dayDirFor,
@@ -58,6 +59,28 @@ export class HistoryReader {
       if ((dayOf(record.id) ?? '') < firstDay) break
       if (isCollection(record) && Date.parse(record.startedAt) >= from)
         result.push(record)
+    }
+    return result
+  }
+
+  /**
+   * Pace's answers in a Slack thread, newest first: the earlier work a task
+   * from that thread follows on
+   */
+  inThread(conversation: string, thread: string, limit = 3): RelatedRun[] {
+    const result: RelatedRun[] = []
+    for (const record of this.records()) {
+      if (isCollection(record)) continue
+      const { origin } = record
+      if (origin.conversation !== conversation || origin.thread !== thread)
+        continue
+      result.push({
+        id: record.id,
+        request: record.request,
+        at: record.startedAt,
+        status: record.status,
+      })
+      if (result.length >= limit) break
     }
     return result
   }

@@ -2,9 +2,18 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
 import type { TasksSettings } from './settings.js'
-import { SOURCE_IDS, sourceNames, sourceOf } from './sources.js'
-import { readTasks, tasksView } from './store.js'
+import {
+  findMessage,
+  SOURCE_IDS,
+  SOURCES,
+  sourceNames,
+  sourceOf,
+} from './sources.js'
+import { allTaskViews, readTasks, tasksView } from './store.js'
+import type { RelatedRun, TaskView } from './types.js'
+import { readWork } from './work.js'
 import { addTasks, closeTask } from './write.js'
 
 /**
@@ -17,6 +26,11 @@ import { addTasks, closeTask } from './write.js'
 export interface TaskToolsOptions {
   dataDir: string
   settings: () => TasksSettings
+  /**
+   * Pace's runs in a thread, for task_context; undefined while the run history
+   * is not shared with AI tools
+   */
+  runs?: (conversation: string, thread: string) => RelatedRun[] | undefined
 }
 
 const OFF =
@@ -35,6 +49,9 @@ export const TASK_RULES = [
   '- A Maybe (confidence "maybe"): an @here or @channel, "someone should look at this", a request that may or may not be for the user, or anything you are not sure about.',
   '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done.',
   'title: what to do, a short imperative under 80 characters, in the language of the messages. reason: one line on why it is a task. due: a due hint in words, only if the messages give one.',
+  'action: what doing it takes. "code" when it needs a change to code or a look in a repository (a review, a fix, a question only the code answers), "reply" when an answer in the thread is all it needs, "other" for anything else.',
+  'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself).',
+  'summary: the thread in two or three sentences, in the language of the messages: who wants what, why, and by when. It is what reminds the user later; no secrets or personal details.',
 ].join('\n')
 
 export function collectPrompt(): string {
@@ -140,6 +157,18 @@ export function registerTaskTools(
               due: z.string().optional().describe('A due hint in words'),
               confidence: z.enum(['sure', 'maybe']).optional(),
               reason: z.string().optional().describe('Why it is a task'),
+              action: z
+                .enum(['code', 'reply', 'other'])
+                .optional()
+                .describe('What doing it takes: code, reply or other'),
+              repo: z
+                .string()
+                .optional()
+                .describe('The repository it is about, as owner/name'),
+              summary: z
+                .string()
+                .optional()
+                .describe('The thread in two or three sentences'),
             })
           )
           .max(100),
@@ -174,18 +203,103 @@ export function registerTaskTools(
       description:
         'Closes an open task settled where it was asked: the user replied in ' +
         'its thread after it ("replied"), its message got a check mark ' +
-        '("checked"), or it was settled some other way ("resolved").',
+        '("checked"), or it was settled some other way ("resolved"). A ' +
+        'session that did the work closes it with "resolved", says what it ' +
+        'did in a line (note) and, when the person who asked waits for an ' +
+        'answer, leaves a reply for the user to send (reply). It never posts ' +
+        'to Slack itself.',
       inputSchema: {
         task: z.string().describe("The task id or its message's link"),
         why: z.enum(['replied', 'checked', 'resolved']),
+        note: z.string().optional().describe('What was done, in a line'),
+        reply: z
+          .string()
+          .optional()
+          .describe('A reply for the user to send in the thread'),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    ({ task, why }) =>
+    ({ task, why, note, reply }) =>
       respond(options, () => {
-        const closed = closeTask(options.dataDir, task, why)
+        const closed = closeTask(options.dataDir, task, why, new Date(), {
+          by: client(),
+          note,
+          reply,
+        })
         if (!closed) throw new Error(`No task ${task}`)
         return { closed: { id: closed.id, title: closed.title, why } }
+      })
+  )
+
+  server.registerTool(
+    'task_context',
+    {
+      description:
+        "One of the user's tasks, to work on it: what was asked, by whom and " +
+        'where, the thread summed up, its repository, and what came before ' +
+        '(earlier tasks in the thread, in the repository and from the same ' +
+        'person, with how each ended and the session it was done in, and ' +
+        "Pace's answers in the thread when the run history is shared).",
+      inputSchema: {
+        task: z.string().describe("The task id or its message's link"),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ task }) =>
+      respond(options, () => {
+        const all = allTaskViews(options.dataDir)
+        const found = findMessage(task)
+        const id = found ? SOURCES[found.app].taskId(found) : task
+        const view = all.find((t) => t.id === id)
+        if (!view) throw new Error(`No task ${task}`)
+        const work = readWork(options.dataDir).entries
+        const [conversation, thread] = splitThread(view)
+        const runs = options.runs?.(conversation, thread)
+        const context = taskContext(view, all, work, runs ?? [])
+        const earlier = (
+          tasks: ReturnType<typeof taskContext>['thread']['tasks']
+        ) =>
+          tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            askedBy: t.askedBy,
+            where: t.where,
+            postedAt: t.postedAt,
+            outcome: t.outcome ?? 'open',
+            session: t.session && {
+              tool: TOOL_LABEL[t.session.tool],
+              id: t.session.session,
+              folder: t.session.cwd,
+            },
+          }))
+        return {
+          task: {
+            id: view.id,
+            title: view.title,
+            kind: view.kind,
+            askedBy: view.askedBy,
+            source: sourceOf(view).label,
+            where: view.source.label,
+            postedAt: view.postedAt,
+            due: view.due,
+            action: view.action ?? 'other',
+            repo: view.repo,
+            summary: view.summary,
+            reason: view.reason,
+            link: view.source.permalink,
+            status: view.status,
+            outcome: outcomeOf(view, work),
+          },
+          earlier: {
+            inThread: earlier(context.thread.tasks),
+            inRepo: earlier(context.repo?.tasks ?? []),
+            fromPerson: earlier(context.person?.tasks ?? []),
+          },
+          paceRuns:
+            runs ??
+            'Not shared: turn on Settings > History & logs > Share with AI tools to see them.',
+          next: 'When the task is done, call close_task with why "resolved", a note on what you did and, if the person who asked waits for an answer, a reply for the user to send. Never post to Slack yourself.',
+        }
       })
   )
 
@@ -231,6 +345,13 @@ export function registerTaskTools(
         }
       })
   )
+}
+
+/** A task's conversation and thread, as Pace's runs record them */
+function splitThread(task: TaskView): [string, string] {
+  const key = threadOf(task)
+  const at = key.indexOf(':')
+  return [key.slice(0, at), key.slice(at + 1)]
 }
 
 function respond(

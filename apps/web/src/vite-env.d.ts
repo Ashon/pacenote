@@ -20,9 +20,14 @@ import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type {
   CollectionRecord,
   CollectOutcome,
+  FolderCheck,
+  SessionItem,
   TaskDecision,
+  TaskDetail,
   TasksCollect,
   TasksView,
+  WorkEntry,
+  WorkTool,
 } from '@src/tasks/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
@@ -102,7 +107,13 @@ declare global {
       tasks: {
         list(): Promise<
           | (TasksView & {
-              settings: { on: boolean; dms: boolean; exclude: string[] }
+              settings: {
+                on: boolean
+                dms: boolean
+                exclude: string[]
+                /** Where code tasks continue */
+                cli: WorkTool
+              }
               collect: TasksCollect
               /** The last 7 days' collections, newest first */
               collections: CollectionRecord[]
@@ -117,6 +128,35 @@ declare global {
         /** Runs a collection (Claude Code, Slack read only) and waits for it */
         collect(): Promise<CollectOutcome | undefined>
         stopCollect(): Promise<void>
+        /** A task with what came before it and its work log */
+        detail(id: string): Promise<TaskDetail | null>
+        /** Checkouts of a repository found on this Mac */
+        folders(repo: string): Promise<FolderCheck[]>
+        /** Asks for a folder, and checks it against the repository */
+        chooseFolder(repo?: string): Promise<FolderCheck | undefined>
+        /** Each repository's folder (tasks-repos.json) */
+        repos(): Promise<Record<string, string>>
+        setRepo(repo: string, folder?: string): Promise<Record<string, string>>
+        /** Opens a session for the task in a terminal, in the folder */
+        continueIn(
+          id: string,
+          how: { tool: WorkTool; folder: string }
+        ): Promise<{ entry?: WorkEntry; error?: string } | undefined>
+        /** Opens a session again, to continue it */
+        resume(entryId: string): Promise<{ error?: string } | undefined>
+        /** Has Claude Code draft a reply from the thread, read only */
+        draft(
+          id: string
+        ): Promise<{ entry?: WorkEntry; error?: string } | undefined>
+        /** Copies the reply and opens the thread; nothing is sent */
+        copyReply(
+          id: string,
+          text: string
+        ): Promise<{ error?: string } | undefined>
+        /** A session's own log, read when you open it */
+        sessionLog(
+          entryId: string
+        ): Promise<{ items?: SessionItem[]; error?: string } | undefined>
       }
       /**
        * Pacenote's MCP server in Claude Code and Codex. connect adds this

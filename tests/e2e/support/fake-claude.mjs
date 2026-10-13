@@ -10,7 +10,11 @@
 //     "answer": "default answer" }
 // The bot's startup check (claude --version, claude auth status) is answered
 // without a record: a fake that is installed and signed in.
-import { appendFileSync, readFileSync } from 'node:fs'
+// An interactive session the desktop app opens to continue a task
+// (claude --session-id ID -n NAME PROMPT, or claude --resume ID) is recorded
+// the same way, with its folder, and leaves a transcript where Claude Code
+// keeps its own: $HOME/.claude/projects/<folder>/<ID>.jsonl.
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout } from 'node:timers/promises'
@@ -30,6 +34,71 @@ if (!dir) {
   process.exit(2)
 }
 const args = process.argv.slice(2)
+
+const sessionAt = args.indexOf('--session-id')
+const resumeAt = args.indexOf('--resume')
+if (sessionAt >= 0 || resumeAt >= 0) {
+  const id = args[(sessionAt >= 0 ? sessionAt : resumeAt) + 1]
+  const prompt = sessionAt >= 0 ? args[args.length - 1] : ''
+  appendFileSync(
+    path.join(dir, 'calls.jsonl'),
+    `${JSON.stringify({ args, system: '', prompt, request: '', images: 0, cwd: process.cwd(), pid: process.pid })}\n`
+  )
+  const project = path.join(
+    process.env.HOME,
+    '.claude',
+    'projects',
+    process.cwd().replace(/[/.]/g, '-')
+  )
+  mkdirSync(project, { recursive: true })
+  const at = new Date().toISOString()
+  const lines =
+    sessionAt >= 0
+      ? [
+          {
+            type: 'user',
+            sessionId: id,
+            cwd: process.cwd(),
+            timestamp: at,
+            message: { role: 'user', content: prompt },
+          },
+          {
+            type: 'assistant',
+            sessionId: id,
+            cwd: process.cwd(),
+            timestamp: at,
+            message: {
+              role: 'assistant',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Here is the task as I understand it. Shall I start with step 1?',
+                },
+                {
+                  type: 'tool_use',
+                  name: 'mcp__pacenote__task_context',
+                  input: { task: 'the task' },
+                },
+              ],
+            },
+          },
+        ]
+      : [
+          {
+            type: 'user',
+            sessionId: id,
+            cwd: process.cwd(),
+            timestamp: at,
+            message: { role: 'user', content: 'Continue where we left off.' },
+          },
+        ]
+  appendFileSync(
+    path.join(project, `${id}.jsonl`),
+    lines.map((line) => `${JSON.stringify(line)}\n`).join('')
+  )
+  process.exit(0)
+}
+
 const stdin = readFileSync(0, 'utf8')
 
 let prompt = stdin
@@ -52,8 +121,11 @@ appendFileSync(
 )
 
 const script = JSON.parse(readFileSync(path.join(dir, 'script.json'), 'utf8'))
+// A mention's request, or the whole prompt (a reply drafted from a task)
 const rule =
-  (script.rules ?? []).find((r) => new RegExp(r.match, 'i').test(request)) ?? {}
+  (script.rules ?? []).find((r) =>
+    new RegExp(r.match, 'i').test(request || prompt)
+  ) ?? {}
 if (rule.delayMs) await setTimeout(rule.delayMs)
 
 const out = (event) => process.stdout.write(`${JSON.stringify(event)}\n`)

@@ -68,6 +68,7 @@ import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
+import { RepoFolders } from './repo-folders'
 import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
 import {
@@ -678,6 +679,9 @@ export function SettingsPage() {
           after: valueOf('TASKS') === 'on' && (
             <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this." />
           ),
+        })}
+        {card('work', {
+          after: valueOf('TASKS') === 'on' && <RepoFolders />,
         })}
       </>
     ),
