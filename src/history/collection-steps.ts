@@ -1,3 +1,4 @@
+import { lookupLabel } from '../tasks/sources.js'
 import type { CollectionRunRecord, RunEvent } from './types.js'
 
 /**
@@ -25,23 +26,16 @@ export interface CollectionResult {
   rules?: string
 }
 
-/** The tools' names as a person reads them */
+/**
+ * Pacenote's and the CLI's tools as a person reads them (the sources' are in
+ * src/tasks/sources.ts)
+ */
 const LABELS: Record<string, string> = {
   collect_context: 'Got the rules',
   my_tasks: 'Read your open tasks',
   add_tasks: 'Added tasks',
   close_task: 'Closed a task',
   ToolSearch: 'Loaded its tools',
-  slack_search_public: 'Searched public messages',
-  slack_search_public_and_private: 'Searched messages',
-  slack_search_channels: 'Looked up channels',
-  slack_search_users: 'Looked up people',
-  slack_read_channel: 'Read a channel',
-  slack_read_thread: 'Read a thread',
-  slack_get_reactions: 'Checked reactions',
-  slack_list_user_channels: 'Listed your channels',
-  slack_list_channel_members: 'Listed channel members',
-  slack_read_user_profile: 'Looked up a person',
 }
 
 /** Calls of one tool in a row, as the Lookups tab lists them */
@@ -186,7 +180,7 @@ export function lookupGroups(run: CollectionRunRecord): LookupGroup[] {
     }
     const group: LookupGroup = {
       offsetMs: Math.max(0, at - start),
-      label: LABELS[call.tool] ?? call.tool,
+      label: LABELS[call.tool] ?? lookupLabel(call.tool) ?? call.tool,
       server: call.server,
       tool: call.tool,
       count: 1,

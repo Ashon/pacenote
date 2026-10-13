@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
 import type { TasksSettings } from './settings.js'
+import { SOURCE_IDS, sourceNames, sourceOf } from './sources.js'
 import { readTasks, tasksView } from './store.js'
 import { addTasks, closeTask } from './write.js'
 
@@ -110,10 +111,11 @@ export function registerTaskTools(
     'add_tasks',
     {
       description:
-        "Adds the user's tasks found in Slack, each from one message, keyed " +
-        'by its permalink, so a message is never added twice. Messages from ' +
-        'channels left out, or DMs while they do not count, are skipped. ' +
-        'Call it once at the end of a collection, even with no tasks.',
+        `Adds the user's tasks found in ${sourceNames()}, each from one ` +
+        "message, keyed by the message's link, so a message is never added " +
+        'twice. Messages from channels left out, or DMs while they do not ' +
+        'count, are skipped. Call it once at the end of a collection, even ' +
+        'with no tasks.',
       inputSchema: {
         tasks: z
           .array(
@@ -124,7 +126,13 @@ export function registerTaskTools(
               where: z
                 .string()
                 .describe('Where it was asked: "#payments", "DM with mina"'),
-              link: z.string().describe('The Slack permalink of the message'),
+              link: z
+                .string()
+                .describe("The message's link: a Slack permalink"),
+              source: z
+                .enum(SOURCE_IDS)
+                .optional()
+                .describe('Where the message is (by default, from its link)'),
               posted_at: z
                 .string()
                 .optional()
@@ -164,11 +172,11 @@ export function registerTaskTools(
     'close_task',
     {
       description:
-        'Closes an open task settled in Slack: the user replied in its ' +
-        'thread after it ("replied"), its message got a check mark ' +
+        'Closes an open task settled where it was asked: the user replied in ' +
+        'its thread after it ("replied"), its message got a check mark ' +
         '("checked"), or it was settled some other way ("resolved").',
       inputSchema: {
-        task: z.string().describe('The task id or its Slack link'),
+        task: z.string().describe("The task id or its message's link"),
         why: z.enum(['replied', 'checked', 'resolved']),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
@@ -185,10 +193,10 @@ export function registerTaskTools(
     'my_tasks',
     {
       description:
-        "The user's open tasks, gathered from Slack: what someone asked of " +
-        'them or what they said they would do, newest first, with who asked, ' +
-        'where, a due hint, why it is a task and a Slack link. Maybes are left ' +
-        'out.',
+        `The user's open tasks, gathered from ${sourceNames()}: what someone ` +
+        'asked of them or what they said they would do, newest first, with ' +
+        'who asked, the source and where in it, a due hint, why it is a task ' +
+        'and a link to the message. Maybes are left out.',
       inputSchema: {
         limit: z
           .number()
@@ -213,6 +221,7 @@ export function registerTaskTools(
               title: task.title,
               kind: task.kind,
               askedBy: task.askedBy,
+              source: sourceOf(task).label,
               where: task.source.label,
               postedAt: task.postedAt,
               due: task.due,

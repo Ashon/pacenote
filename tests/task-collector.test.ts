@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   collectCommand,
   CollectStream,
-  SLACK_READ_TOOLS,
-  SLACK_WRITE_TOOLS,
   TaskCollector,
 } from '../apps/desktop/src/task-collector.js'
 import type { RunEvent } from '../src/history/types.js'
+import { readTools, writeTools } from '../src/tasks/sources.js'
 import type { CollectOutcome } from '../src/tasks/types.js'
 
 const LAUNCH = {
@@ -67,15 +66,26 @@ describe('collecting from the app with Claude Code', () => {
     const between = (from: string, to: string) =>
       args.slice(args.indexOf(from) + 1, args.indexOf(to))
     const allowed = between('--allowedTools', '--disallowedTools')
-    expect(allowed).toEqual(expect.arrayContaining(SLACK_READ_TOOLS))
+    expect(allowed).toEqual(expect.arrayContaining(readTools(['slack'])))
+    expect(allowed).toContain('mcp__claude_ai_Slack__slack_read_thread')
     expect(allowed).toContain('mcp__pacenote__add_tasks')
-    expect(allowed.some((tool) => SLACK_WRITE_TOOLS.includes(tool))).toBe(false)
+    expect(allowed.some((tool) => writeTools().includes(tool))).toBe(false)
     expect(between('--disallowedTools', '--no-session-persistence')).toEqual(
-      SLACK_WRITE_TOOLS
+      writeTools()
     )
-    expect(SLACK_WRITE_TOOLS).toContain(
-      'mcp__claude_ai_Slack__slack_send_message'
+    expect(writeTools()).toContain('mcp__claude_ai_Slack__slack_send_message')
+  })
+
+  it('allows only the reads of the sources it collects from, and denies every write', () => {
+    const args = collectCommand(LAUNCH, [])[1]
+    const allowed = args.slice(
+      args.indexOf('--allowedTools') + 1,
+      args.indexOf('--disallowedTools')
     )
+    expect(allowed.every((tool) => tool.startsWith('mcp__pacenote__'))).toBe(
+      true
+    )
+    expect(args).toContain('mcp__claude_ai_Slack__slack_send_message')
   })
 
   it('counts Slack reads and reads what add_tasks answered', () => {
@@ -127,9 +137,11 @@ describe('collecting from the app with Claude Code', () => {
     const noSlack = new CollectStream()
     for (const line of lines(init(''), result('I have no Slack tools.')))
       noSlack.push(line)
+    expect(noSlack.missing).toEqual(['slack'])
     expect(noSlack.outcome('T')).toMatchObject({
       ok: false,
-      error: expect.stringMatching(/no Slack connector/),
+      error:
+        "Claude Code has no Slack connector. Connect Slack in claude.ai's Settings > Connectors, then collect again.",
     })
 
     const off = new CollectStream()

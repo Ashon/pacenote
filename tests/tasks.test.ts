@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -14,8 +14,16 @@ import {
   readDecisions,
   readTasks,
 } from '../src/tasks/store.js'
+import {
+  findMessage,
+  lookupLabel,
+  parseSlackPermalink,
+  SOURCE_IDS,
+  SOURCES,
+  sourceOf,
+} from '../src/tasks/sources.js'
 import type { Task, TasksFile } from '../src/tasks/types.js'
-import { addTasks, closeTask, parsePermalink } from '../src/tasks/write.js'
+import { addTasks, closeTask } from '../src/tasks/write.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-tasks-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -162,16 +170,47 @@ describe('the tasks view', () => {
 describe('adding tasks from an AI tool', () => {
   it('reads the conversation, message and thread from a Slack permalink', () => {
     expect(
-      parsePermalink(link('C1', '1760140800.000200', '1760140000.000100'))
+      parseSlackPermalink(link('C1', '1760140800.000200', '1760140000.000100'))
     ).toEqual({
       conversation: 'C1',
       message: '1760140800.000200',
       thread: '1760140000.000100',
     })
     expect(
-      parsePermalink('https://example.com/archives/C1/p1760140800000200')
+      parseSlackPermalink('https://example.com/archives/C1/p1760140800000200')
     ).toBeUndefined()
-    expect(parsePermalink('not a link')).toBeUndefined()
+    expect(parseSlackPermalink('not a link')).toBeUndefined()
+  })
+
+  it('finds the source and message of a link through the sources', () => {
+    expect(findMessage(link('C1', '1760140800.000200'))).toEqual({
+      app: 'slack',
+      conversation: 'C1',
+      message: '1760140800.000200',
+      thread: undefined,
+    })
+    expect(findMessage(link('C1', '1760140800.000200'), 'slack')).toMatchObject(
+      { app: 'slack' }
+    )
+    expect(findMessage('https://example.com/x')).toBeUndefined()
+    // Slack's tasks keep the ids they had before there were sources.
+    expect(
+      SOURCES.slack.taskId({ conversation: 'C1', message: '1760140800.000200' })
+    ).toBe('C1:1760140800.000200')
+    // A task from before there were sources is Slack's.
+    expect(sourceOf(task('x')).label).toBe('Slack')
+  })
+
+  it("keeps each source's reads and writes apart, and names its reads", () => {
+    for (const id of SOURCE_IDS) {
+      const { reads, writes, connector } = SOURCES[id]
+      expect(connector.prefix).toMatch(/^mcp__claude_ai_\w+__$/)
+      expect(Object.keys(reads).length).toBeGreaterThan(0)
+      for (const tool of Object.keys(reads)) {
+        expect(writes).not.toContain(tool)
+        expect(lookupLabel(tool)).toBe(reads[tool])
+      }
+    }
   })
 
   it('keys a task by its message, and holds the settings whatever the tool sends', () => {
@@ -229,6 +268,7 @@ describe('adding tasks from an AI tool', () => {
     ])
     expect(first.added[0]).toMatchObject({
       source: {
+        app: 'slack',
         conversation: 'C1',
         label: '#payments',
         message: '1760140800.000200',
@@ -295,6 +335,54 @@ describe('adding tasks from an AI tool', () => {
       closeTask(data, 'C3:1760140800.000200', 'checked')!.closed!.why
     ).toBe('replied')
     expect(closeTask(data, 'C9:1.0', 'resolved')).toBeUndefined()
+  })
+
+  it('reads tasks from before there were sources as Slack tasks', () => {
+    const data = dir('before-sources')
+    mkdirSync(data, { recursive: true })
+    // tasks.json as v0.5.4 wrote it: no app in the source
+    writeFileSync(
+      path.join(data, 'tasks.json'),
+      JSON.stringify({ version: 1, tasks: [task('C1:1760140800.000200')] })
+    )
+    expect(
+      addTasks(
+        data,
+        [
+          {
+            title: 'Again',
+            where: '#payments',
+            link: link('C1', '1760140800.000200'),
+          },
+        ],
+        { settings: on }
+      ).skipped
+    ).toEqual([
+      { link: link('C1', '1760140800.000200'), why: 'already a task' },
+    ])
+    expect(
+      closeTask(data, link('C1', '1760140800.000200'), 'replied')
+    ).toMatchObject({ id: 'C1:1760140800.000200', closed: { why: 'replied' } })
+  })
+
+  it('skips a link the source named does not read', () => {
+    const data = dir('named-source')
+    expect(
+      addTasks(
+        data,
+        [
+          {
+            title: 'Elsewhere',
+            where: '#payments',
+            link: 'https://example.com/x',
+            source: 'slack',
+          },
+        ],
+        { settings: on }
+      ).skipped
+    ).toEqual([
+      { link: 'https://example.com/x', why: 'not a Slack message link' },
+    ])
   })
 })
 
@@ -393,6 +481,7 @@ describe('the task tools over MCP', () => {
     expect(mine.tasks.map((t: { title: string }) => t.title)).toEqual([
       'Review the retry PR',
     ])
+    expect(mine.tasks[0]).toMatchObject({ source: 'Slack', where: '#payments' })
 
     expect(
       JSON.parse(

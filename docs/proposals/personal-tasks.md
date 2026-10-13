@@ -65,10 +65,16 @@ history): `collect_context` (the rules, the channels left out, whether DMs count
 `close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash command. `add_tasks` holds the
 settings whatever the tool sends: it skips messages from channels left out and DMs while they do not count.
 
+**Sources.** A source is a connector of the AI tool, which holds the access and does the reading; Pacenote holds no
+token for it. `src/tasks/sources.ts` keeps, for each source, only what keeps a collection safe and its results in order:
+the connector's read tools a collection may use (with their names in the run history), its tools that write (denied
+outright), how to read its message links, and how a task from it is keyed. A connector that is not listed is not used.
+Slack is the first source; its tasks keep the ids they had before (`<conversation>:<ts>`).
+
 **Files.** The MCP server writes `tasks.json`; the app writes your decisions (done, dismissed with a reason, kept) to
-`tasks-decisions.json`. A task: `{ id, source { conversation, label, message, thread, permalink }, title, askedBy, kind:
-asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundAt, addedBy?, closed? { at, why: replied |
-checked | resolved } }`.
+`tasks-decisions.json`. A task: `{ id, source { app?, conversation, label, message, thread, permalink }, title, askedBy,
+kind: asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundAt, addedBy?, closed? { at, why: replied
+| checked | resolved } }`. A source without `app` is Slack's, as every task was before there were sources.
 
 **Keeping.** Open tasks fade after 7 days and drop after 14; done and dismissed ones are kept 14 days.
 

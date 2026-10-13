@@ -1,12 +1,13 @@
 import type { TasksSettings } from './settings.js'
+import { findMessage, SOURCES, sourceNames, type SourceId } from './sources.js'
 import { readTasks, writeTasks } from './store.js'
 import type { Task, TaskConfidence, TaskKind } from './types.js'
 
 /**
  * Adding and closing tasks, as the MCP server does for an AI tool. A task is
- * keyed by its Slack message, taken from the permalink, so the same message is
- * never added twice, and the settings (DMs, channels left out) hold whatever
- * the tool sends.
+ * keyed by its message, read from its link by its source (sources.ts), so the
+ * same message is never added twice, and the settings (DMs, channels left out)
+ * hold whatever the tool sends.
  */
 
 /** A task as an AI tool sends it */
@@ -16,8 +17,10 @@ export interface NewTask {
   asked_by?: string
   /** "#payments", "DM with mina" */
   where: string
-  /** The Slack permalink of the message the task comes from */
+  /** The link of the message the task comes from: a Slack permalink */
   link: string
+  /** The source the message is in; by default, whichever reads its link */
+  source?: SourceId
   /** When the message was posted (ISO); taken from the link when absent */
   posted_at?: string
   due?: string
@@ -28,28 +31,6 @@ export interface NewTask {
 export interface Skipped {
   link: string
   why: string
-}
-
-/**
- * The conversation and message in a Slack permalink:
- * https://acme.slack.com/archives/C123/p1700000000123456?thread_ts=1699.000100
- */
-export function parsePermalink(
-  link: string
-): { conversation: string; message: string; thread?: string } | undefined {
-  let url: URL
-  try {
-    url = new URL(link)
-  } catch {
-    return undefined
-  }
-  if (!/(^|\.)slack\.com$/.test(url.hostname)) return undefined
-  const match = /^\/archives\/([A-Z0-9]+)\/p(\d{7,})$/.exec(url.pathname)
-  if (!match) return undefined
-  const digits = match[2]!
-  const message = `${digits.slice(0, -6)}.${digits.slice(-6)}`
-  const thread = url.searchParams.get('thread_ts') ?? undefined
-  return { conversation: match[1]!, message, thread }
 }
 
 const isDm = (conversation: string, where: string) =>
@@ -81,25 +62,30 @@ export function addTasks(
   const added: Task[] = []
   const skipped: Skipped[] = []
   for (const item of items) {
-    const source = parsePermalink(item.link)
+    const source = findMessage(item.link, item.source)
     if (!source) {
-      skipped.push({ link: item.link, why: 'not a Slack message link' })
+      skipped.push({
+        link: item.link,
+        why: `not a ${sourceNames(item.source ? [item.source] : undefined)} message link`,
+      })
       continue
     }
-    const id = `${source.conversation}:${source.message}`
+    const id = SOURCES[source.app].taskId(source)
     const title = item.title.trim()
-    const excluded = leftOut(
-      source.conversation,
-      item.where,
-      options.settings.exclude
-    )
+    // Channels left out and DMs are Slack's settings.
+    const slack = source.app === 'slack'
+    const excluded = slack
+      ? leftOut(source.conversation, item.where, options.settings.exclude)
+      : undefined
     const why = !title
       ? 'no title'
       : known.has(id)
         ? 'already a task'
         : excluded
           ? `${excluded} is left out`
-          : !options.settings.dms && isDm(source.conversation, item.where)
+          : slack &&
+              !options.settings.dms &&
+              isDm(source.conversation, item.where)
             ? 'DMs are off'
             : undefined
     if (why) {
@@ -112,6 +98,7 @@ export function addTasks(
     added.push({
       id,
       source: {
+        app: source.app,
         conversation: source.conversation,
         label: item.where.trim(),
         message: source.message,
@@ -125,7 +112,9 @@ export function addTasks(
       confidence: item.confidence ?? 'maybe',
       reason: (item.reason ?? '').trim().slice(0, 300),
       postedAt: new Date(
-        Number.isNaN(posted) ? Number(source.message) * 1000 : posted
+        Number.isNaN(posted)
+          ? (SOURCES[source.app].postedAt?.(source) ?? now.getTime())
+          : posted
       ).toISOString(),
       foundAt: now.toISOString(),
       addedBy: options.addedBy,
@@ -140,15 +129,15 @@ export function addTasks(
   return { added, skipped }
 }
 
-/** Closes an open task by its id or Slack link; undefined when there is none */
+/** Closes an open task by its id or its message's link; undefined when none */
 export function closeTask(
   dataDir: string,
   ref: string,
   why: NonNullable<Task['closed']>['why'],
   now = new Date()
 ): Task | undefined {
-  const source = parsePermalink(ref)
-  const id = source ? `${source.conversation}:${source.message}` : ref
+  const source = findMessage(ref)
+  const id = source ? SOURCES[source.app].taskId(source) : ref
   const file = readTasks(dataDir)
   const task = file.tasks.find((t) => t.id === id)
   if (!task) return undefined

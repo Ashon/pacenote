@@ -5,6 +5,7 @@ import type {
   TaskView,
   TasksCollect,
 } from '@src/tasks/types'
+import { sourceOf } from '@src/tasks/sources'
 import {
   ChevronRight,
   CircleCheck,
@@ -47,7 +48,6 @@ const SETTLED_LABEL: Record<string, string> = {
   'not-worth-it': 'Dismissed: not worth it',
   replied: 'Closed: you replied in the thread',
   checked: 'Closed: marked with a check',
-  resolved: 'Closed: settled in Slack',
 }
 
 /** The leave-out offers you turned down, per channel, in this browser */
@@ -491,9 +491,12 @@ function TaskRow({
       : task.askedBy
         ? `${task.askedBy} asked you`
         : undefined
+  const source = sourceOf(task)
   const settledLabel =
     task.status === 'closed'
-      ? SETTLED_LABEL[task.closed?.why ?? '']
+      ? task.closed?.why === 'resolved'
+        ? `Closed: settled in ${source.label}`
+        : SETTLED_LABEL[task.closed?.why ?? '']
       : task.status === 'dismissed'
         ? SETTLED_LABEL[task.dismissReason ?? 'dismissed']
         : SETTLED_LABEL[task.status]
@@ -611,7 +614,7 @@ function TaskRow({
               href={task.source.permalink}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open in Slack"
+              aria-label={`Open in ${source.label}`}
             >
               <ExternalLink />
             </a>

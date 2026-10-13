@@ -1,13 +1,15 @@
 /**
- * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): AI
- * tools with a Slack connector add them through Pacenote's MCP server, which
- * writes tasks.json (src/tasks/store.ts); the desktop app writes your decisions
- * to tasks-decisions.json, and records the collections it runs as runs in the
- * run history (src/tasks/collections.ts reads them for the Todo screen). Plain
+ * Your own tasks, gathered from your sources (src/tasks/sources.ts,
+ * docs/proposals/personal-tasks.md): AI tools read them with their own
+ * connectors and add tasks through Pacenote's MCP server, which writes
+ * tasks.json (src/tasks/store.ts); the desktop app writes your decisions to
+ * tasks-decisions.json, and records the collections it runs as runs in the run
+ * history (src/tasks/collections.ts reads them for the Todo screen). Plain
  * data, so the UI and the MCP server read the same shapes.
  */
 
 import type { TokenUsage } from '../history/usage.js'
+import type { SourceId } from './sources.js'
 
 /** asked: someone asked you; promised: you said you would */
 export type TaskKind = 'asked' | 'promised'
@@ -16,11 +18,13 @@ export type TaskKind = 'asked' | 'promised'
 export type TaskConfidence = 'sure' | 'maybe'
 
 export interface TaskSource {
-  /** Slack conversation ID */
+  /** The source it was found in; tasks from before there were sources: Slack */
+  app?: SourceId
+  /** Where in the source: a Slack conversation ID */
   conversation: string
   /** "#payments", "DM with mina" */
   label: string
-  /** The message the task comes from (Slack ts) */
+  /** The message the task comes from: a Slack ts */
   message: string
   /** Its thread, when it is in one or has replies */
   thread?: string
@@ -28,7 +32,7 @@ export interface TaskSource {
 }
 
 export interface Task {
-  /** "<conversation>:<message>": one task per source message */
+  /** From its message (Source.taskId): one task per message */
   id: string
   source: TaskSource
   /** Imperative, short: "Review the payment retry PR" */

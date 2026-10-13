@@ -8,31 +8,17 @@ import {
   type TokenUsage,
 } from '../../../src/history/usage.js'
 import { claudeLineToEvents } from '../../../src/reasoners/claude.js'
+import {
+  readTools,
+  SOURCE_IDS,
+  SOURCES,
+  sourceNames,
+  sourceOfTool,
+  writeTools,
+  type SourceId,
+} from '../../../src/tasks/sources.js'
 import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
 
-const SLACK = 'mcp__claude_ai_Slack__'
-/** The Slack connector's tools a collection may use: reading only */
-export const SLACK_READ_TOOLS = [
-  'slack_search_public',
-  'slack_search_public_and_private',
-  'slack_search_channels',
-  'slack_search_users',
-  'slack_read_channel',
-  'slack_read_thread',
-  'slack_get_reactions',
-  'slack_list_user_channels',
-  'slack_list_channel_members',
-  'slack_read_user_profile',
-].map((name) => SLACK + name)
-/** Denied outright, whatever the user's Claude Code permissions say */
-export const SLACK_WRITE_TOOLS = [
-  'slack_send_message',
-  'slack_send_message_draft',
-  'slack_schedule_message',
-  'slack_add_reaction',
-  'slack_create_canvas',
-  'slack_update_canvas',
-].map((name) => SLACK + name)
 const TASK_TOOLS = [
   'collect_context',
   'add_tasks',
@@ -41,16 +27,17 @@ const TASK_TOOLS = [
 ].map((name) => `mcp__pacenote__${name}`)
 const ADD_TASKS = 'mcp__pacenote__add_tasks'
 const TIMEOUT_MS = 10 * 60_000
-const NO_SLACK =
-  "Claude Code has no Slack connector. Connect Slack in claude.ai's Settings > Connectors, then collect again."
+/** What to do when the sources' connectors are not in Claude Code */
+const noConnector = (sources: readonly SourceId[]) =>
+  `Claude Code has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in claude.ai's Settings > Connectors, then collect again.`
 const STOPPED = 'Stopped.'
 const SIGNED_OUT =
   'Claude Code is not signed in. Run claude in a terminal and sign in, then collect again.'
 
 /**
  * The command for one collection: Claude Code, headless, running Pacenote's
- * collect_tasks prompt with only the Slack connector's read tools and
- * Pacenote's task tools.
+ * collect_tasks prompt with only its sources' read tools (sources.ts) and
+ * Pacenote's task tools, every source's tools that write denied.
  * - Only project settings load (none, in the data folder), so the user's own
  *   Claude Code permissions, plugins, CLAUDE.md and MCP servers stay out; the
  *   claude.ai connectors still load.
@@ -58,7 +45,10 @@ const SIGNED_OUT =
  *   not need it added.
  * - The only built-in tool is ToolSearch, to load the MCP tools.
  */
-export function collectCommand(launch: McpLaunch): [string, string[]] {
+export function collectCommand(
+  launch: McpLaunch,
+  sources: readonly SourceId[] = SOURCE_IDS
+): [string, string[]] {
   return [
     'claude',
     [
@@ -76,9 +66,9 @@ export function collectCommand(launch: McpLaunch): [string, string[]] {
       'default',
       '--allowedTools',
       ...TASK_TOOLS,
-      ...SLACK_READ_TOOLS,
+      ...readTools(sources),
       '--disallowedTools',
-      ...SLACK_WRITE_TOOLS,
+      ...writeTools(),
       '--no-session-persistence',
       '--output-format',
       'stream-json',
@@ -109,19 +99,21 @@ interface ContentBlock {
 
 /**
  * Reads Claude Code's stream-json output of a collection: how many times it
- * read Slack, what add_tasks answered, how the run ended and the tokens it
- * spent.
+ * read its sources, what add_tasks answered, how the run ended and the tokens
+ * it spent.
  */
 export class CollectStream {
   reads = 0
-  /** Set once it is clear the run cannot read Slack */
-  noSlack = false
+  /** The sources whose connector the run does not have, once it starts */
+  missing: SourceId[] = []
   added?: { confidence?: string }[]
   skipped = 0
   addError?: string
   ended?: { ok: boolean; text: string }
   usage?: TokenUsage
   private addCall?: string
+
+  constructor(private readonly sources: readonly SourceId[] = SOURCE_IDS) {}
 
   push(line: string): void {
     let event: StreamEvent
@@ -131,11 +123,12 @@ export class CollectStream {
       return
     }
     if (event.type === 'system' && event.subtype === 'init') {
-      const slack = event.mcp_servers?.find(
-        (server) => server.name === 'claude.ai Slack'
-      )
-      if (!slack || ['failed', 'needs-auth'].includes(slack.status))
-        this.noSlack = true
+      this.missing = this.sources.filter((id) => {
+        const server = event.mcp_servers?.find(
+          (entry) => entry.name === SOURCES[id].connector.server
+        )
+        return !server || ['failed', 'needs-auth'].includes(server.status)
+      })
       return
     }
     if (event.type === 'result') {
@@ -150,7 +143,7 @@ export class CollectStream {
     if (!Array.isArray(content)) return
     for (const block of content as ContentBlock[]) {
       if (block.type === 'tool_use') {
-        if (block.name?.startsWith(SLACK)) this.reads += 1
+        if (block.name && sourceOfTool(block.name)) this.reads += 1
         if (block.name === ADD_TASKS) this.addCall = block.id
       } else if (
         block.type === 'tool_result' &&
@@ -199,7 +192,9 @@ export class CollectStream {
       (/not logged in|\/login|invalid api key/i.test(failed)
         ? SIGNED_OUT
         : failed || undefined) ??
-      (this.noSlack && this.reads === 0 ? NO_SLACK : undefined) ??
+      (this.missing.length && this.reads === 0
+        ? noConnector(this.missing)
+        : undefined) ??
       (firstLine(this.ended?.text) ||
         'The collection stopped before it finished.')
     return { at, ok: false, error, ...spent }
@@ -388,7 +383,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       child.on('error', (error) =>
         finish(
           (error as NodeJS.ErrnoException).code === 'ENOENT'
-            ? 'Collecting needs Claude Code, signed in, with its Slack connector: claude is not on this Mac.'
+            ? `Collecting needs Claude Code, signed in, with its ${sourceNames()} connector: claude is not on this Mac.`
             : error.message
         )
       )

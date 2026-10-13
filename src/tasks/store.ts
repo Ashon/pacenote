@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import { sourceOf } from './sources.js'
 import type {
   DismissReason,
   TaskDecision,
@@ -167,7 +168,10 @@ export function buildView(
   }
 }
 
-/** The channel with the most "not for me" dismissals, once there are enough */
+/**
+ * The Slack channel with the most "not for me" dismissals, once there are
+ * enough: leaving channels out is Slack's setting
+ */
 function leaveOutOffer(
   dismissed: TaskView[],
   excluded: readonly string[]
@@ -175,6 +179,7 @@ function leaveOutOffer(
   const counts = new Map<string, { label: string; count: number }>()
   for (const task of dismissed) {
     if (task.dismissReason !== ('not-mine' satisfies DismissReason)) continue
+    if (sourceOf(task).id !== 'slack') continue
     const { conversation, label } = task.source
     if (excluded.includes(conversation) || excluded.includes(label)) continue
     const entry = counts.get(conversation) ?? { label, count: 0 }
