@@ -41,9 +41,12 @@ export const skip =
 function imageInputs(): string {
   const hash = createHash('sha256')
   const dirs = [path.join(REPO, 'sandbox/vm'), path.join(SUPPORT, 'vm')]
+  // Their own files: the renderer's folder goes into no test image.
   for (const dir of dirs)
-    for (const name of readdirSync(dir).sort())
-      hash.update(name).update(readFileSync(path.join(dir, name)))
+    for (const entry of readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .sort((a, b) => a.name.localeCompare(b.name)))
+      hash.update(entry.name).update(readFileSync(path.join(dir, entry.name)))
   hash.update(readFileSync(path.join(SUPPORT, 'fake-claude.mjs')))
   hash.update(JSON.stringify(VM_IMAGE_SETTINGS))
   return hash.digest('hex')

@@ -4,11 +4,11 @@ import type { RunResult } from './process.js'
  * Where a reasoner CLI runs. A sandbox knows how to run one process in
  * isolation and nothing about which CLI it is: the reasoner adapters
  * (src/reasoners) say what to run, which credentials it gets, and which host
- * paths it needs. A new kind of isolation (another container runtime, a VM, a
+ * paths it needs. A new kind of isolation (another VM, a container runtime, a
  * remote runner) is a new Sandbox, and no adapter changes.
  */
 
-export type SandboxKind = 'host' | 'docker' | 'vm'
+export type SandboxKind = 'host' | 'vm'
 
 /**
  * Where an isolated sandbox puts the host paths it is given. The reasoner image
@@ -69,7 +69,7 @@ export interface SandboxRun {
   /** Given on stdin */
   input: string
   /**
-   * Values for the process environment (credentials). A container gets them by
+   * Values for the process environment (credentials). A VM gets them by
    * name only, out of process listings.
    */
   env?: Record<string, string>

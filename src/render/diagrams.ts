@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { runProcess } from '../sandbox/process.js'
-import { jobHint } from '../sandbox/types.js'
+import { vmProblems, vmRunArgs, vmStatus } from '../sandbox/vm.js'
 
 /**
  * Renders the diagram/chart code blocks in an answer to PNG.
- * Rendering runs in a disposable container without network access
- * (sandbox/renderer).
+ * Rendering runs in a VM of its own with no way out (the built-in sandbox's
+ * renderer image, sandbox/vm/renderer).
  */
 export type DiagramFormat = 'mermaid' | 'dot' | 'vega-lite' | 'svg'
 
@@ -74,77 +74,75 @@ export function composeAnswer(
   return text
 }
 
+/** Where the renderer runs: its VM's helper, folder and image */
+export interface RendererVm {
+  /** pacenote-vm */
+  bin: string
+  /** pacenote-vm's folder: kernel, init filesystem, images */
+  root: string
+  /** The renderer's image (VM_RENDERER_IMAGE) */
+  image: string
+}
+
+/** chromium (mermaid) needs room; the rest is small. */
+const RENDER_MEMORY_MIB = 1536
+
 /**
- * Rendering container arguments. No network, read-only root, capabilities
- * dropped, resource limits.
+ * pacenote-vm arguments for one render: a VM with no way out, a read-only image
+ * and an empty /tmp, which sees only the folder with this block (/io). The
+ * image's entrypoint is render, so the format comes first: render mermaid IN
+ * OUT.
  */
 export function renderArgs(
-  image: string,
+  vm: RendererVm,
   dir: string,
   format: DiagramFormat,
   name: string
 ): string[] {
-  return [
-    'run',
-    '--rm',
-    '--network',
-    'none',
-    '--read-only',
-    '--tmpfs',
-    '/tmp:rw,size=256m',
-    '--cap-drop',
-    'ALL',
-    '--security-opt',
-    'no-new-privileges',
-    '--user',
-    '1000:1000',
-    '--memory',
-    '1g',
-    '--pids-limit',
-    '256',
-    '--label',
-    'pacenote.role=renderer',
-    '-v',
-    `${dir}:/io`,
-    image,
-    format,
+  return vmArgs(vm, dir, format, [
     `/io/${name}.${EXTENSION[format]}`,
     `/io/${name}.png`,
-  ]
+  ])
 }
 
-/** Image resize container arguments. Same isolation as rendering. */
+/** pacenote-vm arguments for shrinking an image, isolated as a render is */
 export function resizeArgs(
-  image: string,
+  vm: RendererVm,
   dir: string,
   name: string,
   maxPx: number
 ): string[] {
-  const args = renderArgs(image, dir, 'svg', name)
-  // Replaces the last three renderArgs arguments (format, input, output) with
-  // the resize ones.
-  return [
-    ...args.slice(0, -3),
-    'resize',
+  return vmArgs(vm, dir, 'resize', [
     `/io/${name}.src`,
     `/io/${name}.png`,
     String(maxPx),
-  ]
+  ])
 }
 
-export interface DiagramRendererOptions {
-  dockerBin: string
-  image: string
+function vmArgs(
+  vm: RendererVm,
+  dir: string,
+  command: string,
+  args: string[]
+): string[] {
+  return vmRunArgs(
+    { ...vm, memoryMiB: RENDER_MEMORY_MIB, cpus: 2 },
+    {
+      command,
+      args,
+      mounts: [{ host: dir, at: '/io', writable: true }],
+    }
+  )
+}
+
+export interface DiagramRendererOptions extends RendererVm {
   timeoutMs: number
 }
 
 export class DiagramRenderer {
   constructor(private readonly options: DiagramRendererOptions) {}
 
-  /**
-   * Renders one block and returns the PNG buffer. dir must be a path under home
-   * that colima can mount.
-   */
+  /** Renders one block and returns the PNG buffer. */
   async render(
     block: DiagramBlock,
     dir: string,
@@ -155,11 +153,7 @@ export class DiagramRenderer {
       path.join(dir, `${name}.${EXTENSION[block.format]}`),
       block.source
     )
-    await runProcess(
-      this.options.dockerBin,
-      renderArgs(this.options.image, dir, block.format, name),
-      { cwd: process.cwd(), input: '', timeoutMs: this.options.timeoutMs }
-    )
+    await this.run(renderArgs(this.options, dir, block.format, name))
     const png = await readFile(path.join(dir, `${name}.png`))
     if (png.length === 0 || png.length > MAX_PNG_BYTES) {
       throw new Error(`Invalid PNG size (${png.length} bytes)`)
@@ -179,36 +173,24 @@ export class DiagramRenderer {
   ): Promise<Buffer> {
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, `${name}.src`), image)
-    await runProcess(
-      this.options.dockerBin,
-      resizeArgs(this.options.image, dir, name, maxPx),
-      {
-        cwd: process.cwd(),
-        input: '',
-        timeoutMs: this.options.timeoutMs,
-      }
-    )
+    await this.run(resizeArgs(this.options, dir, name, maxPx))
     const png = await readFile(path.join(dir, `${name}.png`))
     if (png.length === 0) throw new Error('The resize result is empty.')
     return png
   }
 
+  /** What keeps it from rendering: this Mac, or the built-in sandbox's parts */
   async verify(): Promise<string[]> {
-    try {
-      await runProcess(
-        this.options.dockerBin,
-        ['image', 'inspect', this.options.image],
-        {
-          cwd: process.cwd(),
-          input: '',
-          timeoutMs: 15_000,
-        }
-      )
-      return []
-    } catch {
-      return [
-        `Renderer image ${this.options.image} not found: ${jobHint('images')}.`,
-      ]
-    }
+    const status = await vmStatus(this.options)
+    const problems = vmProblems(status, 'the diagram renderer image')
+    return problems
+  }
+
+  private async run(args: string[]): Promise<void> {
+    await runProcess(this.options.bin, args, {
+      cwd: process.cwd(),
+      input: '',
+      timeoutMs: this.options.timeoutMs,
+    })
   }
 }

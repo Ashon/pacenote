@@ -22,7 +22,11 @@ describe('why a reasoner run failed', () => {
         'unavailable',
       ],
       [
-        'docker: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
+        'Error: No image reasoner in /Users/me/.pacenote/vm/images: build it first.',
+        'setup',
+      ],
+      [
+        'Error: The Linux kernel is missing (/Users/me/.pacenote/vm/kernel/vmlinux): prepare first.',
         'setup',
       ],
       [
@@ -47,19 +51,15 @@ describe('why a reasoner run failed', () => {
   })
 
   it('tells the operator what to fix, and where', () => {
-    expect(failureAdvice('auth', 'claude', 'docker')).toEqual({
+    expect(failureAdvice('auth', 'claude', 'vm')).toEqual({
       text: expect.stringContaining('Get a new token in Settings > Sandbox'),
       route: '#/settings/sandbox',
       lasting: true,
     })
-    expect(failureAdvice('auth', 'codex', 'docker')?.text).toContain(
-      'codex login'
-    )
+    expect(failureAdvice('auth', 'codex', 'vm')?.text).toContain('codex login')
     expect(failureAdvice('auth', 'claude', 'host')?.text).toContain('/login')
-    expect(failureAdvice('limit', 'claude', 'docker')?.lasting).toBe(true)
-    expect(failureAdvice('unavailable', 'claude', 'docker')?.lasting).toBe(
-      false
-    )
-    expect(failureAdvice('other', 'claude', 'docker')).toBeUndefined()
+    expect(failureAdvice('limit', 'claude', 'vm')?.lasting).toBe(true)
+    expect(failureAdvice('unavailable', 'claude', 'vm')?.lasting).toBe(false)
+    expect(failureAdvice('other', 'claude', 'vm')).toBeUndefined()
   })
 })

@@ -79,7 +79,7 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
   } as unknown as Directory
   const reasoner: Reasoner = {
     backend: 'codex',
-    sandbox: 'docker',
+    sandbox: 'vm',
     canReadFiles: false,
     mcpServerNames: ['ops'],
     complete,

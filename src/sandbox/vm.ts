@@ -19,12 +19,10 @@ import { VmBroker, type VmBrokerOptions } from './vm-broker.js'
 /**
  * The reasoner sandbox built into Pacenote: each run is one process in a
  * lightweight Linux VM of its own (pacenote-vm, apps/vm), started in well under
- * a second from a read-only image. Like the Docker sandbox, it sees only the
- * mounts a run asks for, and HOME and /tmp are empty every time. The VM has no
- * network device: its one way out is the egress proxy here, relayed in as a
- * socket, which lets through only the allowed domains (the same list the
- * Docker sandbox's proxy reads). Nothing else to install: no Docker, no proxy
- * container.
+ * a second from a read-only image. It sees only the mounts a run asks for, and
+ * HOME and /tmp are empty every time. The VM has no network device: its one
+ * way out is the egress proxy here, relayed in as a socket, which lets through
+ * only the allowed domains. Nothing else to install.
  */
 export interface VmSandboxOptions {
   /** pacenote-vm */
@@ -52,7 +50,7 @@ export const VM_IMAGE = 'reasoner'
 /** What pacenote-vm says and takes (its formatVersion) */
 export const VM_FORMAT = 1
 
-/** HOME and /tmp: empty tmpfs on every run, as in the Docker sandbox */
+/** HOME and /tmp: empty tmpfs on every run */
 const TMPFS = [
   '/tmp:size=256m,mode=1777',
   '/home/node:size=256m,uid=1000,gid=1000,mode=0700',
@@ -97,7 +95,7 @@ export function vmUnsupported(
   return undefined
 }
 
-/** docker --memory format (2g, 1536m) in MiB, as pacenote-vm takes it */
+/** A memory size (2g, 1536m) in MiB, as pacenote-vm takes it */
 export function memoryMiB(text: string): number {
   const match = /^(\d+(?:\.\d+)?)([bkmg]?)$/i.exec(text.trim())
   if (!match) return 2048
@@ -153,6 +151,24 @@ export function vmRunArgs(
   return args
 }
 
+/**
+ * pacenote-vm arguments for the text of a PDF someone uploaded: without the way
+ * out, since it needs no network, and seeing only the PDF's folder
+ */
+export function pdfExtractArgs(
+  options: Pick<VmSandboxOptions, 'root' | 'image'>,
+  pdfPath: string
+): string[] {
+  return vmRunArgs(
+    { ...options, memoryMiB: 512, cpus: 1 },
+    {
+      command: 'pdftotext',
+      args: [...PDFTOTEXT_ARGS, `/in/${path.basename(pdfPath)}`, '-'],
+      mounts: [{ host: path.dirname(pdfPath), at: '/in' }],
+    }
+  )
+}
+
 export class VmSandbox implements Sandbox {
   readonly kind = 'vm' as const
   readonly isolated = true
@@ -206,18 +222,10 @@ export class VmSandbox implements Sandbox {
     }
   }
 
-  /** Without the way out: someone else's PDF needs no network. */
   async extractPdfText(pdfPath: string): Promise<string> {
     const { stdout } = await runProcess(
       this.options.bin,
-      vmRunArgs(
-        { ...this.options, memoryMiB: 512, cpus: 1 },
-        {
-          command: 'pdftotext',
-          args: [...PDFTOTEXT_ARGS, `/in/${path.basename(pdfPath)}`, '-'],
-          mounts: [{ host: path.dirname(pdfPath), at: '/in' }],
-        }
-      ),
+      pdfExtractArgs(this.options, pdfPath),
       { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
     )
     return stdout
@@ -320,9 +328,14 @@ export class VmSandbox implements Sandbox {
   }
 }
 
-/** What pacenote-vm has ready, from its status */
+/**
+ * What pacenote-vm has ready, from its status: image is the one runs use, and
+ * renderer, if named, the diagram renderer's
+ */
 export async function vmStatus(
-  options: Pick<VmSandboxOptions, 'bin' | 'root' | 'image'>
+  options: Pick<VmSandboxOptions, 'bin' | 'root' | 'image'> & {
+    renderer?: string
+  }
 ): Promise<VmStatus> {
   const status: VmStatus = {
     unsupported: vmUnsupported(),
@@ -348,9 +361,14 @@ export async function vmStatus(
       status.helper.error = `pacenote-vm speaks version ${report.version}, Pacenote ${VM_FORMAT}.`
     status.kernel = report.kernel === true
     status.initfs = report.initfs === true
-    const image = report.images?.[options.image]
-    if (image?.created)
-      status.image = { createdAt: image.created, base: image.base ?? '' }
+    const built = (name: string) => {
+      const image = report.images?.[name]
+      return image?.created
+        ? { createdAt: image.created, base: image.base ?? '' }
+        : undefined
+    }
+    status.image = built(options.image)
+    if (options.renderer) status.renderer = built(options.renderer)
   } catch (err) {
     status.helper.error = existsSync(options.bin)
       ? (err as Error).message
@@ -359,14 +377,20 @@ export async function vmStatus(
   return status
 }
 
-/** What keeps the built-in sandbox from running, from its status */
-export function vmProblems(status: VmStatus): string[] {
+/**
+ * What keeps the built-in sandbox from running, from its status: image names
+ * the image asked for (status.image)
+ */
+export function vmProblems(
+  status: VmStatus,
+  image = 'the reasoner image'
+): string[] {
   if (status.unsupported) return [status.unsupported]
   if (!status.helper.ok) return [status.helper.error ?? 'pacenote-vm failed.']
   const missing = [
     !status.kernel && 'the Linux kernel',
     !status.initfs && 'the init filesystem',
-    !status.image && 'the reasoner image',
+    !status.image && image,
   ].filter(Boolean)
   return missing.length > 0
     ? [`The built-in sandbox lacks ${missing.join(', ')}: ${jobHint('vm')}.`]

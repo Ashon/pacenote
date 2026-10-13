@@ -17,14 +17,13 @@ brew install --cask pacenote
   compares the installed copy with itself and skips Pacenote. An install from before the rename to Pacenote (`verda`,
   `orbly`) trusted only the old cask name, so run `brew trust ashon/tap` once there too.
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
-  `codex` CLI login (codex 0.138 or later), Docker (Docker Desktop, OrbStack or colima) only for the Docker sandbox and
-  diagrams, and `gh` and `git` for the ops tools. The built-in sandbox needs nothing installed, on Apple silicon with
-  macOS 15 or later.
+  `codex` CLI login (codex 0.138 or later), and `gh` and `git` for the ops tools. The built-in sandbox, which also renders
+  diagrams, needs nothing installed, on Apple silicon with macOS 15 or later.
 - Open Pacenote. Settings > Messengers > Slack opens Slack with Pacenote's manifest filled in ("Create the Slack app") and
   takes the app's two tokens; "Who can ask" takes your Slack member ID. Pace answers no one until you name who may ask,
   or turn on "Anyone in the workspace may ask".
 - Answers run on this Mac by default (Settings > Sandbox > Run environment). For the built-in sandbox, choose it there, then
-  run "Set up built-in sandbox"; for the Docker sandbox, "Build sandbox images" and "Restart proxy".
+  run "Set up built-in sandbox". Diagrams need that setup too, with answers on this Mac or not.
 - At startup Pace checks that the CLI is installed, signed in and, for codex, new enough; what is missing shows in the
   status bar with what to do.
 - Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive
@@ -48,7 +47,7 @@ brew install --cask pacenote
    profile > ⋮ > Copy member ID) in `MENTION_ALLOWED_USERS`: with your own app, the bot does not start until it knows who
    may ask, or `MENTION_ANYONE=on` lets anyone in the workspace ask.
 4. Write the config file and check it. Config lives outside the repository in `~/.pacenote/.env`. (`PACENOTE_HOME` changes the location)
-   The bot (app, terminal), the setup commands and the sandbox compose all read this file, so values of the target environment never land in the repository.
+   The bot (app, terminal) and the sandbox jobs read this file, so values of the target environment never land in the repository.
 
    ```sh
    mkdir -p ~/.pacenote && cp .env.example ~/.pacenote/.env   # fill in SLACK_*, MENTION_ALLOWED_USERS, REASONER, REASONER_SANDBOX
@@ -84,4 +83,5 @@ Restart handling:
   the next start without counting as an attempt.
 - At startup it deletes attachment/output temp directories (`PACENOTE_DATA_DIR/attachments/*`) older than 1 hour.
 
-Requirements: Node.js 22.9 or later, pnpm 11, and Docker for the sandbox.
+Requirements: Node.js 22.9 or later, pnpm 11, and for the built-in sandbox a Mac with Apple silicon and macOS 15 or later,
+with Xcode to build pacenote-vm (`pnpm sandbox:vm` builds it, then sets the sandbox up).

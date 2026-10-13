@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds the reasoner image of the built-in VM sandbox (pacenote-vm build), as
-# sandbox/reasoner/Dockerfile builds the Docker one, with the same CLI versions.
+# Builds the reasoner image of the built-in VM sandbox (pacenote-vm build), with
+# the CLI versions src/sandbox/vm-setup.ts pins.
 # Runs as root in a VM of its own on node:24-bookworm-slim, with this folder at
 # /pacenote; the only way out is the host's egress proxy, open for the build to
 # the Debian and npm package hosts.

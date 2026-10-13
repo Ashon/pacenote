@@ -99,10 +99,11 @@ TIMEZONE=UTC
 
   it('validates with app environment variables taking precedence over .env', () => {
     const { store: s } = store({
-      REASONER_SANDBOX: 'docker',
+      REASONER_SANDBOX: 'vm',
       MENTION_ALLOWED_USERS: 'U1',
     })
-    // claude + docker needs a sandbox token, which can be saved later.
+    // claude in the built-in sandbox needs a sandbox token, which can be saved
+    // later.
     expect(s.validate({})).toEqual([])
     expect(
       s.validate({ SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-xxxx' })

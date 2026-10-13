@@ -96,6 +96,23 @@ export function writeEnvFile(file: string, text: string): void {
   renameSync(`${file}.tmp`, file)
 }
 
+/**
+ * A setting whose value changed meaning, rewritten as Pace reads it now:
+ * REASONER_SANDBOX=docker, the sandbox Pacenote had before the built-in one,
+ * becomes vm. Returns the text unchanged when there is nothing to rewrite.
+ */
+export function migrateEnvText(text: string): {
+  text: string
+  changed: boolean
+} {
+  if (readEnvValues(text).REASONER_SANDBOX !== 'docker')
+    return { text, changed: false }
+  return {
+    text: updateEnvText(text, { REASONER_SANDBOX: 'vm' }),
+    changed: true,
+  }
+}
+
 export function readEnvFile(file: string): string {
   return existsSync(file) ? readFileSync(file, 'utf8') : ''
 }

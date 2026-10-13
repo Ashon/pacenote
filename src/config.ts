@@ -9,7 +9,6 @@ import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
 import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
-import type { DockerSandboxOptions } from './sandbox/docker.js'
 import {
   defaultSandboxDir,
   defaultVmBin,
@@ -17,10 +16,19 @@ import {
   VM_IMAGE,
   type VmSandboxOptions,
 } from './sandbox/vm.js'
-import { VM_BROKER_IMAGE } from './sandbox/vm-setup.js'
+import { VM_BROKER_IMAGE, VM_RENDERER_IMAGE } from './sandbox/vm-setup.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
+
+/**
+ * REASONER_SANDBOX as Pace reads it: docker, the sandbox Pacenote had before
+ * the built-in one, means the built-in one now. (The desktop app rewrites it in
+ * .env when it starts.)
+ */
+export function sandboxSetting(value: unknown): unknown {
+  return value === 'docker' ? 'vm' : value
+}
 
 const csv = z
   .string()
@@ -135,17 +143,13 @@ export const EnvSchema = z.object({
   REASONER_TIMEOUT_SEC: z.coerce.number().int().positive().default(900),
   CLAUDE_BIN: z.string().default('claude'),
   CODEX_BIN: z.string().default('codex'),
-  REASONER_SANDBOX: z.enum(['none', 'docker', 'vm']).default('none'),
-  DOCKER_BIN: z.string().default('docker'),
-  SANDBOX_IMAGE: z.string().default('pacenote-reasoner:latest'),
-  SANDBOX_NETWORK: z.string().default('pacenote-sandbox'),
-  SANDBOX_PROXY_URL: z.string().url().default('http://egress-proxy:8888'),
+  REASONER_SANDBOX: z.preprocess(
+    sandboxSetting,
+    z.enum(['none', 'vm']).default('none')
+  ),
   SANDBOX_MEMORY: z
     .string()
-    .regex(
-      /^\d+(\.\d+)?[bkmg]?$/i,
-      'Must be in docker --memory format (e.g. 2g, 1536m)'
-    )
+    .regex(/^\d+(\.\d+)?[bkmg]?$/i, 'Must be a size such as 2g or 1536m')
     .default('2g'),
   SANDBOX_CPUS: z
     .string()
@@ -156,10 +160,8 @@ export const EnvSchema = z.object({
   SANDBOX_CODEX_AUTH_FILE: z.string().default('~/.codex/auth.json'),
 
   OPS_TOOLS: z.enum(['off', 'on']).default('off'),
-  OPS_BROKER_URL: z.string().url().default('http://ops-broker:8080/mcp'),
 
   RENDER_DIAGRAMS: z.enum(['on', 'off']).default('on'),
-  RENDERER_IMAGE: z.string().default('pacenote-renderer:latest'),
   /** Max px of a generated image's long side. 0 keeps the original size */
   GENERATED_IMAGE_MAX_PX: z.coerce.number().int().min(0).max(4096).default(512),
 
@@ -237,19 +239,17 @@ export interface Config {
     mcpServers: McpServerRef[]
     /** Binary paths for running on the host (CLAUDE_BIN, CODEX_BIN) */
     commands: Record<ReasonerId, string>
-    /** If set, runs the CLI inside a disposable docker container. */
-    sandbox?: DockerSandboxOptions
     /** If set, runs the CLI in a lightweight VM of its own (sandbox/vm.ts). */
     vm?: VmSandboxOptions
   }
   /**
    * Renders mermaid/dot/vega-lite/svg blocks in answers to PNG and uploads
-   * them. (Requires docker)
+   * them, in a VM of the built-in sandbox (render/diagrams.ts)
    */
   render: {
     enabled: boolean
-    dockerBin: string
-    image: string
+    /** pacenote-vm, its folder and the renderer's image */
+    vm: { bin: string; root: string; image: string }
     /**
      * Shrinks a generated image's long side to this size before upload. 0 keeps
      * the original
@@ -441,8 +441,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }),
     render: {
       enabled: e.RENDER_DIAGRAMS === 'on',
-      dockerBin: e.DOCKER_BIN,
-      image: e.RENDERER_IMAGE,
+      vm: {
+        bin: defaultVmBin(env),
+        root: vmRootPath(env),
+        image: VM_RENDERER_IMAGE,
+      },
       generatedMaxPx: e.GENERATED_IMAGE_MAX_PX,
     },
     dataDir,
@@ -538,7 +541,7 @@ function buildReasonerConfig(
     // It stays off without the sandbox and an allowed user list.
     if (e.REASONER_SANDBOX === 'none') {
       throw new Error(
-        'OPS_TOOLS=on requires a sandbox: REASONER_SANDBOX=vm or docker.'
+        'OPS_TOOLS=on requires the built-in sandbox: REASONER_SANDBOX=vm.'
       )
     }
     if (e.MENTION_ALLOWED_USERS.length === 0 || e.MENTION_ANYONE === 'on') {
@@ -546,22 +549,13 @@ function buildReasonerConfig(
         'OPS_TOOLS=on requires MENTION_ALLOWED_USERS to list who may use it, with MENTION_ANYONE off.'
       )
     }
-    // In the built-in sandbox the broker is relayed into each VM at this
-    // address (vm-broker.ts).
-    base.mcpServers = [
-      {
-        name: 'ops',
-        url:
-          e.REASONER_SANDBOX === 'vm'
-            ? 'http://127.0.0.1:8080/mcp'
-            : e.OPS_BROKER_URL,
-      },
-    ]
+    // The broker is relayed into each VM at this address (vm-broker.ts).
+    base.mcpServers = [{ name: 'ops', url: 'http://127.0.0.1:8080/mcp' }]
   }
   if (e.REASONER_SANDBOX === 'none') {
     // codex on this Mac does not load the user's config.toml (its MCP servers
     // and sandbox settings stay out of answers), so the model it names comes
-    // along as arguments, as in the container.
+    // along as arguments, as in the sandbox.
     if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
       const defaults = readCodexDefaults(
         path.join(host.codexHome, 'config.toml')
@@ -572,8 +566,8 @@ function buildReasonerConfig(
     return { ...base, deniedReads: host.deniedReads }
   }
 
-  // The container or VM has no host keychain or config, so credentials are
-  // passed explicitly.
+  // The VM has no host keychain or config, so credentials are passed
+  // explicitly.
   const claudeEnv: Record<string, string> = {}
   if (e.SANDBOX_CLAUDE_OAUTH_TOKEN) {
     claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = e.SANDBOX_CLAUDE_OAUTH_TOKEN
@@ -583,7 +577,7 @@ function buildReasonerConfig(
   if (e.REASONER === 'claude' && Object.keys(claudeEnv).length === 0) {
     throw new MissingSettingError(
       'SANDBOX_CLAUDE_OAUTH_TOKEN',
-      `Using claude with REASONER_SANDBOX=${e.REASONER_SANDBOX} requires SANDBOX_CLAUDE_OAUTH_TOKEN (claude setup-token) or SANDBOX_ANTHROPIC_API_KEY.`,
+      'Using claude in the built-in sandbox requires SANDBOX_CLAUDE_OAUTH_TOKEN (claude setup-token) or SANDBOX_ANTHROPIC_API_KEY.',
       'sk-ant-oat01-stand-in'
     )
   }
@@ -592,7 +586,7 @@ function buildReasonerConfig(
   if (e.REASONER === 'codex') {
     if (!path.isAbsolute(codexAuthFile) || !existsSync(codexAuthFile)) {
       throw new Error(
-        `Using codex with REASONER_SANDBOX=${e.REASONER_SANDBOX} requires a codex login file: ${codexAuthFile}`
+        `Using codex in the built-in sandbox requires a codex login file: ${codexAuthFile}`
       )
     }
     if (!e.REASONER_MODEL) {
@@ -607,32 +601,16 @@ function buildReasonerConfig(
   // Only the selected CLI's credentials go into its runs.
   const auth =
     e.REASONER === 'claude' ? { env: claudeEnv } : { file: codexAuthFile }
-  if (e.REASONER_SANDBOX === 'vm') {
-    const { broker, ...vm } = host.vm
-    return {
-      ...base,
-      auth,
-      vm: {
-        ...vm,
-        ...(e.OPS_TOOLS === 'on' ? { broker } : {}),
-        image: VM_IMAGE,
-        memoryMiB: memoryMiB(e.SANDBOX_MEMORY),
-        cpus: Number(e.SANDBOX_CPUS),
-      },
-    }
-  }
+  const { broker, ...vm } = host.vm
   return {
     ...base,
     auth,
-    sandbox: {
-      dockerBin: e.DOCKER_BIN,
-      image: e.SANDBOX_IMAGE,
-      network: e.SANDBOX_NETWORK,
-      proxyUrl: e.SANDBOX_PROXY_URL,
-      memory: e.SANDBOX_MEMORY,
-      cpus: e.SANDBOX_CPUS,
-      noProxy: base.mcpServers.map((server) => new URL(server.url).hostname),
-      requiredServices: e.OPS_TOOLS === 'on' ? ['ops-broker'] : [],
+    vm: {
+      ...vm,
+      ...(e.OPS_TOOLS === 'on' ? { broker } : {}),
+      image: VM_IMAGE,
+      memoryMiB: memoryMiB(e.SANDBOX_MEMORY),
+      cpus: Number(e.SANDBOX_CPUS),
     },
   }
 }

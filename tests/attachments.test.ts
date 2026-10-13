@@ -24,7 +24,7 @@ import {
   parseClaudeOutput,
 } from '../src/reasoners/claude.js'
 import { codexArgs } from '../src/reasoners/codex.js'
-import { pdfExtractArgs } from '../src/sandbox/docker.js'
+import { pdfExtractArgs } from '../src/sandbox/vm.js'
 
 const candidate = (
   name: string,
@@ -283,17 +283,15 @@ describe('CLI handoff', () => {
     ])
   })
 
-  it('PDF extraction runs in a disposable container without network access', () => {
+  it('PDF extraction runs in a VM without network access, seeing only its folder', () => {
     const args = pdfExtractArgs(
-      'img:1',
+      { root: '/home/me/.pacenote/vm', image: 'reasoner' },
       '/home/me/agent/data/attachments/x/1-spec.pdf'
     )
-    expect(args.slice(0, 4)).toEqual(['run', '--rm', '--network', 'none'])
-    expect(args).toEqual(
-      expect.arrayContaining(['--read-only', '--entrypoint', 'pdftotext'])
-    )
-    expect(args).toContain('/home/me/agent/data/attachments/x:/in:ro')
+    expect(args).not.toContain('--egress')
+    expect(args).toContain('/home/me/agent/data/attachments/x:/in')
     expect(args.slice(-2)).toEqual(['/in/1-spec.pdf', '-'])
+    expect(args[args.indexOf('--') + 1]).toBe('pdftotext')
   })
 
   it('claude puts base64 image blocks in the stream-json input', async () => {

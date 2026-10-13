@@ -6,7 +6,7 @@ import path from 'node:path'
 import type { Logger } from '../logger.js'
 import { normalizeDomain } from './allowlist.js'
 
-/** The only port CONNECT goes to, as with the Docker sandbox's proxy */
+/** The only port CONNECT goes to */
 const TLS_PORT = 443
 /** Headers that belong to one hop, not to the request passed on */
 const HOP_HEADERS = [
@@ -60,11 +60,10 @@ const resolveAll: Resolve = async (host) =>
 /**
  * The way out of the built-in VM sandbox: an HTTP proxy on a unix socket,
  * which pacenote-vm relays into each VM (the image forwards 127.0.0.1:3128 to
- * it). Like the Docker sandbox's egress proxy (sandbox/proxy), it lets through
- * only the allowed host names, exactly: HTTPS through CONNECT to port 443, and
- * plain HTTP requests. It looks each name up itself and connects to the
- * address it found, so the answer cannot change in between, and never to
- * this Mac's own addresses (LOCAL).
+ * it). It lets through only the allowed host names, exactly: HTTPS through
+ * CONNECT to port 443, and plain HTTP requests. It looks each name up itself
+ * and connects to the address it found, so the answer cannot change in
+ * between, and never to this Mac's own addresses (LOCAL).
  */
 export class EgressProxy {
   private readonly server: http.Server

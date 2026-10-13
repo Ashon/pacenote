@@ -19,7 +19,6 @@ import {
   MESSENGER_NAMES,
   type MessengerId,
 } from '@src/messengers/ids'
-import type { BrokerHealth } from '@src/sandbox/types'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import {
   Box,
@@ -73,9 +72,7 @@ import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
 import {
   AllowlistCard,
-  APPLY_LABEL,
   BrokerCard,
-  DockerFooter,
   EnvironmentDetails,
   LoginChecks,
   PendingList,
@@ -288,13 +285,10 @@ export function SettingsPage() {
   // for setup) is started.
   const botLive =
     supervisor?.phase === 'running' || supervisor?.phase === 'starting'
-  // Changes Pace picks up only when it restarts (not the broker's, which are
-  // applied there, nor those read where they are used)
+  // Changes Pace picks up only when it restarts (not those read where they
+  // are used)
   const botChanged = SETTING_FIELDS.some(
-    (field) =>
-      field.applies !== 'broker' &&
-      field.applies !== 'app' &&
-      field.key in changes
+    (field) => field.applies !== 'app' && field.key in changes
   )
   const save = (restart: boolean) => {
     setSaving(true)
@@ -305,24 +299,22 @@ export function SettingsPage() {
           setIssues(found)
           return
         }
-        const brokerChanged = SETTING_FIELDS.some(
-          (field) => field.applies === 'broker' && field.key in changes
-        )
         reset()
         load()
         sandbox.refresh()
-        const brokerNote = brokerChanged
-          ? ` Apply the ops tool changes with "${APPLY_LABEL.broker}".`
-          : ''
         setNotice(
           restarted || !botChanged
             ? {
-                tone: brokerChanged ? 'warn' : 'ok',
-                text: `${restarted ? (botLive ? 'Saved and restarted Pace.' : 'Saved and started Pace.') : 'Saved.'}${brokerNote}`,
+                tone: 'ok',
+                text: restarted
+                  ? botLive
+                    ? 'Saved and restarted Pace.'
+                    : 'Saved and started Pace.'
+                  : 'Saved.',
               }
             : {
                 tone: 'warn',
-                text: `Saved. Restart Pace to apply.${brokerNote}`,
+                text: 'Saved. Restart Pace to apply.',
                 restart: Boolean(supervisor),
               }
         )
@@ -359,26 +351,21 @@ export function SettingsPage() {
           !isSet('MENTION_ALLOWED_USERS') &&
           valueOf('MENTION_ANYONE') !== 'on'
         setNotice(
-          field.applies === 'broker'
+          other
             ? {
-                tone: 'warn',
-                text: `Saved the ${label}. Apply it with "${APPLY_LABEL.broker}".`,
+                tone: 'ok',
+                text: `Saved the ${label}. Enter the ${FIELD.get(other)?.label.toLowerCase()} next.`,
               }
-            : other
+            : askers
               ? {
                   tone: 'ok',
-                  text: `Saved the ${label}. Enter the ${FIELD.get(other)?.label.toLowerCase()} next.`,
+                  text: `Saved the ${label}. Next, add your Slack member ID under Who can ask.`,
                 }
-              : askers
-                ? {
-                    tone: 'ok',
-                    text: `Saved the ${label}. Next, add your Slack member ID under Who can ask.`,
-                  }
-                : {
-                    tone: 'warn',
-                    text: `Saved the ${label}. ${botLive ? 'Restart' : 'Start'} Pace to use it.`,
-                    restart: true,
-                  }
+              : {
+                  tone: 'warn',
+                  text: `Saved the ${label}. ${botLive ? 'Restart' : 'Start'} Pace to use it.`,
+                  restart: true,
+                }
         )
       })
       .finally(() => setSaving(false))
@@ -408,19 +395,11 @@ export function SettingsPage() {
     Object.keys(changes).filter((key) => settingSectionOf(key) === id).length
   const sectionIssues = (id: Section) =>
     issues.filter((issue) => settingSectionOf(issue.key) === id).length
-  const docker = valueOf('REASONER_SANDBOX') === 'docker'
   const builtIn = valueOf('REASONER_SANDBOX') === 'vm'
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
   const pending = sandbox.status?.pending ?? []
-  // A Docker broker left from when ops tools were on, still to stop or apply
-  const brokerAround =
-    docker &&
-    (pending.some((item) => item.component === 'broker') ||
-      sandbox.status?.containers.some(
-        (c) => c.service === 'ops-broker' && c.state !== 'missing'
-      ) === true)
-  const opsReady = (docker || builtIn) && isSet('MENTION_ALLOWED_USERS')
+  const opsReady = builtIn && isSet('MENTION_ALLOWED_USERS')
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
@@ -446,20 +425,12 @@ export function SettingsPage() {
           !vmStatus.image)
         ? { tone: 'warn', text: 'Set up' }
         : undefined
-      : !docker
-        ? { tone: 'muted', text: 'Off' }
-        : sandbox.status && !sandbox.status.docker.ok
-          ? { tone: 'warn', text: 'No docker' }
-          : pending.some((item) => item.component !== 'broker')
-            ? { tone: 'warn', text: 'Apply needed' }
-            : undefined,
+      : { tone: 'muted', text: 'Off' },
     ops: !opsOn
       ? { tone: 'muted', text: 'Off' }
       : !opsReady
         ? { tone: 'warn', text: 'Needs setup' }
-        : docker && pending.some((item) => item.component === 'broker')
-          ? { tone: 'warn', text: 'Apply needed' }
-          : undefined,
+        : undefined,
   }
 
   /**
@@ -469,16 +440,8 @@ export function SettingsPage() {
   const choiceExtras: Partial<Record<string, ChoiceExtras>> = sandbox.available
     ? {
         REASONER_SANDBOX: {
-          footers: {
-            vm: <VmFooter sandbox={sandbox} />,
-            docker: <DockerFooter sandbox={sandbox} />,
-          },
-          below: (
-            <EnvironmentDetails
-              sandbox={sandbox}
-              chosen={builtIn ? 'vm' : docker ? 'docker' : undefined}
-            />
-          ),
+          footers: { vm: <VmFooter sandbox={sandbox} /> },
+          below: <EnvironmentDetails sandbox={sandbox} chosen={builtIn} />,
         },
       }
     : {}
@@ -523,10 +486,7 @@ export function SettingsPage() {
       />
     )
   }
-  /**
-   * An ops integration's card, with whether its fields turn it on and what the
-   * running broker reports.
-   */
+  /** An ops integration's card, with whether its fields turn it on */
   const integration = (id: SettingGroup) => {
     const requires = GROUP[id].requires ?? []
     const missing = requires.filter((key) => !isSet(key))
@@ -547,7 +507,6 @@ export function SettingsPage() {
           }
         />
       ),
-      live: brokerReport(id, sandbox.status?.broker),
     })
   }
 
@@ -631,14 +590,11 @@ export function SettingsPage() {
       <>
         {card('environment', {
           // Settings Pace picks up on its restart, such as the limits here
-          children: pending.some((item) => item.component === 'bot') && (
-            <PendingList
-              pending={pending.filter((item) => item.component === 'bot')}
-              sandbox={sandbox}
-            />
+          children: pending.length > 0 && (
+            <PendingList pending={pending} sandbox={sandbox} />
           ),
         })}
-        {(docker || builtIn) &&
+        {builtIn &&
           card('credentials', {
             help: credentialsHelp(valueOf('REASONER')),
             after: (
@@ -666,9 +622,7 @@ export function SettingsPage() {
               </>
             ),
           })}
-        {(docker || builtIn) && sandbox.available && (
-          <AllowlistCard sandbox={sandbox} builtIn={builtIn} />
-        )}
+        {builtIn && sandbox.available && <AllowlistCard sandbox={sandbox} />}
       </>
     ),
     ops: (
@@ -678,17 +632,14 @@ export function SettingsPage() {
             <Requirements
               items={[
                 {
-                  ok: docker || builtIn,
-                  label: 'A sandbox',
+                  ok: builtIn,
+                  label: 'The built-in sandbox',
                   detail: builtIn
                     ? 'Requests run in the built-in sandbox, and the broker in a VM of its own.'
-                    : docker
-                      ? 'Requests run in the docker sandbox.'
-                      : 'Choose the built-in or docker sandbox as the run environment.',
-                  action:
-                    docker || builtIn
-                      ? undefined
-                      : { label: 'Open Sandbox', section: 'sandbox' },
+                    : 'Choose the built-in sandbox as the run environment.',
+                  action: builtIn
+                    ? undefined
+                    : { label: 'Open Sandbox', section: 'sandbox' },
                 },
                 {
                   ok: isSet('MENTION_ALLOWED_USERS'),
@@ -705,14 +656,12 @@ export function SettingsPage() {
             />
           ),
         })}
-        {(docker || builtIn) &&
-          sandbox.available &&
-          (opsOn || brokerAround) && (
-            <BrokerCard sandbox={sandbox} builtIn={builtIn} />
-          )}
+        {builtIn && sandbox.available && opsOn && (
+          <BrokerCard sandbox={sandbox} />
+        )}
         <SubHeading
           title="Integrations"
-          help={`Each one turns on once its fields are filled in. ${builtIn ? "Changes apply when Pace restarts, as its broker's VM starts with it." : `Changes apply when the broker is recreated ("${APPLY_LABEL.broker}").`}${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
+          help={`Each one turns on once its fields are filled in. Changes apply when Pace restarts, as its broker's VM starts with it.${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
         />
         {integration('files')}
         {integration('github')}
@@ -1102,13 +1051,11 @@ function CardHeader({
   title,
   help,
   chip,
-  live,
   action,
 }: {
   title: string
   help?: React.ReactNode
   chip?: React.ReactNode
-  live?: string
   action?: React.ReactNode
 }) {
   return (
@@ -1119,11 +1066,6 @@ function CardHeader({
           {chip}
         </h3>
         {help && <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>}
-        {live && (
-          <p className="mt-0.5 text-xs text-muted-foreground/80">
-            Running broker: {live}
-          </p>
-        )}
       </div>
       {action}
     </header>
@@ -1140,7 +1082,6 @@ function GroupCard({
   row,
   help,
   chip,
-  live,
   action,
   children,
   after,
@@ -1151,7 +1092,6 @@ function GroupCard({
   /** Replaces the group's own help text */
   help?: string
   chip?: React.ReactNode
-  live?: string
   action?: React.ReactNode
   /** Shown under the header, before the fields */
   children?: React.ReactNode
@@ -1166,7 +1106,6 @@ function GroupCard({
         title={info.label}
         help={help ?? info.help}
         chip={chip}
-        live={live}
         action={action}
       />
       {children}
@@ -1240,36 +1179,6 @@ function StateChip({
       {STATE_CHIP[state].label}
     </span>
   )
-}
-
-/**
- * What the running broker reports for an integration, to compare with what is
- * set here
- */
-function brokerReport(
-  id: SettingGroup,
-  broker: BrokerHealth | undefined
-): string | undefined {
-  if (!broker) return undefined
-  const list = (items: string[]) => (items.length ? items.join(', ') : 'off')
-  switch (id) {
-    case 'files':
-      return broker.fs ? 'on' : 'off'
-    case 'github':
-      return broker.github.length
-        ? `${broker.github.join(', ')}, pull requests ${broker.git ? 'on' : 'off'}`
-        : 'off'
-    case 'jira':
-      return list(broker.jira)
-    case 'k8s':
-      return list(broker.k8s)
-    case 'ssh':
-      return broker.sshHosts
-        ? `${broker.sshHosts} ${broker.sshHosts === 1 ? 'host' : 'hosts'}`
-        : 'off'
-    default:
-      return undefined
-  }
 }
 
 function credentialsHelp(reasoner: string): string {

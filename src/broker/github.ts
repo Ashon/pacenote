@@ -1,7 +1,7 @@
 /**
  * Read-only GitHub lookups. Uses the broker's GitHub token to view only
- * repositories in the allowed orgs (GIT_ALLOWED_OWNERS). The reasoner container
- * has no token and cannot reach GitHub. PR and repository lookups go through
+ * repositories in the allowed orgs (GIT_ALLOWED_OWNERS). The reasoner's VM has
+ * no token and cannot reach GitHub. PR and repository lookups go through
  * these tools only.
  */
 export interface RepoRef {

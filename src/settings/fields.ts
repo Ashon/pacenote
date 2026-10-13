@@ -1,5 +1,4 @@
 import type { MessengerId } from '../messengers/ids.js'
-import type { SandboxComponent } from '../sandbox/types.js'
 
 /**
  * Config file (.env, ~/.pacenote/.env outside the repository) entries handled
@@ -35,12 +34,12 @@ export const SETTING_SECTIONS: {
   {
     id: 'sandbox',
     label: 'Sandbox',
-    help: 'Where the reasoner CLI runs for each request. Allowed domains apply at once in the built-in sandbox and when the proxy restarts in Docker; everything else when Pace restarts.',
+    help: 'Where the reasoner CLI runs for each request. Allowed domains apply at once; everything else when Pace restarts.',
   },
   {
     id: 'ops',
     label: 'Ops tools',
-    help: "Tools the reasoner can call through ops-broker. SSH keys, kubeconfig, and tokens stay in the broker container, never in the reasoner's.",
+    help: "Tools the reasoner can call through ops-broker. SSH keys, kubeconfig, and tokens stay in the broker's VM, never in the reasoner's. Changes apply when Pace restarts.",
   },
   {
     id: 'tasks',
@@ -94,7 +93,7 @@ export interface SettingField {
    * What must be applied again after a change. Defaults to restarting the bot;
    * app: nothing, the value is read where it is used.
    */
-  applies?: SandboxComponent | 'app'
+  applies?: 'app'
   /**
    * Shown only while another field has this value, or one of these values
    * (e.g. sandbox limits only for the sandboxes). Hidden values stay in .env.
@@ -402,7 +401,7 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'RENDER_DIAGRAMS',
     group: 'diagrams',
     label: 'Render diagrams',
-    help: 'Renders mermaid, dot, vega-lite, and svg blocks in answers as PNG and uploads them. (Requires docker)',
+    help: 'Renders mermaid, dot, vega-lite, and svg blocks in answers as PNG and uploads them, in a VM of the built-in sandbox (set it up in Settings > Sandbox, even with Pace on this Mac).',
     type: 'toggle',
     default: 'on',
   },
@@ -428,12 +427,7 @@ export const SETTING_FIELDS: SettingField[] = [
       {
         value: 'vm',
         label: 'Built-in sandbox',
-        help: 'A lightweight Linux VM for each request, built into Pacenote: no Docker to install. It has only the login set below, and its only way out leads to the allowed domains. Needs Apple silicon and macOS 15 or later.',
-      },
-      {
-        value: 'docker',
-        label: 'Docker sandbox',
-        help: 'A fresh container for each request, with only the login set below and outbound traffic limited to allowed domains. Needs Docker running.',
+        help: 'A lightweight Linux VM for each request, built into Pacenote: nothing else to install. It has only the login set below, and its only way out leads to the allowed domains. Needs Apple silicon and macOS 15 or later.',
       },
     ],
     default: 'none',
@@ -442,10 +436,10 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'SANDBOX_MEMORY',
     group: 'environment',
     label: 'Memory limit',
-    help: 'docker --memory format (e.g. 2g, 1536m)',
+    help: 'For each request, such as 2g or 1536m',
     type: 'text',
     default: '2g',
-    shownWhen: { key: 'REASONER_SANDBOX', equals: ['docker', 'vm'] },
+    shownWhen: { key: 'REASONER_SANDBOX', equals: 'vm' },
   },
   {
     key: 'SANDBOX_CPUS',
@@ -453,35 +447,7 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'CPU limit',
     type: 'text',
     default: '2',
-    shownWhen: { key: 'REASONER_SANDBOX', equals: ['docker', 'vm'] },
-  },
-  {
-    key: 'SANDBOX_IMAGE',
-    group: 'environment',
-    label: 'Reasoner image',
-    type: 'text',
-    default: 'pacenote-reasoner:latest',
-    advanced: true,
-    shownWhen: { key: 'REASONER_SANDBOX', equals: 'docker' },
-  },
-  {
-    key: 'SANDBOX_NETWORK',
-    group: 'environment',
-    label: 'Docker network',
-    help: 'Internal network with no direct outbound access',
-    type: 'text',
-    default: 'pacenote-sandbox',
-    advanced: true,
-    shownWhen: { key: 'REASONER_SANDBOX', equals: 'docker' },
-  },
-  {
-    key: 'SANDBOX_PROXY_URL',
-    group: 'environment',
-    label: 'Proxy URL',
-    type: 'text',
-    default: 'http://egress-proxy:8888',
-    advanced: true,
-    shownWhen: { key: 'REASONER_SANDBOX', equals: 'docker' },
+    shownWhen: { key: 'REASONER_SANDBOX', equals: 'vm' },
   },
   {
     key: 'SANDBOX_CLAUDE_OAUTH_TOKEN',
@@ -504,7 +470,7 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'SANDBOX_CODEX_AUTH_FILE',
     group: 'credentials',
     label: 'codex login file',
-    help: 'Copied into the container when using codex in the sandbox.',
+    help: 'Copied into the VM when using codex in the sandbox.',
     type: 'text',
     default: '~/.codex/auth.json',
     shownWhen: { key: 'REASONER', equals: 'codex' },
@@ -518,21 +484,12 @@ export const SETTING_FIELDS: SettingField[] = [
     default: 'off',
   },
   {
-    key: 'OPS_BROKER_URL',
-    group: 'ops',
-    label: 'Broker URL',
-    type: 'text',
-    default: 'http://ops-broker:8080/mcp',
-    advanced: true,
-  },
-  {
     key: 'OPS_FS_ROOT',
     group: 'files',
     label: 'Work directory',
     help: 'Work directory to mount read-only (absolute path). Leave empty to turn off the file and PR tools.',
     type: 'text',
     placeholder: '/Users/me/workspaces',
-    applies: 'broker',
   },
   {
     key: 'OPS_GIT_ALLOWED_OWNERS',
@@ -541,7 +498,6 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Limits PR creation and GitHub queries to repositories of these orgs (or users). Comma-separated. Leave empty to turn off the GitHub tools.',
     type: 'text',
     placeholder: 'my-org, my-user',
-    applies: 'broker',
   },
   {
     key: 'OPS_GIT_AUTHOR_NAME',
@@ -549,7 +505,6 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'PR commit author name',
     help: "Author of commits the sandbox makes. Leave empty to use the global git config (git config --global user.name). Separate from this repository's git config.",
     type: 'text',
-    applies: 'broker',
   },
   {
     key: 'OPS_GIT_AUTHOR_EMAIL',
@@ -557,7 +512,6 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'PR commit author email',
     help: 'Leave empty to use the global git config (git config --global user.email).',
     type: 'text',
-    applies: 'broker',
   },
   {
     key: 'OPS_JIRA_URL',
@@ -566,7 +520,6 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Jira Cloud site URL. The Jira tools turn on only when the URL, email, token, and projects are all set.',
     type: 'text',
     placeholder: 'https://your-site.atlassian.net',
-    applies: 'broker',
   },
   {
     key: 'OPS_JIRA_EMAIL',
@@ -574,15 +527,13 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'Jira account email',
     help: 'Atlassian account that owns the API token. Issues and comments are posted as this account.',
     type: 'text',
-    applies: 'broker',
   },
   {
     key: 'OPS_JIRA_TOKEN',
     group: 'jira',
     label: 'Jira API token',
-    help: 'Create it under Security > API tokens at id.atlassian.com. Passed only to the broker container.',
+    help: "Create it under Security > API tokens at id.atlassian.com. Passed only to the broker's VM.",
     type: 'secret',
-    applies: 'broker',
   },
   {
     key: 'OPS_JIRA_PROJECTS',
@@ -591,7 +542,6 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Limits queries, creation, and comments to these projects. Comma-separated project keys',
     type: 'text',
     placeholder: 'PROJ, OPS',
-    applies: 'broker',
   },
   {
     key: 'OPS_K8S_CONTEXTS',
@@ -599,7 +549,6 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'k8s contexts',
     help: 'Local kubeconfig contexts to build the read-only kubeconfig from. Comma-separated. Rebuild the kubeconfig after changing them.',
     type: 'text',
-    applies: 'broker',
   },
   {
     key: 'OPS_K8S_SA',
@@ -609,7 +558,6 @@ export const SETTING_FIELDS: SettingField[] = [
     type: 'text',
     default: 'pacenote-ro',
     advanced: true,
-    applies: 'broker',
   },
   {
     key: 'OPS_K8S_SA_NAMESPACE',
@@ -618,7 +566,6 @@ export const SETTING_FIELDS: SettingField[] = [
     type: 'text',
     default: 'pacenote',
     advanced: true,
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_USER',
@@ -626,7 +573,6 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'SSH user',
     help: 'Account used for host checks. Host checks turn on only when the user, allowed range, and key are all set.',
     type: 'text',
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_ALLOWED_CIDR',
@@ -635,16 +581,14 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Only hosts in this range are checked over SSH.',
     type: 'text',
     placeholder: '192.168.10.0/24',
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_KEY',
     group: 'ssh',
     label: 'SSH key path',
-    help: 'Absolute path. The key is mounted only into the broker container.',
+    help: "Absolute path. The key is shared only into the broker's VM.",
     type: 'text',
     placeholder: '/Users/me/.ssh/id_ed25519',
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_KNOWN_HOSTS',
@@ -653,7 +597,6 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Absolute path. Leave empty to remember host keys from the first connection only inside the broker.',
     type: 'text',
     advanced: true,
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_INVENTORY_DIR',
@@ -662,7 +605,6 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Location of the ansible project used to build the host list. Relative paths are relative to this repository. Leave empty to write ~/.pacenote/ops-broker/hosts.json directly.',
     type: 'text',
     advanced: true,
-    applies: 'broker',
   },
   {
     key: 'OPS_SSH_INVENTORY',
@@ -672,7 +614,6 @@ export const SETTING_FIELDS: SettingField[] = [
     type: 'text',
     placeholder: 'inventory.ini',
     advanced: true,
-    applies: 'broker',
   },
   {
     key: 'HISTORY',

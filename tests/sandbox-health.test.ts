@@ -15,8 +15,12 @@ function recordingLogger() {
 describe('sandbox health while the bot runs', () => {
   it('reports only changes, and says when the issues are resolved', async () => {
     const results = [
-      ['The egress proxy is not running. (pnpm sandbox:up)'],
-      ['The egress proxy is not running. (pnpm sandbox:up)'],
+      [
+        'The built-in sandbox lacks the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
+      ],
+      [
+        'The built-in sandbox lacks the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
+      ],
       [],
     ]
     const onChange = vi.fn()
@@ -29,16 +33,20 @@ describe('sandbox health while the bot runs', () => {
 
     await health.check()
     expect(health.current).toEqual([
-      'The egress proxy is not running. (pnpm sandbox:up)',
+      'The built-in sandbox lacks the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
     ])
     await health.check() // unchanged: no report
     await health.check() // the proxy came up
     expect(onChange.mock.calls).toEqual([
-      [['The egress proxy is not running. (pnpm sandbox:up)']],
+      [
+        [
+          'The built-in sandbox lacks the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
+        ],
+      ],
       [[]],
     ])
     expect(lines).toEqual([
-      'ERROR [pacenote] Sandbox: The egress proxy is not running. (pnpm sandbox:up)',
+      'ERROR [pacenote] Sandbox: The built-in sandbox lacks the reasoner image: run "Set up built-in sandbox" in Settings > Sandbox (pnpm sandbox:vm).',
       'INFO  [pacenote] Sandbox ready: the earlier check issues are resolved.',
     ])
   })
@@ -61,12 +69,14 @@ describe('sandbox health while the bot runs', () => {
 
     const failing = new SandboxHealth(
       async () => {
-        throw new Error('docker not found')
+        throw new Error('pacenote-vm not found')
       },
       () => undefined,
       recordingLogger().log
     )
     await failing.check()
-    expect(failing.current).toEqual(['Sandbox check failed: docker not found'])
+    expect(failing.current).toEqual([
+      'Sandbox check failed: pacenote-vm not found',
+    ])
   })
 })

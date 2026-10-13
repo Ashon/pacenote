@@ -7,6 +7,7 @@ import { BrokerEnvSchema } from '../src/sandbox/env.js'
 import {
   envKeys,
   formatEnvValue,
+  migrateEnvText,
   readEnvFile,
   readEnvValues,
   updateEnvText,
@@ -96,6 +97,19 @@ MENTION_ALLOWED_USERS='U1, U2'
     expect(readEnvFile(file)).toBe('A=2\n')
     expect(readEnvFile(path.join(root, 'missing'))).toBe('')
   })
+
+  it('rewrites the Docker sandbox, which is gone, as the built-in one', () => {
+    const text = '# mine\nREASONER_SANDBOX=docker\nSANDBOX_IMAGE=x\n'
+    expect(migrateEnvText(text)).toEqual({
+      text: '# mine\nREASONER_SANDBOX=vm\nSANDBOX_IMAGE=x\n',
+      changed: true,
+    })
+    for (const unchanged of ['REASONER_SANDBOX=vm\n', 'A=1\n', ''])
+      expect(migrateEnvText(unchanged)).toEqual({
+        text: unchanged,
+        changed: false,
+      })
+  })
 })
 
 describe('setting fields', () => {
@@ -108,11 +122,6 @@ describe('setting fields', () => {
       const inBot = field.key in EnvSchema.shape
       const inBroker = field.key in BrokerEnvSchema.shape
       expect([field.key, inBot || inBroker]).toEqual([field.key, true])
-      // Values the broker reads are applied by recreating the broker.
-      expect([field.key, field.applies === 'broker']).toEqual([
-        field.key,
-        inBroker,
-      ])
       if (field.required) continue
       const value = (inBot ? botDefaults : brokerDefaults)[field.key]
       // An empty comma list is read as [].
@@ -169,7 +178,7 @@ describe('setting fields', () => {
     ).toEqual([
       {
         key: 'OPS_TOOLS',
-        message: expect.stringContaining('REASONER_SANDBOX=vm or docker'),
+        message: expect.stringContaining('REASONER_SANDBOX=vm'),
       },
     ])
   })

@@ -36,66 +36,13 @@ describe('app paths', () => {
 })
 
 describe('sandbox jobs', () => {
-  const ctx = { sandboxDir: '/app/sandbox', envFile: '/home/me/.pacenote/.env' }
-  const compose = ['compose', '-f', '/app/sandbox/compose.yaml']
-
-  it('each job runs its fixed steps against the same compose project', () => {
-    expect(planJob('images', ctx)).toEqual([
-      { kind: 'compose', args: [...compose, '--profile', 'build', 'build'] },
-    ])
-    expect(planJob('proxy', ctx)).toEqual([
-      { kind: 'allowlist' },
-      {
-        kind: 'compose',
-        args: [
-          ...compose,
-          'up',
-          '-d',
-          '--build',
-          '--force-recreate',
-          'egress-proxy',
-        ],
-      },
-    ])
-    expect(planJob('broker', ctx).map((step) => step.kind)).toEqual([
-      'broker-bundle',
-      'allowlist',
-      'broker-files',
-      'credentials',
-      'compose',
-    ])
-    expect(planJob('broker', ctx).at(-1)).toEqual({
-      kind: 'compose',
-      args: [
-        ...compose,
-        '--env-file',
-        '/home/me/.pacenote/.env',
-        '--profile',
-        'ops',
-        'up',
-        '-d',
-        '--build',
-        '--force-recreate',
-        'ops-broker',
-      ],
-    })
-    // Without a config file, --env-file is not passed.
-    expect(
-      planJob('broker', { sandboxDir: '/app/sandbox' }).at(-1)
-    ).toMatchObject({
-      args: expect.not.arrayContaining(['--env-file']),
-    })
-    expect(planJob('kubeconfig', ctx)).toEqual([{ kind: 'kubeconfig' }])
-    // The built-in sandbox needs no Docker: the allowed domains list, then its
-    // own setup.
-    expect(planJob('vm', ctx)).toEqual([{ kind: 'allowlist' }, { kind: 'vm' }])
-    // There, the broker runs in a VM of Pace's: its job prepares its files.
-    expect(
-      planJob('broker', { ...ctx, builtIn: true }).map((step) => step.kind)
-    ).toEqual(['broker-bundle', 'broker-files', 'note'])
+  it('each job runs its fixed steps', () => {
+    expect(planJob('kubeconfig')).toEqual([{ kind: 'kubeconfig' }])
+    // The allowed domains list, then the built-in sandbox's own setup
+    expect(planJob('vm')).toEqual([{ kind: 'allowlist' }, { kind: 'vm' }])
   })
 
-  it('layers the environment over the config file and expands PACENOTE_HOME for compose', () => {
+  it('layers the environment over the config file and expands PACENOTE_HOME', () => {
     const envFile = path.join(root, '.env')
     writeFileSync(envFile, 'OPS_SSH_USER=from-file\nOPS_FS_ROOT=/from/file\n')
     const env = jobEnv({ OPS_SSH_USER: 'from-env', HOME: '/home/me' }, envFile)

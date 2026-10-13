@@ -1,9 +1,8 @@
 # Reasoner sandbox
 The requester's message and the thread content become model input as they are. With `REASONER_SANDBOX=vm`, each
-request runs the reasoner in a lightweight Linux VM of its own, built into Pacenote; with `REASONER_SANDBOX=docker`, in a
-new container. Either is gone when the request finishes. In the code these are `VmSandbox` (`src/sandbox/vm.ts`) and
-`DockerSandbox` (`src/sandbox/docker.ts`), implementations of the `Sandbox` interface; `REASONER_SANDBOX=none`, the
-default, is `HostSandbox`, which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
+request runs the reasoner in a lightweight Linux VM of its own, built into Pacenote, gone when the request finishes. In
+the code this is `VmSandbox` (`src/sandbox/vm.ts`), an implementation of the `Sandbox` interface; `REASONER_SANDBOX=none`,
+the default, is `HostSandbox`, which runs the CLI on your Mac with your own login. See [Layers](architecture.md#layers).
 
 ## On this Mac
 
@@ -23,33 +22,49 @@ or to nothing without one:
 - At startup and every 5 minutes, Pace checks that the CLI is installed, signed in and, for codex, new enough. What is
   missing shows in the status bar with what to do.
 
-What leaves the Mac is not limited to allowed domains here; that is what the sandboxes below are for.
+What leaves the Mac is not limited to allowed domains here; that is what the built-in sandbox is for.
 
 ## Built-in sandbox
 
 ```
 bot (host) --pacenote-vm run--> a Linux VM of its own, with no network device
                                 |- the reasoner image   read-only root
-                                |- /workspace, /attachments, /out, /run/secrets   as in the Docker sandbox
-                                |- HOME, /tmp           tmpfs, empty on every run
+                                |- /workspace     reference directory (read-only, optional)
+                                |- /attachments   attached images for codex (read-only)
+                                |- /out           codex's generated images (the one writable mount)
+                                |- /run/secrets   codex's auth.json (read-only)
+                                |- HOME, /tmp     tmpfs, empty on every run
                                 '- 127.0.0.1:3128 --socket--> egress proxy in Pace --> allowed domains only
 ```
 
 Settings > Sandbox > Run environment > "Built-in sandbox" (`REASONER_SANDBOX=vm`) runs each request in a VM of its own,
 which starts in under a second. `VmSandbox` asks `pacenote-vm` to start it: a helper in the app (`apps/vm`, Swift on
 Apple's [Containerization](https://github.com/apple/containerization) and Virtualization.framework). Nothing else is
-installed: no Docker, no proxy container. It needs a Mac with Apple silicon and macOS 15 or later.
+installed. It needs a Mac with Apple silicon and macOS 15 or later; on other Macs, answers run on this Mac.
+
+Each CLI's adapter (`src/reasoners`) asks only for the mounts it needs; the paths are `SANDBOX_PATHS` in
+`src/sandbox/runtime.ts`, and the reasoner image is built for them.
 
 | Item | Limit |
 | --- | --- |
 | Isolation | A VM per request under its own Linux kernel, stopped when the request ends or is cut off. Requests at the same time each get their own |
-| Filesystem | The reasoner image read-only, and only the mounts the CLI's adapter asks for, the same ones as in Docker. A single file (codex's `auth.json`) is copied into the VM alone, never with its folder |
-| Network | No network device at all. The CLIs' `HTTPS_PROXY` is 127.0.0.1:3128, which the image forwards over a socket that pacenote-vm relays to Pace's own egress proxy (`src/sandbox/egress.ts`). It lets through only the domains in `~/.pacenote/sandbox/allowed-domains.txt` (exact names; CONNECT on 443, and plain HTTP), the list the Docker sandbox uses, and reads it again when it changes, so an edit applies to the next request. It looks each name up itself and connects to that address, never to this Mac's own (loopback), the link-local range (where cloud metadata answers), "any" or multicast, even for an allowed name; private ranges stay reachable by name |
-| Privileges | uid 1000 |
-| Auth | As in the Docker sandbox: claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` by variable name only, codex its `auth.json` read-only |
+| Filesystem | The reasoner image read-only, and only the mounts above. A single file (codex's `auth.json`) is copied into the VM alone, never with its folder |
+| Network | No network device at all. The CLIs' `HTTPS_PROXY` is 127.0.0.1:3128, which the image forwards over a socket that pacenote-vm relays to Pace's own egress proxy (`src/sandbox/egress.ts`). It lets through only the domains in `~/.pacenote/sandbox/allowed-domains.txt` (exact names; CONNECT on 443, and plain HTTP; first created from `sandbox/allowed-domains.txt`), and reads it again when it changes, so an edit applies to the next request. It looks each name up itself and connects to that address, never to this Mac's own (loopback), the link-local range (where cloud metadata answers), "any" or multicast, even for an allowed name; private ranges stay reachable by name |
+| Privileges | uid 1000, the memory and CPUs set in Settings > Sandbox |
+| Auth | claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` by variable name only (not in process arguments); codex gets its `auth.json` read-only, copied to tmpfs |
 | On failure | Settings > Sandbox and the status bar say what is missing and how to set it up. Reasoner calls fail; it does not fall back to running on the host |
 
-The CLIs run as in the Docker sandbox: the same adapters, mounts and login, from the same CLI versions.
+Per backend:
+
+- `claude`: it has no shell tool, so even inside the sandbox it can consult `/workspace` with `Read,Grep,Glob`.
+  Use this combination when you need the reference directory.
+- `codex`: inside the VM, codex's own sandbox (bubblewrap) cannot create namespaces, so every shell command is rejected.
+  This state is kept so the outer isolation is not loosened, and the reference directory is not mounted. In other
+  words, it answers from the thread context only. The model and reasoning effort are read from `model` and
+  `model_reasoning_effort` in `~/.codex/config.toml` and passed along.
+
+The domain allowlist keeps the model API domains open, so it cannot stop data being sent out through that API.
+That is why the sandbox keeps a setup where shell tools do not work (claude has no shell, codex commands are rejected).
 
 Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in the repository. It keeps everything in
 `~/.pacenote/vm`:
@@ -58,55 +73,21 @@ Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in 
    (about 290 MB), downloaded once and checked against a pinned SHA-256 (`KERNEL` in `src/sandbox/vm-setup.ts`); only the
    14 MB kernel is kept.
 2. The init filesystem: vminitd, from `ghcr.io/apple/containerization/vminit`.
-3. The reasoner image, built in a VM from `node:24-bookworm-slim` by `sandbox/vm/build.sh`, with the CLI versions pinned in
-   `sandbox/compose.yaml`. The build's own way out goes only to `deb.debian.org` and `registry.npmjs.org`.
+3. The reasoner image, built in a VM from `node:24-bookworm-slim` by `sandbox/vm/build.sh`. The build's own way out goes
+   only to `deb.debian.org` and `registry.npmjs.org`.
+4. With diagrams on, the diagram renderer's image (`sandbox/vm/renderer-build.sh`): chromium for mermaid, graphviz,
+   librsvg and vl-convert, with `pypi.org` and `files.pythonhosted.org` added to the build's way out.
+5. With ops tools on, the ops broker's image: the broker then runs in a VM of its own while Pace runs, its way out
+   limited to what its settings name (see [Ops tools](ops-tools.md#in-the-built-in-sandbox)).
 
-Run it again to build the image anew, with newer CLIs. With ops tools on, it also builds the ops broker's image: the
-broker then runs in a VM of its own while Pace runs, its way out limited to what its settings name (see
-[Ops tools](ops-tools.md#in-the-built-in-sandbox)). Diagram rendering uses Docker in any run environment.
+What goes into the images is pinned in `VERSIONS` in `src/sandbox/vm-setup.ts`. When you upgrade the host CLI, bump it
+there too and run the setup again, which builds the images anew.
 
-## Docker sandbox
+Diagrams and charts in answers render in a VM of the renderer's image with no way out at all, seeing only the folder with
+the block and its PNG; generated images are shrunk there too. That works whatever the run environment, once the built-in
+sandbox is set up, so it needs Apple silicon and macOS 15 as well.
 
-```
-bot (host) --docker run--> reasoner container --(internal network)--> egress-proxy --> allowed domains only
-                           |- /workspace     reference directory (read-only, optional)
-                           |- /attachments   attached images for codex (read-only)
-                           |- /out           codex's generated images (the one writable mount)
-                           |- /run/secrets   codex's auth.json (read-only)
-                           |- HOME, /tmp     tmpfs, empty on every run
-                           '- no other host files
-```
-
-Each CLI's adapter (`src/reasoners`) asks only for the mounts it needs; the paths are `SANDBOX_PATHS` in
-`src/sandbox/runtime.ts`, and the reasoner image is built for them.
-
-| Item | Limit |
-| --- | --- |
-| Filesystem | Read-only root. The only host files visible are the mounts above: the reference directory, attachments and the codex auth file read-only, and codex's output directory |
-| Network | `internal` network with no external route. Only domains in `~/.pacenote/sandbox/allowed-domains.txt` are allowed, via CONNECT on 443 (the file is first created from `sandbox/proxy/allowed-domains.txt`) |
-| Privileges | All capabilities dropped, `no-new-privileges`, uid 1000, pids/memory/CPU limits |
-| Auth | claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` passed by environment variable name only (not exposed in process arguments). codex gets `auth.json` mounted read-only and copied to tmpfs |
-| On failure | If the image, network or proxy is missing, the startup log says so and reasoner calls fail. It does not fall back to running on the host. |
-
-Per backend:
-
-- `claude`: it has no shell tool, so even inside the sandbox it can consult `/workspace` with `Read,Grep,Glob`.
-  Use this combination when you need the reference directory.
-- `codex`: inside the hardened container, codex's own sandbox (bubblewrap) cannot create namespaces, so every shell
-  command is rejected. This state is kept so the outer isolation is not loosened, and the reference directory is not mounted.
-  In other words, it answers from the thread context only. The model and reasoning effort are read from `model` and
-  `model_reasoning_effort` in `~/.codex/config.toml` and passed along.
-
-The domain allowlist keeps the model API domains open, so it cannot stop data being sent out through that API.
-That is why the sandbox keeps a setup where shell tools do not work (claude has no shell, codex commands are rejected).
-
-Setup:
-
-```sh
-pnpm sandbox:build     # build the reasoner image (claude, codex CLIs), the renderer image and the proxy image
-pnpm sandbox:up        # start the egress proxy and the internal network (also run after changing the allowed domains)
-claude setup-token     # for the claude backend: issue a subscription token -> SANDBOX_CLAUDE_OAUTH_TOKEN in .env
-```
+## Reasoner login
 
 In the desktop app, Settings > Sandbox > Reasoner login > "Get token from Claude" does the `claude setup-token` step: it runs
 the command (under `script`, which gives it the terminal it needs), you approve in the browser, and the token it prints is
@@ -117,4 +98,17 @@ in the status bar's check issues) and in Settings > Sandbox's status ("Sandbox c
 the [team hub](team-hub.md) each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
 is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
 
-The CLI versions are pinned by build args in `sandbox/compose.yaml`. When you upgrade the host CLI, bump them too and rebuild.
+From a terminal, `claude setup-token` prints the same token; put it in `SANDBOX_CLAUDE_OAUTH_TOKEN` in `~/.pacenote/.env`.
+
+## Before the built-in sandbox
+
+Pacenote used to offer a Docker sandbox. It is gone: `REASONER_SANDBOX=docker` is read as the built-in sandbox, and the
+desktop app rewrites it in `.env` when it starts. Nothing uses its containers, network and images any more, but the
+proxy and broker containers restart with Docker until removed:
+
+```sh
+docker rm -f pacenote-sandbox-egress-proxy-1 pacenote-sandbox-ops-broker-1
+docker network rm pacenote-sandbox pacenote-egress
+docker volume rm pacenote-sandbox_ops-work
+docker image rm pacenote-reasoner pacenote-renderer pacenote-egress-proxy pacenote-ops-broker
+```

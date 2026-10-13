@@ -1,7 +1,8 @@
 #!/bin/sh
 # Usage: render <mermaid|dot|vega-lite|svg> <input file> <output PNG>
 #        render resize <input image> <output PNG> <max long side px>
-# The container runs without network, with a read-only root and tmpfs (/tmp).
+# Runs in a VM of its own with no way out, a read-only image and an empty /tmp;
+# /io is the folder the bot shares for the input and the PNG.
 set -eu
 format="$1"
 input="$2"

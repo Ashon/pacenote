@@ -58,10 +58,10 @@ export function hostDeniedReads(
 }
 
 /**
- * In the container, /proc holds the CLI's environment, with its login, and the
+ * In the sandbox, /proc holds the CLI's environment, with its login, and the
  * secrets mount holds codex's auth.json
  */
-const CONTAINER_DENIED = ['/proc', SANDBOX_PATHS.secrets]
+const SANDBOX_DENIED = ['/proc', SANDBOX_PATHS.secrets]
 
 export function readScope(
   sandbox: Sandbox,
@@ -74,6 +74,6 @@ export function readScope(
         ? SANDBOX_PATHS.workspace
         : readOnlyDir
       : undefined,
-    denied: sandbox.isolated ? CONTAINER_DENIED : (options.deniedReads ?? []),
+    denied: sandbox.isolated ? SANDBOX_DENIED : (options.deniedReads ?? []),
   }
 }

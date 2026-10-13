@@ -7,18 +7,18 @@ import { claudeAdapter } from '../src/reasoners/claude.js'
 import { CliReasoner, createReasoner } from '../src/reasoners/cli.js'
 import { codexAdapter } from '../src/reasoners/codex.js'
 import type { ReasonerOptions } from '../src/reasoners/types.js'
-import { DockerSandbox } from '../src/sandbox/docker.js'
 import { HostSandbox } from '../src/sandbox/host.js'
+import { VmSandbox } from '../src/sandbox/vm.js'
 import { ProcessExitError, type RunResult } from '../src/sandbox/process.js'
 import type { Sandbox, SandboxRun } from '../src/sandbox/runtime.js'
 
-const docker = new DockerSandbox({
-  dockerBin: 'docker',
-  image: 'img:1',
-  network: 'sbx',
-  proxyUrl: 'http://egress-proxy:8888',
-  memory: '2g',
-  cpus: '2',
+const vm = new VmSandbox({
+  bin: '/bin/pacenote-vm',
+  root: '/vm',
+  image: 'reasoner',
+  memoryMiB: 2048,
+  cpus: 2,
+  allowlistFile: '/allowed-domains.txt',
 })
 const host = new HostSandbox()
 
@@ -40,10 +40,10 @@ const codexOptions: ReasonerOptions = {
 
 describe('claude adapter', () => {
   it('reads files in any sandbox and works in the reference directory', async () => {
-    expect(claudeAdapter.canReadFiles(docker)).toBe(true)
+    expect(claudeAdapter.canReadFiles(vm)).toBe(true)
     const run = await claudeAdapter.invocation(
       { system: 's', prompt: 'p' },
-      { sandbox: docker, options: claudeOptions, readOnlyDir: '/repo' }
+      { sandbox: vm, options: claudeOptions, readOnlyDir: '/repo' }
     )
     expect(run.command).toBe('claude')
     expect(run.cwd).toEqual({ host: '/repo', at: '/workspace' })
@@ -59,7 +59,7 @@ describe('claude adapter', () => {
         prompt: 'p',
         images: [{ path: image, mimetype: 'image/png' }],
       },
-      { sandbox: docker, options: claudeOptions }
+      { sandbox: vm, options: claudeOptions }
     )
     expect(run.args).toContain('stream-json')
     expect(JSON.parse(run.input).message.content[0].source.data).toBe(
@@ -78,7 +78,7 @@ describe('claude adapter', () => {
 
 describe('codex adapter', () => {
   it('does not read files in an isolated sandbox, and does on the host', () => {
-    expect(codexAdapter.canReadFiles(docker)).toBe(false)
+    expect(codexAdapter.canReadFiles(vm)).toBe(false)
     expect(codexAdapter.canReadFiles(host)).toBe(true)
   })
 
@@ -91,7 +91,7 @@ describe('codex adapter', () => {
         images: [{ path: image, mimetype: 'image/png' }],
         outputDir: out,
       },
-      { sandbox: docker, options: codexOptions }
+      { sandbox: vm, options: codexOptions }
     )
     expect(run.mounts).toEqual([
       { host: '/home/me/.codex/auth.json', at: '/run/secrets/codex-auth.json' },
@@ -129,7 +129,7 @@ describe('codex adapter', () => {
 
 /** Records what it is asked to run and answers with a canned result */
 class FakeSandbox implements Sandbox {
-  readonly kind = 'docker' as const
+  readonly kind = 'vm' as const
   readonly isolated = true
   runs: SandboxRun[] = []
   constructor(private readonly result: (run: SandboxRun) => RunResult) {}
@@ -172,7 +172,7 @@ describe('CliReasoner', () => {
     )
     expect(reasoner).toMatchObject({
       backend: 'claude',
-      sandbox: 'docker',
+      sandbox: 'vm',
       canReadFiles: true,
       mcpServerNames: ['ops'],
     })
@@ -223,11 +223,11 @@ describe('CliReasoner', () => {
 
   it('passes other errors through unchanged', async () => {
     const box = new FakeSandbox(() => {
-      throw new Error('docker is not running')
+      throw new Error('pacenote-vm did not start')
     })
     const reasoner = new CliReasoner(claudeAdapter, claudeOptions, box)
     await expect(
       reasoner.complete({ system: 's', prompt: 'p' })
-    ).rejects.toThrow('docker is not running')
+    ).rejects.toThrow('pacenote-vm did not start')
   })
 })

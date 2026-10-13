@@ -591,7 +591,7 @@ ${this.parts.join('\n')}
 }
 
 /**
- * Slack, Pace's layers on the Mac, the Docker sandbox, and what the sandbox
+ * Slack, Pace's layers on the Mac, the built-in sandbox, and what the sandbox
  * may reach
  */
 function architecture(c) {
@@ -648,12 +648,12 @@ function architecture(c) {
       help: 'Reasoner: calls the CLI, reads its steps',
     },
     {
-      label: 'sandbox/docker',
-      help: 'Sandbox: a container per request, or the host',
+      label: 'sandbox/vm',
+      help: 'Sandbox: a Linux VM per request, or the host',
     },
   ])
   c.badges(376, TOP + 286, [
-    ['claude@docker', { icon: 'cpu' }],
+    ['claude@vm', { icon: 'cpu' }],
     ['👀 on the mention', { tone: 'running' }],
   ])
   c.rows(
@@ -691,18 +691,18 @@ function architecture(c) {
   c.well(844, TOP, 308, 418)
   c.heading(860, TOP + 30, 276, {
     icon: 'container',
-    title: 'Docker sandbox',
-    meta: 'pacenote-* containers',
+    title: 'Built-in sandbox',
+    meta: 'pacenote-vm',
   })
   c.hairline(860, 1136, TOP + 46)
-  c.text(860, TOP + 66, 'Every container', { size: 11.5, fill: c.t.muted })
-  const first = c.badge(860, TOP + 76, 'read-only root')
-  c.badge(866 + first, TOP + 76, 'no capabilities')
-  const second = c.badge(860, TOP + 102, 'internal network')
-  c.badge(866 + second, TOP + 102, 'removed after use')
+  c.text(860, TOP + 66, 'Every VM', { size: 11.5, fill: c.t.muted })
+  const first = c.badge(860, TOP + 76, 'read-only image')
+  c.badge(866 + first, TOP + 76, 'its own kernel')
+  const second = c.badge(860, TOP + 102, 'no network device')
+  c.badge(866 + second, TOP + 102, 'gone after use')
   c.rows(860, TOP + 138, 276, [
-    { label: 'renderer', help: 'Diagrams to PNG, no network' },
-    { label: 'reasoner', help: 'claude or codex, a new container per request' },
+    { label: 'renderer', help: 'Diagrams to PNG, no way out' },
+    { label: 'reasoner', help: 'claude or codex, a new VM per request' },
   ])
   c.hairline(860, 1136, TOP + 230)
   c.vline(998, TOP + 240, TOP + 402)
@@ -719,7 +719,7 @@ function architecture(c) {
     )
     c.text(x + 8, TOP + 249, label, { size: 11, fill: c.t.muted })
   })
-  c.text(860, TOP + 274, 'egress-proxy', { mono: true, size: 12, weight: 600 })
+  c.text(860, TOP + 274, 'proxy in Pace', { mono: true, size: 12, weight: 600 })
   c.text(860, TOP + 291, 'Allowed domains only', {
     size: 11.5,
     fill: c.t.muted,
@@ -772,7 +772,7 @@ function architecture(c) {
       [808, TOP + 207],
       [852, TOP + 207],
     ],
-    { main: true, label: 'docker run', at: [808, TOP + 230] }
+    { main: true, label: 'start a VM', at: [808, TOP + 230] }
   )
 
   // The rules that hold everywhere
@@ -1114,7 +1114,7 @@ function mentionFlow(c) {
     },
     {
       title: 'Sandbox',
-      help: 'Docker or the host',
+      help: 'A VM or the host',
       icon: 'container',
       y: 432,
       h: 100,
@@ -1453,9 +1453,9 @@ function layers(c) {
       lower: 'Implementations',
       adapters: [
         ['host.ts', 'Your login, no isolation'],
-        ['docker.ts', 'Hardened, one per request'],
+        ['vm.ts', 'A Linux VM per request'],
       ],
-      slots: ['Podman', 'A VM or a remote runner'],
+      slots: ['A container runtime', 'A remote runner'],
     },
   ]
 
@@ -1523,7 +1523,7 @@ function layers(c) {
     [
       'settings-2',
       'Settings',
-      "REASONER picks the model's adapter, REASONER_SANDBOX the sandbox: host or docker.",
+      "REASONER picks the model's adapter, REASONER_SANDBOX the sandbox: host or vm.",
     ],
     [
       'cpu',
@@ -1533,7 +1533,7 @@ function layers(c) {
     [
       'container',
       'A runtime',
-      'A Sandbox in src/sandbox. Adapters ask for mounts and env, never for docker.',
+      'A Sandbox in src/sandbox. Adapters ask for mounts and env, never for a runtime.',
     ],
   ]
   c.hairline(48, 1152, TOP + H + 24)
@@ -1658,7 +1658,7 @@ function codeLayout(c) {
   const around = [
     [
       ['reasoners/', 'An adapter per CLI'],
-      ['sandbox/', 'Where it runs: host, docker'],
+      ['sandbox/', 'Where it runs: host, a VM'],
       ['history/', 'runs/, the stats, over MCP'],
       ['tasks/', 'Your tasks, their MCP tools'],
     ],

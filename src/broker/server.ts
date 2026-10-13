@@ -46,19 +46,19 @@ import {
 import { redactSecrets } from './redact.js'
 
 /**
- * Ops check relay (ops-broker). An MCP (Streamable HTTP) server reachable only
- * from the sandbox internal network. SSH keys, kubeconfig, and the work
- * directory exist only in this container; the reasoner container only requests
- * predefined lookups.
+ * Ops check relay (ops-broker). An MCP (Streamable HTTP) server in a VM of its
+ * own, reachable only through the door Pace relays into each reasoner VM. SSH
+ * keys, kubeconfig, and the work directory exist only in this VM; the reasoner
+ * only requests predefined lookups.
  * - host_*: read-only host checks on inventory hosts (SSH)
  * - k8s_*: kubectl lookups with a read-only ServiceAccount
  * - fs_*: read-only browsing of the work directory (secret files excluded)
  * - ws_*: code edits and draft PR creation in a separate workspace created from
  *   the remote default branch
  * - gh_*: read-only lookups of GitHub repositories and PRs in allowed orgs (the
- *   token exists only in this container)
+ *   token exists only in this VM)
  * - jira_*: Jira issue lookups in allowed projects, plus issue creation and
- *   comments on request (the token exists only in this container)
+ *   comments on request (the token exists only in this VM)
  * Features with empty settings or an empty mounted file do not register their
  * tools.
  */

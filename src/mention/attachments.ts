@@ -8,7 +8,8 @@ import type { Download, MessageFile } from '../messengers/types.js'
  * - Images: saved as files and passed to the CLI as images.
  * - Text (logs, config, code, snippets): the content goes into the prompt as
  *   data.
- * - PDF: only the text is extracted, in a container without network access.
+ * - PDF: only the text is extracted, in a VM without network access when the
+ *   built-in sandbox is on.
  * - Other formats, files the messenger cannot give out: reports why they could
  *   not be read.
  */
@@ -227,7 +228,7 @@ export interface LoadDeps {
   dir: string
   /** The messenger's download (Messenger.download) */
   download(file: MessageFile): Promise<Download>
-  /** Extracts text from a PDF. (sandbox container or host) */
+  /** Extracts text from a PDF. (the sandbox's VM, or this Mac) */
   extractPdfText(pdfPath: string): Promise<string>
 }
 

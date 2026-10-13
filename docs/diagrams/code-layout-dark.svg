@@ -111,7 +111,7 @@
 <text x="768" y="523" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#93a79e" text-anchor="start">An adapter per CLI</text>
 <path d="M768 532.5H944" stroke="#25322e" stroke-width="1"/>
 <text x="768" y="552" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#e1ebe6" text-anchor="start">sandbox/</text>
-<text x="768" y="569" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#93a79e" text-anchor="start">Where it runs: host, docker</text>
+<text x="768" y="569" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#93a79e" text-anchor="start">Where it runs: host, a VM</text>
 <path d="M768 578.5H944" stroke="#25322e" stroke-width="1"/>
 <text x="768" y="598" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#e1ebe6" text-anchor="start">history/</text>
 <text x="768" y="615" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#93a79e" text-anchor="start">runs/, the stats, over MCP</text>

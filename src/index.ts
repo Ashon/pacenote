@@ -12,7 +12,6 @@ import {
 import { connectSlack } from './messengers/slack/connect.js'
 import { createReasoner } from './reasoners/cli.js'
 import { hostCliProblems } from './reasoners/host-check.js'
-import { DockerSandbox } from './sandbox/docker.js'
 import { HostSandbox } from './sandbox/host.js'
 import { VmSandbox } from './sandbox/vm.js'
 import type { Sandbox } from './sandbox/runtime.js'
@@ -117,17 +116,15 @@ async function main(): Promise<void> {
   /** Why the reasoner cannot answer, until it answers again */
   let reasonerProblem: string | undefined
 
-  const sandbox: Sandbox = config.reasoner.sandbox
-    ? new DockerSandbox(config.reasoner.sandbox)
-    : config.reasoner.vm
-      ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
-      : new HostSandbox(config.reasoner.commands)
+  const sandbox: Sandbox = config.reasoner.vm
+    ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
+    : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
   const reasoner = createReasoner(config.reasoner, sandbox)
   // If the sandbox is not ready, reasoner calls fail. They do not fall back to
   // the host. The check repeats while the bot runs, and right away when the
   // desktop app finishes a sandbox job, so the status (and the status bar)
-  // follows a proxy that is started or stopped later.
+  // follows a setup that finishes later.
   // On this Mac, the CLI itself is what to check: installed, signed in, and
   // recent enough, before a mention fails on it.
   const checked = sandbox.kind === 'host' ? 'Reasoner' : 'Sandbox'
@@ -158,8 +155,7 @@ async function main(): Promise<void> {
   let renderer: DiagramRenderer | undefined
   if (config.render.enabled) {
     const candidate = new DiagramRenderer({
-      dockerBin: config.render.dockerBin,
-      image: config.render.image,
+      ...config.render.vm,
       timeoutMs: 60_000,
     })
     const rendererProblems = await candidate.verify()
@@ -232,8 +228,8 @@ async function main(): Promise<void> {
   await connection.start((mention) => responder.handle(mention))
   status.update({ state: 'running' })
   running = true
-  // The CLI's sign-in changes rarely; the sandbox's proxy may stop any time.
-  sandboxHealth.start(sandbox.kind === 'docker' ? 30_000 : 5 * 60_000)
+  // The CLI's sign-in and the sandbox's parts change rarely.
+  sandboxHealth.start(5 * 60_000)
   // Messages from the desktop app
   parentPort()?.on('message', (event) => {
     const type = (event.data as { type?: string } | undefined)?.type

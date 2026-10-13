@@ -1,12 +1,9 @@
-import { spawn, spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { ensureAllowlistFile } from '../sandbox/allowlist.js'
 import { loadBrokerEnv } from '../sandbox/env.js'
 import { writeKubeconfig } from '../sandbox/kubeconfig.js'
-import { prepareBrokerFiles } from '../sandbox/prepare.js'
 import { defaultVmBin } from '../sandbox/vm.js'
 import { setupVm } from '../sandbox/vm-setup.js'
 import { readEnvFile, readEnvValues } from '../settings/env-file.js'
@@ -18,86 +15,23 @@ import {
 } from '../settings/paths.js'
 
 /**
- * Sandbox apply jobs. The desktop app and the terminal (pnpm sandbox:*) use the
- * same steps.
- * Usage: sandbox-job <images|proxy|broker|kubeconfig|vm> [--dry-run]
+ * Sandbox jobs. The desktop app and the terminal (pnpm sandbox:vm,
+ * k8s:kubeconfig) use the same steps.
+ * Usage: sandbox-job <vm|kubeconfig> [--dry-run]
  * - The sandbox directory is PACENOTE_SANDBOX_DIR (the sandbox inside the
  *   bundle for the app), otherwise sandbox in the current directory
  * - Settings are read from the config file (PACENOTE_HOME/.env), and existing
  *   environment variables take precedence. (Same as node --env-file)
- * - The compose project name (pacenote-sandbox) is the same, so the repository
- *   and the app manage the same containers.
  */
-export const JOB_KINDS = [
-  'images',
-  'proxy',
-  'broker',
-  'kubeconfig',
-  'vm',
-] as const
+export const JOB_KINDS = ['vm', 'kubeconfig'] as const
 export type JobKind = (typeof JOB_KINDS)[number]
 
-export interface JobContext {
-  sandboxDir: string
-  /** Config file. If present, it is also passed to compose as --env-file. */
-  envFile?: string
-  /**
-   * The built-in VM sandbox is the run environment: the broker runs in a VM of
-   * Pace's, so its job only prepares its files.
-   */
-  builtIn?: boolean
-}
-
 export type JobStep =
-  | { kind: 'allowlist' }
-  | { kind: 'broker-files' }
-  | { kind: 'broker-bundle' }
-  | { kind: 'kubeconfig' }
-  | { kind: 'credentials' }
-  | { kind: 'vm' }
-  | { kind: 'note'; text: string }
-  | { kind: 'compose'; args: string[] }
+  { kind: 'allowlist' } | { kind: 'kubeconfig' } | { kind: 'vm' }
 
 /** Turns a job into steps. (Does not run them) */
-export function planJob(kind: JobKind, ctx: JobContext): JobStep[] {
-  const compose = (...args: string[]) => ({
-    kind: 'compose' as const,
-    args: ['compose', '-f', path.join(ctx.sandboxDir, 'compose.yaml'), ...args],
-  })
+export function planJob(kind: JobKind): JobStep[] {
   switch (kind) {
-    case 'images':
-      return [compose('--profile', 'build', 'build')]
-    case 'proxy':
-      return [
-        { kind: 'allowlist' },
-        compose('up', '-d', '--build', '--force-recreate', 'egress-proxy'),
-      ]
-    case 'broker':
-      if (ctx.builtIn)
-        return [
-          { kind: 'broker-bundle' },
-          { kind: 'broker-files' },
-          {
-            kind: 'note',
-            text: "Restart Pace to apply: the broker's VM starts with it.",
-          },
-        ]
-      return [
-        { kind: 'broker-bundle' },
-        { kind: 'allowlist' },
-        { kind: 'broker-files' },
-        { kind: 'credentials' },
-        compose(
-          ...(ctx.envFile ? ['--env-file', ctx.envFile] : []),
-          '--profile',
-          'ops',
-          'up',
-          '-d',
-          '--build',
-          '--force-recreate',
-          'ops-broker'
-        ),
-      ]
     case 'kubeconfig':
       return [{ kind: 'kubeconfig' }]
     case 'vm':
@@ -107,7 +41,7 @@ export function planJob(kind: JobKind, ctx: JobContext): JobStep[] {
 
 /**
  * Overlays the current environment variables on the config file values.
- * PACENOTE_HOME is always passed resolved, so compose uses the same location as
+ * PACENOTE_HOME is always passed resolved, so the job uses the same location as
  * the app.
  */
 export function jobEnv(
@@ -123,33 +57,6 @@ export function jobEnv(
   return merged
 }
 
-const capture = (command: string, args: string[], env: NodeJS.ProcessEnv) => {
-  const result = spawnSync(command, args, {
-    env,
-    encoding: 'utf8',
-    timeout: 15_000,
-  })
-  return result.status === 0 ? result.stdout.trim() : ''
-}
-
-function run(
-  command: string,
-  args: string[],
-  env: NodeJS.ProcessEnv
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { env, stdio: 'inherit' })
-    child.on('error', (err) =>
-      reject(new Error(`Failed to run ${command}: ${err.message}`))
-    )
-    child.on('close', (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`${command} exited with code ${code}.`))
-    )
-  })
-}
-
 async function main(): Promise<void> {
   const [kind, ...flags] = process.argv.slice(2)
   if (!JOB_KINDS.includes(kind as JobKind))
@@ -161,11 +68,7 @@ async function main(): Promise<void> {
   const envFile = envFilePath()
   const env = jobEnv(process.env, envFile)
   const log = (line: string) => console.log(line)
-  const steps = planJob(kind as JobKind, {
-    sandboxDir,
-    envFile: existsSync(envFile) ? envFile : undefined,
-    builtIn: env.REASONER_SANDBOX === 'vm',
-  })
+  const steps = planJob(kind as JobKind)
 
   for (const step of steps) {
     switch (step.kind) {
@@ -175,48 +78,12 @@ async function main(): Promise<void> {
         if (!dryRun)
           ensureAllowlistFile(
             file,
-            path.join(sandboxDir, 'proxy/allowed-domains.txt')
+            path.join(sandboxDir, 'allowed-domains.txt')
           )
         break
       }
-      case 'broker-bundle': {
-        const bundle = path.join(sandboxDir, 'ops-broker/dist/server.mjs')
-        if (!existsSync(bundle))
-          throw new Error(
-            `Broker bundle not found: ${bundle} (run pnpm bundle in the repository)`
-          )
-        break
-      }
-      case 'broker-files':
-        if (!dryRun) await prepareBrokerFiles(loadBrokerEnv(env), env, log)
-        break
-      case 'credentials':
-        // PRs use the gh login account, the commit author uses OPS_GIT_AUTHOR_*
-        // or the global git config (repository local config is not consulted)
-        env.GH_TOKEN ||= capture('gh', ['auth', 'token'], env)
-        env.GIT_AUTHOR_NAME ||= capture(
-          'git',
-          ['config', '--global', 'user.name'],
-          env
-        )
-        env.GIT_AUTHOR_EMAIL ||= capture(
-          'git',
-          ['config', '--global', 'user.email'],
-          env
-        )
-        log(
-          `GitHub token ${env.GH_TOKEN ? 'present' : 'missing (gh auth login)'}, commit author ${env.GIT_AUTHOR_EMAIL || 'none'}`
-        )
-        break
       case 'kubeconfig':
         if (!dryRun) await writeKubeconfig(loadBrokerEnv(env), env, log)
-        break
-      case 'compose':
-        log(`$ docker ${step.args.join(' ')}`)
-        if (!dryRun) await run('docker', step.args, env)
-        break
-      case 'note':
-        log(step.text)
         break
       case 'vm': {
         const root = vmRootPath(env)
@@ -229,6 +96,7 @@ async function main(): Promise<void> {
             sandboxDir,
             log,
             broker: env.OPS_TOOLS === 'on',
+            renderer: env.RENDER_DIAGRAMS !== 'off',
           })
         break
       }

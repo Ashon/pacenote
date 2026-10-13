@@ -21,8 +21,8 @@ export function hostEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 /**
- * Runs the CLI directly on this computer, with the user's own login. No
- * container: mounts are only the host paths themselves, and the CLI's own
+ * Runs the CLI directly on this computer, with the user's own login. No VM:
+ * mounts are only the host paths themselves, and the CLI's own
  * sandboxing is all there is, which the adapters keep to the reference
  * directory (claude's read rules, codex's permission profile).
  */

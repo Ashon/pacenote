@@ -16,7 +16,7 @@ const CAUSES: [FailureCause, RegExp][] = [
   ['limit', /\b429\b|rate[ _]limit|usage limit|quota|credit balance/i],
   [
     'setup',
-    /docker daemon|no such image|unable to find image|network \S+ not found|executable not found/i,
+    /no image \S+ in |is missing \(.*\): prepare first|pacenote-vm not found|executable not found/i,
   ],
   [
     'unavailable',
@@ -98,7 +98,7 @@ export function failureAdvice(
       }
     case 'setup':
       return {
-        text: 'Something Pace runs on failed: Docker, the sandbox images or the CLI. The Pace screen and Settings > Sandbox show what.',
+        text: 'Something Pace runs on failed: the built-in sandbox or the CLI. The Pace screen and Settings > Sandbox show what.',
         route: '#/bot',
         lasting: false,
       }

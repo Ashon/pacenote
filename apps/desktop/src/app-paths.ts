@@ -16,9 +16,12 @@ export interface AppPaths {
   webDist: string
   /** Bot entry file */
   botEntry: string
-  /** sandbox/compose.yaml and image build files */
+  /**
+   * The sandbox folder: the image build files, the broker bundle and the
+   * default allowed domains
+   */
   sandboxDir: string
-  /** Sandbox apply job (src/tools/sandbox-job.ts bundle) */
+  /** Sandbox jobs (src/tools/sandbox-job.ts bundle) */
   jobRunner: string
   /** The run history's MCP server (src/tools/history-mcp.ts bundle) */
   historyMcp: string

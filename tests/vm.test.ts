@@ -20,12 +20,7 @@ import {
   vmRunArgs,
   vmUnsupported,
 } from '../src/sandbox/vm.js'
-import {
-  fetchKernel,
-  kernelPath,
-  kubectlVersion,
-  reasonerVersions,
-} from '../src/sandbox/vm-setup.js'
+import { fetchKernel, kernelPath, VERSIONS } from '../src/sandbox/vm-setup.js'
 import { brokerDestinations, openBrokerDoor } from '../src/sandbox/vm-broker.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-vm-'))
@@ -202,7 +197,7 @@ describe('built-in sandbox runs', () => {
     ).toEqual(['--workdir', '/work', '--', 'pdftotext', '/in/a.pdf', '-'])
   })
 
-  it('reads the memory limit as the Docker sandbox does', () => {
+  it('reads the memory limit as a size such as 2g or 1536m', () => {
     expect(memoryMiB('2g')).toBe(2048)
     expect(memoryMiB('1536m')).toBe(1536)
     expect(memoryMiB('64m')).toBe(256)
@@ -388,11 +383,11 @@ describe('the ops broker in its own VM', () => {
 })
 
 describe('built-in sandbox setup', () => {
-  it('builds with the CLI and kubectl versions the Docker images use', () => {
-    const versions = reasonerVersions(path.resolve('sandbox'))
-    expect(versions.claude).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(versions.codex).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(kubectlVersion(path.resolve('sandbox'))).toMatch(/^v\d+\.\d+\.\d+$/)
+  it('pins what goes into the images to exact versions', () => {
+    expect(VERSIONS.claude).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(VERSIONS.codex).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(VERSIONS.kubectl).toMatch(/^v\d+\.\d+\.\d+$/)
+    expect(VERSIONS.mermaidCli).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
   it('keeps the kernel only from an archive whose hash matches', async () => {
@@ -483,7 +478,6 @@ describe('config', () => {
       SANDBOX_MEMORY: '3g',
       PACENOTE_VM_BIN: '/Applications/Pacenote.app/Contents/MacOS/pacenote-vm',
     })
-    expect(config.reasoner.sandbox).toBeUndefined()
     expect(config.reasoner.auth).toEqual({
       env: { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat01-x' },
     })
@@ -499,7 +493,7 @@ describe('config', () => {
 
   it('needs the sandbox login', () => {
     expect(() => loadConfig({ ...base, REASONER_SANDBOX: 'vm' })).toThrow(
-      /REASONER_SANDBOX=vm requires SANDBOX_CLAUDE_OAUTH_TOKEN/
+      /built-in sandbox requires SANDBOX_CLAUDE_OAUTH_TOKEN/
     )
   })
 
@@ -525,7 +519,7 @@ describe('config', () => {
     })
     // Not without a sandbox
     expect(() => loadConfig({ ...ops, REASONER_SANDBOX: 'none' })).toThrow(
-      /OPS_TOOLS=on requires a sandbox/
+      /OPS_TOOLS=on requires the built-in sandbox/
     )
   })
 })

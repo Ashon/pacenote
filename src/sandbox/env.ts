@@ -2,10 +2,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import type { ConfigIssue } from '../config.js'
 
-/**
- * compose does not expand ~ in .env values, so mount paths accept only absolute
- * paths.
- */
+/** Mount paths accept only absolute paths: ~ is not expanded. */
 const absolutePath = z
   .string()
   .refine(
@@ -18,9 +15,9 @@ const projectKey = '[A-Za-z][A-Za-z0-9_]*'
 const name = '[A-Za-z0-9][A-Za-z0-9._@-]*'
 
 /**
- * Values that ops-broker and its prep jobs (sandbox-job broker, kubeconfig)
- * read from .env. Must match the defaults in sandbox/compose.yaml. For empty
- * features the broker starts without those tools.
+ * Values that ops-broker and its prep jobs (the broker's start, sandbox-job
+ * kubeconfig) read from .env. For empty features the broker starts without
+ * those tools.
  */
 export const BrokerEnvSchema = z.object({
   /**
@@ -161,18 +158,14 @@ export function splitList(value: string | undefined): string[] {
 }
 
 /**
- * Empty placeholder an unset mount points to instead. Created by the broker
- * job. (src/sandbox/prepare.ts) (runtimeDir must match brokerRuntimeDir() and
- * sandbox/compose.yaml)
+ * Empty placeholder an unset mount points to instead. Created when the broker
+ * starts. (src/sandbox/prepare.ts) (runtimeDir must match brokerRuntimeDir())
  */
 export function unsetMount(runtimeDir: string, name: string): string {
   return path.join(runtimeDir, 'unset', name)
 }
 
-/**
- * Values compose actually uses (with defaults expanded). Used to compare
- * against the broker.
- */
+/** Values the broker starts with (with defaults expanded) */
 export function brokerExpected(env: NodeJS.ProcessEnv, runtimeDir: string) {
   const parsed = BrokerEnvSchema.parse(provided(env))
   const unset = (name: string) => unsetMount(runtimeDir, name)

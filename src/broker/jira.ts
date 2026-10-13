@@ -1,7 +1,7 @@
 /**
  * Jira Cloud lookups, issue creation, and comments. Uses the broker's API token
- * and handles only the allowed projects (JIRA_PROJECTS). The reasoner container
- * has no token and cannot reach Jira.
+ * and handles only the allowed projects (JIRA_PROJECTS). The reasoner's VM has
+ * no token and cannot reach Jira.
  * Writes are recorded under the token owner's account, so only creation and
  * comments are offered, not status changes (transitions).
  */

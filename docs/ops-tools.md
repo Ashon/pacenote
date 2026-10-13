@@ -1,10 +1,10 @@
 # Ops tools (ops-broker)
 With `OPS_TOOLS=on`, the reasoner CLI can query operational state and fix code into draft PRs. Credentials and the work directory
-are never put into the reasoner container; only a separate relay container (`ops-broker`) holds them. The reasoner container can
+are never put into the reasoner's VM; only a separate relay (`ops-broker`), in a VM of its own, holds them. The reasoner can
 only request fixed queries through MCP tools.
 
 ```
-reasoner container --MCP(http, internal network)--> ops-broker     --ssh OPS_SSH_USER--> inventory hosts (within OPS_SSH_ALLOWED_CIDR)
+reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH_USER--> inventory hosts (within OPS_SSH_ALLOWED_CIDR)
   (no credentials, no shell or shell rejected)      (keys, tokens) --kubectl (read-only SA)--> OPS_K8S_CONTEXTS clusters
                                                                    --read-only mount--> OPS_FS_ROOT
                                                                    --git(https, user token)--> GitHub (pacenote/* branches, draft PRs)
@@ -23,18 +23,17 @@ reasoner container --MCP(http, internal network)--> ops-broker     --ssh OPS_SSH
 
 - Every tool output is returned with secret values in common formats, such as tokens and private keys, masked.
 - Jira is accessed only with the broker's API token (`OPS_JIRA_TOKEN`). The broker connects directly, so Jira is not added to the proxy's allowed domains.
-- GitHub is queried only with the broker's token (`gh auth token`). The reasoner container cannot reach GitHub and has no token.
+- GitHub is queried only with the broker's token (`gh auth token`). The reasoner's VM cannot reach GitHub and has no token.
   codex's ChatGPT app connectors (`codex_apps`, including the GitHub connector) have a different permission scope and send data
   over a different path, so they are turned off in sandbox runs. (`codex exec --disable apps`)
-- Every call is logged by the broker (`docker logs pacenote-sandbox-ops-broker-1`; in the built-in sandbox, Pace's own log).
-- Because it uses credentials, the bot does not start without a sandbox (`REASONER_SANDBOX=vm` or `docker`) and
+- Every call is logged by the broker, in Pace's own log.
+- Because it uses credentials, the bot does not start without the built-in sandbox (`REASONER_SANDBOX=vm`) and
   `MENTION_ALLOWED_USERS`, with `MENTION_ANYONE` off.
-- To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts` and rebuild the broker.
+- To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts`, bundle the broker (`pnpm bundle`) and restart Pace.
 
 ## In the built-in sandbox
 
-With `REASONER_SANDBOX=vm`, the broker runs in a Linux VM of its own while Pace runs (`src/sandbox/vm-broker.ts`), not in
-a container:
+The broker runs in a Linux VM of its own while Pace runs (`src/sandbox/vm-broker.ts`):
 
 ```
 reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:3128--> Pace's broker egress --> what its settings name
@@ -44,29 +43,29 @@ reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:312
 - The VMs share no network: each reasoner VM gets a door to the broker of its run's own, where it is 127.0.0.1:8080.
   The door is Pace's: it adds who the run answers (the Slack user, the channel, the thread and the run) to every call
   and drops any such header the reasoner sent, so the broker's audit lines say who asked, in Pace's log
-  (`"by":{"user":"U0...","label":"#ops",...}`). The Docker broker cannot know: the reasoner reaches it directly.
+  (`"by":{"user":"U0...","label":"#ops",...}`).
 - The broker's VM has no network device either. Its way out is an egress proxy in Pace that lets it reach only what its
   settings name: the hosts in `hosts.json` on port 22 (ssh goes through it with a ProxyCommand), each kubeconfig
-  cluster's API server, `github.com` and `api.github.com` when the GitHub tools are on, and the Jira site. The Docker
-  broker can reach anything; this one cannot. It never reaches this Mac's own addresses.
-- It gets the same files and settings as the Docker broker: `hosts.json` is built from the inventory and the GitHub
-  token read with `gh auth token` each time Pace starts. Its work folder (mirrors and worktrees) is `~/.pacenote/vm/broker-work`.
-- Its image (ssh, git, ripgrep and the same kubectl) is built by "Set up built-in sandbox" when ops tools are on; the
-  broker's code is mounted from the app at each start, so a newer Pacenote needs no new image.
-- Settings apply when Pace restarts. "Recreate broker" only prepares the broker's files then.
+  cluster's API server, `github.com` and `api.github.com` when the GitHub tools are on, and the Jira site. It never reaches
+  this Mac's own addresses.
+- Each time Pace starts, `hosts.json` is built from the inventory and the GitHub token read with `gh auth token`. Its work
+  folder (mirrors and worktrees) is `~/.pacenote/vm/broker-work`.
+- Its image (ssh, git, ripgrep and kubectl) is built by "Set up built-in sandbox" when ops tools are on; the broker's code
+  is mounted from the app at each start, so a newer Pacenote needs no new image.
+- Settings apply when Pace restarts.
 
 ## Code changes and PRs
 
 - `ws_prepare(repo)`: finds `origin` from the local repository directory name and, if it is a repository of an allowed org
   (`OPS_GIT_ALLOWED_OWNERS`), creates a workspace on a `pacenote/<date>-<id>` branch from the remote default branch.
-  The workspace is a mirror worktree in the broker volume (`ops-work`), so the user's local working tree and changes in progress are not touched.
+  The workspace is a mirror worktree in the broker's work folder (`~/.pacenote/vm/broker-work`), so the user's local working tree and changes in progress are not touched.
 - Changes are made only with `ws_edit` (exact string replacement), `ws_write` and `ws_delete`. There is no shell and no test run.
   Verification is left to the PR's CI and human review.
 - `ws_create_pr`: commits after policy checks, pushes only to `pacenote/*` branches, and creates a draft PR.
   - Rejected: no changes, `.github/workflows/`, `.gitmodules`, secret file paths, secret value formats in the diff, more than 50 files, more than 3000 added lines
   - The commit author is `OPS_GIT_AUTHOR_NAME`, `OPS_GIT_AUTHOR_EMAIL`, or, when they are empty, the user in the global git config (`git config --global`).
     This is separate from this repository's git config. PRs are created as the `gh` login account. Limited to 10 per hour.
-- The GitHub token is read with `gh auth token` by the broker jobs (`pnpm sandbox:ops-up`, "Recreate broker" in the app) and passed only as a broker environment variable. The model cannot see it.
+- The GitHub token is read with `gh auth token` when the broker starts (with Pace) and passed only as a broker environment variable. The model cannot see it.
   It has the `repo` and `workflow` scopes, so in production a fine-grained PAT limited to the target repositories is recommended instead.
 - Workspaces are cleaned up after 24 hours.
 
@@ -86,8 +85,9 @@ Files the broker generates, such as the host list and kubeconfig, are also creat
 # 1) Read-only k8s SA: apply sandbox/k8s/pacenote-ro.yaml to every cluster to query
 # 2) Build the broker kubeconfig from the SA tokens (reads the token Secrets with the local admin kubeconfig)
 pnpm k8s:kubeconfig
-# 3) Bundle the broker (pnpm bundle), prepare mounts and the host list, then build and start the broker
-pnpm sandbox:ops-up
+# 3) Build the broker's image with the built-in sandbox (with OPS_TOOLS=on), then start Pace
+pnpm bundle && pnpm sandbox:vm
 ```
 
-When the inventory or an SA token changes, run the matching command and `pnpm sandbox:ops-up` again.
+In the app, "Rebuild kubeconfig" (Settings > Ops tools > Broker) and "Set up built-in sandbox" do steps 2 and 3. When the
+inventory or an SA token changes, run the matching step and restart Pace.

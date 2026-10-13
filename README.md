@@ -18,14 +18,14 @@ voice of the app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
-  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="docs/diagrams/architecture-light.svg">
+  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker" src="docs/diagrams/architecture-light.svg">
 </picture>
 
 ## What it does
 
 - Answers mentions in the thread, with the thread and its attachments (text, images, PDFs) as context.
 - Reasons with your own `claude` or `codex` CLI login: on your Mac, reading only a folder you choose, or in a
-  disposable sandbox that reaches only allowed domains: a Linux VM built into Pacenote, or a Docker container.
+  disposable Linux VM built into Pacenote that reaches only allowed domains.
 - Answers only the people you name, and keeps its own tokens and other secrets out of what it posts.
 - Optional ops tools: read-only lookups on servers, k8s clusters and a work directory, GitHub and Jira, and code
   changes as draft PRs, through a broker that keeps credentials out of the reasoner.
@@ -60,10 +60,8 @@ Then:
      Settings > Answers, never its `.env` files, Pacenote's folder or the usual credential folders.
    - **Built-in sandbox**: a lightweight Linux VM for each answer, reaching only allowed domains, with nothing to
      install (Apple silicon, macOS 15 or later). Run "Set up built-in sandbox" in Settings > Sandbox.
-   - **Docker sandbox**: a new container for each answer, reaching only allowed domains. Run Docker (Docker Desktop,
-     OrbStack or colima), then "Build sandbox images" and "Restart proxy" in Settings > Sandbox.
 
-   Ops tools need one of the two sandboxes.
+   Ops tools need the built-in sandbox, and diagrams its setup in either run environment.
 5. Invite `@Pace` to a public channel and mention it.
 
 `brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across
@@ -75,7 +73,7 @@ upgrades and uninstalls. To run from source instead, see [Installation](docs/ins
 | --- | --- |
 | [Architecture](docs/architecture.md) | The design in six diagrams: the pieces, one mention, your tasks and AI tools, the team hub, the layers, the code layout |
 | [How it works](docs/how-it-works.md) | The path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs |
-| [Reasoner sandbox](docs/sandbox.md) | Where answers run: on this Mac and what the CLI may read there, the built-in VM sandbox, or the Docker sandbox, with their way out, allowed domains and login |
+| [Reasoner sandbox](docs/sandbox.md) | Where answers run: on this Mac and what the CLI may read there, or the built-in VM sandbox, with its way out, allowed domains and login |
 | [Ops tools](docs/ops-tools.md) | ops-broker: hosts, k8s, work directory, GitHub, Jira, and code changes as draft PRs |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
 | [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: Claude Code, Codex and other tools on your Mac reading what Pace did |

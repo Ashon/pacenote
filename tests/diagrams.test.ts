@@ -62,20 +62,34 @@ describe('composeAnswer', () => {
   })
 })
 
+const vm = {
+  bin: '/bin/pacenote-vm',
+  root: '/home/me/.pacenote/vm',
+  image: 'renderer',
+}
+
 describe('renderArgs', () => {
-  it('renders in a disposable read-only container without network access', () => {
+  it('renders in a VM of its own with no way out, seeing only its folder', () => {
     const args = renderArgs(
-      'renderer:1',
+      vm,
       '/home/me/agent/data/x/renders',
       'mermaid',
       'figure-1'
     )
-    expect(args.slice(0, 4)).toEqual(['run', '--rm', '--network', 'none'])
-    expect(args).toEqual(
-      expect.arrayContaining(['--read-only', '--cap-drop', 'ALL'])
-    )
+    expect(args.slice(0, 5)).toEqual([
+      'run',
+      '--root',
+      '/home/me/.pacenote/vm',
+      '--image',
+      'renderer',
+    ])
+    expect(args).not.toContain('--egress')
+    expect(args).not.toContain('--relay')
+    expect(args.filter((arg) => arg === '--mount')).toHaveLength(1)
+    expect(args).toContain('/home/me/agent/data/x/renders:/io:rw')
+    // The image's entrypoint is render: the format comes first.
     expect(args.slice(-4)).toEqual([
-      'renderer:1',
+      '--',
       'mermaid',
       '/io/figure-1.mmd',
       '/io/figure-1.png',
@@ -140,10 +154,11 @@ describe('generated images', () => {
 describe('resizeArgs', () => {
   it('runs resize with the same isolation as rendering', async () => {
     const { resizeArgs } = await import('../src/render/diagrams.js')
-    const args = resizeArgs('renderer:1', '/h/x/resized', 'image-1', 512)
-    expect(args.slice(0, 4)).toEqual(['run', '--rm', '--network', 'none'])
+    const args = resizeArgs(vm, '/h/x/resized', 'image-1', 512)
+    expect(args).not.toContain('--egress')
+    expect(args).toContain('/h/x/resized:/io:rw')
     expect(args.slice(-5)).toEqual([
-      'renderer:1',
+      '--',
       'resize',
       '/io/image-1.src',
       '/io/image-1.png',

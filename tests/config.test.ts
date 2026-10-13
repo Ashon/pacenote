@@ -21,7 +21,7 @@ describe('loadConfig', () => {
       backend: 'claude',
       model: 'claude-opus-5-5',
     })
-    expect(config.reasoner.sandbox).toBeUndefined()
+    expect(config.reasoner.vm).toBeUndefined()
     expect(config.mention).toEqual({
       allowedUserIds: ['U0ME'],
       workspace: undefined,
@@ -134,24 +134,31 @@ describe('loadConfig', () => {
       OPS_TOOLS: 'on',
     }
     expect(() => loadConfig({ ...base, MENTION_ALLOWED_USERS: 'U1' })).toThrow(
-      /requires a sandbox: REASONER_SANDBOX=vm or docker/
+      /requires the built-in sandbox: REASONER_SANDBOX=vm/
     )
     expect(() =>
-      loadConfig({ ...base, REASONER_SANDBOX: 'docker', MENTION_ANYONE: 'on' })
+      loadConfig({ ...base, REASONER_SANDBOX: 'vm', MENTION_ANYONE: 'on' })
     ).toThrow(/MENTION_ALLOWED_USERS/)
     const config = loadConfig({
       ...base,
-      REASONER_SANDBOX: 'docker',
+      REASONER_SANDBOX: 'vm',
       MENTION_ALLOWED_USERS: 'U1',
     })
+    // The broker is relayed into each VM at this address.
     expect(config.reasoner.mcpServers).toEqual([
-      { name: 'ops', url: 'http://ops-broker:8080/mcp' },
+      { name: 'ops', url: 'http://127.0.0.1:8080/mcp' },
     ])
-    expect(config.reasoner.sandbox).toMatchObject({
-      noProxy: ['ops-broker'],
-      requiredServices: ['ops-broker'],
-    })
+    expect(config.reasoner.vm?.broker).toBeDefined()
     expect(loadConfig(env).reasoner.mcpServers).toEqual([])
+  })
+
+  it('reads the Docker sandbox, which is gone, as the built-in one', () => {
+    const config = loadConfig({
+      ...env,
+      REASONER_SANDBOX: 'docker',
+      SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
+    })
+    expect(config.reasoner.vm).toMatchObject({ image: 'reasoner' })
   })
 
   it('reports which value is wrong when a token format is invalid', () => {
@@ -183,7 +190,7 @@ describe('Slack API URL', () => {
 describe('checkConfig', () => {
   it('marks settings that are only missing, and still checks the rules behind them', () => {
     expect(
-      checkConfig({ REASONER_SANDBOX: 'docker', OPS_TOOLS: 'on' }).map(
+      checkConfig({ REASONER_SANDBOX: 'vm', OPS_TOOLS: 'on' }).map(
         ({ key, missing }) => ({
           key,
           missing,
@@ -197,7 +204,7 @@ describe('checkConfig', () => {
     ])
     expect(
       checkConfig({
-        REASONER_SANDBOX: 'docker',
+        REASONER_SANDBOX: 'vm',
         OPS_TOOLS: 'on',
         MENTION_ANYONE: 'on',
       }).map(({ key, missing }) => ({ key, missing }))
@@ -206,7 +213,7 @@ describe('checkConfig', () => {
       { key: 'SLACK_APP_TOKEN', missing: true },
       { key: 'OPS_TOOLS', missing: undefined },
     ])
-    expect(checkConfig({ ...env, REASONER_SANDBOX: 'docker' })).toEqual([
+    expect(checkConfig({ ...env, REASONER_SANDBOX: 'vm' })).toEqual([
       expect.objectContaining({
         key: 'SANDBOX_CLAUDE_OAUTH_TOKEN',
         missing: true,

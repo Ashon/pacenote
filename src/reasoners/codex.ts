@@ -21,8 +21,8 @@ export const codexAdapter: CliAdapter = {
   id: 'codex',
 
   /**
-   * codex reads files through its shell, but inside a hardened container its
-   * own sandbox (bubblewrap) cannot create namespaces, so the commands are
+   * codex reads files through its shell, but inside the sandbox's VM its own
+   * sandbox (bubblewrap) cannot create namespaces, so the commands are
    * rejected. Instead of loosening the outer isolation, file reading is off
    * there.
    */
@@ -40,7 +40,7 @@ export const codexAdapter: CliAdapter = {
         at: `${SANDBOX_PATHS.secrets}/codex-auth.json`,
       })
     if (attachments) mounts.push(attachments)
-    // The container's only writable host path. The image's entrypoint links
+    // The sandbox's only writable host path. The image's entrypoint links
     // ~/.codex/generated_images here.
     if (request.outputDir && sandbox.isolated)
       mounts.push({
@@ -57,7 +57,7 @@ export const codexAdapter: CliAdapter = {
         reasoningEffort: options.reasoningEffort,
         mcpServers: options.mcpServers,
         // On this Mac, codex's own sandbox keeps its shell to the reference
-        // directory; in the container, its shell does not run at all.
+        // directory; in the sandbox, its shell does not run at all.
         reads: sandbox.isolated
           ? undefined
           : readScope(sandbox, options, readOnlyDir),
@@ -130,13 +130,13 @@ export function codexProfile(reads: ReadScope): string {
  * reads only the reference directory, and the user's config.toml (its MCP
  * servers, profiles, sandbox settings) is not loaded, as claude does not load
  * the user's settings; config.ts passes its model along. Without (in the
- * container, where nothing else is there to read), the read-only sandbox.
+ * sandbox, where nothing else is there to read), the read-only sandbox.
  */
 export function codexArgs(options: {
   model?: string
   reasoningEffort?: string
   mcpServers?: McpServerRef[]
-  /** Image paths as seen from the container (or host) */
+  /** Image paths as seen from the sandbox (or this Mac) */
   images?: string[]
   reads?: ReadScope
 }): string[] {
@@ -377,8 +377,8 @@ export interface CodexDefaults {
 
 /**
  * Reads only the top-level model and model_reasoning_effort from
- * ~/.codex/config.toml. The host config file is not put in the sandbox
- * container, so only these values are passed as arguments.
+ * ~/.codex/config.toml. The host config file is not put in the sandbox, so
+ * only these values are passed as arguments.
  */
 export function parseCodexDefaults(toml: string): CodexDefaults {
   const topLevel = toml.split(/^\s*\[/m)[0] ?? ''

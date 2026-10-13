@@ -7,10 +7,10 @@ import type { Logger } from '../logger.js'
 export const RECHECK_SANDBOX = 'recheck-sandbox'
 
 /**
- * The sandbox's readiness (image, network, egress proxy, broker), checked again
- * while the bot runs instead of only at startup, so the status bar and the Pace
- * screen follow a proxy that was started or stopped later. Reports a change
- * only when the problems differ from the last check.
+ * The sandbox's readiness (its parts, the allowed domains, the broker), checked
+ * again while the bot runs instead of only at startup, so the status bar and
+ * the Pace screen follow a setup that finishes later. Reports a change only
+ * when the problems differ from the last check.
  */
 export class SandboxHealth {
   private problems: string[] = []

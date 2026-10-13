@@ -8,18 +8,17 @@ app, so drawing them again keeps them in step with it.
 
 Pace, the bot, runs on your Mac as a process the desktop app manages, in four layers: the Slack messenger, the
 mention pipeline, the reasoner that calls your `claude` or `codex` CLI, and the sandbox the CLI runs in. Slack reaches
-it over Socket Mode, so nothing listens on a public port. With the Docker sandbox, each answer is reasoned in a new,
-hardened container whose only ways out are the egress proxy (the model APIs and the domains you allow) and ops-broker
-(ops tools, with the credentials kept in the broker). The built-in sandbox does the same in a Linux VM of its own,
-started by the app with no network device, whose one way out is Pace's own egress proxy. Without either, the CLI runs
-on your Mac with your own login.
-Diagrams are rendered in a container of their own, with no network. The app also offers an MCP server to the AI tools
+it over Socket Mode, so nothing listens on a public port. With the built-in sandbox, each answer is reasoned in a new
+Linux VM of its own, started by the app with no network device, whose only ways out are Pace's own egress proxy (the
+model APIs and the domains you allow) and ops-broker (ops tools, in a VM of its own that keeps the credentials).
+Without it, the CLI runs on your Mac with your own login.
+Diagrams are rendered in a VM of their own, with no way out. The app also offers an MCP server to the AI tools
 on your Mac, for your tasks and the run history ([below](#your-tasks-and-ai-tools)). Settings and everything Pace keeps
 live in `~/.pacenote`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/architecture-dark.svg">
-  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the Docker sandbox with the renderer, the reasoner and its two ways out, the egress proxy and ops-broker" src="diagrams/architecture-light.svg">
+  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker" src="diagrams/architecture-light.svg">
 </picture>
 
 More: [How it works](how-it-works.md), [Reasoner sandbox](sandbox.md), [Ops tools](ops-tools.md),
@@ -76,14 +75,14 @@ Three interfaces keep the mention pipeline apart from everything it could be swa
   read what it prints; one runner (`cli.ts`) runs any adapter.
 - **Sandbox** (`src/sandbox/runtime.ts`): where the CLI runs. A sandbox runs one process with the environment values,
   mounts and working directory it is given, and knows nothing about which CLI it is. `host.ts` runs it on your Mac with
-  your login; `docker.ts` runs it in a disposable, hardened container. An isolated sandbox puts mounts at fixed paths
+  your login; `vm.ts` runs it in a disposable Linux VM of its own. An isolated sandbox puts mounts at fixed paths
   (`SANDBOX_PATHS`: `/workspace`, `/attachments`, `/out`, `/run/secrets`) that the reasoner image is built for.
 
 `src/index.ts` builds one of each from the settings. The dashed slots are where the next ones go.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="diagrams/layers-dark.svg">
-  <img alt="The Messenger, Reasoner and Sandbox interfaces around the mention pipeline, what implements each today, and room for Telegram, Discord, other CLIs, an API reasoner, Podman and remote runners" src="diagrams/layers-light.svg">
+  <img alt="The Messenger, Reasoner and Sandbox interfaces around the mention pipeline, what implements each today, and room for Telegram, Discord, other CLIs, an API reasoner, a container runtime and remote runners" src="diagrams/layers-light.svg">
 </picture>
 
 ## Code layout

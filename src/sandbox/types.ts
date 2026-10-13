@@ -1,68 +1,32 @@
 /**
  * Sandbox status and jobs. The desktop app produces them and the settings
- * screen shows them. (Only types also read in the browser live here) Each
- * component applies settings differently.
- * - bot: reasoner sandbox (a new container per request) settings. Applied by
- *   restarting the bot.
- * - proxy: egress allowlist. Applied by restarting egress-proxy.
- * - broker: ops-broker settings (SSH, k8s, files, GitHub, Jira). Applied by
- *   recreating the broker.
+ * screen shows them. (Only types also read in the browser live here) Sandbox
+ * settings, the ops broker's included, apply when Pace restarts; the allowed
+ * domains list, on the next request.
  */
-export type SandboxComponent = 'bot' | 'proxy' | 'broker'
-
-export interface ContainerState {
-  service: 'egress-proxy' | 'ops-broker'
-  /**
-   * docker state such as running or exited. missing if there is no container
-   */
-  state: string
-  startedAt?: string
-}
-
-export interface BrokerHealth {
-  sshHosts: number
-  k8s: string[]
-  fs?: string
-  git: boolean
-  github: string[]
-  jira: string[]
-}
-
 export interface SandboxCheck {
   label: string
   ok: boolean
   detail?: string
-  /** The reasoner's login, which both sandboxes take (the rest: the broker) */
+  /** The reasoner's login (the rest are the broker's) */
   login?: boolean
 }
 
+/** Settings changed since Pace started, and why it needs a restart */
 export interface PendingApply {
-  component: SandboxComponent
   reason: string
 }
 
 export interface SandboxStatus {
   checkedAt: string
-  docker: { ok: boolean; version?: string; error?: string }
-  images: {
-    name: string
-    purpose: string
-    present: boolean
-    createdAt?: string
-  }[]
-  containers: ContainerState[]
-  broker?: BrokerHealth
   /** Credentials and generated file status (values are not sent) */
   checks: SandboxCheck[]
-  /** Components whose changed settings are not applied yet */
+  /** Changed settings Pace has not picked up yet */
   pending: PendingApply[]
   allowlist: { file: string; domains: string[]; required: string[] }
-  /**
-   * Number of requests the bot is handling. If not 0, proxy/broker restarts are
-   * blocked.
-   */
+  /** Number of requests the bot is handling */
   activeRequests: number
-  /** The built-in VM sandbox, when it is the run environment */
+  /** The built-in VM sandbox (on a Mac), chosen or not */
   vm?: VmStatus
 }
 
@@ -76,6 +40,8 @@ export interface VmStatus {
   initfs: boolean
   /** The reasoner image, once built */
   image?: { createdAt: string; base: string }
+  /** The diagram renderer's image, once built */
+  renderer?: { createdAt: string; base: string }
 }
 
 export interface AllowlistIssue {
@@ -83,36 +49,21 @@ export interface AllowlistIssue {
   message: string
 }
 
-export type SandboxJobKind = 'proxy' | 'broker' | 'images' | 'kubeconfig' | 'vm'
+export type SandboxJobKind = 'kubeconfig' | 'vm'
 
 export const SANDBOX_JOBS: Record<
   SandboxJobKind,
   { label: string; script: string; help: string }
 > = {
-  proxy: {
-    label: 'Restart proxy',
-    script: 'sandbox:up',
-    help: 'Reloads the allowed domains list.',
-  },
-  broker: {
-    label: 'Recreate broker',
-    script: 'sandbox:ops-up',
-    help: "Fetches the host list and GitHub token again, then rebuilds the image and starts it. In the built-in sandbox, it prepares the broker's files for Pace's next start.",
-  },
-  images: {
-    label: 'Build sandbox images',
-    script: 'sandbox:build',
-    help: 'Rebuilds the reasoner and diagram (renderer) images. Used from the next request.',
-  },
   kubeconfig: {
     label: 'Rebuild kubeconfig',
     script: 'k8s:kubeconfig',
-    help: 'Builds the broker kubeconfig from the read-only SA token. Recreate the broker afterward.',
+    help: "Builds the broker's kubeconfig from the read-only SA token. Used when Pace restarts.",
   },
   vm: {
     label: 'Set up built-in sandbox',
     script: 'sandbox:vm',
-    help: 'Fetches the Linux kernel the first time, then builds the reasoner image in a VM. Run it again to update the CLIs.',
+    help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with ops tools on, the broker. Run it again to update the CLIs.',
   },
 }
 

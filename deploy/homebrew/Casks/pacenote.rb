@@ -40,8 +40,8 @@ cask "pacenote" do
       - open Pacenote and connect Slack in Settings > Messengers > Slack: pair with your team's hub,
         or create your own Slack app from there and save its tokens
       - with your own app, add your Slack member ID under Who can ask
-    Answers run on this Mac by default, reading only the reference directory you set. For a Docker
-    sandbox, run Docker, choose it in Settings > Sandbox and build its images there.
+    Answers run on this Mac by default, reading only the reference directory you set. On Apple
+    silicon with macOS 15, choose the built-in sandbox in Settings > Sandbox and set it up there.
     Config and run history are in ~/.pacenote and are kept when the app is removed.
   EOS
 end

@@ -7,8 +7,7 @@ import { defaultHome } from './home.js'
  * (.env) and ops-broker runtime files (host list, kubeconfig). It is kept out
  * of the repository so values from target environments do not end up in it.
  * Change the location with the PACENOTE_HOME environment variable. The default
- * is ~/.pacenote. (sandbox/compose.yaml defaults to ~/.pacenote;
- * the prep commands always pass the resolved location)
+ * is ~/.pacenote. (The sandbox jobs always get the resolved location)
  */
 export function pacenoteHome(
   env: NodeJS.ProcessEnv = process.env,
@@ -21,7 +20,7 @@ export function pacenoteHome(
     : path.resolve(value)
 }
 
-/** Config file shared by the bot, desktop app, prep commands, and compose */
+/** Config file shared by the bot, desktop app, and sandbox jobs */
 export function envFilePath(
   env: NodeJS.ProcessEnv = process.env,
   home = homedir()
@@ -30,8 +29,8 @@ export function envFilePath(
 }
 
 /**
- * Egress allowlist. Mounted by the egress proxy. Created from
- * sandbox/proxy/allowed-domains.txt if missing.
+ * Egress allowlist the built-in sandbox's proxy reads on each request. Created
+ * from sandbox/allowed-domains.txt if missing.
  */
 export function allowlistPath(
   env: NodeJS.ProcessEnv = process.env,

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the ops broker's image for the built-in VM sandbox (pacenote-vm build),
-# as sandbox/ops-broker/Dockerfile builds the Docker one, with the same kubectl.
+# with the kubectl src/sandbox/vm-setup.ts pins.
 # Runs as root in a VM of its own on node:24-bookworm-slim, with this folder at
 # /pacenote; the way out goes only to the Debian and Kubernetes download hosts.
 # The broker's code is not in the image: its bundle is mounted at /app when the

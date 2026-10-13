@@ -5,7 +5,7 @@ import {
   parseClaudeOutput,
 } from '../src/reasoners/claude.js'
 import { codexArgs, codexProfile } from '../src/reasoners/codex.js'
-import { DockerSandbox } from '../src/sandbox/docker.js'
+import { VmSandbox } from '../src/sandbox/vm.js'
 
 describe('claudeArgs', () => {
   it('by default has no tools and does not read user settings or MCP config', () => {
@@ -45,14 +45,14 @@ describe('claudeArgs', () => {
     expect(args).not.toContain('--model')
   })
 
-  it('in the container reads the mounted directory, never /proc or the secrets', async () => {
-    const box = new DockerSandbox({
-      dockerBin: 'docker',
-      image: 'img',
-      network: 'net',
-      proxyUrl: 'http://proxy:8888',
-      memory: '2g',
-      cpus: '2',
+  it('in the sandbox reads the mounted directory, never /proc or the secrets', async () => {
+    const box = new VmSandbox({
+      bin: '/bin/pacenote-vm',
+      root: '/vm',
+      image: 'reasoner',
+      memoryMiB: 2048,
+      cpus: 2,
+      allowlistFile: '/allowed-domains.txt',
     })
     const { args } = await claudeAdapter.invocation(
       { system: 's', prompt: 'p' },

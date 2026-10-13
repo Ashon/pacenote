@@ -20,8 +20,7 @@ import { brokerRuntimeDir } from '../settings/paths.js'
  * and VmSandbox relays that socket into each reasoner VM (127.0.0.1:8080
  * there), so the two VMs share no network. The broker's VM has no network
  * device either: its way out is an egress proxy here that goes only where its
- * settings name (brokerDestinations), where the Docker broker can reach
- * anything.
+ * settings name (brokerDestinations).
  */
 export interface VmBrokerOptions {
   bin: string
@@ -35,7 +34,7 @@ export interface VmBrokerOptions {
   /**
    * Where its settings come from: .env's OPS_* and the environment. Its files
    * (hosts.json, kubeconfig, placeholders for what is not set) are in
-   * brokerRuntimeDir(env), ~/.pacenote/ops-broker, as for the Docker broker.
+   * brokerRuntimeDir(env), ~/.pacenote/ops-broker.
    */
   env: NodeJS.ProcessEnv
   log?: Logger
@@ -264,8 +263,8 @@ export class VmBroker {
   }
 
   /**
-   * The broker's settings, as compose passes them to the Docker broker, and
-   * the credentials it gets from this Mac: the gh login's token and the git
+   * The broker's settings from .env, and the credentials it gets from this
+   * Mac: the gh login's token and the git
    * author
    */
   private values(

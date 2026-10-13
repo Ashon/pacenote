@@ -3,7 +3,6 @@ import {
   type AllowlistIssue,
   type PendingApply,
   type SandboxCheck,
-  type SandboxComponent,
   type SandboxJob,
   type SandboxJobKind,
   type SandboxStatus,
@@ -29,12 +28,6 @@ import { formatDuration, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 type Sandbox = ReturnType<typeof useSandbox>
-
-export const APPLY_LABEL: Record<SandboxComponent, string> = {
-  bot: 'Restart Pace',
-  proxy: 'Restart proxy',
-  broker: 'Recreate broker',
-}
 
 function Card({
   title,
@@ -76,17 +69,7 @@ const Dot = ({ ok, warn }: { ok: boolean; warn?: boolean }) => (
   />
 )
 
-const REASONER_IMAGE = 'pacenote-reasoner:latest'
-const BROKER_IMAGE = 'pacenote-ops-broker:latest'
-
-/** Restarting the proxy or the broker cuts off the tool calls in progress. */
-const disruptive = (kind: SandboxJobKind) =>
-  kind === 'proxy' || kind === 'broker'
-
-/**
- * A sandbox job's button, named after the job. One job runs at a time, and the
- * proxy and broker wait for the requests in progress.
- */
+/** A sandbox job's button, named after the job. One job runs at a time. */
 export function JobButton({
   sandbox,
   kind,
@@ -97,20 +80,14 @@ export function JobButton({
   /** The next step to take, rather than one to run again */
   primary?: boolean
 }) {
-  const { job, run, status } = sandbox
+  const { job, run } = sandbox
   const running = job?.state === 'running'
-  const active = status?.activeRequests ?? 0
-  const waiting = disruptive(kind) && active > 0
   return (
     <Button
       size="xs"
       variant={primary ? 'default' : 'outline'}
-      disabled={running || waiting}
-      title={
-        waiting
-          ? `Available after ${active} active ${active === 1 ? 'request finishes' : 'requests finish'}`
-          : `${SANDBOX_JOBS[kind].help} From the repository: pnpm ${SANDBOX_JOBS[kind].script}`
-      }
+      disabled={running}
+      title={`${SANDBOX_JOBS[kind].help} From the repository: pnpm ${SANDBOX_JOBS[kind].script}`}
       onClick={() => run(kind)}
     >
       {running && job?.kind === kind && (
@@ -184,72 +161,27 @@ export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
 }
 
 /**
- * Under the Docker sandbox's choice: whether Docker runs it, and the next job
- * it needs (its images, then the proxy)
- */
-export function DockerFooter({ sandbox }: { sandbox: Sandbox }) {
-  const { status, job } = sandbox
-  if (!status) return <span className="text-muted-foreground">Checking</span>
-  if (!status.docker.ok)
-    return (
-      <span className="flex min-w-0 items-center gap-1.5">
-        <Dot ok={false} />
-        <span className="truncate" title={status.docker.error}>
-          Docker is not running
-        </span>
-      </span>
-    )
-  const imageMissing = !status.images.find(
-    (image) => image.name === REASONER_IMAGE
-  )?.present
-  const proxyDown =
-    status.containers.find((c) => c.service === 'egress-proxy')?.state !==
-    'running'
-  const next: SandboxJobKind = !imageMissing && proxyDown ? 'proxy' : 'images'
-  return (
-    <>
-      <Readiness
-        busy={
-          job?.state === 'running' &&
-          (job.kind === 'images' || job.kind === 'proxy')
-        }
-        ready={!imageMissing && !proxyDown}
-        busyText={SANDBOX_JOBS[job?.kind ?? 'images'].label}
-        needs={imageMissing ? 'Images not built' : 'Proxy not running'}
-      />
-      <span className="ml-auto">
-        <JobButton
-          sandbox={sandbox}
-          kind={next}
-          primary={imageMissing || proxyDown}
-        />
-      </span>
-    </>
-  )
-}
-
-/**
- * Under the run environment choice: the output of the job that sets a sandbox
- * up, then what the chosen sandbox has ready
+ * Under the run environment choice: the output of the job that sets the
+ * built-in sandbox up, then what it has ready once chosen
  */
 export function EnvironmentDetails({
   sandbox,
   chosen,
 }: {
   sandbox: Sandbox
-  chosen?: 'vm' | 'docker'
+  chosen: boolean
 }) {
   const { status, loading, refresh } = sandbox
   const vm = status?.vm
   return (
     <>
-      <JobLog sandbox={sandbox} kinds={['vm', 'images']} className="mt-3" />
-      {chosen && status && (chosen === 'docker' || vm) && (
+      <JobLog sandbox={sandbox} kinds={['vm']} className="mt-3" />
+      {chosen && status && vm && (
         <div className="mt-3 overflow-hidden rounded-lg bg-well">
           <div className="flex items-center gap-2 py-1 pr-1.5 pl-4 text-xs text-muted-foreground">
             <span className="min-w-0 flex-1">
-              {chosen === 'vm' ? 'Built-in sandbox' : 'Docker sandbox'} on this
-              Mac, checked {formatRelative(status.checkedAt)}
+              Built-in sandbox on this Mac, checked{' '}
+              {formatRelative(status.checkedAt)}
             </span>
             <Button
               size="icon-sm"
@@ -264,70 +196,40 @@ export function EnvironmentDetails({
             </Button>
           </div>
           <div className="divide-y divide-card border-t border-card">
-            {chosen === 'vm' && vm ? (
-              vm.unsupported ? (
-                <Line label="This Mac">
-                  <Dot ok={false} />
-                  {vm.unsupported}
-                </Line>
-              ) : (
-                <>
-                  <Line label="Linux kernel">
-                    <Dot ok={vm.kernel} warn />
-                    {vm.kernel
-                      ? 'Ready'
-                      : 'Not downloaded yet (about 290 MB, once)'}
-                  </Line>
-                  <Line label="Init filesystem">
-                    <Dot ok={vm.initfs} warn />
-                    {vm.initfs ? 'Ready' : 'Not prepared yet'}
-                  </Line>
-                  <Line label="Reasoner image">
-                    <Dot ok={Boolean(vm.image)} warn />
-                    {vm.image
-                      ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}`
-                      : 'Not built yet'}
-                  </Line>
-                  <Line label="pacenote-vm">
-                    <Dot ok={vm.helper.ok} />
-                    <span className="break-all select-text">
-                      {vm.helper.ok ? vm.helper.path : vm.helper.error}
-                    </span>
-                  </Line>
-                </>
-              )
+            {vm.unsupported ? (
+              <Line label="This Mac">
+                <Dot ok={false} />
+                {vm.unsupported}
+              </Line>
             ) : (
               <>
-                <Line label="Docker">
-                  <Dot ok={status.docker.ok} />
-                  {status.docker.ok
-                    ? `Engine ${status.docker.version}`
-                    : (status.docker.error ?? 'Unavailable')}
+                <Line label="Linux kernel">
+                  <Dot ok={vm.kernel} warn />
+                  {vm.kernel
+                    ? 'Ready'
+                    : 'Not downloaded yet (about 290 MB, once)'}
                 </Line>
-                <Line label="Images">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {status.images
-                      .filter(
-                        (image) =>
-                          image.name === REASONER_IMAGE ||
-                          image.name === 'pacenote-renderer:latest'
-                      )
-                      .map((image) => (
-                        <span
-                          key={image.name}
-                          className="flex items-center gap-1.5"
-                          title={image.purpose}
-                        >
-                          <Dot ok={image.present} />
-                          {image.name.replace(/^pacenote-|:latest$/g, '')}
-                          {image.createdAt && (
-                            <span className="text-muted-foreground">
-                              (built {formatRelative(image.createdAt)})
-                            </span>
-                          )}
-                        </span>
-                      ))}
-                  </div>
+                <Line label="Init filesystem">
+                  <Dot ok={vm.initfs} warn />
+                  {vm.initfs ? 'Ready' : 'Not prepared yet'}
+                </Line>
+                <Line label="Reasoner image">
+                  <Dot ok={Boolean(vm.image)} warn />
+                  {vm.image
+                    ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}`
+                    : 'Not built yet'}
+                </Line>
+                <Line label="Diagram image">
+                  <Dot ok={Boolean(vm.renderer)} warn />
+                  {vm.renderer
+                    ? `Built ${formatRelative(vm.renderer.createdAt)}`
+                    : 'Not built yet (with diagrams on, setup builds it)'}
+                </Line>
+                <Line label="pacenote-vm">
+                  <Dot ok={vm.helper.ok} />
+                  <span className="break-all select-text">
+                    {vm.helper.ok ? vm.helper.path : vm.helper.error}
+                  </span>
                 </Line>
               </>
             )}
@@ -367,31 +269,15 @@ export function LoginChecks({ sandbox }: { sandbox: Sandbox }) {
   )
 }
 
-/**
- * The ops broker: what it has and still needs, and the jobs that prepare it
- */
-export function BrokerCard({
-  sandbox,
-  builtIn,
-}: {
-  sandbox: Sandbox
-  builtIn: boolean
-}) {
+/** The ops broker: what it has and still needs, and the job that prepares it */
+export function BrokerCard({ sandbox }: { sandbox: Sandbox }) {
   const { status, loading, refresh } = sandbox
-  const pending =
-    status?.pending.filter((item) => item.component === 'broker') ?? []
-  const container = status?.containers.find((c) => c.service === 'ops-broker')
-  const image = status?.images.find((item) => item.name === BROKER_IMAGE)
   const checks = status?.checks.filter((check) => !check.login) ?? []
-  const kinds: SandboxJobKind[] = ['kubeconfig', 'broker']
+  const kinds: SandboxJobKind[] = ['kubeconfig']
   return (
     <Card
       title="Broker"
-      help={
-        builtIn
-          ? 'Runs the tools with your credentials, in a VM of its own that starts with Pace.'
-          : 'Runs the tools with your credentials, in a container beside the egress proxy.'
-      }
+      help="Runs the tools with your credentials, in a VM of its own that starts with Pace. Its settings and files apply when Pace restarts."
       action={
         <Button
           size="sm"
@@ -405,84 +291,17 @@ export function BrokerCard({
       }
     >
       <div className="divide-y divide-border">
-        {!builtIn && pending.length > 0 && (
-          <PendingList pending={pending} sandbox={sandbox} />
-        )}
-        {!builtIn && container && (
-          <Line label="Container">
-            <Dot
-              ok={container.state === 'running'}
-              warn={container.state === 'missing'}
-            />
-            {container.state === 'running'
-              ? `Running${container.startedAt ? `, up ${formatDuration(Date.now() - Date.parse(container.startedAt))}` : ''}`
-              : container.state === 'missing'
-                ? 'Not created yet'
-                : container.state}
-            {image?.createdAt && (
-              <span className="text-muted-foreground">
-                (image built {formatRelative(image.createdAt)})
-              </span>
-            )}
-          </Line>
-        )}
-        {!builtIn && status?.broker && (
-          <Line label="Tools">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <span className="flex items-center gap-1.5">
-                <Dot ok={status.broker.sshHosts > 0} warn />
-                {status.broker.sshHosts > 0
-                  ? `${status.broker.sshHosts} SSH ${status.broker.sshHosts === 1 ? 'host' : 'hosts'}`
-                  : 'SSH off'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Dot ok={status.broker.k8s.length > 0} warn />
-                k8s{' '}
-                {status.broker.k8s.length
-                  ? status.broker.k8s.join(', ')
-                  : 'off'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Dot ok={Boolean(status.broker.fs)} warn />
-                Files {status.broker.fs ? 'on' : 'off'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Dot ok={status.broker.github.length > 0} warn />
-                GitHub{' '}
-                {status.broker.github.length
-                  ? status.broker.github.join(', ')
-                  : 'off'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Dot ok={status.broker.git} warn />
-                PR {status.broker.git ? 'on' : 'off'}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Dot ok={status.broker.jira.length > 0} warn />
-                Jira{' '}
-                {status.broker.jira.length
-                  ? status.broker.jira.join(', ')
-                  : 'off'}
-              </span>
-            </div>
-          </Line>
-        )}
         {checks.map((check) => (
           <CheckLine key={check.label} check={check} />
         ))}
-        {kinds
-          // The pending list above has the broker's own button.
-          .filter(
-            (kind) => kind !== 'broker' || builtIn || pending.length === 0
-          )
-          .map((kind) => (
-            <div key={kind} className="flex items-center gap-3 px-4 py-2.5">
-              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-                {SANDBOX_JOBS[kind].help}
-              </p>
-              <JobButton sandbox={sandbox} kind={kind} />
-            </div>
-          ))}
+        {kinds.map((kind) => (
+          <div key={kind} className="flex items-center gap-3 px-4 py-2.5">
+            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+              {SANDBOX_JOBS[kind].help}
+            </p>
+            <JobButton sandbox={sandbox} kind={kind} />
+          </div>
+        ))}
       </div>
       <JobLog
         sandbox={sandbox}
@@ -508,9 +327,7 @@ function Line({
   )
 }
 
-/**
- * Settings changed since a component started, with the button that applies them
- */
+/** Settings changed since Pace started, with the button that applies them */
 export function PendingList({
   pending,
   sandbox,
@@ -519,77 +336,46 @@ export function PendingList({
   sandbox: Sandbox
 }) {
   const supervisor = useSupervisor()
-  const components = [...new Set(pending.map((item) => item.component))]
-  const busy = sandbox.job?.state === 'running'
-  const active = sandbox.status?.activeRequests ?? 0
-  const apply = (component: SandboxComponent) => {
-    if (component === 'bot') {
-      const live =
-        supervisor?.phase === 'running' || supervisor?.phase === 'starting'
-      void (live ? botControl()?.restart() : botControl()?.start())
-      setTimeout(sandbox.refresh, 4_000)
-    } else {
-      sandbox.run(component)
-    }
+  const restart = () => {
+    const live =
+      supervisor?.phase === 'running' || supervisor?.phase === 'starting'
+    void (live ? botControl()?.restart() : botControl()?.start())
+    setTimeout(sandbox.refresh, 4_000)
   }
+  if (pending.length === 0) return null
   return (
-    <div className="space-y-2 bg-status-interrupted/8 px-4 py-3">
-      {components.map((component) => (
-        <div key={component} className="flex items-start gap-3 text-xs">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-status-interrupted" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-status-interrupted">
-              {APPLY_LABEL[component]} needed
-            </p>
-            <ul className="mt-0.5 text-muted-foreground">
-              {pending
-                .filter((item) => item.component === component)
-                .map((item) => (
-                  <li key={item.reason}>{item.reason}</li>
-                ))}
-            </ul>
-          </div>
-          {component === 'bot' && supervisor?.phase === 'external' ? (
-            <span className="text-muted-foreground">
-              Restart Pace in the terminal yourself
-            </span>
-          ) : (
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={
-                busy ||
-                (component !== 'bot' && active > 0) ||
-                (component === 'bot' && !supervisor)
-              }
-              onClick={() => apply(component)}
-              title={
-                component !== 'bot' && active > 0
-                  ? `Available after ${active} active ${active === 1 ? 'request finishes' : 'requests finish'}`
-                  : undefined
-              }
-            >
-              {APPLY_LABEL[component]}
-            </Button>
-          )}
-        </div>
-      ))}
+    <div className="flex items-start gap-3 bg-status-interrupted/8 px-4 py-3 text-xs">
+      <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-status-interrupted" />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-status-interrupted">
+          Restart Pace needed
+        </p>
+        <ul className="mt-0.5 text-muted-foreground">
+          {pending.map((item) => (
+            <li key={item.reason}>{item.reason}</li>
+          ))}
+        </ul>
+      </div>
+      {supervisor?.phase === 'external' ? (
+        <span className="text-muted-foreground">
+          Restart Pace in the terminal yourself
+        </span>
+      ) : (
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={sandbox.job?.state === 'running' || !supervisor}
+          onClick={restart}
+        >
+          Restart Pace
+        </Button>
+      )}
     </div>
   )
 }
 
 /** Edits the domains allowed for outbound access */
-export function AllowlistCard({
-  sandbox,
-  builtIn,
-}: {
-  sandbox: Sandbox
-  /**
-   * The built-in sandbox reads the list on every request; Docker's proxy only
-   * when it restarts.
-   */
-  builtIn?: boolean
-}) {
+export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
   const status = sandbox.status
   const saved = status?.allowlist.domains ?? []
   const required = status?.allowlist.required ?? []
@@ -600,14 +386,6 @@ export function AllowlistCard({
   const domains = draft ?? saved
   const dirty =
     draft !== undefined && JSON.stringify(draft) !== JSON.stringify(saved)
-  // Docker's proxy applies the list when it restarts: its state and the
-  // restart sit with the list.
-  const proxy = builtIn
-    ? undefined
-    : status?.containers.find((c) => c.service === 'egress-proxy')
-  const proxyPending = builtIn
-    ? []
-    : (status?.pending.filter((item) => item.component === 'proxy') ?? [])
 
   const add = () => {
     const domain = input.trim().toLowerCase().replace(/\.$/, '')
@@ -622,11 +400,7 @@ export function AllowlistCard({
         setIssues(found)
         if (found.length === 0) {
           setDraft(undefined)
-          setNotice(
-            builtIn
-              ? 'Saved. The next request uses it.'
-              : 'Saved. Restart the proxy to apply.'
-          )
+          setNotice('Saved. The next request uses it.')
           sandbox.refresh()
         }
       })
@@ -638,47 +412,11 @@ export function AllowlistCard({
       help={
         <>
           Domains the reasoner sandbox can reach directly through the proxy.
-          Only HTTPS (443) and only exact name matches are allowed.{' '}
-          {builtIn
-            ? 'The next request uses the saved list.'
-            : 'The proxy applies the list when it restarts.'}
+          Only HTTPS (443) and only exact name matches are allowed. The next
+          request uses the saved list.
         </>
       }
-      action={
-        builtIn ? undefined : (
-          <JobButton
-            sandbox={sandbox}
-            kind="proxy"
-            primary={proxyPending.length > 0}
-          />
-        )
-      }
     >
-      {proxy && (
-        <div className="space-y-1 border-b border-border px-4 py-2.5 text-xs">
-          <p className="flex items-center gap-1.5">
-            <Dot ok={proxy.state === 'running'} warn />
-            <span className="font-medium">Proxy</span>
-            <span className="text-muted-foreground">
-              {proxy.state === 'running'
-                ? `running${proxy.startedAt ? `, up ${formatDuration(Date.now() - Date.parse(proxy.startedAt))}` : ''}`
-                : proxy.state === 'missing'
-                  ? 'not running'
-                  : proxy.state}
-            </span>
-          </p>
-          {proxyPending.map((item) => (
-            <p
-              key={item.reason}
-              className="flex items-start gap-1.5 text-status-interrupted"
-            >
-              <TriangleAlert className="mt-px size-3 shrink-0" />
-              {item.reason}
-            </p>
-          ))}
-          <JobLog sandbox={sandbox} kinds={['proxy']} className="pt-1.5" />
-        </div>
-      )}
       <div className="space-y-3 px-4 py-3">
         <p className="flex items-start gap-1.5 rounded-lg bg-status-interrupted/10 px-3 py-2 text-xs text-status-interrupted">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />

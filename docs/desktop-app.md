@@ -35,10 +35,10 @@ Packaging:
 Using the packaged app:
 
 - `Pacenote.app` contains the UI, the bot and sandbox job bundles (`pnpm bundle`) and the `sandbox/` files, so it runs without the repository, Node or pnpm.
-  It needs Docker (sandbox), a reasoner CLI login (claude or codex), and gh and git for the ops tools.
+  It needs a reasoner CLI login (claude or codex), and gh and git for the ops tools; the built-in sandbox comes with it.
 - Config (`~/.pacenote/.env`), history and the allowed domains list live outside the app (`PACENOTE_HOME`, default `~/.pacenote`), so they are kept when the app is reinstalled.
-- Sandbox apply jobs (image builds, proxy, broker, kubeconfig) run the job bundle inside the app with the app's Node.
-  From the repository, the same jobs run with `pnpm sandbox:build`, `sandbox:up`, `sandbox:ops-up` and `k8s:kubeconfig`.
+- Sandbox jobs (the built-in sandbox's setup, the broker's kubeconfig) run the job bundle inside the app with the app's Node.
+  From the repository, the same jobs run with `pnpm sandbox:vm` and `pnpm k8s:kubeconfig`.
 - The packaged app uses its bundles as they are, so it has no "Rebuild and restart". After changing code, reinstall with `pnpm package:mac && pnpm install:mac`.
 - To avoid two bots on the same Slack app token, do not run `pnpm desktop` or `pnpm dev` while using the packaged app.
   (If both run, the bot run lock makes the one started later only show "Pace is running elsewhere, such as a terminal.")
@@ -70,7 +70,7 @@ Bot management:
 - The bot runs as an Electron utilityProcess. Development runs use the repository's `dist/index.js` and run `pnpm build` first when `src` is newer.
   The packaged app uses its bundled bot (`bot/index.mjs`) as is.
   Environment variables are read from the config file (`~/.pacenote/.env`) like `node --env-file`, and existing environment variables take precedence.
-  PATH comes from the login shell. (So docker, codex and pnpm are found even when the app is launched from Finder)
+  PATH comes from the login shell. (So codex, gh and pnpm are found even when the app is launched from Finder)
 - The Pace screen has "Start", "Stop", "Restart" and "Rebuild and restart" (development runs only). The number of requests in progress is shown next to the menu bar icon.
   Pace's mark beside its name looks around while Pace starts or stops, and turns while it is connected: once in 16 seconds,
   four times as fast while it answers. With reduced motion it stays still. Stopped, a gray stop sign (a circle and a bar) takes its place. The status bar's dot pings only while Pace starts or stops.
@@ -81,7 +81,7 @@ Bot management:
   which shows `brew upgrade --cask pacenote` to copy and the release notes. The app never replaces itself; Homebrew does.
 - When Pace needs attention, the app tells you once with a macOS notification, unless its window is in front: Pace stopped
   (until it runs again), it needs setup, it lost Slack for 2 minutes or more, or a problem the Pace screen lists (a sign-in
-  the reasoner rejected, a usage limit, the sandbox's proxy). Clicking it opens the screen to look at. While any of it lasts,
+  the reasoner rejected, a usage limit, the built-in sandbox's setup). Clicking it opens the screen to look at. While any of it lasts,
   the menu bar shows ⚠︎ next to the icon, and the menu lists what the status line does not say. macOS's own notification
   settings turn them off.
 - "Open Pacenote when you log in" (Settings > General, installed app only) adds Pacenote to macOS Login Items. Opened at
@@ -115,16 +115,16 @@ Settings:
   | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
-  | Sandbox | Run environment (on this Mac, the built-in sandbox or the docker sandbox) with each sandbox's state and setup, limits, the reasoner login, allowed domains |
+  | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login, allowed domains |
   | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
   | History & logs | Run history and retention, log level |
 
-- The section list shows what needs attention: "Not connected" when Slack tokens are missing, "Apply needed" for changes the sandbox or
-  broker has not picked up, "Off" for an unused sandbox or ops tools, and per section the number of unsaved changes or a red dot for
+- The section list shows what needs attention: "Not connected" when Slack tokens are missing, "Set up" for a built-in sandbox
+  that still needs its setup, "Off" for an unused sandbox or ops tools, and per section the number of unsaved changes or a red dot for
   values to fix. Changes in several sections are saved together from the bar at the bottom, which also names the section with a problem.
-- Fields show only when they apply: sandbox limits only for the docker sandbox, and only the selected reasoner's login (claude token or
-  codex login file). Hidden values stay in `.env`. Each ops integration card says whether its fields turn it on ("On", "Incomplete", "Off")
-  and what the running broker reports. Rarely changed values are collapsed under "Advanced".
+- Fields show only when they apply: sandbox limits and the reasoner login only for the built-in sandbox, and only the selected
+  reasoner's (claude token or codex login file). Hidden values stay in `.env`. Each ops integration card says whether its fields turn it
+  on ("On", "Incomplete", "Off"). Rarely changed values are collapsed under "Advanced".
   Fields, groups and sections are defined only in `src/settings/fields.ts`, and a test checks that their defaults match the bot config (`src/config.ts`).
 - Secret values such as tokens are never sent to the UI. Only the prefix and the last 4 characters are shown; enter a new value to change one.
   The Save button next to the input (or Enter) saves just that value and closes the input; Esc cancels.
@@ -145,39 +145,21 @@ Settings:
 
 Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
 
-- Each sandbox's choice under Run environment says whether it is ready, beside the job it needs next, so a sandbox can be
-  set up before it is chosen: "Set up built-in sandbox" (`sandbox:vm`) under the built-in sandbox, and "Build sandbox
-  images" (`sandbox:build`), or "Restart proxy" while the proxy is down, under the Docker sandbox. The job's output shows
-  under the choices, then what the chosen sandbox has: for the built-in one (a VM per request,
-  [Reasoner sandbox](sandbox.md#built-in-sandbox)) the kernel, the init filesystem, the reasoner image and pacenote-vm;
-  for Docker, the engine and the reasoner and renderer images. Settings that need Pace's restart (`SANDBOX_*`) show as
-  pending at the top of the card.
+- The built-in sandbox's choice under Run environment says whether it is ready, beside "Set up built-in sandbox"
+  (`sandbox:vm`), so it can be set up before it is chosen, and for diagrams with Pace on this Mac. The job's output shows
+  under the choices, then, once chosen, what it has ([Reasoner sandbox](sandbox.md#built-in-sandbox)): the kernel, the init
+  filesystem, the reasoner and diagram images and pacenote-vm. Settings that need Pace's restart show as pending at the
+  top of the card, with "Restart Pace": when the config fingerprint (`configHash`) the bot wrote to its status file at
+  startup differs from the one computed from the current `.env`.
 - The reasoner login's check (the claude token, the codex login file) shows in the login card. The allowed domains apply
-  from the next request in the built-in sandbox; for Docker, the domains card shows the proxy and "Restart proxy".
-- The broker's state, its checks (host list, kubeconfig, gh login, PR author) and its jobs ("Rebuild kubeconfig", "Recreate
-  broker") are in the Broker card under Ops tools.
-- The Docker sandbox has three components, and each applies settings differently. Each section says how its settings apply.
-
-  | Component | Settings | Applied by |
-  | --- | --- | --- |
-  | Reasoner sandbox (a new container per request) | `SANDBOX_*`, `OPS_TOOLS` | Restarting the bot |
-  | Allowed outbound domains (egress-proxy) | `~/.pacenote/sandbox/allowed-domains.txt` | Restarting the proxy (`pnpm sandbox:up`) |
-  | ops-broker | `OPS_GIT_*`, `OPS_FS_ROOT`, `OPS_SSH_*`, `OPS_K8S_*`, `OPS_JIRA_*` | Recreating the broker (`pnpm sandbox:ops-up`) |
-
-- Status: docker and its images beside the run environment, the proxy with the allowed domains, and the broker container and tools
-  (SSH host count, k8s, files, GitHub, PR, Jira) with the broker. Credential values are not read; only their presence is checked.
-- Pending changes: components whose changed settings are not applied yet are listed with the reason (for example "Recreate broker needed")
-  where that component is, and can be applied in place.
-  - Bot: when the config fingerprint (`configHash`) the bot wrote to its status file at startup differs from the one computed from the current `.env`
-  - Proxy: when the allowlist changed after the proxy started, or when the proxy is not running
-  - Broker: when the container settings (SSH user, allowed range, GitHub orgs, mount paths) differ from `.env`, when a newer image exists or
-    the `src/broker` code is newer than the image, or when the host list or kubeconfig changed after the broker started
+  from the next request.
+- The broker's checks (host list, kubeconfig, gh login, PR author) and "Rebuild kubeconfig" (`k8s:kubeconfig`) are in the
+  Broker card under Ops tools. The broker's VM starts with Pace, so its settings and files apply when Pace restarts.
+  Credential values are not read; only their presence is checked.
 - Allowed domains accept exact host names only (wildcards, IPs, ports and URLs are rejected). Domains the current reasoner CLI needs cannot be removed.
   Internal systems that need a token are connected as broker tools instead of opening their domains.
-- Jobs: "Build sandbox images" (`sandbox:build`), "Restart proxy", "Rebuild kubeconfig" (`k8s:kubeconfig`) and "Recreate broker"
-  run from the app, each from its card, and show their output there. Only one runs at a time, and secret values in the output are masked.
-  Restarting the proxy or the broker cuts off tool calls in progress, so these jobs are blocked while requests are in progress.
-- Paths the broker mounts (`OPS_FS_ROOT`, `OPS_SSH_KEY`, `OPS_SSH_KNOWN_HOSTS`) must be absolute. (compose does not expand `~`)
+- Jobs run from the app, each from its card, and show their output there. Only one runs at a time, and secret values in the output are masked.
+- Paths the broker mounts (`OPS_FS_ROOT`, `OPS_SSH_KEY`, `OPS_SSH_KNOWN_HOSTS`) must be absolute. (`~` is not expanded)
 
 Status and logs:
 

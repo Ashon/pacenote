@@ -86,8 +86,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       envFile: string
       dataDir: string
       /**
-       * Login shell PATH (an app launched from Finder lacks the docker, codex,
-       * and pnpm paths)
+       * Login shell PATH (an app launched from Finder lacks the codex, gh and
+       * pnpm paths)
        */
       toolPath: () => string
       log: (message: string) => void

@@ -1,0 +1,11 @@
+# Domains the built-in sandbox can reach (exact match, one per line). The copy in
+# ~/.pacenote/sandbox is the one in use, edited in Settings > Sandbox; the next
+# request uses it.
+
+# claude CLI (Anthropic API)
+api.anthropic.com
+
+# codex CLI (ChatGPT login / OpenAI API)
+chatgpt.com
+auth.openai.com
+api.openai.com

@@ -29,7 +29,12 @@ import {
   readBotStatus,
 } from '../../../src/runtime/status.js'
 import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
-import { readEnvFile, readEnvValues } from '../../../src/settings/env-file.js'
+import {
+  migrateEnvText,
+  readEnvFile,
+  readEnvValues,
+  writeEnvFile,
+} from '../../../src/settings/env-file.js'
 import {
   secretValues,
   setupSettingsRoute,
@@ -109,6 +114,19 @@ const log = createLogger('info', 'desktop', [
   fileSink(path.join(dataDir, DESKTOP_LOG_FILE)),
 ])
 log.info(`Starting ${app.getVersion()} (pid ${process.pid})`)
+// The Docker sandbox is gone: a setting that chose it chooses the built-in
+// sandbox now, which Settings > Sandbox then sets up.
+try {
+  const migrated = migrateEnvText(readEnvFile(envFile))
+  if (migrated.changed) {
+    writeEnvFile(envFile, migrated.text)
+    log.info(
+      'Settings: REASONER_SANDBOX=docker is now vm (the built-in sandbox)'
+    )
+  }
+} catch (err) {
+  log.warn(`Could not update the settings file: ${(err as Error).message}`)
+}
 // An error nothing caught goes to the log instead of a dialog; the bot runs in
 // its own process either way.
 process.on('uncaughtException', (err) =>
@@ -168,7 +186,7 @@ let toolPathCache: string | undefined
 
 /**
  * An app launched from Finder does not inherit the terminal's PATH (Homebrew,
- * nvm, docker, codex, pnpm).
+ * nvm, codex, gh, pnpm).
  */
 function toolPath(): string {
   if (toolPathCache) return toolPathCache

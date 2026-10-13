@@ -106,7 +106,7 @@ export function readAllowlistFile(file: string): string {
 
 /**
  * Creates the allowlist from the default list (template,
- * sandbox/proxy/allowed-domains.txt) if it is missing.
+ * sandbox/allowed-domains.txt) if it is missing.
  */
 export function ensureAllowlistFile(file: string, template: string): void {
   if (existsSync(file)) return

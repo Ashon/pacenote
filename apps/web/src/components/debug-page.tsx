@@ -410,7 +410,7 @@ function StatusBench() {
           state: 'running',
           managedBy: 'desktop',
           socket: { state: socket, since: ago(3 * 3_600_000), reconnects: 0 },
-          reasoner: 'claude@docker',
+          reasoner: 'claude@vm',
           mcp: ['github', 'linear'],
           diagrams: true,
           problems: CHECK_ISSUES.slice(0, issues),

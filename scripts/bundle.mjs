@@ -5,12 +5,12 @@ import { build } from 'esbuild'
 
 /**
  * Builds single-file executables with their dependencies bundled in. The
- * packaged desktop app and the broker image use only these outputs.
+ * packaged desktop app and the broker's VM use only these outputs.
  * - build/bot/index.mjs: the bot (the packaged app runs it as a utilityProcess)
  * - build/tools/sandbox-job.mjs: sandbox apply jobs (run by the packaged app)
  * - build/tools/history-mcp.mjs: the run history's MCP server (AI tools launch
  *   it with the packaged app's Node)
- * - sandbox/ops-broker/dist/server.mjs: ops-broker (goes into the image)
+ * - sandbox/ops-broker/dist/server.mjs: ops-broker (mounted in its VM at /app)
  * - deploy/hub/dist/hub.mjs: the team hub (goes into its image, deploy/hub)
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
