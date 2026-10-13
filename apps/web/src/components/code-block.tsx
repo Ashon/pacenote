@@ -1,6 +1,7 @@
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 
 export function CopyButton({
@@ -52,18 +53,16 @@ export function CodeBlock({
           {label}
         </div>
       )}
+      <ScrollArea viewportClassName={maxHeight}>
+        <pre className="px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words select-text">
+          {code}
+        </pre>
+      </ScrollArea>
+      {/* After the scroll area, so it stays above it */}
       <CopyButton
         text={code}
         className="absolute top-0.5 right-0.5 opacity-0 transition-opacity group-hover:opacity-100"
       />
-      <pre
-        className={cn(
-          'overflow-auto px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words select-text',
-          maxHeight
-        )}
-      >
-        {code}
-      </pre>
     </div>
   )
 }

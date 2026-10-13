@@ -6,9 +6,12 @@ function ScrollArea({
   className,
   children,
   viewportClassName,
+  viewportRef,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   viewportClassName?: string
+  /** The element that scrolls, for code that scrolls it (to follow output) */
+  viewportRef?: React.Ref<HTMLDivElement>
 }) {
   return (
     <ScrollAreaPrimitive.Root
@@ -16,6 +19,7 @@ function ScrollArea({
       {...props}
     >
       <ScrollAreaPrimitive.Viewport
+        ref={viewportRef}
         className={cn(
           'h-full w-full rounded-[inherit] [&>div]:!block',
           viewportClassName

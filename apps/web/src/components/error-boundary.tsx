@@ -1,6 +1,7 @@
 import { House, RotateCw } from 'lucide-react'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface State {
   error?: Error
@@ -40,9 +41,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             Pace keeps answering. Reload to try again, or go back to Overview.
             What broke is in the app's log: Pace &gt; Open logs folder.
           </p>
-          <pre className="mt-4 overflow-x-auto rounded-lg bg-well px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
-            {error.message}
-          </pre>
+          <ScrollArea
+            className="mt-4 rounded-lg bg-well"
+            viewportClassName="max-h-48"
+          >
+            <pre className="px-3 py-2 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground select-text">
+              {error.message}
+            </pre>
+          </ScrollArea>
           <div className="mt-4 flex gap-2">
             <Button size="sm" onClick={() => window.location.reload()}>
               <RotateCw />

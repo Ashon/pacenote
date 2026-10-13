@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useBotLogs, useBotStatus } from '@/lib/api'
 import { botControl, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
@@ -498,24 +499,26 @@ function LogPanel() {
           )}
         </div>
       </div>
-      <div
-        ref={scroller}
+      <ScrollArea
+        viewportRef={scroller}
         onWheel={(e) => {
           if (e.deltaY < 0) setFollow(false)
         }}
-        className="min-h-0 flex-1 overflow-auto px-10 py-2 font-mono text-[11.5px] leading-[1.6] select-text"
+        className="min-h-0 flex-1"
       >
-        <div className="mx-auto max-w-5xl">
-          {lines.map((line, i) => (
-            <LogRow key={`${line.at}-${i}`} line={line} />
-          ))}
-          {lines.length === 0 && (
-            <p className="py-10 text-center font-sans text-sm text-muted-foreground">
-              {isError ? 'Could not load logs.' : 'No logs to show.'}
-            </p>
-          )}
+        <div className="px-10 py-2 font-mono text-[11.5px] leading-[1.6] select-text">
+          <div className="mx-auto max-w-5xl">
+            {lines.map((line, i) => (
+              <LogRow key={`${line.at}-${i}`} line={line} />
+            ))}
+            {lines.length === 0 && (
+              <p className="py-10 text-center font-sans text-sm text-muted-foreground">
+                {isError ? 'Could not load logs.' : 'No logs to show.'}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      </ScrollArea>
     </section>
   )
 }

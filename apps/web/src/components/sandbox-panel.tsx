@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { botControl, useSupervisor, type useSandbox } from '@/lib/desktop'
 import { formatDuration, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -545,7 +546,7 @@ export function JobLog({
   className?: string
 }) {
   const { job, error } = sandbox
-  const output = useRef<HTMLPreElement>(null)
+  const output = useRef<HTMLDivElement>(null)
   const shown = job && kinds.includes(job.kind) ? job : undefined
   useEffect(() => {
     if (output.current) output.current.scrollTop = output.current.scrollHeight
@@ -565,7 +566,7 @@ function JobOutput({
   outputRef,
 }: {
   job: SandboxJob
-  outputRef: React.RefObject<HTMLPreElement | null>
+  outputRef: React.RefObject<HTMLDivElement | null>
 }) {
   const elapsed =
     (job.finishedAt ? Date.parse(job.finishedAt) : Date.now()) -
@@ -590,12 +591,15 @@ function JobOutput({
           , {formatDuration(elapsed)}
         </span>
       </div>
-      <pre
-        ref={outputRef}
-        className="select-text max-h-64 overflow-auto rounded-lg bg-well px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words"
+      <ScrollArea
+        viewportRef={outputRef}
+        className="rounded-lg bg-well"
+        viewportClassName="max-h-64"
       >
-        {job.output.join('\n')}
-      </pre>
+        <pre className="select-text px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words">
+          {job.output.join('\n')}
+        </pre>
+      </ScrollArea>
     </div>
   )
 }

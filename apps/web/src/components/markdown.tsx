@@ -49,6 +49,9 @@ export function Markdown({
         // switches to the card surface so gray and green do not mix.
         'prose-code:rounded prose-code:bg-[var(--code-bg,var(--well))] prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none',
         'prose-pre:bg-[var(--code-bg,var(--well))] prose-pre:text-foreground [&_pre_code]:bg-transparent [&_pre_code]:p-0',
+        // Long lines wrap, as in Slack and the app's code blocks, rather than
+        // scrolling sideways under a native scrollbar.
+        'prose-pre:break-words prose-pre:whitespace-pre-wrap',
         'prose-th:text-foreground prose-strong:text-foreground',
         className
       )}
