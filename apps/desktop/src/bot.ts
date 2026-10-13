@@ -61,6 +61,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   private child?: UtilityProcess
   private childStartedAt = 0
   private stopRequested = false
+  /** The app is quitting: nothing starts the bot again (dispose) */
+  private disposed = false
   /** Exits no one asked for in a row (nextRetry) */
   private failures = 0
   /** Starts the bot again after such an exit */
@@ -123,7 +125,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   }
 
   async start(options: { rebuild?: boolean } = {}): Promise<void> {
-    if (this.child || this.state.phase === 'building') return
+    if (this.disposed || this.child || this.state.phase === 'building') return
     this.cancelRetry()
     this.refreshExternal()
     if (this.state.phase === 'external') return
@@ -192,7 +194,12 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     await this.start(options)
   }
 
+  /**
+   * For a quitting app: no retry, no start from a startup still on its way or
+   * an external bot that stops. A running bot is still stopped with stop().
+   */
   dispose(): void {
+    this.disposed = true
     if (this.poller) clearInterval(this.poller)
     this.cancelRetry()
   }
@@ -293,7 +300,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     this.child = undefined
     const uptime = Date.now() - this.childStartedAt
     this.options.log(`bot exited code=${code} uptime=${uptime}ms`)
-    if (this.stopRequested) {
+    if (this.stopRequested || this.disposed) {
       this.set({ phase: 'idle', pid: undefined, message: 'Stopped' })
       return
     }

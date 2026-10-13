@@ -975,6 +975,9 @@ if (!app.requestSingleInstanceLock()) {
     .then(async () => {
       registerAppProtocol()
       registerBotIpc()
+      // Opened only to be told to quit (see before-quit): no tray, window or
+      // Pace for the moment it lasts.
+      if (isQuitting) return
       if (process.platform === 'darwin' && !app.isPackaged) {
         app.dock?.setIcon(nativeImage.createFromPath(appIcon))
       }
@@ -999,17 +1002,25 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let botStopped = false
+let botStopping: Promise<void> | undefined
+/**
+ * Homebrew quits the app before an upgrade by asking again and again until it
+ * is gone. A request that lands just as the app exits makes macOS open the app
+ * again to deliver it, and that copy is told to quit while it starts. So from
+ * the first request on, nothing starts Pace again, and one stop answers them
+ * all.
+ */
 app.on('before-quit', (event) => {
   isQuitting = true
   taskCollector.cancel()
+  supervisor?.dispose()
   // A bot started by the app finishes active requests before it stops. (up to
   // 30 seconds)
   if (supervisor?.managing && !botStopped) {
     event.preventDefault()
     tray?.setToolTip(`${appName} - Pace: Stopping`)
-    void supervisor.stop().finally(() => {
+    botStopping ??= supervisor.stop().finally(() => {
       botStopped = true
-      supervisor.dispose()
       app.quit()
     })
   }
