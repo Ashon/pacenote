@@ -9,9 +9,13 @@ The desktop app installs from the Homebrew tap (macOS 12 or later, Apple silicon
 
 ```sh
 brew tap ashon/tap
+brew trust ashon/tap
 brew install --cask pacenote
 ```
 
+- Homebrew loads casks only from taps you trust. Without `brew trust`, the install is refused, and a plain `brew upgrade`
+  compares the installed copy with itself and skips Pacenote. An install from before the rename to Pacenote (`verda`,
+  `orbly`) trusted only the old cask name, so run `brew trust ashon/tap` once there too.
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
   `codex` CLI login (codex 0.138 or later), Docker (Docker Desktop, OrbStack or colima) only for the Docker sandbox and
   diagrams, and `gh` and `git` for the ops tools. The built-in sandbox needs nothing installed, on Apple silicon with
@@ -28,6 +32,7 @@ brew install --cask pacenote
   `logs/desktop.log`, beside Pace's `logs/bot.log`.
 - `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 15 seconds to finish its requests, and the rest
   resume on the next start) and reopens it. The app tells you when a new release is out ("Update" in its status bar).
+  Homebrew refreshes the tap at most once a day on its own, so right after a release run `brew update` first.
   `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
 
 ## From source

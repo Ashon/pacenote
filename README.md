@@ -39,8 +39,13 @@ The desktop app installs with Homebrew (macOS 12 or later, Apple silicon or Inte
 
 ```sh
 brew tap ashon/tap
+brew trust ashon/tap
 brew install --cask pacenote
 ```
+
+Homebrew loads casks only from taps you trust: without `brew trust`, the install is refused and `brew upgrade` skips
+Pacenote. An install from before the rename to Pacenote trusted only the old cask name, so run `brew trust ashon/tap`
+once there too.
 
 Then:
 
