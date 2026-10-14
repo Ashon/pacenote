@@ -130,8 +130,8 @@ declare global {
         stopCollect(): Promise<void>
         /** A task with what came before it and its work log */
         detail(id: string): Promise<TaskDetail | null>
-        /** Checkouts of a repository found on this Mac */
-        folders(repo: string): Promise<FolderCheck[]>
+        /** Where a task may open on this Mac, likeliest first */
+        folders(id: string): Promise<FolderCheck[]>
         /** Asks for a folder, and checks it against the repository */
         chooseFolder(repo?: string): Promise<FolderCheck | undefined>
         /** Each repository's folder (tasks-repos.json) */

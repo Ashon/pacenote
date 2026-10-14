@@ -44,7 +44,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
-import { taskDetailQuery, useTaskDetail, useTaskWork } from '@/lib/tasks'
+import {
+  taskDetailQuery,
+  useRepoFolders,
+  useTaskDetail,
+  useTaskWork,
+} from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PaceSpinner } from './pace-spinner'
 
@@ -167,6 +172,8 @@ export function TaskRow({
 }) {
   const client = useQueryClient()
   const act = useTaskWork(task.id)
+  // Its repository's folder: Continue opens there without asking.
+  const folder = repoFolderOf(useRepoFolders().data, task.repo)
   const [dismissing, setDismissing] = useState(false)
   const [folderFor, setFolderFor] = useState<WorkTool>()
   const [drafting, setDrafting] = useState(false)
@@ -236,6 +243,19 @@ export function TaskRow({
       icon: <SquareTerminal />,
       run: () => void continueIn(other(cli)),
     },
+    ...(folder
+      ? [
+          {
+            label: 'Continue in another folder',
+            icon: <FolderOpen />,
+            run: () => {
+              setError(undefined)
+              if (!open) onToggle()
+              setFolderFor(cli)
+            },
+          },
+        ]
+      : []),
     ...(task.action === 'reply'
       ? []
       : [
@@ -343,14 +363,16 @@ export function TaskRow({
             {task.status === 'open' && !dismissing && (
               <>
                 {task.action === 'code' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void continueIn(cli)}
-                  >
-                    <SquareTerminal />
-                    Continue in {TOOL[cli]}
-                  </Button>
+                  <OpensIn folder={folder}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void continueIn(cli)}
+                    >
+                      <SquareTerminal />
+                      Continue in {TOOL[cli]}
+                    </Button>
+                  </OpensIn>
                 )}
                 {task.action === 'reply' && (
                   <Button
@@ -866,7 +888,36 @@ function EarlierLine({
   )
 }
 
-/** Where the session opens, the first time a repository needs one */
+/** A repository's folder, by its name in any case */
+const repoFolderOf = (
+  repos: Record<string, string> | undefined,
+  repo: string | undefined
+) =>
+  repo
+    ? Object.entries(repos ?? {}).find(
+        ([name]) => name.toLowerCase() === repo.toLowerCase()
+      )?.[1]
+    : undefined
+
+/** A folder under your home folder, as ~/… */
+const tilde = (folder: string) => folder.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
+
+/** Continue, with where it opens on hover when it opens without asking */
+function OpensIn({
+  folder,
+  children,
+}: {
+  folder: string | undefined
+  children: React.ReactElement
+}) {
+  if (!folder) return children
+  return <Tooltip content={`Opens in ${tilde(folder)}`}>{children}</Tooltip>
+}
+
+/**
+ * Where the session opens, when its repository has no folder yet (or you
+ * choose another): the likeliest folders, the first one chosen
+ */
 function FolderDialog({
   task,
   tool,
@@ -884,15 +935,11 @@ function FolderDialog({
   const [error, setError] = useState<string>()
   const [opening, setOpening] = useState(false)
   useEffect(() => {
-    if (!task.repo) {
-      setFound([])
-      return
-    }
-    void bridge?.folders(task.repo).then((folders) => {
+    void bridge?.folders(task.id).then((folders) => {
       setFound(folders)
       setChosen((current) => current ?? folders[0]?.path)
     })
-  }, [bridge, task.repo])
+  }, [bridge, task.id])
   const choose = async () => {
     const check = await bridge?.chooseFolder(task.repo)
     if (!check) return
@@ -926,9 +973,11 @@ function FolderDialog({
             aria-label="Folder"
             className="flex flex-col gap-2"
           >
-            {found === undefined && task.repo && (
+            {found === undefined && (
               <p className="text-[13px] text-muted-foreground">
-                Looking for {task.repo} on this Mac.
+                {task.repo
+                  ? `Looking for ${task.repo} on this Mac.`
+                  : 'Looking for the folders you worked in.'}
               </p>
             )}
             {found?.length === 0 && task.repo && (
@@ -967,18 +1016,25 @@ function FolderDialog({
                     {folder.path}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {folder.error ??
-                      [
-                        folder.remote
-                          ? `Its remote is ${folder.remote}`
-                          : 'No remote',
-                        folder.changes
-                          ? `${folder.changes} changes not committed`
-                          : 'clean',
-                      ].join(' · ')}
-                    {!folder.matches && !folder.error && task.repo
-                      ? ` · not ${task.repo}`
-                      : ''}
+                    {[
+                      folder.error?.replace(/\.$/, '') ??
+                        [
+                          folder.remote
+                            ? `Its remote is ${folder.remote}`
+                            : 'No remote',
+                          folder.changes
+                            ? `${folder.changes} changes not committed`
+                            : 'clean',
+                        ].join(' · '),
+                      !folder.matches && !folder.error && task.repo
+                        ? `not ${task.repo}`
+                        : undefined,
+                      folder.usedAt
+                        ? `used ${formatRelative(folder.usedAt)}`
+                        : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
                 </span>
               </button>

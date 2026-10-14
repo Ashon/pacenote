@@ -3,6 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
+import { yourRepos } from './folders.js'
 import type { TasksSettings } from './settings.js'
 import {
   findMessage,
@@ -31,6 +32,12 @@ export interface TaskToolsOptions {
    * is not shared with AI tools
    */
   runs?: (conversation: string, thread: string) => RelatedRun[] | undefined
+  /**
+   * The home folder, where Claude Code's and Codex's session logs are: the
+   * remotes of the folders you worked in lately are among your repositories
+   * (collect_context). Without it, only the ones with a folder remembered.
+   */
+  home?: string
 }
 
 const OFF =
@@ -59,7 +66,7 @@ export const TASK_RULES = [
   '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done.',
   'title: what to do, a short imperative under 80 characters, in the language of the messages. reason: one line on why it is a task. due: a due hint in words, only if the messages give one.',
   'action: what doing it takes. "code" when it needs a change to code or a look in a repository (a review, a fix, a question only the code answers), "reply" when an answer in the thread is all it needs, "other" for anything else.',
-  'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself).',
+  'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself) or plainly mean one of the user\u2019s repositories collect_context lists (by its name, as "the payments service" means acme/payments).',
   'summary: the thread in two or three sentences, in the language of the messages: who wants what, why, and by when. It is what reminds the user later; no secrets or personal details.',
 ].join('\n')
 
@@ -70,7 +77,7 @@ export function collectPrompt(): string {
     '1. Call collect_context: the rules, what to leave out, since when to read, and the open tasks.',
     '2. With your Slack tools, read only: never send, edit, react or schedule anything. Find, since then: messages that mention the user; threads they took part in whose last word is not theirs; in DMs (only if DMs count), what the other person said after the user last wrote; and the user’s own messages saying they will do something. Leave out the channels collect_context lists.',
     '3. Decide for each: a task, a Maybe, or nothing, by the rules.',
-    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, fill them in with update_task. When you close one, give close_task a wrap_up too.',
+    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, or no repo while its thread plainly means one, fill them in with update_task. When you close one, give close_task a wrap_up too.',
     '5. For each task collect_context lists to wrap up (done or closed lately, with no wrap-up yet), read its thread and call wrap_up_task. Anything left that is asked of the user is a task to add like any other.',
     '6. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished.',
     '',
@@ -104,12 +111,13 @@ export function registerTaskTools(
       description:
         "What collecting the user's tasks from Slack needs: the rules for " +
         'what is a task, the channels to leave out, whether DMs count, since ' +
-        'when to read, the open tasks to check for closing, and the tasks ' +
-        'done or closed lately to wrap up. Call it first.',
+        'when to read, the open tasks to check for closing, the tasks done ' +
+        'or closed lately to wrap up, and the repositories the user works ' +
+        'in. Call it first.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     () =>
-      respond(options, () => {
+      respond(options, async () => {
         const settings = options.settings()
         const file = readTasks(options.dataDir)
         const since =
@@ -154,6 +162,8 @@ export function registerTaskTools(
               summary: task.summary,
               link: task.source.permalink,
             })),
+          // For a task's repo: names only, never where they are
+          repos: await yourRepos(options.dataDir, options.home),
         }
       })
   )
@@ -519,14 +529,14 @@ function splitThread(task: TaskView): [string, string] {
   return [key.slice(0, at), key.slice(at + 1)]
 }
 
-function respond(
+async function respond(
   options: TaskToolsOptions,
-  build: () => object
-): CallToolResult {
+  build: () => object | Promise<object>
+): Promise<CallToolResult> {
   if (!options.settings().on)
     return { content: [{ type: 'text', text: OFF }], isError: true }
   try {
-    const body = redact({ note: NOTE, ...build() })
+    const body = redact({ note: NOTE, ...(await build()) })
     return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] }
   } catch (error) {
     return {

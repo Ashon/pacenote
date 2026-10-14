@@ -459,6 +459,26 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     )
     await line('Last time').waitFor()
 
+    // Its repository has a folder now: Continue opens there without asking,
+    // and says where on hover. Another folder is under the row's menu, the
+    // remembered one first, with when you last worked in it.
+    const next = row.getByRole('button', { name: 'Continue in Claude Code' })
+    await next.hover()
+    await page.getByRole('tooltip', { name: `Opens in ${checkout}` }).waitFor()
+    await row.getByRole('button', { name: 'More for this task' }).click()
+    await page
+      .getByRole('menuitem', { name: 'Continue in another folder' })
+      .click()
+    await page.getByText('Where is Ashon/payments on this Mac?').waitFor()
+    const remembered = page.getByRole('radio', {
+      name: /used (just now|\d+m ago)/,
+    })
+    await remembered.waitFor()
+    expect(await page.getByRole('radio').count()).toBe(1)
+    expect(await remembered.getAttribute('aria-checked')).toBe('true')
+    expect(await remembered.textContent()).toContain(checkout)
+    await page.getByRole('button', { name: 'Cancel' }).click()
+
     // The session closes the task through Pacenote's MCP server, as Claude
     // Code would, with a reply for the user to send.
     const transport = new StdioClientTransport({
@@ -482,6 +502,11 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(body.earlier.inRepo).toMatchObject([
       { id: earlier.id, outcome: 'Done in Claude Code · 2 comments' },
     ])
+    // A collection knows the repositories you work in, by name only.
+    const collecting = await client.callTool({ name: 'collect_context' })
+    const collectText = (collecting.content as { text: string }[])[0]!.text
+    expect(JSON.parse(collectText).repos).toEqual(['Ashon/payments'])
+    expect(collectText).not.toContain(checkout)
     // A later collection finds the thread moved the due date: the open row
     // says so, and the row in the list says it was updated.
     await client.callTool({
@@ -626,6 +651,26 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await eventually('the question’s thread opened', async () =>
       (await openedLinks()).includes(question.source.permalink!)
     )
+
+    // A task with no repository opens where you worked lately: the folder
+    // of the last session, chosen, with when.
+    await asked.getByRole('button', { name: 'More for this task' }).click()
+    await page
+      .getByRole('menuitem', { name: 'Continue in Claude Code' })
+      .click()
+    await page.getByText('Where should the session open?').waitFor()
+    const recent = page.getByRole('radio', { name: new RegExp(`used `) })
+    await recent.waitFor()
+    expect(await recent.getAttribute('aria-checked')).toBe('true')
+    expect(await recent.textContent()).toContain(folder)
+    await faded(
+      page.getByRole('button', { name: 'Open Claude Code here' }),
+      'the recent folder ready to open'
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-folder-recent.png'),
+    })
+    await page.getByRole('button', { name: 'Cancel' }).click()
 
     // Settings > Todo shows where the repository opens.
     await page.evaluate("window.location.hash = '#/settings/tasks'")

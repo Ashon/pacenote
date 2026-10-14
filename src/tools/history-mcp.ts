@@ -34,6 +34,7 @@ const server = createHistoryServer({
   version: process.env.PACENOTE_VERSION ?? 'dev',
   tasks: {
     dataDir: data,
+    home: homedir(),
     settings: () => readTasksSettings(process.env, envFile),
   },
 })

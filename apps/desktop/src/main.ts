@@ -68,6 +68,14 @@ import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
 import type { TaskDecision, WorkEntry } from '../../../src/tasks/types.js'
 import {
+  checkFolder,
+  readRepos,
+  recentFolders,
+  repoFolder,
+  saveRepo,
+  suggestFolders,
+} from '../../../src/tasks/folders.js'
+import {
   addWork,
   readWork,
   updateWork,
@@ -75,17 +83,12 @@ import {
 } from '../../../src/tasks/work.js'
 import { draftReply } from './drafter.js'
 import {
-  checkFolder,
   discoverSessions,
   findCodexSession,
-  findRepoFolders,
   lastActive,
-  readRepos,
   readSessionLog,
-  repoFolder,
   resumeCommand,
   resumeSession,
-  saveRepo,
   sessionFile,
   startSession,
   terminalOf,
@@ -837,19 +840,23 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:tasks:detail', (event, id: unknown) =>
     fromMainWindow(event) && typeof id === 'string' ? taskDetail(id) : null
   )
-  ipcMain.handle('pacenote:tasks:folders', (event, repo: unknown) =>
-    fromMainWindow(event) && typeof repo === 'string'
-      ? findRepoFolders(repo, homedir())
-      : []
-  )
+  // Where a task may open: its repository's folder and checkouts, or the
+  // folders you worked in lately, likeliest first
+  ipcMain.handle('pacenote:tasks:folders', (event, id: unknown) => {
+    if (!fromMainWindow(event) || typeof id !== 'string') return []
+    const task = allTaskViews(dataDir).find((t) => t.id === id)
+    return task ? suggestFolders(task, { home: homedir(), dataDir }) : []
+  })
   ipcMain.handle(
     'pacenote:tasks:choose-folder',
     async (event, repo: unknown) => {
       if (!fromMainWindow(event) || !mainWindow) return undefined
+      // Next to the folder you worked in last, where your checkouts are
+      const [last] = recentFolders(homedir(), { leaveOut: [dataDir], limit: 1 })
       const result = await dialog.showOpenDialog(mainWindow, {
         title:
           typeof repo === 'string' ? `Where is ${repo}?` : 'Choose a folder',
-        defaultPath: homedir(),
+        defaultPath: last ? path.dirname(last.path) : homedir(),
         properties: ['openDirectory'],
       })
       const folder = result.filePaths[0]

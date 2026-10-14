@@ -67,7 +67,7 @@ first lever is picking fewer, better tasks; Dismiss is the safety net.
 
 **MCP.** On Pacenote's MCP server, behind Settings > Tasks > Gather my tasks from Slack (separate from sharing the run
 history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks as they are,
-the tasks to wrap up), `add_tasks`, `update_task`, `close_task`, `wrap_up_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash
+the tasks to wrap up, the repositories you work in), `add_tasks`, `update_task`, `close_task`, `wrap_up_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash
 command. `add_tasks` holds the settings whatever the tool sends: it skips messages from channels left out and DMs while
 they do not count.
 
@@ -83,6 +83,15 @@ kind: asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundA
 | checked | resolved } }`. A source without `app` is Slack's, as every task was before there were sources.
 
 **Keeping.** Open tasks fade after 7 days and drop after 14; done and dismissed ones are kept 14 days.
+
+**Folders.** A code task continues in Claude Code or Codex, opened in its repository's folder on this Mac: the folder
+chosen for the repository the first time (`tasks-repos.json`, the app's), without asking; Continue shows it on hover,
+and the row's menu opens another. Without one, the app suggests folders, likeliest first, the first one chosen: for a
+repository, its checkouts you worked in lately, then the ones under the usual folders; for a task with none, the folders
+you worked in lately, the ones its title or summary names first, then its channel. Where you worked comes from Claude
+Code's and Codex's own session logs of the last 30 days, only each session's folder. A collection is given the
+repositories' names (the remembered ones and the remotes of those folders), never the folders, so it can tell what
+repository a thread means without a link.
 
 ## Risks
 

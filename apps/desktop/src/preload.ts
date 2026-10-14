@@ -72,8 +72,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     // A task's detail, and continuing it: in a terminal (Claude Code or
     // Codex), or with a reply drafted for you to send
     detail: (id: string) => ipcRenderer.invoke('pacenote:tasks:detail', id),
-    folders: (repo: string) =>
-      ipcRenderer.invoke('pacenote:tasks:folders', repo),
+    folders: (id: string) => ipcRenderer.invoke('pacenote:tasks:folders', id),
     chooseFolder: (repo?: string) =>
       ipcRenderer.invoke('pacenote:tasks:choose-folder', repo),
     repos: () => ipcRenderer.invoke('pacenote:tasks:repos'),

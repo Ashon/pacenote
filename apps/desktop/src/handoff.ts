@@ -2,13 +2,10 @@ import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
-  closeSync,
   existsSync,
   mkdirSync,
-  openSync,
   readdirSync,
   readFileSync,
-  readSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -18,9 +15,8 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
 import { TOOL_LABEL } from '../../../src/tasks/context.js'
-import { readJson, writeJson } from '../../../src/tasks/store.js'
+import { codexLogs, head } from '../../../src/tasks/folders.js'
 import type {
-  FolderCheck,
   SessionItem,
   TaskContext,
   TaskView,
@@ -58,147 +54,6 @@ export type Terminal = TerminalApp | 'auto'
 /** TASKS_TERMINAL as a terminal; unset or unknown: auto */
 export const terminalOf = (value?: string): Terminal =>
   value && Object.hasOwn(TERMINALS, value) ? (value as TerminalApp) : 'auto'
-
-// ---------------------------------------------------------------------------
-// Repository folders
-
-/** Each repository's folder on this Mac (tasks-repos.json, the app's) */
-export const REPOS_FILE = 'tasks-repos.json'
-
-export function readRepos(dataDir: string): Record<string, string> {
-  const file = readJson<{ repos?: Record<string, string> }>(
-    path.join(dataDir, REPOS_FILE),
-    {}
-  )
-  return file.repos && typeof file.repos === 'object' ? file.repos : {}
-}
-
-export function saveRepo(
-  dataDir: string,
-  repo: string,
-  folder: string | undefined
-): Record<string, string> {
-  const repos = readRepos(dataDir)
-  const key = Object.keys(repos).find(
-    (name) => name.toLowerCase() === repo.toLowerCase()
-  )
-  if (key) delete repos[key]
-  if (folder) repos[repo] = folder
-  writeJson(path.join(dataDir, REPOS_FILE), { version: 1, repos })
-  return repos
-}
-
-export const repoFolder = (dataDir: string, repo: string) =>
-  Object.entries(readRepos(dataDir)).find(
-    ([name]) => name.toLowerCase() === repo.toLowerCase()
-  )?.[1]
-
-/**
- * The repository a git remote points to, as owner/name:
- * https://github.com/Ashon/payments.git, git@github.com:Ashon/payments.git
- */
-export function remoteRepo(remote: string): string | undefined {
-  const match = /[/:]([^/:\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec(remote.trim())
-  return match ? `${match[1]}/${match[2]}` : undefined
-}
-
-/** Whether a folder is the repository's checkout: its origin and its changes */
-export async function checkFolder(
-  folder: string,
-  repo: string | undefined
-): Promise<FolderCheck> {
-  if (!existsSync(folder) || !statSync(folder).isDirectory())
-    return { path: folder, matches: false, error: 'There is no such folder.' }
-  const remote = await git(folder, ['remote', 'get-url', 'origin'])
-  const status = await git(folder, ['status', '--porcelain'])
-  if (status === undefined)
-    return { path: folder, matches: !repo, error: 'It is not a git checkout.' }
-  return {
-    path: folder,
-    remote: remote?.trim() || undefined,
-    matches:
-      !repo || remoteRepo(remote ?? '')?.toLowerCase() === repo.toLowerCase(),
-    changes: status.split('\n').filter((line) => line.trim()).length,
-  }
-}
-
-async function git(
-  folder: string,
-  args: string[]
-): Promise<string | undefined> {
-  try {
-    const { stdout } = await run('git', ['-C', folder, ...args], {
-      timeout: 5000,
-    })
-    return stdout
-  } catch {
-    return undefined
-  }
-}
-
-/** Where checkouts usually are, under the home folder */
-const ROOTS = [
-  'git',
-  'src',
-  'code',
-  'work',
-  'projects',
-  'Developer',
-  'dev',
-  'repos',
-]
-const SKIP = new Set(['node_modules', 'Library', 'vendor', 'target', 'dist'])
-
-/**
- * Checkouts of the repository under the usual folders of the home, at most
- * four levels down: the checkouts are listed first, then the ones named like
- * the repository have their remote checked before the rest, a few, quickly
- */
-export async function findRepoFolders(
-  repo: string,
-  home: string,
-  limit = 5
-): Promise<FolderCheck[]> {
-  const deadline = Date.now() + 3000
-  const checkouts: string[] = []
-  const queue: { dir: string; depth: number }[] = ROOTS.map((name) => ({
-    dir: path.join(home, name),
-    depth: 0,
-  })).filter(({ dir }) => existsSync(dir))
-  let visited = 0
-  while (queue.length && Date.now() < deadline && (visited += 1) <= 5000) {
-    const { dir, depth } = queue.shift()!
-    if (existsSync(path.join(dir, '.git'))) {
-      checkouts.push(dir)
-      continue
-    }
-    if (depth >= 4) continue
-    try {
-      for (const entry of readdirSync(dir, { withFileTypes: true }))
-        if (
-          entry.isDirectory() &&
-          !entry.name.startsWith('.') &&
-          !SKIP.has(entry.name)
-        )
-          queue.push({ dir: path.join(dir, entry.name), depth: depth + 1 })
-    } catch {
-      // Not readable
-    }
-  }
-  const name = repo.split('/')[1]?.toLowerCase() ?? ''
-  const named = (dir: string) => path.basename(dir).toLowerCase().includes(name)
-  const ordered = [
-    ...checkouts.filter(named),
-    ...checkouts.filter((dir) => !named(dir)),
-  ].slice(0, 60)
-  const found: FolderCheck[] = []
-  for (const dir of ordered) {
-    if (found.length >= limit || Date.now() > deadline + 3000) break
-    const check = await checkFolder(dir, repo)
-    if (check.matches) found.push(check)
-  }
-  return found
-}
 
 // ---------------------------------------------------------------------------
 // The handoff
@@ -487,41 +342,6 @@ export const resumeCommand = (entry: Session) =>
 
 // ---------------------------------------------------------------------------
 // The tools' own session logs
-
-/** The first bytes of a file, for finding what a log starts with */
-function head(file: string, bytes = 256 * 1024): string {
-  const fd = openSync(file, 'r')
-  try {
-    const buffer = Buffer.alloc(bytes)
-    const read = readSync(fd, buffer, 0, bytes, 0)
-    return buffer.subarray(0, read).toString('utf8')
-  } finally {
-    closeSync(fd)
-  }
-}
-
-/** Codex's session logs since a time: ~/.codex/sessions/YYYY/MM/DD/*.jsonl */
-function codexLogs(home: string, since: number): string[] {
-  const root = path.join(home, '.codex', 'sessions')
-  const files: string[] = []
-  for (
-    let day = since - 86_400_000;
-    day <= Date.now() + 86_400_000;
-    day += 86_400_000
-  ) {
-    const date = new Date(day)
-    const dir = path.join(
-      root,
-      String(date.getFullYear()),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0')
-    )
-    if (!existsSync(dir)) continue
-    for (const name of readdirSync(dir))
-      if (name.endsWith('.jsonl')) files.push(path.join(dir, name))
-  }
-  return files.filter((file) => statSync(file).mtimeMs >= since - 60_000)
-}
 
 /** The id in a Codex log: its session_meta, else the uuid in its name */
 function codexSessionId(file: string, text: string): string | undefined {

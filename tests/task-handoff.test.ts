@@ -18,21 +18,15 @@ import {
   draftReply,
 } from '../apps/desktop/src/drafter.js'
 import {
-  checkFolder,
   chooseTerminal,
   commandScript,
   discoverSessions,
   findCodexSession,
-  findRepoFolders,
   handoffPrompt,
   lastActive,
-  readRepos,
   readSessionLog,
-  remoteRepo,
-  repoFolder,
   resumeCommand,
   resumeSession,
-  saveRepo,
   sessionFile,
   shellQuote,
   startSession,
@@ -40,6 +34,14 @@ import {
   type HandoffOptions,
   type Session,
 } from '../apps/desktop/src/handoff.js'
+import {
+  checkFolder,
+  findRepoFolders,
+  readRepos,
+  remoteRepo,
+  repoFolder,
+  saveRepo,
+} from '../src/tasks/folders.js'
 import { writeTools } from '../src/tasks/sources.js'
 import type { TaskContext, TaskView } from '../src/tasks/types.js'
 

@@ -268,6 +268,8 @@ export interface FolderCheck {
   /** Changes not committed */
   changes?: number
   error?: string
+  /** When you last worked in it with Claude Code or Codex */
+  usedAt?: string
 }
 
 /** One turn or step of a Claude Code or Codex session, as its log shows it */
