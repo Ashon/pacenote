@@ -401,7 +401,8 @@ describe("the tools' own session logs", () => {
       task: task.id,
       tool: 'codex',
       cwd: '/w/payments',
-      startedAt: new Date(Date.now() - 60_000).toISOString(),
+      // A minute before the log's own time, on the day of its folder
+      startedAt: new Date(2026, 9, 13, 11, 59, 5).toISOString(),
     }
     expect(findCodexSession(home, entry)).toBe(id)
     expect(findCodexSession(home, { ...entry, id: 'other' })).toBeUndefined()
