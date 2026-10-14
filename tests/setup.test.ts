@@ -11,7 +11,13 @@ import {
   PART_TITLES,
   vmSetupProgress,
 } from '../src/sandbox/vm-progress.js'
-import { prepareEarly, setupView } from '../src/settings/setup.js'
+import { pairStartFailure } from '../apps/desktop/src/hub-pairing.js'
+import {
+  prepareEarly,
+  reopened,
+  setupView,
+  stepToFix,
+} from '../src/settings/setup.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-setup-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -64,6 +70,33 @@ describe('first-run setup', () => {
     expect(JSON.parse(readFileSync(store.file, 'utf8'))).toEqual(done.record)
   })
 
+  it('opens again where it was, from the review at the latest', () => {
+    const dir = mkdtempSync(path.join(root, 'reopen-'))
+    const store = new SetupStore(dir, () => ({
+      configured: false,
+      answered: false,
+    }))
+    store.save({
+      step: 'answer',
+      slack: 'app',
+      answerSince: '2026-10-14T00:00:00Z',
+    })
+    store.save({ me: { id: 'U0ALICE', name: 'alice' }, finished: true })
+    // Left for Settings, then back to the steps: the first answer it waited
+    // for is no longer waited for.
+    expect(store.save({ finished: false })).toEqual({
+      open: true,
+      record: {
+        step: 'review',
+        slack: 'app',
+        me: { id: 'U0ALICE', name: 'alice' },
+      },
+    })
+    expect(reopened({ step: 'slack', finishedAt: 'x' })).toEqual({
+      step: 'slack',
+    })
+  })
+
   it('a Pacenote set up before setup existed is marked done once', () => {
     const dir = mkdtempSync(path.join(root, 'migrate-'))
     const store = new SetupStore(dir, () => ({
@@ -74,6 +107,37 @@ describe('first-run setup', () => {
     expect(JSON.parse(readFileSync(store.file, 'utf8'))).toMatchObject({
       finishedAt: expect.any(String),
     })
+  })
+})
+
+describe('what keeps Pace from starting', () => {
+  it('leads to the step that fixes it', () => {
+    expect(stepToFix([{ key: 'MENTION_ALLOWED_USERS' }])).toBe('slack')
+    expect(stepToFix([{ key: 'HUB_TOKEN' }])).toBe('slack')
+    expect(stepToFix([{ key: 'REASONER_TIMEOUT_SEC' }])).toBe('ai')
+    expect(stepToFix([{ key: 'SANDBOX_CLAUDE_OAUTH_TOKEN' }])).toBe('runtime')
+    // Without settings named, by what the message says
+    expect(stepToFix([], 'Slack rejected the bot token (invalid_auth).')).toBe(
+      'slack'
+    )
+    expect(stepToFix(undefined, 'claude is not signed in.')).toBe('ai')
+    expect(stepToFix(undefined, 'Pace stopped right after starting.')).toBe(
+      undefined
+    )
+  })
+
+  it("says why a hub handed out no code: the address, the network, or the hub's side", () => {
+    const url = 'https://hub.example.com'
+    expect(pairStartFailure(url, 'fetch failed')).toBe(
+      "Couldn't reach a hub at https://hub.example.com. Check the address and your network."
+    )
+    expect(pairStartFailure(url, 'HTTP 404')).toMatch(
+      /^No Pacenote hub answers/
+    )
+    expect(pairStartFailure(url, 'HTTP 502')).toMatch(
+      /had a problem \(HTTP 502\)/
+    )
+    expect(pairStartFailure(url, 'pairing_closed')).toMatch(/pairing_closed$/)
   })
 })
 

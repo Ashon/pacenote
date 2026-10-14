@@ -12,9 +12,26 @@ import type { Detected, useSandboxSetup } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import type { SettingsView } from '@src/settings/fields'
 import type { SetupPart } from '@src/sandbox/vm-progress'
-import { ChoiceCard, Chip, Note, StepFrame } from './parts'
+import { ChoiceCard, Chip, Note, Problem, StepFrame } from './parts'
 
 type Runtime = 'vm' | 'none'
+
+/**
+ * Why the built-in sandbox is not being prepared, when it stopped or could not
+ * start: what to check, and the job's last lines for Details
+ */
+export function preparingProblem(
+  sandbox: ReturnType<typeof useSandboxSetup>
+): { text: string; details?: string } | undefined {
+  if (sandbox.error?.kind === 'vm' && !sandbox.preparing)
+    return { text: `Preparing couldn't start. ${sandbox.error.message}` }
+  if (sandbox.job?.state !== 'failed' || sandbox.ready) return undefined
+  const part = sandbox.progress?.parts.find((each) => each.state === 'failed')
+  return {
+    text: `Preparing stopped${part ? ` at "${part.label}"` : ''}. Check your network and that the disk has about 1.5 GB free, then try again.`,
+    details: sandbox.job.output.slice(-12).join('\n'),
+  }
+}
 
 /**
  * 2. Where Pace works out answers: the built-in sandbox by default, where this
@@ -52,6 +69,7 @@ export function RuntimeStep({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
+  const problem = preparingProblem(sandbox)
 
   if (preparing)
     return (
@@ -121,11 +139,15 @@ export function RuntimeStep({
             {unsupported ? (
               <Chip tone="neutral">Not on this Mac</Chip>
             ) : (
-              <Chip tone="ok">Recommended</Chip>
+              <Chip tone="accent">Recommended</Chip>
             )}
           </span>
           <Point good>A small Linux VM per request, removed after</Point>
-          <Point good>Can't see your files or your logins</Point>
+          <Point good>
+            {backend === 'codex'
+              ? "Can't see your files, only your codex login"
+              : "Can't see your files or your logins"}
+          </Point>
           <Point good>
             Reaches only {backend === 'codex' ? 'ChatGPT' : 'Claude'} and the
             sites you allow
@@ -147,6 +169,18 @@ export function RuntimeStep({
       </div>
       {runtime === 'vm' && (
         <>
+          {problem && (
+            <Problem
+              details={problem.details}
+              action={
+                <Button variant="outline" onClick={() => sandbox.run('vm')}>
+                  Try again
+                </Button>
+              }
+            >
+              {problem.text}
+            </Problem>
+          )}
           <p className="flex items-start gap-2.5 text-body text-muted-foreground">
             <Download className="mt-px size-4 shrink-0" />
             {sandbox.ready ? (
@@ -219,11 +253,14 @@ export function SandboxLogin({
   set,
   onSaved,
   later,
+  required,
 }: {
   set: boolean
   onSaved: () => void
   /** It can wait: said beside the button, which is then not required yet */
   later?: boolean
+  /** Pace cannot start without it: said beside its name */
+  required?: boolean
 }) {
   const sandbox = window.pacenoteDesktop?.sandbox
   const [state, setState] = useState<
@@ -242,9 +279,12 @@ export function SandboxLogin({
     <div className="flex items-center gap-4 rounded-2xl px-4 py-3.5 ring-1 ring-border">
       <KeyRound className="size-5 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <b className="text-sm font-semibold">
-          The sandbox needs its own Claude login
-        </b>
+        <span className="flex flex-wrap items-center gap-2">
+          <b className="text-sm font-semibold">
+            The sandbox needs its own Claude login
+          </b>
+          {required && <Chip tone="warn">Required</Chip>}
+        </span>
         <span className="text-body text-muted-foreground">
           {state.step === 'error'
             ? state.message
@@ -300,7 +340,8 @@ function Preparing({
   retry: () => void
 }) {
   const progress = sandbox.progress
-  const failed = sandbox.job?.state === 'failed'
+  const problem = preparingProblem(sandbox)
+  const failed = Boolean(problem)
   const done = sandbox.job?.state === 'succeeded' || sandbox.ready
   const working = progress?.parts.find((part) => part.state === 'working')
   const percent = done ? 100 : Math.round((progress?.fraction ?? 0) * 100)
@@ -315,17 +356,21 @@ function Preparing({
             Back
           </Button>
           <span className="flex-1" />
-          {failed && (
-            <Button variant="outline" onClick={retry}>
-              Try again
-            </Button>
+          {failed ? (
+            <>
+              <Button variant="ghost" onClick={onDone}>
+                Continue setup
+              </Button>
+              <Button onClick={retry}>Try again</Button>
+            </>
+          ) : (
+            <Button onClick={onDone}>Continue setup</Button>
           )}
-          <Button onClick={onDone}>Continue setup</Button>
         </>
       }
     >
       <div className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
-        <span className="text-sm font-semibold">
+        <span aria-live="polite" className="text-sm font-semibold">
           {failed
             ? 'Preparing stopped'
             : done
@@ -379,11 +424,7 @@ function Preparing({
           </li>
         ))}
       </ul>
-      {failed && sandbox.job && (
-        <pre className="max-h-32 overflow-auto rounded-xl bg-well px-4 py-3 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
-          {sandbox.job.output.slice(-6).join('\n')}
-        </pre>
-      )}
+      {problem && <Problem details={problem.details}>{problem.text}</Problem>}
       <Note>
         Quitting Pacenote pauses this, and it picks up where it stopped next
         time.

@@ -1,5 +1,5 @@
 import { ChevronRight, LoaderCircle, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import type { Detected } from '@/lib/setup'
 import type { SettingsView } from '@src/settings/fields'
 import type { CliCheck } from '@src/settings/setup'
-import { ChoiceCard, Chip, Note, StepFrame } from './parts'
+import { ChoiceCard, Chip, CommandLine, Note, StepFrame } from './parts'
 
 type Backend = 'claude' | 'codex'
 
@@ -20,6 +20,7 @@ const SERVICES: Record<
     name: string
     plans: string
     command: string
+    /** What signs it in, typed in Terminal */
     signIn: string
     install: string
   }
@@ -28,14 +29,14 @@ const SERVICES: Record<
     name: 'Claude',
     plans: 'Pro, Max, Team or Enterprise',
     command: 'claude',
-    signIn: 'Run claude in Terminal and sign in with /login, then check again.',
+    signIn: 'claude auth login',
     install: 'https://docs.anthropic.com/en/docs/claude-code/setup',
   },
   codex: {
     name: 'ChatGPT',
     plans: 'Plus, Pro or Business, through Codex',
     command: 'codex',
-    signIn: 'Run codex login in Terminal, then check again.',
+    signIn: 'codex login',
     install: 'https://developers.openai.com/codex/cli',
   },
 }
@@ -73,6 +74,15 @@ export function AiStep({
   const [timeout, setTimeoutSec] = useState<string>()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
+  // Installed or signed in from Terminal meanwhile: looked for again on
+  // coming back to the window, without a click.
+  const missing = Boolean(cli && !(cliReady(cli.claude) && cliReady(cli.codex)))
+  const { check } = detect
+  useEffect(() => {
+    if (!missing) return
+    window.addEventListener('focus', check)
+    return () => window.removeEventListener('focus', check)
+  }, [missing, check])
 
   const use = async () => {
     if (!choice) return
@@ -109,10 +119,19 @@ export function AiStep({
             Check again
           </Button>
           <span className="flex-1" />
-          {error && <p className="text-body text-status-failed">{error}</p>}
+          {error ? (
+            <p className="text-body text-status-failed">{error}</p>
+          ) : (
+            cli &&
+            !choice && (
+              <p className="text-body text-muted-foreground">
+                Sign in to one of them first
+              </p>
+            )
+          )}
           <Button onClick={() => void use()} disabled={!choice || saving}>
             {saving && <LoaderCircle className="animate-spin" />}
-            Use {SERVICES[choice ?? 'claude'].name}
+            {choice ? `Use ${SERVICES[choice].name}` : 'Continue'}
           </Button>
         </>
       }
@@ -141,8 +160,8 @@ export function AiStep({
       )}
       <Note>
         Connectors and account settings stay in{' '}
-        {SERVICES[choice ?? 'claude'].name}. Pacenote doesn't set them up or
-        change them.
+        {choice ? SERVICES[choice].name : 'your AI service'}. Pacenote doesn't
+        set them up or change them.
       </Note>
       <Collapsible>
         <CollapsibleTrigger className="group inline-flex items-center gap-1.5 text-body font-semibold text-muted-foreground hover:text-foreground">
@@ -235,9 +254,12 @@ function ServiceCard({
         ) : check.tooOld ? (
           `${service.command} ${check.version ?? ''} is too old for Pace. Update it, then check again.`
         ) : (
-          service.signIn
+          'Sign in from Terminal with this, and Pacenote sees it when you come back.'
         )}
       </span>
+      {check.installed && !check.tooOld && !ready && (
+        <CommandLine text={service.signIn} />
+      )}
     </ChoiceCard>
   )
 }

@@ -27,20 +27,25 @@ export class HubPairing {
   ) {}
 
   async start(url: unknown): Promise<PairStartResponse> {
+    const given = typeof url === 'string' ? url.trim() : ''
     if (
-      typeof url !== 'string' ||
       !/^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/.test(
-        url.trim()
+        given
       )
     )
-      throw new Error('Enter the hub URL (https://...).')
-    const hubUrl = url.trim().replace(/\/+$/, '')
+      throw new Error(
+        /^http:\/\//.test(given)
+          ? "Use the hub's https:// address. Plain http works only for a hub on this Mac."
+          : "Enter the hub's address, starting with https://."
+      )
+    const hubUrl = given.replace(/\/+$/, '')
     const client = new HubClient(hubUrl, this.fetchImpl)
     const { token, tokenHash } = newHubToken()
-    const started = await client.pairStart(
-      tokenHash,
-      hostname().replace(/\.local$/, '')
-    )
+    const started = await client
+      .pairStart(tokenHash, hostname().replace(/\.local$/, ''))
+      .catch((err: unknown) => {
+        throw new Error(pairStartFailure(hubUrl, (err as Error).message))
+      })
     this.pending = { client, url: hubUrl, pairingId: started.pairingId, token }
     return started
   }
@@ -84,4 +89,22 @@ export class HubPairing {
         .catch(() => undefined)
     return this.settings.save({ HUB_TOKEN: null })
   }
+}
+
+/**
+ * Why a hub did not hand out a code, in words that say what to check: the
+ * address, the network, or whoever runs the hub
+ */
+export function pairStartFailure(url: string, error: string): string {
+  if (
+    /fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|getaddrinfo|certificate|self.signed/i.test(
+      error
+    )
+  )
+    return `Couldn't reach a hub at ${url}. Check the address and your network.`
+  if (/\bHTTP (404|405)\b/.test(error))
+    return `No Pacenote hub answers at ${url}. Check the address with whoever runs it.`
+  if (/\bHTTP 5\d\d\b/.test(error))
+    return `The hub at ${url} had a problem (${error}). Try again in a moment, or tell whoever runs it.`
+  return `The hub at ${url} turned the pairing down: ${error}`
 }

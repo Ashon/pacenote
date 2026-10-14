@@ -220,6 +220,17 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(
       JSON.parse(readFileSync(path.join(world.home, 'setup.json'), 'utf8'))
     ).toMatchObject({ finishedAt: expect.any(String) })
+    // Settings is not a one-way door: Overview leads back to the steps.
+    await page.evaluate("window.location.hash = '#/'")
+    await page.getByRole('button', { name: 'Set up step by step' }).click()
+    await page
+      .getByRole('heading', { name: 'Which AI service do you already use?' })
+      .waitFor()
+    await page.getByRole('button', { name: 'Finish later' }).click()
+    await page
+      .getByRole('button', { name: 'Set it up in Settings instead' })
+      .click()
+    await page.getByRole('heading', { name: 'Messengers' }).waitFor()
 
     // Each token is saved on its own, from beside its input.
     await enterSecret(page, 'SLACK_APP_TOKEN', slack.appToken, 'enter')
@@ -334,9 +345,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     // 4. Review: you may ask; this Mac has no sandbox, so no diagrams.
     await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
     await page.getByText('@alice', { exact: true }).waitFor()
-    expect(
-      await page.getByRole('switch', { name: 'Diagrams' }).isDisabled()
-    ).toBe(true)
+    expect(await page.getByRole('switch', { name: 'Diagrams' }).count()).toBe(0)
     expect(readFileSync(path.join(world.home, '.env'), 'utf8')).toContain(
       `MENTION_ALLOWED_USERS=${alice.id}`
     )
@@ -356,6 +365,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(reply!.text).toBe('*Healthy*. Up 3 days.')
     await page.getByText('First answer sent').waitFor()
     await page.getByText('"how is web-01?"').waitFor()
+    await page.getByRole('heading', { name: 'Pace is set up' }).waitFor()
     await eventually(
       'setup to be done',
       () =>
@@ -389,11 +399,29 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('heading', { name: 'Connect Pace to Slack' }).waitFor()
 
     await page.getByText("Join your team's hub").click()
+    // An address that is not a hub's says so in plain words.
+    await page.getByLabel('Hub address').fill('http://hub.example.com')
+    await page.getByRole('button', { name: 'Get a pairing code' }).click()
+    await page
+      .getByText("Use the hub's https:// address.", { exact: false })
+      .waitFor()
+    await page.getByLabel('Hub address').fill('https://127.0.0.1:1')
+    await page.getByRole('button', { name: 'Get a pairing code' }).click()
+    await page
+      .getByText("Couldn't reach a hub at https://127.0.0.1:1.", {
+        exact: false,
+      })
+      .waitFor()
+    // Waiting for the mention can be called off, freeing the address.
     await page.getByLabel('Hub address').fill(url)
     await page.getByRole('button', { name: 'Get a pairing code' }).click()
-    const command = (await page
-      .locator('code', { hasText: '@Pace connect' })
-      .textContent({ timeout: 15_000 }))!
+    const pairing = page.locator('code', { hasText: '@Pace connect' })
+    await pairing.waitFor()
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await pairing.waitFor({ state: 'detached' })
+    expect(await page.getByLabel('Hub address').isEnabled()).toBe(true)
+    await page.getByRole('button', { name: 'Get a pairing code' }).click()
+    const command = (await pairing.textContent({ timeout: 15_000 }))!
     const code = command.replace('@Pace connect ', '').trim()
     await slack.mention({
       channel: ops.id,
@@ -423,6 +451,103 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
     await world.answered(ops.id, ts)
     await page.getByText('First answer sent').waitFor()
+  })
+
+  it('gets past where setup used to stop: a token in the wrong place, someone else\'s mention, a wrong "Yes", a failed first answer', async () => {
+    world = await World.create([
+      { match: 'break', fail: 'Something broke in the reasoner.' },
+      { match: 'web-01', answer: 'Healthy.' },
+    ])
+    const { slack, ops, alice, bob } = world
+    const page = await launch(world, { firstRun: true })
+    await page.getByRole('button', { name: 'Use Claude' }).click()
+    await page.getByRole('button', { name: 'Run directly on this Mac' }).click()
+    await page.getByRole('heading', { name: 'Connect Pace to Slack' }).waitFor()
+    await page.getByText('Use your own Slack app').click()
+    await page.getByRole('button', { name: 'Set up your own app' }).click()
+
+    // A token in the wrong field says where it goes, before Slack is asked.
+    const token = (setting: string) =>
+      page.locator(`[data-setting="${setting}"] input`)
+    await token('SLACK_APP_TOKEN').fill(slack.botToken)
+    await page
+      .getByText('This is the bot token. It goes in the next field.')
+      .waitFor()
+    await token('SLACK_APP_TOKEN').fill(slack.appToken)
+    await token('SLACK_BOT_TOKEN').fill(slack.botToken)
+    await page
+      .locator('[data-setting="SLACK_BOT_TOKEN"]')
+      .getByText(/^Valid/)
+      .waitFor()
+    await page.getByRole('button', { name: 'Connect Slack' }).click()
+
+    // bob mentions Pace first; alice after him does not take his place
+    // under the buttons.
+    await page.getByText('Waiting for your mention').waitFor()
+    const mention = (user: string, text: string) =>
+      slack.mention({
+        channel: ops.id,
+        user,
+        text: `<@${slack.botUserId}> ${text}`,
+      })
+    await mention(bob.id, 'what is this?')
+    await page.getByText('@bob mentioned Pace in #ops just now').waitFor()
+    await page.getByText('"what is this?"').waitFor()
+    await mention(alice.id, "it's me")
+    await eventually('the note for alice', () =>
+      slack.ephemerals.find((note) => note.user === alice.id)
+    )
+    expect(await page.getByText('@bob mentioned Pace').count()).toBe(1)
+
+    // A wrong "Yes" for bob is undone by saying it again as alice.
+    await page.getByRole('button', { name: "Yes, that's me" }).click()
+    await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
+    await page.getByText('@bob', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('button', { name: 'Set up your own app' }).click()
+    await page
+      .locator('[data-setting="SLACK_BOT_TOKEN"]')
+      .getByText(/^Valid/)
+      .waitFor()
+    await page.getByRole('button', { name: 'Connect Slack' }).click()
+    await page.getByRole('button', { name: 'Continue as @bob' }).waitFor()
+    await page.getByText('Waiting for your mention').waitFor()
+    await mention(alice.id, "it's me")
+    await page.getByText('@alice mentioned Pace in #ops just now').waitFor()
+    await page.getByRole('button', { name: "Yes, that's me" }).click()
+    await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
+    await page.getByText('@alice', { exact: true }).waitFor()
+    expect(await page.getByText('@bob', { exact: true }).count()).toBe(0)
+    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).toMatch(
+      new RegExp(`^MENTION_ALLOWED_USERS=${alice.id}$`, 'm')
+    )
+    await page.getByRole('button', { name: 'Start Pace', exact: true }).click()
+
+    // A first answer that fails says why, and the next one finishes setup.
+    await page
+      .getByRole('heading', { name: 'Say hello to Pace in Slack' })
+      .waitFor({ timeout: 30_000 })
+    await mention(alice.id, 'break it')
+    await page.getByText('It could not answer').waitFor({ timeout: 30_000 })
+    await page
+      .getByText(
+        "Pace couldn't produce an answer. Fix it, then mention Pace again",
+        { exact: false }
+      )
+      .waitFor()
+    const ts = await mention(alice.id, 'how is web-01?')
+    await world.answered(ops.id, ts)
+    await page.getByText('First answer sent').waitFor()
+    await page.getByRole('heading', { name: 'Pace is set up' }).waitFor()
+    await eventually(
+      'setup to be done',
+      () =>
+        JSON.parse(readFileSync(path.join(world!.home, 'setup.json'), 'utf8'))
+          .finishedAt
+    )
+    expect(
+      await page.getByRole('button', { name: 'Finish later' }).count()
+    ).toBe(0)
   })
 
   it.skipIf(vmUnsupported() !== undefined)(
@@ -477,7 +602,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         .getByRole('heading', { name: 'Preparing the built-in sandbox' })
         .waitFor()
       // Where it stopped, and a way to try again
-      await page.getByText('Preparing stopped').waitFor()
+      await page.getByText('Preparing stopped', { exact: true }).waitFor()
       await page.getByRole('button', { name: 'Try again' }).waitFor()
       expect(
         await page

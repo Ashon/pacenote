@@ -18,7 +18,7 @@ import { useWindowWidth } from '../resize-handle'
 import { AiStep } from './ai-step'
 import { AnswerStep } from './answer-step'
 import { ReviewStep } from './review-step'
-import { RuntimeStep } from './runtime-step'
+import { preparingProblem, RuntimeStep } from './runtime-step'
 import { SlackStep, type SlackPart } from './slack-step'
 
 /** Below this window width the step list keeps only its numbers */
@@ -74,14 +74,22 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
   ])
   /** Preparing shows under its step until this Mac is chosen instead */
   const preparingShown = sandbox.preparing && setting !== 'none'
+  /** As does preparing that stopped, so it is not found out only at Start */
+  const stoppedShown =
+    !sandbox.preparing &&
+    setting !== 'none' &&
+    !unsupported &&
+    preparingProblem(sandbox) !== undefined
+  /** Pace is being started: the steps wait until it has or has not */
+  const [locked, setLocked] = useState(false)
 
   const save = setup.save
   const { refresh } = settings
   // Each step reads the settings again: the one before may have changed them
   // in the app (pairing with the hub saves its address and token there).
   const go = useCallback(
-    (next: SetupStep) => {
-      setPart(undefined)
+    (next: SetupStep, nextPart?: string) => {
+      setPart(nextPart)
       setStep(next)
       refresh()
       void save({ step: next })
@@ -126,6 +134,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
             onPart={(next) => setPart(next === 'choose' ? undefined : next)}
             settings={settings}
             connection={record.slack}
+            me={record.me}
             onBack={() => go('runtime')}
             onDone={(connection, me) => {
               void save({ slack: connection, me })
@@ -141,6 +150,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
             detected={detect.detected}
             sandbox={sandbox}
             onChange={go}
+            onBusy={setLocked}
             onStarted={(since) => {
               void save({ step: 'answer', answerSince: since })
               setPart(undefined)
@@ -201,7 +211,12 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
             {SETUP_STEPS.map((each, index) => {
               const current = each === step
               const reached = index <= furthest
+              // Done: passed on the way to the furthest step, or the last
+              // one once setup is over
+              const done =
+                !current && (index < furthest || Boolean(record?.finishedAt))
               const preparing = each === 'runtime' && preparingShown && !current
+              const stopped = each === 'runtime' && stoppedShown && !current
               const inner = (
                 <>
                   <span
@@ -214,7 +229,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                           : 'text-muted-foreground ring-1 ring-border'
                     )}
                   >
-                    {reached && !current ? (
+                    {done ? (
                       <Check className="size-3.5" strokeWidth={2.5} />
                     ) : (
                       index + 1
@@ -252,6 +267,11 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                         Preparing
                       </span>
                     )}
+                    {stopped && (
+                      <span className="text-2xs font-semibold text-status-failed">
+                        Preparing stopped
+                      </span>
+                    )}
                   </span>
                 </>
               )
@@ -273,35 +293,38 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                     <button
                       type="button"
                       className={className}
+                      disabled={locked}
+                      title={compact ? STEP_LABELS[each] : undefined}
                       onClick={() => go(each)}
                     >
                       {inner}
                     </button>
                   ) : (
-                    <span aria-disabled="true" className={className}>
-                      {inner}
-                    </span>
+                    <span className={className}>{inner}</span>
                   )}
                 </li>
               )
             })}
           </ol>
           <span className="flex-1" />
-          <div className="flex flex-col gap-1 px-2.5">
-            <button
-              type="button"
-              onClick={() => onLeave('#/')}
-              aria-label={compact ? 'Finish later' : undefined}
-              className="flex items-center gap-2 self-start text-body font-semibold text-primary hover:underline"
-            >
-              {compact ? <LogOut className="size-4" /> : 'Finish later'}
-            </button>
-            {!compact && (
-              <span className="text-xs text-muted-foreground">
-                Your choices are saved. Pick up from Overview.
-              </span>
-            )}
-          </div>
+          {!record?.finishedAt && (
+            <div className="flex flex-col gap-1 px-2.5">
+              <button
+                type="button"
+                onClick={() => onLeave('#/')}
+                aria-label={compact ? 'Finish later' : undefined}
+                title={compact ? 'Finish later' : undefined}
+                className="flex items-center gap-2 self-start text-body font-semibold text-primary hover:underline"
+              >
+                {compact ? <LogOut className="size-4" /> : 'Finish later'}
+              </button>
+              {!compact && (
+                <span className="text-xs text-muted-foreground">
+                  Your choices are saved. Pick up from Overview.
+                </span>
+              )}
+            </div>
+          )}
         </nav>
         <main
           className="content-surface mr-3 mb-3 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-card"

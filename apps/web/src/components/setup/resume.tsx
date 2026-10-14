@@ -10,6 +10,7 @@ import {
 } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from '../logo'
+import { preparingProblem } from './runtime-step'
 
 /**
  * Overview while setup is unfinished: how far it got and the way back to it,
@@ -76,6 +77,7 @@ export function SetupFacts() {
   // Prepared from the start, until this Mac is chosen instead
   const unsupported = sandbox.status?.vm?.unsupported
   const used = settings.view?.values.REASONER_SANDBOX !== 'none' && !unsupported
+  const stopped = used && preparingProblem(sandbox) !== undefined
   const running = supervisor?.phase === 'running'
   return (
     <section
@@ -103,12 +105,20 @@ export function SetupFacts() {
               ? 'Ready'
               : sandbox.preparing
                 ? `Preparing, ${Math.round((sandbox.progress?.fraction ?? 0) * 100)}%`
-                : 'Not prepared yet'
+                : stopped
+                  ? 'Preparing stopped'
+                  : 'Not prepared yet'
         }
         hint={
-          used
-            ? 'Keeps going in the background'
-            : 'Pace runs directly on this Mac'
+          !used
+            ? 'Pace runs directly on this Mac'
+            : sandbox.ready
+              ? 'Pace answers in it'
+              : sandbox.preparing
+                ? 'Keeps going in the background'
+                : stopped
+                  ? 'Try again in setup, under Where it runs'
+                  : 'Prepares once you resume setup'
         }
         accent={used && sandbox.preparing}
       />

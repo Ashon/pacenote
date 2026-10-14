@@ -60,8 +60,8 @@ Then:
      channel and mention it with `@Pace it's me`: Pacenote shows who did, and once you confirm it is you, you may ask.
    - **Review**, then **Start Pace**, and mention it once in Slack for its first answer.
 
-   Setup can be left at any step and picked up from Overview, or done in Settings instead. Ops tools need the built-in
-   sandbox, and diagrams its setup in either run environment.
+   Setup can be left at any step and picked up from Overview, or done in Settings instead and taken up again from
+   Overview. Ops tools need the built-in sandbox, and diagrams its setup in either run environment.
 
 `brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across
 upgrades and uninstalls. To run from source instead, see [Installation](docs/installation.md).

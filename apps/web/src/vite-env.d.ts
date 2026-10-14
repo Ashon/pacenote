@@ -204,6 +204,7 @@ declare global {
           slack?: 'hub' | 'app'
           me?: { id: string; name: string } | null
           answerSince?: string
+          /** true ends setup; false opens it again */
           finished?: boolean
         }): Promise<SetupView | null>
         /** The CLIs on this Mac, and whether it runs the built-in sandbox */
@@ -219,6 +220,8 @@ declare global {
         ): Promise<{ issues: SettingsIssue[] } | { error: string }>
         claimStop(): Promise<void>
         onClaim(callback: (user: ClaimedUser) => void): () => void
+        /** Listening stopped on its own: Pace started, here or elsewhere */
+        onClaimEnded(callback: (message: string) => void): () => void
       }
       sandbox: {
         status(): Promise<SandboxStatus | null>

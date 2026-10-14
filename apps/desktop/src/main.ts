@@ -277,10 +277,25 @@ const setup = new SetupStore(dataDir, () => ({
 }))
 /** Setup listening for "@Pace it's me" on your own Slack app */
 let claim: ClaimListener | undefined
+/**
+ * Pace was running when listening began, and runs again if listening ends
+ * without anyone confirmed
+ */
+let claimPaused = false
 async function stopClaim(): Promise<void> {
   const listening = claim
   claim = undefined
   await listening?.stop().catch(() => undefined)
+}
+/**
+ * Listening starts, stops and is confirmed one at a time, in the order asked:
+ * a screen left while it still connects stops the listener it was waiting for.
+ */
+let claimQueue: Promise<unknown> = Promise.resolve()
+function claimStep<T>(run: () => Promise<T>): Promise<T> {
+  const next = claimQueue.then(run, run)
+  claimQueue = next.catch(() => undefined)
+  return next
 }
 /**
  * Settings > Sandbox "Get token from Claude": runs claude setup-token and saves
@@ -1126,50 +1141,75 @@ function registerBotIpc(): void {
     return { cli: { claude, codex }, sandbox: { unsupported: vmUnsupported() } }
   })
   ipcMain.handle('pacenote:setup:claim-start', (event) =>
-    hubCall(event, async () => {
-      await stopClaim()
-      const env = settings.effectiveEnv()
-      const appToken = env.SLACK_APP_TOKEN?.trim()
-      const botToken = env.SLACK_BOT_TOKEN?.trim()
-      if (!appToken || !botToken)
-        throw new Error('Connect your Slack app with both tokens first.')
-      // Pace on the same app would take some of the mentions meanwhile.
-      if (supervisor?.managing) await supervisor.stop()
-      claim = await listenForClaim({
-        appToken,
-        botToken,
-        apiUrl: env.SLACK_API_URL,
-        log: log.child('setup'),
-        onMention: (user) =>
-          mainWindow?.webContents.send('pacenote:setup:claimed', user),
+    hubCall(event, () =>
+      claimStep(async () => {
+        await stopClaim()
+        const env = settings.effectiveEnv()
+        const appToken = env.SLACK_APP_TOKEN?.trim()
+        const botToken = env.SLACK_BOT_TOKEN?.trim()
+        if (!appToken || !botToken)
+          throw new Error('Connect your Slack app with both tokens first.')
+        if (supervisor?.current.phase === 'external')
+          throw new Error(
+            'Pace is running elsewhere, such as a terminal, and takes the mentions. Stop it there, then try again.'
+          )
+        // Pace on the same app would take some of the mentions meanwhile.
+        if (supervisor?.managing) {
+          claimPaused = true
+          await supervisor.stop()
+        }
+        claim = await listenForClaim({
+          appToken,
+          botToken,
+          apiUrl: env.SLACK_API_URL,
+          log: log.child('setup'),
+          onMention: (user) =>
+            mainWindow?.webContents.send('pacenote:setup:claimed', user),
+        })
+        return { ok: true as const }
       })
-      return { ok: true as const }
-    })
+    )
   )
   ipcMain.handle('pacenote:setup:claim-confirm', (event, raw: unknown) =>
-    hubCall(event, async () => {
-      const user = (raw ?? {}) as { id?: unknown; name?: unknown }
-      if (
-        typeof user.id !== 'string' ||
-        !/^[UW][A-Z0-9]+$/.test(user.id) ||
-        typeof user.name !== 'string'
-      )
-        throw new Error('That is not a Slack member.')
-      await stopClaim()
-      const listed = (settings.effectiveEnv().MENTION_ALLOWED_USERS ?? '')
-        .split(/[\s,]+/)
-        .filter(Boolean)
-      const issues = settings.save({
-        MENTION_ALLOWED_USERS: [...new Set([...listed, user.id])].join(','),
+    hubCall(event, () =>
+      claimStep(async () => {
+        const user = (raw ?? {}) as { id?: unknown; name?: unknown }
+        if (
+          typeof user.id !== 'string' ||
+          !/^[UW][A-Z0-9]+$/.test(user.id) ||
+          typeof user.name !== 'string'
+        )
+          throw new Error('That is not a Slack member.')
+        await stopClaim()
+        // Saying it again replaces the one setup let in before, so a wrong
+        // "Yes" is undone by the right one.
+        const before = setup.view().record.me?.id
+        const listed = (settings.effectiveEnv().MENTION_ALLOWED_USERS ?? '')
+          .split(/[\s,]+/)
+          .filter((id) => id && id !== before)
+        const issues = settings.save({
+          MENTION_ALLOWED_USERS: [...new Set([...listed, user.id])].join(','),
+        })
+        if (issues.length === 0) {
+          claimPaused = false
+          setup.save({ me: { id: user.id, name: user.name } })
+        }
+        return { issues }
       })
-      if (issues.length === 0)
-        setup.save({ me: { id: user.id, name: user.name } })
-      return { issues }
-    })
+    )
   )
-  ipcMain.handle('pacenote:setup:claim-stop', async (event) => {
-    if (fromMainWindow(event)) await stopClaim()
-  })
+  // Left without confirming: Pace runs again if listening stopped it.
+  ipcMain.handle('pacenote:setup:claim-stop', (event) =>
+    fromMainWindow(event)
+      ? claimStep(async () => {
+          await stopClaim()
+          if (claimPaused) {
+            claimPaused = false
+            await supervisor?.start()
+          }
+        })
+      : undefined
+  )
   ipcMain.handle('pacenote:hub:pair-cancel', (event) => {
     if (fromMainWindow(event)) hubPairing.cancel()
   })
@@ -1234,6 +1274,20 @@ function registerBotIpc(): void {
   supervisor?.on('change', (state) => {
     mainWindow?.webContents.send('pacenote:bot:changed', state)
     updateTray()
+    // Pace takes the mentions from here on, so setup stops listening for
+    // "it's me" rather than share them.
+    if (claim && (state.phase === 'starting' || state.phase === 'external'))
+      void claimStep(async () => {
+        if (!claim) return
+        await stopClaim()
+        claimPaused = false
+        mainWindow?.webContents.send(
+          'pacenote:setup:claim-ended',
+          state.phase === 'external'
+            ? 'Pace started running elsewhere, such as a terminal, and takes the mentions now. Stop it there, then try again.'
+            : 'Pace started, so setup stopped listening. Try again to stop Pace and listen.'
+        )
+      })
   })
   ipcMain.handle('pacenote:window:full-screen', (event) =>
     fromMainWindow(event) ? (mainWindow?.isFullScreen() ?? false) : false

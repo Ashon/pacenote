@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   furthest,
+  reopened,
   SETUP_STEPS,
   setupView,
   type SetupRecord,
@@ -15,6 +16,7 @@ export interface SetupPatch {
   slack?: 'hub' | 'app'
   me?: { id: string; name: string } | null
   answerSince?: string
+  /** true ends setup; false opens it again (reopened) */
   finished?: boolean
 }
 
@@ -42,7 +44,8 @@ export class SetupStore {
 
   save(raw: unknown): SetupView {
     const patch = parsePatch(raw)
-    const record = this.view().record
+    const current = this.view().record
+    const record = patch.finished === false ? reopened(current) : current
     const next: SetupRecord = {
       ...record,
       ...(patch.step ? { step: furthest(record.step, patch.step) } : {}),
@@ -88,6 +91,6 @@ function parsePatch(raw: unknown): SetupPatch {
     !Number.isNaN(Date.parse(value.answerSince))
   )
     patch.answerSince = value.answerSince
-  if (value.finished === true) patch.finished = true
+  if (typeof value.finished === 'boolean') patch.finished = value.finished
   return patch
 }

@@ -113,9 +113,12 @@ Bot management:
   this Mac; its progress follows in the step list. Its own Claude login is asked for before Pace starts, and Start Pace
   waits for it to be ready. With your own Slack app, "Show Pace it's you" listens on
   the app (Socket Mode, before Pace runs) for a mention, tells that person alone to confirm in Pacenote, and once you
-  confirm it is you, makes you the first who may ask. The first answer in Slack ends setup. Its progress is
-  `PACENOTE_DATA_DIR/setup.json`; leaving it ("Finish later") puts a card on Overview to pick it up again or to set
-  things up in Settings instead. A Pacenote set up before setup existed never opens on it.
+  confirm it is you, makes you the first who may ask. The first to mention it stays on screen until you say it is not
+  you, and confirming again replaces the one setup let in before; Pace starting stops the listening, and leaving without
+  confirming starts Pace again if listening stopped it. Any answer in Slack since Pace started ends setup: a failed one
+  says why and waits for the next. Its progress is `PACENOTE_DATA_DIR/setup.json`; leaving it ("Finish later") puts a
+  card on Overview to pick it up again or to set things up in Settings instead, and the Setup needed card leads back to
+  the steps. A Pacenote set up before setup existed never opens on it.
 - Before launching the bot, the app checks the settings with the bot's own rules. When the Slack tokens are missing (a first run) or a
   value is invalid, it does not launch the bot and shows "Setup needed" with a way to Settings (on the Pace screen, the Overview,
   the status bar, and the tray menu; while setup is unfinished, the tray opens setup instead). That way opens the section to fix: Slack for missing or rejected tokens, otherwise the section

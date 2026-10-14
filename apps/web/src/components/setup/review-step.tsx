@@ -1,21 +1,34 @@
 import type { SettingsView } from '@src/settings/fields'
-import type { SetupRecord } from '@src/settings/setup'
-import { LoaderCircle, Lock, TriangleAlert } from 'lucide-react'
+import { stepToFix, type SetupRecord } from '@src/settings/setup'
+import type { SupervisorState } from '@src/runtime/types'
+import { LoaderCircle, Lock, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { useSupervisor } from '@/lib/desktop'
-import type { Detected, SetupStep, useSandboxSetup } from '@/lib/setup'
+import {
+  allowedIds,
+  STEP_LABELS,
+  type Detected,
+  type SetupStep,
+  type useSandboxSetup,
+} from '@/lib/setup'
 import { cn } from '@/lib/utils'
-import { Chip, StepFrame } from './parts'
-import { SandboxLogin } from './runtime-step'
+import { Chip, Problem, StepFrame } from './parts'
+import { preparingProblem, SandboxLogin } from './runtime-step'
 
 const SERVICE = { claude: 'Claude', codex: 'ChatGPT' } as const
+
+/** What stopped Pace from starting, and the step that fixes it */
+type Stopped = { error: string; step?: SetupStep; part?: string }
+
+type Starting = 'idle' | 'saving' | 'waiting' | 'starting' | Stopped
 
 /**
  * 4. Who may ask and what Pace may use, once more before it starts: these
  * shape what it can reach, so they are confirmed together. Starting waits for
- * the built-in sandbox, if it is still being prepared.
+ * the built-in sandbox, if it is still being prepared, and says what stopped
+ * it, with the way to fix it, when it does not start.
  */
 export function ReviewStep({
   record,
@@ -24,70 +37,137 @@ export function ReviewStep({
   sandbox,
   onChange,
   onStarted,
+  onBusy,
 }: {
   record: SetupRecord
   settings: { view?: SettingsView; refresh: () => void }
   detected?: Detected
   sandbox: ReturnType<typeof useSandboxSetup>
-  onChange: (step: SetupStep) => void
+  onChange: (step: SetupStep, part?: string) => void
   /** Pace started; since: when you chose to start it */
   onStarted: (since: string) => void
+  /** Starting or not: the other steps wait meanwhile */
+  onBusy: (busy: boolean) => void
 }) {
   const values = settings.view?.values
   const backend = values?.REASONER === 'codex' ? 'codex' : 'claude'
   const vm = values?.REASONER_SANDBOX === 'vm'
+  const hub = values?.SLACK_CONNECTION === 'hub'
   const [diagrams, setDiagrams] = useState<boolean>()
   const diagramsOn = vm && (diagrams ?? values?.RENDER_DIAGRAMS !== 'off')
   const supervisor = useSupervisor()
-  const [starting, setStarting] = useState<
-    'idle' | 'saving' | 'waiting' | 'starting' | { error: string }
-  >('idle')
+  const [starting, setStarting] = useState<Starting>('idle')
   const percent = Math.round((sandbox.progress?.fraction ?? 0) * 100)
+  /** When Start was chosen */
   const startedAt = useRef<number>(undefined)
+  /** Start set the sandbox preparing again, so only that job's end counts */
+  const kicked = useRef(false)
+  /** Pace's state once asked to start: anything older is passed over */
+  const launched = useRef<SupervisorState | null>(undefined)
+
+  const busy =
+    starting === 'saving' || starting === 'waiting' || starting === 'starting'
+  useEffect(() => onBusy(busy), [busy, onBusy])
+  useEffect(() => () => onBusy(false), [onBusy])
+
+  // Starts Pace, or starts it again so it reads what setup saved.
+  const launch = async () => {
+    setStarting('starting')
+    const bot = window.pacenoteDesktop?.bot
+    const now = await bot?.state()
+    if (now?.phase === 'external')
+      return setStarting({
+        error:
+          'Pace is already running elsewhere, such as a terminal. Stop it there, then start it here.',
+      })
+    if (now?.phase === 'running' || now?.phase === 'starting')
+      await bot?.restart()
+    else await bot?.start()
+    const after = (await bot?.state()) ?? null
+    launched.current = after
+    settle(after)
+  }
+  const settle = (state: SupervisorState | null) => {
+    if (!state) return
+    if (state.phase === 'running')
+      onStarted(new Date(startedAt.current ?? Date.now()).toISOString())
+    else if (
+      state.phase === 'setup' ||
+      state.phase === 'failed' ||
+      state.phase === 'crashed' ||
+      state.phase === 'idle' ||
+      state.phase === 'external'
+    ) {
+      const message =
+        state.phase === 'external'
+          ? 'Pace is already running elsewhere, such as a terminal. Stop it there, then start it here.'
+          : state.phase === 'idle' || !state.message
+            ? 'Pace did not start. Try again.'
+            : state.message
+      const step = stepToFix(state.issues, state.message)
+      const allowlist = state.issues?.some(
+        (issue) => issue.key === 'MENTION_ALLOWED_USERS'
+      )
+      setStarting({
+        error: message,
+        step,
+        ...(allowlist && !hub ? { part: 'me' } : {}),
+      })
+    }
+  }
 
   // Waiting for the sandbox: start Pace once it is ready.
   useEffect(() => {
     if (starting !== 'waiting') return
-    if (vm && sandbox.job?.state === 'failed')
+    const job = sandbox.job
+    const fresh = Boolean(
+      job &&
+      (!kicked.current || Date.parse(job.startedAt) >= (startedAt.current ?? 0))
+    )
+    if (vm && kicked.current && sandbox.error?.kind === 'vm')
+      setStarting({
+        error: `The built-in sandbox couldn't start preparing. ${sandbox.error.message}`,
+        step: 'runtime',
+      })
+    else if (vm && fresh && job?.state === 'failed')
       setStarting({
         error:
-          'Preparing the built-in sandbox failed. Go back to Where it runs to try again.',
+          'Preparing the built-in sandbox stopped, so Pace has nothing to answer in yet.',
+        step: 'runtime',
       })
-    else if (!vm || sandbox.ready || sandbox.job?.state === 'succeeded') {
-      setStarting('starting')
-      void window.pacenoteDesktop?.bot.start()
-    }
-  }, [starting, vm, sandbox.ready, sandbox.job?.state])
-  // Started: on to the first answer, or what stopped it.
+    else if (!vm || sandbox.ready || (fresh && job?.state === 'succeeded'))
+      void launch()
+  }, [starting, vm, sandbox.ready, sandbox.job, sandbox.error])
+  // Started: on to the first answer, or what stopped it. The state Pace was
+  // in as it was asked to start is news already settled.
   useEffect(() => {
-    if (starting !== 'starting' || !supervisor) return
-    if (supervisor.phase === 'running')
-      onStarted(new Date(startedAt.current ?? Date.now()).toISOString())
-    else if (
-      (supervisor.phase === 'setup' ||
-        supervisor.phase === 'failed' ||
-        supervisor.phase === 'crashed') &&
-      Date.now() - (startedAt.current ?? 0) > 500
-    )
-      setStarting({ error: supervisor.message ?? 'Pace did not start.' })
-  }, [starting, supervisor, onStarted])
+    if (starting !== 'starting' || launched.current === undefined) return
+    if (!supervisor || supervisor === launched.current) return
+    if (supervisor.phase === 'starting' || supervisor.phase === 'stopping')
+      return
+    settle(supervisor)
+  }, [starting, supervisor])
 
   // The diagrams setting is saved before Pace starts, so it reads it.
   const start = async () => {
     startedAt.current = Date.now()
+    launched.current = undefined
+    kicked.current = false
     setStarting('saving')
     await window.pacenoteDesktop?.settings.save({
       RENDER_DIAGRAMS: diagramsOn || !vm ? null : 'off',
     })
     settings.refresh()
-    if (vm && !sandbox.ready && !sandbox.preparing) sandbox.run('vm')
+    if (vm && !sandbox.ready && !sandbox.preparing) {
+      kicked.current = true
+      sandbox.run('vm')
+    }
     setStarting('waiting')
   }
 
-  const busy =
-    starting === 'saving' || starting === 'waiting' || starting === 'starting'
   const waitingForSandbox =
     vm && !sandbox.ready && sandbox.job?.state !== 'succeeded'
+  const background = vm && !busy ? preparingProblem(sandbox) : undefined
   const cli = detected?.cli[backend]
   // claude in the sandbox answers with a login of its own, asked for here at
   // the latest
@@ -95,6 +175,24 @@ export function ReviewStep({
     vm &&
     backend === 'claude' &&
     !settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
+  // Your own app answers no one until it knows who may ask.
+  const anyone = values?.MENTION_ANYONE === 'on'
+  const allowed = allowedIds(values?.MENTION_ALLOWED_USERS)
+  const nobody = !hub && !anyone && allowed.length === 0
+  const blocked = needsLogin
+    ? 'Get the sandbox its Claude login first'
+    : nobody
+      ? 'Say who may ask first'
+      : undefined
+  const stopped = typeof starting === 'object' ? starting : undefined
+
+  const remove = async (id: string) => {
+    await window.pacenoteDesktop?.settings.save({
+      MENTION_ALLOWED_USERS: allowed.filter((each) => each !== id).join(','),
+    })
+    settings.refresh()
+  }
+
   return (
     <StepFrame
       step="review"
@@ -110,46 +208,97 @@ export function ReviewStep({
             Back
           </Button>
           <span className="flex-1" />
-          {typeof starting === 'object' && (
-            <p className="flex min-w-0 items-center gap-1.5 text-body text-status-failed">
-              <TriangleAlert className="size-4 shrink-0" />
-              <span className="truncate" title={starting.error}>
-                {starting.error}
-              </span>
-            </p>
+          {blocked && !busy && (
+            <p className="text-body text-muted-foreground">{blocked}</p>
           )}
-          <Button onClick={() => void start()} disabled={busy || needsLogin}>
+          <Button
+            onClick={() => void start()}
+            disabled={busy || Boolean(blocked)}
+          >
             {busy && <LoaderCircle className="animate-spin" />}
             {starting === 'waiting' && waitingForSandbox
               ? `Waiting for the sandbox, ${percent}%`
               : busy
                 ? 'Starting Pace'
-                : waitingForSandbox
-                  ? 'Start Pace when ready'
-                  : 'Start Pace'}
+                : stopped
+                  ? 'Try again'
+                  : waitingForSandbox
+                    ? 'Start once the sandbox is ready'
+                    : 'Start Pace'}
           </Button>
         </>
       }
     >
-      {needsLogin && <SandboxLogin set={false} onSaved={settings.refresh} />}
+      {stopped && (
+        <Problem
+          action={
+            stopped.step && (
+              <Button
+                variant="outline"
+                onClick={() => onChange(stopped.step!, stopped.part)}
+              >
+                Change {STEP_LABELS[stopped.step]}
+              </Button>
+            )
+          }
+        >
+          {stopped.error}
+        </Problem>
+      )}
+      {background && (
+        <Problem
+          details={background.details}
+          action={
+            <Button variant="outline" onClick={() => sandbox.run('vm')}>
+              Try again
+            </Button>
+          }
+        >
+          {background.text}
+        </Problem>
+      )}
+      {needsLogin && (
+        <SandboxLogin set={false} onSaved={settings.refresh} required />
+      )}
       <section className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
         <b className="text-sm font-semibold">Who can ask Pace</b>
         <span className="flex flex-wrap items-center gap-2">
-          {record.me ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm ring-1 ring-border">
-              You
-              <span className="text-body text-muted-foreground">
-                @{record.me.name}
-              </span>
+          {hub ? (
+            <Person you name={record.me?.name} />
+          ) : anyone ? (
+            <span className="text-body text-muted-foreground">
+              Anyone in your workspace
+            </span>
+          ) : nobody ? (
+            <span className="text-body text-status-failed">
+              No one yet.{' '}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onChange('slack', 'me')}
+                className="font-semibold text-primary hover:underline"
+              >
+                Show Pace it's you
+              </button>
             </span>
           ) : (
+            allowed.map((id) =>
+              id === record.me?.id ? (
+                <Person key={id} you name={record.me.name} />
+              ) : (
+                <Person
+                  key={id}
+                  name={id}
+                  onRemove={busy ? undefined : () => void remove(id)}
+                />
+              )
+            )
+          )}
+          {!nobody && (
             <span className="text-body text-muted-foreground">
-              {values?.MENTION_ALLOWED_USERS || 'Anyone in your workspace'}
+              Let more people ask later in Settings.
             </span>
           )}
-          <span className="text-body text-muted-foreground">
-            Let more people ask later in Settings.
-          </span>
         </span>
         <span className="flex items-center gap-2 text-body text-muted-foreground">
           <Lock className="size-3.5 shrink-0" />
@@ -159,11 +308,17 @@ export function ReviewStep({
       </section>
 
       <dl className="flex flex-col rounded-2xl ring-1 ring-border">
-        <Row label="AI service" onChange={() => onChange('ai')}>
+        <Row
+          label="AI service"
+          onChange={busy ? undefined : () => onChange('ai')}
+        >
           {SERVICE[backend]}
           {cli && (cli.signedIn ? ', signed in' : ', not signed in')}
         </Row>
-        <Row label="Runs in" onChange={() => onChange('runtime')}>
+        <Row
+          label="Runs in"
+          onChange={busy ? undefined : () => onChange('runtime')}
+        >
           {vm ? (
             <>
               Built-in sandbox
@@ -174,6 +329,10 @@ export function ReviewStep({
               ) : sandbox.preparing ? (
                 <Chip tone="working" className="ml-2">
                   Preparing, {percent}%
+                </Chip>
+              ) : background ? (
+                <Chip tone="failed" className="ml-2">
+                  Stopped
                 </Chip>
               ) : null}
             </>
@@ -186,39 +345,43 @@ export function ReviewStep({
             </>
           )}
         </Row>
-        <Row label="Slack" onChange={() => onChange('slack')}>
-          {record.slack === 'hub' || values?.SLACK_CONNECTION === 'hub'
+        <Row
+          label="Slack"
+          onChange={busy ? undefined : () => onChange('slack')}
+        >
+          {hub
             ? `Through the hub at ${values?.HUB_URL ?? ''}`
             : 'Your own Slack app'}
         </Row>
-        <Row label="Diagrams">
-          <span className="flex flex-1 items-center gap-3">
-            <span className={cn('flex-1', !vm && 'text-muted-foreground')}>
-              {vm
-                ? 'Mermaid and chart blocks in answers become images, made in the sandbox'
-                : 'Need the built-in sandbox; they stay as text'}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={diagramsOn}
-              aria-label="Diagrams"
-              disabled={!vm}
-              onClick={() => setDiagrams(!diagramsOn)}
-              className={cn(
-                'relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50',
-                diagramsOn ? 'bg-primary' : 'bg-input'
-              )}
-            >
-              <span
+        {vm && (
+          <Row label="Diagrams">
+            <span className="flex flex-1 items-center gap-3">
+              <span className="flex-1">
+                Mermaid and chart blocks in answers become images, made in the
+                sandbox
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={diagramsOn}
+                aria-label="Diagrams"
+                disabled={busy}
+                onClick={() => setDiagrams(!diagramsOn)}
                 className={cn(
-                  'absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                  diagramsOn && 'translate-x-4'
+                  'relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50',
+                  diagramsOn ? 'bg-primary' : 'bg-input'
                 )}
-              />
-            </button>
-          </span>
-        </Row>
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
+                    diagramsOn && 'translate-x-4'
+                  )}
+                />
+              </button>
+            </span>
+          </Row>
+        )}
         <Row label="Ops tools">
           <span className="text-muted-foreground">
             Off. GitHub, Jira, Kubernetes and SSH are in Settings when you need
@@ -232,6 +395,44 @@ export function ReviewStep({
         </Row>
       </dl>
     </StepFrame>
+  )
+}
+
+/** Someone who may ask: you, by name, or a member ID let in before */
+function Person({
+  you,
+  name,
+  onRemove,
+}: {
+  you?: boolean
+  name?: string
+  onRemove?: () => void
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-card py-1 pr-1.5 pl-3 text-sm ring-1 ring-border">
+      {you ? (
+        <>
+          You
+          {name && (
+            <span className="pr-1.5 text-body text-muted-foreground">
+              @{name}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="font-mono text-xs">{name}</span>
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={`Remove ${name}`}
+          onClick={onRemove}
+          className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-well hover:text-foreground"
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
+    </span>
   )
 }
 

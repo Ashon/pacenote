@@ -136,6 +136,13 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       return () =>
         ipcRenderer.removeListener('pacenote:setup:claimed', listener)
     },
+    onClaimEnded: (callback: (message: string) => void) => {
+      const listener = (_event: IpcRendererEvent, message: string) =>
+        callback(message)
+      ipcRenderer.on('pacenote:setup:claim-ended', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:setup:claim-ended', listener)
+    },
   },
   sandbox: {
     status: () => ipcRenderer.invoke('pacenote:sandbox:status'),

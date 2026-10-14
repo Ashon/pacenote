@@ -35,6 +35,10 @@ export const STEP_NEXT: Record<SetupStep, string> = {
 
 export const stepIndex = (step: SetupStep) => SETUP_STEPS.indexOf(step)
 
+/** The Slack member IDs in MENTION_ALLOWED_USERS */
+export const allowedIds = (value: string | undefined) =>
+  (value ?? '').split(/[\s,]+/).filter(Boolean)
+
 /** The setup record, and saving changes to it. undefined outside the app */
 export function useSetup() {
   const bridge = window.pacenoteDesktop?.setup

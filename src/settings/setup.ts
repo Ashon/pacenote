@@ -59,6 +59,8 @@ export interface ClaimedUser {
   realName?: string
   /** Where they mentioned Pace: "#ops" */
   channel: string
+  /** What they wrote besides the mention: "it's me" */
+  said?: string
   /** The workspace's name */
   team: string
 }
@@ -82,6 +84,48 @@ export function setupView(
     return { view: { open: false, record: migrated }, migrated }
   }
   return { view: { open: true, record: { step: 'ai' } } }
+}
+
+/**
+ * Setup opened again after it ended (Overview, when Pace cannot start): it
+ * picks up where it was, but from the review at the latest, since the first
+ * answer it waited for came before or never will.
+ */
+export function reopened(record: SetupRecord): SetupRecord {
+  const next: SetupRecord = {
+    ...record,
+    step: record.step === 'answer' ? 'review' : record.step,
+  }
+  delete next.finishedAt
+  delete next.answerSince
+  return next
+}
+
+/**
+ * The step that fixes what keeps Pace from starting: the settings it names,
+ * or the words of its message when it names none
+ */
+export function stepToFix(
+  issues: readonly { key?: string }[] | undefined,
+  message = ''
+): SetupStep | undefined {
+  const keys = (issues ?? []).flatMap((issue) => (issue.key ? [issue.key] : []))
+  const step = (key: string): SetupStep | undefined =>
+    /^(SLACK_|HUB_|MENTION_)/.test(key)
+      ? 'slack'
+      : /^(REASONER|CLAUDE_|CODEX_)/.test(key)
+        ? 'ai'
+        : /^(SANDBOX_|RENDER_)/.test(key)
+          ? 'runtime'
+          : undefined
+  for (const key of keys) {
+    const found = step(key)
+    if (found) return found
+  }
+  if (/\b(slack|hub|token|who may ask)\b/i.test(message)) return 'slack'
+  if (/\b(sandbox|vm)\b/i.test(message)) return 'runtime'
+  if (/\b(claude|codex|sign(?:ed)?[- ]in|login)\b/i.test(message)) return 'ai'
+  return undefined
 }
 
 /** The step after a change, never going back from the furthest one reached */

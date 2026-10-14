@@ -24,14 +24,17 @@ import { ResumeSetup, SetupFacts } from './setup/resume'
 /**
  * The first thing to do when the bot cannot start yet, usually connecting Slack
  * on a first run. It names what is missing and leads to Settings, where the
- * tokens are entered and checked.
+ * tokens are entered and checked, or back to setup's steps for someone who
+ * left them for Settings and would rather be guided.
  */
 function SetupCard({
   message,
   issues,
+  onGuide,
 }: {
   message?: string
   issues?: { key?: string }[]
+  onGuide?: () => void
 }) {
   return (
     <div className="mt-6 flex items-center gap-4 rounded-2xl bg-card-accent px-5 py-4">
@@ -41,6 +44,11 @@ function SetupCard({
           {message ?? 'Some settings are missing before Pace can start.'}
         </p>
       </div>
+      {onGuide && (
+        <Button size="sm" variant="ghost" onClick={onGuide}>
+          Set up step by step
+        </Button>
+      )}
       <Button
         size="sm"
         onClick={() => (window.location.hash = setupSettingsRoute(issues))}
@@ -107,7 +115,18 @@ export function Overview() {
         />
       ) : (
         supervisor?.phase === 'setup' && (
-          <SetupCard message={supervisor.message} issues={supervisor.issues} />
+          <SetupCard
+            message={supervisor.message}
+            issues={supervisor.issues}
+            onGuide={
+              setup.view
+                ? () =>
+                    void setup.save({ finished: false }).then(() => {
+                      window.location.hash = '#/setup'
+                    })
+                : undefined
+            }
+          />
         )
       )}
 

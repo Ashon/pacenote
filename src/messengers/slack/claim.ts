@@ -11,8 +11,9 @@ export interface ClaimListener {
 /**
  * "@Pace it's me": before Pace answers anyone, setup listens on your own Slack
  * app for a mention and says who made it, so that person can become the first
- * who may ask. It reads only who mentioned Pace and where, tells them alone to
- * confirm in Pacenote, and never asks the AI. People from other organizations
+ * who may ask. It reads only who mentioned Pace, where, and the few words they
+ * wrote (shown beside their name), tells them alone to confirm in Pacenote,
+ * and never asks the AI. People from other organizations
  * in a shared channel are passed over.
  */
 export async function listenForClaim(options: {
@@ -47,6 +48,11 @@ export async function listenForClaim(options: {
         .catch(() => undefined),
     ])
     const profile = user?.user
+    const said = (event.text ?? '')
+      .replace(/<@[A-Z0-9]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80)
     options.onMention({
       id: event.user,
       name: profile?.profile?.display_name || profile?.name || event.user,
@@ -55,6 +61,7 @@ export async function listenForClaim(options: {
         ? `#${channel.channel.name}`
         : event.channel,
       team: auth.team ?? '',
+      ...(said ? { said } : {}),
     })
     await client.chat
       .postEphemeral({

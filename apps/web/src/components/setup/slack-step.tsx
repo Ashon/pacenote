@@ -9,14 +9,26 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
+import { allowedIds } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { PaceSpinner } from '../pace-spinner'
 import { SLACK_APP_URL } from '../slack-app-setup'
-import { ChoiceCard, Chip, CommandLine, Note, StepFrame } from './parts'
+import {
+  ChoiceCard,
+  Chip,
+  CommandLine,
+  Hint,
+  Note,
+  StepFrame,
+  useWaited,
+} from './parts'
 
 export type SlackPart = 'choose' | 'app' | 'me'
 type Connection = 'hub' | 'app'
 type Me = { id: string; name: string }
+
+/** Your Slack apps, where a made app's settings and tokens are */
+const SLACK_APPS_URL = 'https://api.slack.com/apps'
 
 /**
  * 3. How Pace reaches Slack: your team's hub, paired here, or your own Slack
@@ -28,6 +40,7 @@ export function SlackStep({
   onPart,
   settings,
   connection: saved,
+  me,
   onBack,
   onDone,
 }: {
@@ -36,9 +49,12 @@ export function SlackStep({
   settings: { view?: SettingsView; refresh: () => void }
   /** The connection chosen before, if any */
   connection?: Connection
+  /** Who setup let in before, if anyone */
+  me?: Me
   onBack: () => void
   onDone: (connection: Connection, me: Me) => void
 }) {
+  const values = settings.view?.values
   if (part === 'app')
     return (
       <AppTokens
@@ -49,12 +65,23 @@ export function SlackStep({
     )
   if (part === 'me')
     return (
-      <ItsMe onBack={() => onPart('app')} onDone={(me) => onDone('app', me)} />
+      <ItsMe
+        before={
+          saved === 'app' &&
+          me &&
+          allowedIds(values?.MENTION_ALLOWED_USERS).includes(me.id)
+            ? me
+            : undefined
+        }
+        onBack={() => onPart('app')}
+        onDone={(me) => onDone('app', me)}
+      />
     )
   return (
     <ChooseConnection
       settings={settings.view}
       saved={saved}
+      paired={saved === 'hub' ? me : undefined}
       onBack={onBack}
       onApp={() => onPart('app')}
       onPaired={(me) => onDone('hub', me)}
@@ -68,17 +95,21 @@ type PairState =
   | { step: 'waiting'; code: string }
   | { step: 'bound'; user: HubUser }
   | { step: 'confirming'; user: HubUser }
-  | { step: 'error'; message: string }
+  /** afterCode: it went wrong after a code was given, so a new one is next */
+  | { step: 'error'; message: string; afterCode?: boolean }
 
 function ChooseConnection({
   settings,
   saved,
+  paired,
   onBack,
   onApp,
   onPaired,
 }: {
   settings?: SettingsView
   saved?: Connection
+  /** Who paired this Mac with the hub before, in setup */
+  paired?: Me
   onBack: () => void
   onApp: () => void
   onPaired: (me: Me) => void
@@ -94,18 +125,30 @@ function ChooseConnection({
   const [url, setUrl] = useState<string>()
   const hubUrl = url ?? settings?.values.HUB_URL ?? ''
   const [pair, setPair] = useState<PairState>({ step: 'idle' })
+  /** The pairing asked for last: one cancelled meanwhile is let go */
+  const attempt = useRef(0)
+  // Paired here before, with this hub: going on needs no new code.
+  const pairedHere =
+    paired &&
+    settings?.values.SLACK_CONNECTION === 'hub' &&
+    settings.secrets.HUB_TOKEN?.set &&
+    hubUrl.trim().replace(/\/+$/, '') === settings.values.HUB_URL
+      ? paired
+      : undefined
 
   useEffect(() => {
     if (pair.step !== 'waiting' || !hub) return
     const timer = setInterval(() => {
       void hub.pairStatus().then((res) => {
-        if ('error' in res) setPair({ step: 'error', message: res.error })
+        if ('error' in res)
+          setPair({ step: 'error', message: res.error, afterCode: true })
         else if (res.status === 'bound')
           setPair({ step: 'bound', user: res.user })
         else if (res.status === 'expired')
           setPair({
             step: 'error',
-            message: 'The code expired. Get a new one.',
+            message: 'The code expired before it came back. Get a new one.',
+            afterCode: true,
           })
       })
     }, 1_500)
@@ -115,16 +158,24 @@ function ChooseConnection({
   useEffect(() => () => void hub?.pairCancel(), [hub])
 
   const start = () => {
+    const id = ++attempt.current
     setPair({ step: 'starting' })
-    void hub
-      ?.pairStart(hubUrl)
-      .then((res) =>
-        setPair(
-          'error' in res
-            ? { step: 'error', message: res.error }
-            : { step: 'waiting', code: res.code }
-        )
+    void hub?.pairStart(hubUrl).then((res) => {
+      if (attempt.current !== id) {
+        if (!('error' in res)) void hub.pairCancel()
+        return
+      }
+      setPair(
+        'error' in res
+          ? { step: 'error', message: res.error }
+          : { step: 'waiting', code: res.code }
       )
+    })
+  }
+  const cancel = (note?: string) => {
+    attempt.current += 1
+    void hub?.pairCancel()
+    setPair({ step: 'idle', note })
   }
   const confirm = (user: HubUser) => {
     setPair({ step: 'confirming', user })
@@ -138,46 +189,39 @@ function ChooseConnection({
       onPaired({ id: res.user.id, name: res.user.name })
     })
   }
+  const choose = (next: Connection) => {
+    if (next === 'app' && pair.step !== 'idle') cancel()
+    setChosen(next)
+  }
 
+  const asking = pair.step === 'starting' || pair.step === 'waiting'
   const primary =
     connection === 'app' ? (
       <Button onClick={onApp}>Set up your own app</Button>
-    ) : pair.step === 'bound' || pair.step === 'confirming' ? (
+    ) : pair.step === 'bound' || pair.step === 'confirming' ? null : asking ? (
       <>
-        <Button
-          variant="ghost"
-          disabled={pair.step === 'confirming'}
-          onClick={() => {
-            void hub?.pairCancel()
-            setPair({
-              step: 'idle',
-              note: 'Cancelled. If someone else sent your code, get a new one.',
-            })
-          }}
-        >
-          Not me
+        <Button variant="ghost" onClick={() => cancel()}>
+          Cancel
         </Button>
-        <Button
-          disabled={pair.step === 'confirming'}
-          onClick={() => confirm(pair.user)}
-        >
-          {pair.step === 'confirming' && (
-            <LoaderCircle className="animate-spin" />
-          )}
-          Yes, that's me
+        <Button disabled>
+          <LoaderCircle className="animate-spin" />
+          {pair.step === 'waiting' ? 'Waiting for Slack' : 'Getting a code'}
+        </Button>
+      </>
+    ) : pairedHere ? (
+      <>
+        <Button variant="ghost" onClick={start}>
+          Pair again
+        </Button>
+        <Button onClick={() => onPaired(pairedHere)}>
+          Continue as @{pairedHere.name}
         </Button>
       </>
     ) : (
-      <Button
-        onClick={start}
-        disabled={
-          !hubUrl.trim() || pair.step === 'starting' || pair.step === 'waiting'
-        }
-      >
-        {(pair.step === 'starting' || pair.step === 'waiting') && (
-          <LoaderCircle className="animate-spin" />
-        )}
-        {pair.step === 'waiting' ? 'Waiting for Slack' : 'Get a pairing code'}
+      <Button onClick={start} disabled={!hubUrl.trim()}>
+        {pair.step === 'error' && pair.afterCode
+          ? 'Get a new code'
+          : 'Get a pairing code'}
       </Button>
     )
 
@@ -205,7 +249,7 @@ function ChooseConnection({
           name="connection"
           value="hub"
           checked={connection === 'hub'}
-          onChoose={() => setChosen('hub')}
+          onChoose={() => choose('hub')}
         >
           <span className="flex items-center gap-2">
             <b className="text-sm">Join your team's hub</b>
@@ -220,7 +264,7 @@ function ChooseConnection({
           name="connection"
           value="app"
           checked={connection === 'app'}
-          onChoose={() => setChosen('app')}
+          onChoose={() => choose('app')}
         >
           <b className="text-sm">Use your own Slack app</b>
           <span className="text-body text-muted-foreground">
@@ -242,9 +286,20 @@ function ChooseConnection({
                 onChange={(e) => setUrl(e.target.value)}
               />
             </label>
-            <Swap id={pair.step === 'confirming' ? 'bound' : pair.step}>
-              <PairBody state={pair} />
-            </Swap>
+            <div aria-live="polite">
+              <Swap id={pair.step === 'confirming' ? 'bound' : pair.step}>
+                <PairBody
+                  state={pair}
+                  pairedHere={pairedHere}
+                  onConfirm={confirm}
+                  onNotMe={() =>
+                    cancel(
+                      'Cancelled. If someone else sent your code, get a new one.'
+                    )
+                  }
+                />
+              </Swap>
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -252,13 +307,25 @@ function ChooseConnection({
   )
 }
 
-function PairBody({ state }: { state: PairState }) {
+function PairBody({
+  state,
+  pairedHere,
+  onConfirm,
+  onNotMe,
+}: {
+  state: PairState
+  pairedHere?: Me
+  onConfirm: (user: HubUser) => void
+  onNotMe: () => void
+}) {
   switch (state.step) {
     case 'idle':
       return (
         <p className="text-body text-muted-foreground">
           {state.note ??
-            'You get a code to send to Pace in Slack. Your mentions then come to this Mac.'}
+            (pairedHere
+              ? `This Mac is paired with this hub as @${pairedHere.name}.`
+              : 'You get a code to send to Pace in Slack. Your mentions then come to this Mac.')}
         </p>
       )
     case 'starting':
@@ -274,7 +341,7 @@ function PairBody({ state }: { state: PairState }) {
           <p className="text-body">
             In a channel Pace is in, send this. It expires in 10 minutes.
           </p>
-          <CommandLine text={`@Pace connect ${state.code}`} />
+          <CommandLine text={`@Pace connect ${state.code}`} raised />
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <PaceSpinner className="size-6" />
             <span className="text-shimmer">Waiting for your mention</span>
@@ -283,44 +350,130 @@ function PairBody({ state }: { state: PairState }) {
       )
     case 'bound':
     case 'confirming':
-      return <WhoSent user={state.user} where="sent the code" />
+      return (
+        <WhoSent
+          user={state.user}
+          where="sent the code"
+          actions={
+            <>
+              <Button
+                variant="ghost"
+                disabled={state.step === 'confirming'}
+                onClick={onNotMe}
+              >
+                Not me
+              </Button>
+              <Button
+                disabled={state.step === 'confirming'}
+                onClick={() => onConfirm(state.user)}
+              >
+                {state.step === 'confirming' && (
+                  <LoaderCircle className="animate-spin" />
+                )}
+                Yes, that's me
+              </Button>
+            </>
+          }
+        />
+      )
     case 'error':
       return (
-        <p className="flex items-center gap-2 text-body text-status-failed">
-          <TriangleAlert className="size-4 shrink-0" />
+        <p className="flex items-start gap-2 text-body text-status-failed">
+          <TriangleAlert className="mt-px size-4 shrink-0" />
           {state.message}
         </p>
       )
   }
 }
 
-/** Who answered in Slack, to confirm it is you */
+/**
+ * Who answered in Slack, to confirm it is you, with the buttons that do: they
+ * come and go with the person, so they never answer for someone not shown
+ */
 function WhoSent({
   user,
   where,
+  said,
+  actions,
 }: {
   user: { id: string; name: string; realName?: string }
   where: string
+  /** What they wrote */
+  said?: string
+  actions: React.ReactNode
 }) {
   return (
-    <div className="flex items-center gap-3.5">
-      <span
-        aria-hidden="true"
-        className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/12 text-base font-semibold text-primary"
-      >
-        {(user.realName ?? user.name).slice(0, 1).toUpperCase()}
-      </span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <b className="truncate text-sm font-semibold">
-          {user.realName ?? user.name}
-        </b>
-        <span className="truncate text-body text-muted-foreground">
-          @{user.name} {where}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3.5">
+        <span
+          aria-hidden="true"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/12 text-base font-semibold text-primary"
+        >
+          {(user.realName ?? user.name).slice(0, 1).toUpperCase()}
         </span>
-      </span>
-      <span className="text-sm font-semibold">Is this you?</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <b className="truncate text-sm font-semibold">
+            {user.realName ?? user.name}
+          </b>
+          <span className="truncate text-body text-muted-foreground">
+            @{user.name} {where}
+          </span>
+          {said && (
+            <span className="truncate text-body text-foreground">"{said}"</span>
+          )}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="flex-1 text-sm font-semibold">Is this you?</span>
+        {actions}
+      </div>
     </div>
   )
+}
+
+/**
+ * A token that is not the kind its field takes, said before Slack is asked:
+ * where it goes instead
+ */
+function tokenShape(kind: 'app' | 'bot', value: string): string | undefined {
+  const token = value.trim()
+  if (!token) return undefined
+  if (kind === 'app') {
+    if (token.startsWith('xapp-')) return undefined
+    if (token.startsWith('xoxb-'))
+      return 'This is the bot token. It goes in the next field.'
+    return 'App-Level Tokens start with xapp-.'
+  }
+  if (token.startsWith('xoxb-')) return undefined
+  if (token.startsWith('xapp-'))
+    return 'This is the App-Level Token. It goes in the field above.'
+  if (token.startsWith('xoxp-'))
+    return 'This is a user token. Copy the Bot User OAuth Token, which starts with xoxb-.'
+  return 'Bot tokens start with xoxb-.'
+}
+
+/** What Slack's answer about a token means, and what to do about it */
+function slackProblem(kind: 'app' | 'bot', detail = ''): string {
+  if (/invalid_auth|not_authed|invalid_token/.test(detail))
+    return "Slack doesn't recognize this token. Copy it again from your app."
+  if (/token_revoked|token_expired/.test(detail))
+    return kind === 'app'
+      ? 'This token was revoked. Generate a new App-Level Token.'
+      : 'This token was revoked. Reinstall the app and copy the new bot token.'
+  if (/account_inactive/.test(detail))
+    return 'The app was removed from the workspace. Install it again and copy the new token.'
+  if (/not_allowed_token_type/.test(detail))
+    return kind === 'app'
+      ? "This isn't an App-Level Token. Those start with xapp-."
+      : "This isn't a bot token. Those start with xoxb-."
+  if (
+    /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|EAI_AGAIN|getaddrinfo/i.test(detail)
+  )
+    return "Couldn't reach Slack. Check your network."
+  const missing = /^Missing: (.+)/.exec(detail)?.[1]
+  if (missing)
+    return `The app is missing permissions (${missing}). Create it from the manifest, or add them and reinstall it.`
+  return detail || 'Slack turned this token down.'
 }
 
 /** What the token check says about each token */
@@ -336,13 +489,13 @@ function tokenStates(items: SlackCheckItem[] | undefined) {
     app: socket
       ? socket.ok
         ? { ok: true, text: 'Valid' }
-        : { ok: false, text: socket.detail ?? 'Not valid' }
+        : { ok: false, text: slackProblem('app', socket.detail) }
       : undefined,
     bot: bot
       ? !bot.ok
-        ? { ok: false, text: bot.detail ?? 'Not valid' }
+        ? { ok: false, text: slackProblem('bot', bot.detail) }
         : scopes && !scopes.ok
-          ? { ok: false, text: scopes.detail ?? 'Missing scopes' }
+          ? { ok: false, text: slackProblem('bot', scopes.detail) }
           : { ok: true, text: team ? `Valid · ${team}` : 'Valid' }
       : undefined,
     mismatch:
@@ -356,7 +509,11 @@ function tokenStates(items: SlackCheckItem[] | undefined) {
   }
 }
 
-/** 3a. Your own Slack app: made from the manifest, and its two tokens */
+/**
+ * 3a. Your own Slack app: made from the manifest, and its two tokens. A token
+ * in the right shape is kept when you leave, so waiting for an admin's
+ * approval loses nothing.
+ */
 function AppTokens({
   settings,
   onBack,
@@ -375,8 +532,13 @@ function AppTokens({
   const [items, setItems] = useState<SlackCheckItem[]>()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
+  const shape = {
+    app: tokenShape('app', appToken),
+    bot: tokenShape('bot', botToken),
+  }
   const haveApp = Boolean(appToken.trim() || secrets?.SLACK_APP_TOKEN?.set)
   const haveBot = Boolean(botToken.trim() || secrets?.SLACK_BOT_TOKEN?.set)
+  const shaped = !shape.app && !shape.bot
   const changes = {
     SLACK_CONNECTION: 'app',
     ...(appToken.trim() ? { SLACK_APP_TOKEN: appToken.trim() } : {}),
@@ -386,8 +548,10 @@ function AppTokens({
   // Checked with Slack as soon as both are in, a moment after the last key
   const run = useRef(0)
   useEffect(() => {
-    if (!bridge || !haveApp || !haveBot) {
+    if (!bridge || !haveApp || !haveBot || !shaped) {
+      run.current += 1
       setItems(undefined)
+      setChecking(false)
       return
     }
     const id = ++run.current
@@ -402,8 +566,30 @@ function AppTokens({
         })
     }, 500)
     return () => clearTimeout(timer)
-  }, [bridge, key, haveApp, haveBot])
+  }, [bridge, key, haveApp, haveBot, shaped])
   const states = tokenStates(items)
+
+  // Kept on the way out: the tokens typed here that look right
+  const typed = useRef({ appToken, botToken })
+  useEffect(() => {
+    typed.current = { appToken, botToken }
+  })
+  const { refresh } = settings
+  useEffect(
+    () => () => {
+      const { appToken, botToken } = typed.current
+      const keep = {
+        ...(appToken.trim() && !tokenShape('app', appToken)
+          ? { SLACK_APP_TOKEN: appToken.trim() }
+          : {}),
+        ...(botToken.trim() && !tokenShape('bot', botToken)
+          ? { SLACK_BOT_TOKEN: botToken.trim() }
+          : {}),
+      }
+      if (Object.keys(keep).length > 0) void bridge?.save(keep).then(refresh)
+    },
+    [bridge, refresh]
+  )
 
   const connect = async () => {
     setSaving(true)
@@ -413,6 +599,7 @@ function AppTokens({
     settings.refresh()
     if (result?.issues.length)
       return setError(result.issues.map((issue) => issue.message).join(' '))
+    typed.current = { appToken: '', botToken: '' }
     void window.pacenoteDesktop?.setup.save({ slack: 'app' })
     onDone()
   }
@@ -475,14 +662,15 @@ function AppTokens({
           placeholder="xapp-..."
           where={
             <>
-              In Slack: Basic Information, App-Level Tokens, Generate Token and
-              Scopes, with{' '}
+              In the app's Basic Information, under App-Level Tokens, choose
+              Generate Token and Scopes, add{' '}
               <code className="rounded bg-well px-1 font-mono text-xs">
                 connections:write
               </code>
+              , and copy the token.
             </>
           }
-          state={states.app}
+          state={shape.app ? { ok: false, text: shape.app } : states.app}
           checking={checking && haveApp && haveBot}
         />
         <TokenField
@@ -493,21 +681,36 @@ function AppTokens({
           value={botToken}
           onChange={setBotToken}
           placeholder="xoxb-..."
-          where="In Slack: Install App, Install to your workspace, then copy the Bot User OAuth Token"
-          state={states.bot}
+          where="Under Install App, install it to your workspace, then copy the Bot User OAuth Token."
+          state={shape.bot ? { ok: false, text: shape.bot } : states.bot}
           checking={checking && haveApp && haveBot}
         />
       </ol>
       {states.mismatch && (
-        <p className="flex items-center gap-2 text-body text-status-failed">
+        <p
+          role="alert"
+          className="flex items-center gap-2 text-body text-status-failed"
+        >
           <TriangleAlert className="size-4 shrink-0" />
           {states.mismatch}
         </p>
       )}
+      <p className="text-body text-muted-foreground">
+        Made the app already? Its settings are in{' '}
+        <a
+          href={SLACK_APPS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-primary hover:underline"
+        >
+          your Slack apps
+        </a>
+        .
+      </p>
       <Note>
         Does your workspace ask an admin to approve apps? Slack sends them the
-        request when you install. Your progress here is saved; come back once
-        it's approved.
+        request when you install. The tokens you enter here are kept, so you can
+        come back once it's approved.
       </Note>
     </StepFrame>
   )
@@ -549,6 +752,7 @@ function TokenField({
   state?: { ok: boolean; text: string }
   checking: boolean
 }) {
+  const problem = !checking && state && !state.ok ? state.text : undefined
   return (
     <li className="flex gap-3">
       <StepNumber n={n} />
@@ -563,6 +767,7 @@ function TokenField({
             autoComplete="off"
             spellCheck={false}
             value={value}
+            aria-invalid={problem ? true : undefined}
             placeholder={
               hint?.set ? `Saved (${hint.hint ?? '...'})` : placeholder
             }
@@ -574,14 +779,21 @@ function TokenField({
               <LoaderCircle className="animate-spin" />
               Checking
             </Chip>
-          ) : state ? (
-            <Chip tone={state.ok ? 'ok' : 'failed'} className="max-w-64">
+          ) : state?.ok ? (
+            <Chip tone="ok" className="max-w-64">
               <span className="truncate" title={state.text}>
                 {state.text}
               </span>
             </Chip>
+          ) : state ? (
+            <Chip tone="failed">Not valid</Chip>
           ) : null}
         </span>
+        {problem ? (
+          <span role="alert" className="text-body text-status-failed">
+            {problem}
+          </span>
+        ) : null}
         <span className="text-xs text-muted-foreground">{where}</span>
       </label>
     </li>
@@ -590,12 +802,17 @@ function TokenField({
 
 /**
  * 3b. "@Pace it's me": Pace, invited to a channel, is mentioned once, and the
- * person who did becomes the first who may ask once you confirm it is you
+ * person who did becomes the first who may ask once you confirm it is you.
+ * The first to mention it stays shown until you say it is not you, so the
+ * name cannot change under the button.
  */
 function ItsMe({
+  before,
   onBack,
   onDone,
 }: {
+  /** Who you said you were before, still let in */
+  before?: Me
   onBack: () => void
   onDone: (me: Me) => void
 }) {
@@ -606,6 +823,7 @@ function ItsMe({
     | { state: 'error'; message: string }
   >({ state: 'starting' })
   const [claimed, setClaimed] = useState<ClaimedUser>()
+  const [notMe, setNotMe] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string>()
   const [attempt, setAttempt] = useState(0)
@@ -614,7 +832,13 @@ function ItsMe({
     if (!setup) return
     let live = true
     setListening({ state: 'starting' })
-    const off = setup.onClaim((user) => live && setClaimed(user))
+    setClaimed(undefined)
+    const off = setup.onClaim(
+      (user) => live && setClaimed((shown) => shown ?? user)
+    )
+    const ended = setup.onClaimEnded(
+      (message) => live && setListening({ state: 'error', message })
+    )
     void setup.claimStart().then((res) => {
       if (!live) return
       setListening(
@@ -626,9 +850,11 @@ function ItsMe({
     return () => {
       live = false
       off()
+      ended()
       void setup.claimStop()
     }
   }, [setup, attempt])
+  const waited = useWaited(listening.state === 'on' && !claimed, 30_000)
 
   const confirm = async (user: ClaimedUser) => {
     if (!setup) return
@@ -654,24 +880,10 @@ function ItsMe({
             Back
           </Button>
           <span className="flex-1" />
-          {error && <p className="text-body text-status-failed">{error}</p>}
-          {claimed && (
-            <>
-              <Button
-                variant="ghost"
-                disabled={confirming}
-                onClick={() => setClaimed(undefined)}
-              >
-                Not me
-              </Button>
-              <Button
-                disabled={confirming}
-                onClick={() => void confirm(claimed)}
-              >
-                {confirming && <LoaderCircle className="animate-spin" />}
-                Yes, that's me
-              </Button>
-            </>
+          {before && !claimed && (
+            <Button onClick={() => onDone(before)}>
+              Continue as @{before.name}
+            </Button>
           )}
         </>
       }
@@ -692,7 +904,10 @@ function ItsMe({
           <CommandLine text="@Pace it's me" />
         </li>
       </ol>
-      <div className="rounded-2xl px-5 py-4 ring-1 ring-border">
+      <div
+        aria-live="polite"
+        className="rounded-2xl px-5 py-4 ring-1 ring-border"
+      >
         <Swap
           id={
             listening.state === 'error'
@@ -719,22 +934,59 @@ function ItsMe({
             <WhoSent
               user={claimed}
               where={`mentioned Pace in ${claimed.channel} just now`}
+              said={claimed.said}
+              actions={
+                <>
+                  <Button
+                    variant="ghost"
+                    disabled={confirming}
+                    onClick={() => {
+                      setClaimed(undefined)
+                      setNotMe(true)
+                      setError(undefined)
+                    }}
+                  >
+                    Not me
+                  </Button>
+                  <Button
+                    disabled={confirming}
+                    onClick={() => void confirm(claimed)}
+                  >
+                    {confirming && <LoaderCircle className="animate-spin" />}
+                    Yes, that's me
+                  </Button>
+                </>
+              }
             />
           ) : (
             <p className="flex items-center gap-2.5 text-body text-muted-foreground">
               <PaceSpinner className="size-6" />
               <span className="text-shimmer">
                 {listening.state === 'on'
-                  ? 'Waiting for your mention'
+                  ? notMe
+                    ? 'Waiting for your mention. Send it from your own account.'
+                    : 'Waiting for your mention'
                   : 'Connecting to Slack'}
               </span>
             </p>
           )}
         </Swap>
       </div>
+      {error && (
+        <p role="alert" className="text-body text-status-failed">
+          {error}
+        </p>
+      )}
+      {waited && (
+        <Hint>
+          Nothing yet? Check that Pace is in that channel, and pick Pace from
+          the list that opens as you type @Pace, so the message mentions it.
+        </Hint>
+      )}
       <p className="text-body text-muted-foreground">
-        Until setup finishes, Pace listens only for this mention and replies to
-        you alone. You can let more people ask later in Settings.
+        While this is open, Pace answers no one: it only notes who mentions it
+        and tells that person alone to confirm here. You can let more people ask
+        later in Settings.
       </p>
     </StepFrame>
   )

@@ -35,11 +35,10 @@ cask "pacenote" do
     Pacenote answers your Slack mentions with your local claude or codex CLI login.
     Before the first mention:
       - log in to claude or codex (codex 0.138 or later)
-      - open Pacenote and connect Slack in Settings > Messengers > Slack: pair with your team's hub,
-        or create your own Slack app from there and save its tokens
-      - with your own app, add your Slack member ID under Who can ask
-    Answers run on this Mac by default, reading only the reference directory you set. On macOS 15
-    or later, choose the built-in sandbox in Settings > Sandbox and set it up there.
+      - open Pacenote: a first run opens on setup, from the AI service on this Mac to Pace's
+        first answer, with the built-in sandbox prepared in the background (macOS 15 or later),
+        your team's hub or your own Slack app, and "@Pace it's me" to say who may ask
+    Setup can be left and picked up from Overview, or done in Settings instead.
     Config and run history are in ~/.pacenote and are kept when the app is removed.
   EOS
 end
