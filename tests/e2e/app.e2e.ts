@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
@@ -7,6 +7,7 @@ import {
   realpathSync,
   writeFileSync,
 } from 'node:fs'
+import { once } from 'node:events'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -63,6 +64,30 @@ afterEach(async (context) => {
   world = undefined
 })
 
+/** The app's environment on the world, with the test's own on top */
+function appEnv(
+  world: World,
+  extra: Record<string, string> = {}
+): Record<string, string> {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] =>
+        entry[1] !== undefined && !/^(PACENOTE|SLACK|HUB)_/.test(entry[0])
+    )
+  )
+  return {
+    ...env,
+    // Its own HOME, so the bot lock does not see a real Pacenote running from
+    // its home.
+    HOME: world.root,
+    PACENOTE_HOME: world.home,
+    PACENOTE_DATA_DIR: world.home,
+    PACENOTE_DESKTOP_USER_DATA: path.join(world.root, 'user-data'),
+    PACENOTE_DESKTOP_THEME: 'light',
+    ...extra,
+  }
+}
+
 /**
  * Opens the app on the world. settings: lines the settings file has besides
  * what any member would have set before (all but the Slack tokens, which the
@@ -106,26 +131,10 @@ async function launch(
       '',
     ].join('\n')
   )
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] =>
-        entry[1] !== undefined && !/^(PACENOTE|SLACK|HUB)_/.test(entry[0])
-    )
-  )
   app = await _electron.launch({
     executablePath: ELECTRON,
     args: [path.join(REPO, 'apps/desktop')],
-    env: {
-      ...env,
-      // Its own HOME, so the bot lock does not see a real Pacenote running from
-      // its home.
-      HOME: world.root,
-      PACENOTE_HOME: world.home,
-      PACENOTE_DATA_DIR: world.home,
-      PACENOTE_DESKTOP_USER_DATA: path.join(world.root, 'user-data'),
-      PACENOTE_DESKTOP_THEME: 'light',
-      ...options.env,
-    },
+    env: appEnv(world, options.env),
   })
   const page = await app.firstWindow()
   page.setDefaultTimeout(20_000)
@@ -1290,4 +1299,55 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     },
     240_000
   )
+
+  it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {
+    world = await World.create()
+    const { slack } = world
+    const { version } = JSON.parse(
+      readFileSync(path.join(REPO, 'apps/desktop/package.json'), 'utf8')
+    ) as { version: string }
+    const plist = (v: string) =>
+      `<plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>${v}</string></dict></plist>`
+    const info = path.join(world.root, 'Info.plist')
+    writeFileSync(info, plist(version))
+    const env = {
+      PACENOTE_DESKTOP_BUNDLE_INFO: info,
+      // The test sees it go; opening again is the system's part.
+      PACENOTE_DESKTOP_NO_RELAUNCH: '1',
+    }
+    const desktopLog = () =>
+      readFileSync(path.join(world!.home, 'logs/desktop.log'), 'utf8')
+
+    // Running, with Pace answering, when the upgrade swaps the bundle
+    const page = await launch(world, {
+      settings: [
+        `SLACK_APP_TOKEN=${slack.appToken}`,
+        `SLACK_BOT_TOKEN=${slack.botToken}`,
+        `MENTION_ALLOWED_USERS=${world.alice.id}`,
+      ],
+      env,
+    })
+    await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+    const closed = app!.waitForEvent('close', { timeout: 60_000 })
+    writeFileSync(info, plist('99.0.0'))
+    await closed
+    app = undefined
+    expect(desktopLog()).toMatch(
+      /The app on disk is 99\.0\.0 now; restarting into it/
+    )
+    // Pace stopped as on any quit, not cut off
+    expect(world.status()).toBeUndefined()
+
+    // Opened from a bundle already replaced: no window and no Pace, straight
+    // on.
+    // (So quickly that Playwright cannot attach: it is spawned as is.)
+    const again = spawn(ELECTRON, [path.join(REPO, 'apps/desktop')], {
+      env: appEnv(world, env),
+      stdio: 'ignore',
+    })
+    const [code] = (await once(again, 'exit')) as [number | null]
+    expect(code).toBe(0)
+    const starts = desktopLog().match(/restarting into it/g) ?? []
+    expect(starts).toHaveLength(2)
+  })
 })

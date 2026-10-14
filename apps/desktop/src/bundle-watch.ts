@@ -1,0 +1,63 @@
+import { readFileSync } from 'node:fs'
+
+/** The version an app bundle's Info.plist names (CFBundleShortVersionString) */
+export function bundleVersion(plist: string): string | undefined {
+  return /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/.exec(
+    plist
+  )?.[1]
+}
+
+/**
+ * Watches the app's bundle for another version put in its place while this
+ * one runs. An upgrade can swap the bundle under a running copy: Homebrew asks
+ * the app to quit until it is gone, and a copy opened by a late request can
+ * still be running from the old bundle when the new one moves in. That copy's
+ * code no longer matches the files it loads, which ends Pace, so it restarts
+ * into the new version once the Info.plist on disk names one. A missing file
+ * is a swap in progress, and waits for the next look.
+ */
+export class BundleWatch {
+  private timer?: NodeJS.Timeout
+  private replaced = false
+
+  constructor(
+    private readonly options: {
+      /** Contents/Info.plist of the running app */
+      file: string
+      /** The running app's version */
+      running: string
+      onReplaced: (version: string) => void
+      intervalMs?: number
+    }
+  ) {}
+
+  start(): void {
+    this.timer = setInterval(
+      () => this.check(),
+      this.options.intervalMs ?? 3_000
+    )
+    this.timer.unref()
+  }
+
+  stop(): void {
+    clearInterval(this.timer)
+    this.timer = undefined
+  }
+
+  /** Looks now; true when another version has taken this one's place */
+  check(): boolean {
+    if (this.replaced) return true
+    let text: string
+    try {
+      text = readFileSync(this.options.file, 'utf8')
+    } catch {
+      return false
+    }
+    const version = bundleVersion(text)
+    if (!version || version === this.options.running) return false
+    this.replaced = true
+    this.stop()
+    this.options.onReplaced(version)
+    return true
+  }
+}

@@ -102,6 +102,7 @@ import { recordCollection, TaskCollector } from './task-collector.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
+import { BundleWatch } from './bundle-watch.js'
 import { setupProblem } from './bot-readiness.js'
 import {
   listenForClaim,
@@ -166,6 +167,27 @@ try {
 } catch (err) {
   log.warn(`Could not update the settings file: ${(err as Error).message}`)
 }
+/**
+ * Another version put in this app's place while it runs (BundleWatch): Pace
+ * stops as on any quit, and the app opens again as the new version. The
+ * packaged app watches its own Info.plist; end-to-end tests name one
+ * (PACENOTE_DESKTOP_BUNDLE_INFO) and keep it from opening again
+ * (PACENOTE_DESKTOP_NO_RELAUNCH).
+ */
+const bundleInfo = app.isPackaged
+  ? path.join(path.dirname(path.dirname(process.execPath)), 'Info.plist')
+  : process.env.PACENOTE_DESKTOP_BUNDLE_INFO
+const bundleWatch = bundleInfo
+  ? new BundleWatch({
+      file: bundleInfo,
+      running: app.getVersion(),
+      onReplaced: (version) => {
+        log.info(`The app on disk is ${version} now; restarting into it`)
+        if (process.env.PACENOTE_DESKTOP_NO_RELAUNCH !== '1') app.relaunch()
+        app.quit()
+      },
+    })
+  : undefined
 // An error nothing caught goes to the log instead of a dialog; the bot runs in
 // its own process either way.
 process.on('uncaughtException', (err) =>
@@ -1425,15 +1447,21 @@ function reportStartupError(error: unknown): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => showMainWindow())
+  // Opened again: usually to show the window, or after an upgrade put a new
+  // version in this one's place, which this copy then restarts into.
+  app.on('second-instance', () => {
+    if (!bundleWatch?.check()) showMainWindow()
+  })
   app
     .whenReady()
     .then(async () => {
       registerAppProtocol()
       registerBotIpc()
       // Opened only to be told to quit (see before-quit): no tray, window or
-      // Pace for the moment it lasts.
-      if (isQuitting) return
+      // Pace for the moment it lasts. Opened from a bundle already replaced:
+      // straight on to the new version.
+      if (isQuitting || bundleWatch?.check()) return
+      bundleWatch?.start()
       if (process.platform === 'darwin' && !app.isPackaged) {
         app.dock?.setIcon(nativeImage.createFromPath(appIcon))
       }
@@ -1468,6 +1496,7 @@ let botStopping: Promise<void> | undefined
  */
 app.on('before-quit', (event) => {
   isQuitting = true
+  bundleWatch?.stop()
   taskCollector.cancel()
   void stopClaim()
   supervisor?.dispose()
