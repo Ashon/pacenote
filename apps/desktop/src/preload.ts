@@ -24,6 +24,19 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
         ipcRenderer.removeListener('pacenote:app:update-changed', listener)
     },
   },
+  // macOS full screen, where the window's traffic lights hide
+  fullScreen: {
+    get: () => ipcRenderer.invoke('pacenote:window:full-screen'),
+    onChange: (callback: (on: boolean) => void) => {
+      const listener = (_event: IpcRendererEvent, on: boolean) => callback(on)
+      ipcRenderer.on('pacenote:window:full-screen-changed', listener)
+      return () =>
+        ipcRenderer.removeListener(
+          'pacenote:window:full-screen-changed',
+          listener
+        )
+    },
+  },
   // Opening the app when you log in (macOS Login Items)
   loginItem: {
     get: () => ipcRenderer.invoke('pacenote:app:login-item'),

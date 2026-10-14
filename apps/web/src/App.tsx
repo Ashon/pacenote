@@ -106,6 +106,7 @@ export default function App() {
   const [q, setQ] = useState('')
   const windowWidth = useWindowWidth()
   const isMacDesktop = window.pacenoteDesktop?.platform === 'darwin'
+  const fullScreen = useFullScreen()
   const [collapsed, setCollapsed] = useStoredFlag(
     'pacenote.sidebar.collapsed',
     false
@@ -142,9 +143,16 @@ export default function App() {
     <TooltipProvider delayDuration={300}>
       <div className="flex h-full flex-col bg-sidebar">
         {/* Three columns keep the search centered on the window; the left one
-            clears the traffic lights and holds the sidebar toggle. */}
+            clears the traffic lights and holds the sidebar toggle. In full
+            screen there are none, and the toggle lines up with the sidebar's
+            icons. */}
         <header className="titlebar-drag grid h-12 shrink-0 grid-cols-[1fr_minmax(0,520px)_1fr] items-center gap-3 px-3">
-          <div className={cn('flex', isMacDesktop && 'pl-[72px]')}>
+          <div
+            className={cn(
+              'flex transition-[padding] duration-200 motion-reduce:transition-none',
+              isMacDesktop && (fullScreen ? 'pl-1' : 'pl-[72px]')
+            )}
+          >
             <SidebarToggle
               compact={compact}
               forced={windowWidth < SIDEBAR.below}
@@ -195,6 +203,18 @@ export default function App() {
       </div>
     </TooltipProvider>
   )
+}
+
+/** Whether the window is in macOS full screen, where its traffic lights hide */
+function useFullScreen(): boolean {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const bridge = window.pacenoteDesktop?.fullScreen
+    if (!bridge) return
+    void bridge.get().then(setOn)
+    return bridge.onChange(setOn)
+  }, [])
+  return on
 }
 
 /**

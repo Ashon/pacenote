@@ -1128,6 +1128,9 @@ function registerBotIpc(): void {
     mainWindow?.webContents.send('pacenote:bot:changed', state)
     updateTray()
   })
+  ipcMain.handle('pacenote:window:full-screen', (event) =>
+    fromMainWindow(event) ? (mainWindow?.isFullScreen() ?? false) : false
+  )
   ipcMain.handle('pacenote:app:update', (event) =>
     fromMainWindow(event) ? (updates?.current ?? null) : null
   )
@@ -1170,6 +1173,14 @@ async function createWindow(route = ''): Promise<void> {
   })
   mainWindow = window
   if (!captureFile) window.once('ready-to-show', () => window.show())
+  // Full screen hides the traffic lights, so the title bar stops keeping room
+  // for them.
+  window.on('enter-full-screen', () =>
+    window.webContents.send('pacenote:window:full-screen-changed', true)
+  )
+  window.on('leave-full-screen', () =>
+    window.webContents.send('pacenote:window:full-screen-changed', false)
+  )
   window.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault()

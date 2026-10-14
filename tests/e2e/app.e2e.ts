@@ -183,6 +183,40 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(await link.getAttribute('href')).toBe(
       `${slack.url}/archives/${ops.id}/p${ts.replace('.', '')}`
     )
+
+    // The title bar keeps room for the traffic lights, except in full screen,
+    // where they hide: the sidebar toggle then lines up with the sidebar's
+    // icons. (The window's full-screen events, without taking the screen.)
+    const toggle = page.getByRole('button', { name: /sidebar labels$/ })
+    const toggleLeft = async () => (await toggle.boundingBox())!.x
+    expect(await toggleLeft()).toBeGreaterThanOrEqual(84)
+    const fullScreen = (on: boolean) =>
+      app!.evaluate(({ BrowserWindow }, on) => {
+        BrowserWindow.getAllWindows()[0]!.emit(
+          on ? 'enter-full-screen' : 'leave-full-screen'
+        )
+      }, on)
+    await fullScreen(true)
+    await eventually('the toggle at the edge', async () => {
+      const icon = await page
+        .getByRole('navigation', { name: 'Sections' })
+        .locator('svg')
+        .nth(1)
+        .boundingBox()
+      const box = (await toggle.boundingBox())!
+      return (
+        box.x === 16 &&
+        Math.abs(box.x + box.width / 2 - (icon!.x + icon!.width / 2)) < 1
+      )
+    })
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/full-screen.png'),
+    })
+    await fullScreen(false)
+    await eventually(
+      'room for the traffic lights again',
+      async () => (await toggleLeft()) === 84
+    )
   })
 
   /** Waits for an element to finish fading in, for a screenshot */

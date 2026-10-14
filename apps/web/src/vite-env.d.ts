@@ -64,6 +64,11 @@ declare global {
         state(): Promise<UpdateState | null>
         onChange(callback: (state: UpdateState) => void): () => void
       }
+      /** macOS full screen, where the window's traffic lights hide */
+      fullScreen: {
+        get(): Promise<boolean>
+        onChange(callback: (on: boolean) => void): () => void
+      }
       /** Opening the app when you log in */
       loginItem: {
         get(): Promise<LoginItemState | null>
