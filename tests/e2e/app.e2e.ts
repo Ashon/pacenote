@@ -417,10 +417,19 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/task-open.png'),
     })
 
-    // Continuing it opens the same session again.
-    await line('Your work')
-      .getByRole('button', { name: 'Continue', exact: true })
-      .click()
+    // Continuing it opens the same session again: the terminal icon, named
+    // in its tooltip.
+    const resume = line('Your work').getByRole('button', {
+      name: 'Continue this session in Claude Code',
+    })
+    await resume.hover()
+    await page
+      .getByRole('tooltip', { name: 'Continue this session in Claude Code' })
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-continue.png'),
+    })
+    await resume.click()
     await eventually('the session continued', () =>
       world!
         .claudeCalls()
@@ -537,7 +546,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
     // The earlier review's session can be continued from the line about it.
     await line('Last time')
-      .getByRole('button', { name: 'Continue', exact: true })
+      .getByRole('button', { name: 'Continue its session in Claude Code' })
       .click()
     await eventually('the earlier session continued', () =>
       world!

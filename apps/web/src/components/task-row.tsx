@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import { taskDetailQuery, useTaskDetail, useTaskWork } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -755,8 +756,6 @@ function Line({
   )
 }
 
-const LINK = 'text-primary hover:text-primary'
-
 /**
  * An earlier task, Pace's run or one of your sessions, on one line: its name
  * opens what is behind it (the run, the session's log), and a session can be
@@ -776,15 +775,23 @@ function EarlierLine({
   const log = session?.session
     ? taskHash(taskId, `/log/${encodeURIComponent(session.id)}`)
     : undefined
+  // The terminal icon of the row's own Continue button: it opens there too.
+  // Its name is a tooltip at its left, clear of the lines' icons above.
+  const resume = session?.session
+    ? `Continue ${task ? 'its' : 'this'} session in ${TOOL[session.tool]}`
+    : ''
   const action = session?.session ? (
-    <Button
-      size="xs"
-      variant="ghost"
-      className={LINK}
-      onClick={() => onResume(session.id)}
-    >
-      Continue
-    </Button>
+    <Tooltip content={resume} side="left">
+      <Button
+        size="icon-sm"
+        variant="outline"
+        aria-label={resume}
+        className="text-primary"
+        onClick={() => onResume(session.id)}
+      >
+        <SquareTerminal />
+      </Button>
+    </Tooltip>
   ) : line.session ? (
     <span className="text-xs text-muted-foreground">
       Waiting for {TOOL[line.session.tool]} to start it
