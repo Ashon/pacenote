@@ -5,7 +5,7 @@ What happens between a mention and its answer: context, attachments, diagrams an
 ```
 @bot mention in a public channel
   -> messenger adapter (Slack: Bolt, Socket Mode or the team hub, app_mention event) -> Mention
-  -> check allowed users / public channel
+  -> check it is you, in a public channel
   -> Pace reacts to the mention with 👀 (📥 first while it waits its turn, and ⏳ after 90 seconds of work)
   -> collect context (in a thread its first message and the latest 29, or the last 10 messages outside a thread)
   -> Reasoner: claude -p or codex exec (a disposable VM when REASONER_SANDBOX=vm)

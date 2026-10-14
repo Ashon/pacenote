@@ -37,8 +37,8 @@
 <rect x="192" y="320" width="132" height="68" rx="14" fill="#ffffff"/>
 <circle cx="212" cy="340" r="10" fill="#007c5c"/>
 <text x="212" y="344" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
-<text x="228" y="345" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10211c" text-anchor="start">Allowed here?</text>
-<text x="204" y="364" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Allowed users,</text>
+<text x="228" y="345" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#10211c" text-anchor="start">Asked by you?</text>
+<text x="204" y="364" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Only you, in</text>
 <text x="204" y="379" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">public channels</text>
 <rect x="350" y="192" width="132" height="68" rx="14" fill="#ffffff"/>
 <circle cx="370" cy="212" r="10" fill="#007c5c"/>
@@ -87,7 +87,7 @@
 <rect x="48.5" y="580.5" width="68" height="19" rx="9.5" fill="#d42f34" fill-opacity="0.12" stroke="#d42f34" stroke-opacity="0.3"/>
 <circle cx="58" cy="590" r="3" fill="#d42f34"/>
 <text x="65.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#d42f34" text-anchor="start">Refused</text>
-<text x="48" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Not allowed or not public</text>
+<text x="48" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Not you, or not public</text>
 <text x="48" y="642" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">A note only the asker sees; nothing runs.</text>
 <path d="M324.5 580V664" stroke="#d8e5df" stroke-width="1"/>
 <rect x="340.5" y="580.5" width="57" height="19" rx="9.5" fill="#d42f34" fill-opacity="0.12" stroke="#d42f34" stroke-opacity="0.3"/>

@@ -1,41 +1,95 @@
 <p align="center">
-  <img src="assets/pacenote-icon-256.png" alt="Pacenote" width="96" height="96">
+  <img src="assets/pacenote-icon-256.png" alt="" width="96" height="96">
 </p>
 
-# Pacenote
+<h1 align="center">Pacenote</h1>
 
-[![ci](https://github.com/Ashon/pacenote/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Ashon/pacenote/actions/workflows/ci.yml)
-[![e2e coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAshon%2Fpacenote%2Fbadges%2Fe2e-coverage.json)](https://github.com/Ashon/pacenote/actions/workflows/ci.yml)
+<p align="center">
+  <b>You drive. Pace reads the notes.</b><br>
+  Your work context, kept on your Mac, for whichever AI does the work.
+</p>
 
-**You drive. Pace reads the notes.**
+<p align="center">
+  <a href="https://github.com/Ashon/pacenote/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/Ashon/pacenote/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/Ashon/pacenote/actions/workflows/ci.yml"><img alt="e2e coverage" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAshon%2Fpacenote%2Fbadges%2Fe2e-coverage.json"></a>
+</p>
 
-In rallying, the co-driver reads pace notes so the driver can keep their eyes on the road. Pacenote puts Pace in that
-seat for your team's Slack: mention `@Pace` in a public channel, and Pace reads the thread, hands the reasoning to a
-local `claude` or `codex` CLI on your machine, keeps only what matters now, and answers in the same thread.
-
-Two names, two roles: **Pacenote** is the project and the app; **Pace** is who you talk to, the Slack bot and the
-voice of the app.
-
+<p align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
-  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker" src="docs/diagrams/architecture-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/todo-dark.webp">
+  <img alt="Pacenote's Todo screen: three tasks people asked of you in Slack. The open one, a PR review due Thursday, shows how a related review ended last week in Codex and what Pace answered in the same thread, with a button to continue it in Claude Code." src="docs/images/todo-light.webp">
 </picture>
+</p>
 
-## What it does
+Work reaches you in Slack and gets done in Claude Code, Codex, or a quick question to an assistant. Each of those keeps
+its own memory, so the thread, what you found last time and where you stopped end up scattered across tools and vendors.
 
-- Answers mentions in the thread, with the thread and its attachments (text, images, PDFs) as context.
-- Reasons with your own `claude` or `codex` CLI login: on your Mac, reading only a folder you choose, or in a
-  disposable Linux VM built into Pacenote that reaches only allowed domains.
-- Answers only you, and keeps its own tokens and other secrets out of what it posts.
-- Optional ops tools: read-only lookups on servers, k8s clusters and a work directory, GitHub and Jira, and code
-  changes as draft PRs, through a broker that keeps credentials out of the reasoner.
-- Renders diagrams and charts to images, and keeps a run history with every tool step in the desktop app.
-- Connects over Socket Mode, so it needs no public endpoint. A team can share one Slack app through a
-  [team hub](docs/team-hub.md), which routes each member's mentions to their own desktop.
+Pacenote keeps that context on your Mac. Its assistant, **Pace**, answers you in Slack with your own Claude or ChatGPT
+login, keeps a list of what people ask of you, and carries each task, with what came before, into Claude Code or Codex.
+In rallying, the co-driver reads the pace notes so the driver can keep their eyes on the road. Pace does that for your
+work.
+
+## What you can do
+
+### Ask Pace in Slack
+
+Mention `@Pace` in a thread. Pace reads the thread and its files (text, images, PDFs), works the question out with the
+`claude` or `codex` CLI you are signed in to, and answers in the thread. The app keeps every run with each step Pace
+took, so you can see how it got there. In the built-in sandbox, diagrams and charts in an answer come back as images.
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/run-dark.webp">
+  <img alt="A run in Pacenote: the question asked in #ops, the two tool steps Pace took, and its answer naming the likely cause." src="docs/images/run-light.webp">
+</picture>
+</p>
+
+### Keep track of what is asked of you
+
+**Collect now** has Claude Code read Slack through your claude.ai Slack connector, read only, and lists what people
+asked of you and what you said you would do. Anything it is not sure about waits under Maybe instead of cluttering the
+list, and a message never becomes a task twice. Collecting is off until you turn it on.
+
+### Pick up where you left off, in either tool
+
+**Continue in Claude Code** (or Codex) opens a terminal session with the task, the thread, what Pace found there, and
+how related work ended last time, even when that work was done in the other tool. When the session is done, it closes
+the task with a note on how it ended and, if someone is waiting on you, a reply for you to send.
+
+### Share the history with your AI tools
+
+Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did and what is on your
+list. You add it to each tool with one click, and only if you want to.
+
+## What Pace never does
+
+- **Answer anyone but you.** It runs with your login, so anyone else who mentions it gets a note only they can see.
+  Teammates each run their own Pace through a [team hub](docs/team-hub.md).
+- **Answer in private channels or DMs.** It works in public channels it has been invited to.
+- **Send messages for you.** It answers in the thread you asked in; replies it drafts for your tasks are yours to send.
+- **Change your files.** On your Mac, the CLI gets read-only access to one folder you choose, and never your
+  credential folders. In the built-in sandbox, each answer runs in a Linux VM that is thrown away afterwards and reaches
+  only the domains you allow.
+- **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With ops tools on, SSH keys and
+  cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only lookups, draft PRs, and
+  Jira issues or comments.
+- **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet.
+  Besides Slack (or your hub), your AI service and the services you connect as ops tools, it talks only to GitHub to
+  check for updates, and downloads the sandbox's images when you set it up. There is no telemetry.
+- **Bill you or hold your AI account.** Answers use the subscription you already have, through its official CLI.
+
+How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Ops tools](docs/ops-tools.md) and
+[How it works](docs/how-it-works.md).
+
+## Requirements
+
+- A Mac with Apple silicon and macOS 12 or later. The built-in sandbox needs macOS 15 or later.
+- Claude Code with a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later with ChatGPT Plus, Pro or
+  Business, signed in on that Mac.
+- A Slack workspace where you can create an app, or your team's Pacenote hub.
+- To gather your tasks: Claude Code, with the Slack connector of your claude.ai account.
 
 ## Install
-
-The desktop app installs with Homebrew (macOS 12 or later, Apple silicon; Intel Macs are not supported since v0.5.7):
 
 ```sh
 brew tap ashon/tap
@@ -43,28 +97,37 @@ brew trust ashon/tap
 brew install --cask pacenote
 ```
 
-Homebrew loads casks only from taps you trust: without `brew trust`, the install is refused and `brew upgrade` skips
-Pacenote. An install from before the rename to Pacenote trusted only the old cask name, so run `brew trust ashon/tap`
-once there too.
+Homebrew loads casks only from taps you trust, so without `brew trust` the install is refused and upgrades skip
+Pacenote.
 
-Then:
+Open Pacenote, and setup takes you through five steps: the AI service on your Mac, where answers run, Slack, a review,
+and Pace's first answer. It ends when Pace answers you in Slack for the first time. You can leave at any step and pick
+it up again from Overview.
 
-1. Log in to `claude` or `codex` (0.138 or later) on your Mac.
-2. Open Pacenote. A first run opens on setup, five steps from the AI service to Pace's first answer:
-   - **AI service**: Claude, or ChatGPT through Codex, whichever is installed and signed in on this Mac.
-   - **Where it runs**: the built-in sandbox, a lightweight Linux VM for each answer that reaches only allowed domains
-     (Apple silicon, macOS 15 or later), prepared in the background from the moment setup opens; or directly on this
-     Mac, where the CLI runs with your login and reads only the reference directory set in Settings > Answers.
-   - **Slack**: pair with your team's hub (see [Team hub](docs/team-hub.md)), or create your own app from Pacenote's
-     [manifest](slack-app-manifest.yaml) and paste its two tokens. With your own app, invite `@Pace` to a public
-     channel and mention it with `@Pace it's me`: Pacenote shows who did, and once you confirm it is you, you may ask.
-   - **Review**, then **Start Pace**, and mention it once in Slack for its first answer.
-
-   Setup can be left at any step and picked up from Overview, or done in Settings instead and taken up again from
-   Overview. Ops tools need the built-in sandbox, and diagrams its setup in either run environment.
-
-`brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across
+`brew upgrade --cask pacenote` updates the app. Settings and run history live in `~/.pacenote` and are kept across
 upgrades and uninstalls. To run from source instead, see [Installation](docs/installation.md).
+
+## How it works
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
+  <img alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker" src="docs/diagrams/architecture-light.svg">
+</picture>
+</p>
+
+1. A mention reaches Pace on your Mac over Socket Mode, or through your team's hub.
+2. Pace checks that it is you asking, in a public channel, then reads the thread and its files.
+3. It runs `claude` or `codex` on your Mac, limited to one folder, or in the built-in sandbox's VM.
+4. It takes its own secrets out of the answer, replies in the thread, and records every step in the run history.
+
+The design, one mention end to end, and the code layout are drawn in [Architecture](docs/architecture.md).
+
+## For teams
+
+A team can share one Slack app through a Pacenote hub. Each member pairs their own Mac once, and the hub sends each
+mention to the desktop of the person who wrote it, where Pace answers with that person's login, sandbox and tools. The
+Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 
 ## Documentation
 
@@ -72,13 +135,13 @@ upgrades and uninstalls. To run from source instead, see [Installation](docs/ins
 | --- | --- |
 | [Architecture](docs/architecture.md) | The design in six diagrams: the pieces, one mention, your tasks and AI tools, the team hub, the layers, the code layout |
 | [How it works](docs/how-it-works.md) | The path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs |
-| [Reasoner sandbox](docs/sandbox.md) | Where answers run: on this Mac and what the CLI may read there, or the built-in VM sandbox, with its way out, allowed domains and login |
-| [Ops tools](docs/ops-tools.md) | ops-broker: hosts, k8s, work directory, GitHub, Jira, and code changes as draft PRs |
+| [Reasoner sandbox](docs/sandbox.md) | Where answers run: on your Mac and what the CLI may read there, or the built-in VM sandbox, its allowed domains and login |
+| [Ops tools](docs/ops-tools.md) | Read-only lookups on hosts, k8s, a work directory, GitHub and Jira, and code changes as draft PRs |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
-| [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: Claude Code, Codex and other tools on your Mac reading what Pace did |
-| [Your tasks from Slack](docs/tasks.md) | What people asked of you, collected by Claude Code or Codex with its Slack connector, on the Todo screen |
+| [Your tasks from Slack](docs/tasks.md) | What people ask of you, collected on the Todo screen, and continuing it in Claude Code or Codex |
+| [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: your AI tools reading what Pace did and your tasks |
 | [Installation](docs/installation.md) | Homebrew in detail, running from source, restarts and the run lock |
-| [Desktop app](docs/desktop-app.md) | The app's screens, bot management, settings, sandbox controls, packaging |
+| [Desktop app](docs/desktop-app.md) | The app's screens, setup, settings, sandbox controls, packaging |
 | [Development](docs/development.md) | Checks, end-to-end tests and coverage, adding a messenger |
 | [Releases](docs/releases) | Release notes |
 
@@ -92,3 +155,7 @@ pnpm desktop    # the desktop app from source
 ```
 
 See [Development](docs/development.md) for more.
+
+## Names
+
+**Pacenote** is the app and the project. **Pace** is who you talk to: the assistant in Slack and the voice of the app.
