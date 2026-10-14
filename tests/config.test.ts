@@ -161,6 +161,19 @@ describe('loadConfig', () => {
     expect(config.reasoner.vm).toMatchObject({ image: 'reasoner' })
   })
 
+  it("shows times in this Mac's time zone unless one is set, and checks its name", () => {
+    expect(loadConfig(env).timezone).toBe(
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    )
+    expect(loadConfig({ ...env, TIMEZONE: '' }).timezone).toBe(
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    )
+    expect(loadConfig({ ...env, TIMEZONE: 'America/New_York' }).timezone).toBe(
+      'America/New_York'
+    )
+    expect(() => loadConfig({ ...env, TIMEZONE: 'Seoul' })).toThrow(/TIMEZONE/)
+  })
+
   it('reports which value is wrong when a token format is invalid', () => {
     expect(() => loadConfig({ ...env, SLACK_BOT_TOKEN: 'xoxp-1' })).toThrow(
       /SLACK_BOT_TOKEN/

@@ -72,6 +72,10 @@ Layout:
   The patterns live in `apps/web/src/motion.css` and the primitives in `apps/web/src/components/ui` (Collapsible, Dialog,
   the menu, the tooltip, Tabs, `Swap`, `useListMotion`, `usePresence`); `tests/web-motion.test.ts` fails on durations,
   easings or animations written anywhere else. The Debug section has a Motion bench that plays each pattern slowly.
+- Text takes its size from one scale in `apps/web/src/index.css` (2xs 11, xs 12, body 13, sm 14, base 16, lg 18), and
+  `tests/web-type.test.ts` fails on sizes made up elsewhere. Hangul is set in Pretendard, bundled with the app, and the
+  rest in the system font. A run's status in the list is a dot when it succeeded and an icon otherwise, and every
+  status color reads at 4.5:1 or more as text.
 
 Bot management:
 

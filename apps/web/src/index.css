@@ -5,9 +5,38 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Hangul in Pretendard, the typeface the diagrams use too; everything else in
+ * the system font. The face covers only Hangul, so it can come first: the
+ * system font would otherwise answer for Hangul itself (Apple SD Gothic Neo)
+ * and Pretendard would never be reached.
+ */
+@font-face {
+  font-family: 'Pretendard';
+  src: url('../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2')
+    format('woff2-variations');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
+}
+
+/*
+ * The type scale. Text takes one of these sizes, never one of its own
+ * (tests/web-type.test.ts): 2xs 11 for counts, pills and the status bar, xs 12
+ * for meta lines, body 13 for lists, menus and dialogs (as macOS sets its own
+ * body), sm 14 for row titles and forms, base 16, lg 18 for page titles, 3xl
+ * for the big numbers.
+ */
+@theme {
+  --text-2xs: 0.6875rem;
+  --text-body: 0.8125rem;
+}
+
 @theme inline {
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo',
+    'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
     'Segoe UI', 'Noto Sans KR', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
   --color-background: var(--background);
@@ -56,7 +85,9 @@
  * Colors are taken from the emerald -> mint gradient of the logo (assets/pacenote.svg).
  *   Logo #01ab78 -> #1fc289 -> #48c89c, ring edge mint #a8e7d3
  *   Text contrast: white on light primary #007c5c 5.2:1, #04281d on dark primary #3ccb96 7.7:1
- *   The running status uses teal to stand apart from succeeded (green).
+ *   Statuses are text as much as dots, so each reads at 4.5:1 or more on white and on its own pill (12% tint).
+ *   Succeeded is a leaf green apart from the brand's teal green, so a selected item, a link or a badge in primary
+ *   does not read as a success; running is teal.
  *   chart-4 is the series stacked on the gradient (task collections on tokens per day): primary in light, mint in
  *   dark, so it differs from the gradient in lightness in both.
  * Surfaces, not borders, set the levels. Higher surfaces are lighter. (same rule in light and dark)
@@ -94,7 +125,7 @@
   --muted-foreground: oklch(0.49 0.03 172);
   --accent: oklch(0.948 0.035 165);
   --accent-foreground: oklch(0.32 0.07 165);
-  --destructive: oklch(0.57 0.2 25);
+  --destructive: oklch(0.53 0.19 25);
   --border: oklch(0.91 0.016 168);
   --input: oklch(0.89 0.018 168);
   --ring: rgba(12, 182, 126, 0.5);
@@ -103,10 +134,10 @@
   --sidebar-accent: oklch(0.935 0.04 165);
   --sidebar-accent-foreground: oklch(0.27 0.06 165);
   --sidebar-border: oklch(0.91 0.016 168);
-  --status-running: #029a92;
-  --status-succeeded: #007c5c;
-  --status-failed: oklch(0.57 0.2 25);
-  --status-interrupted: oklch(0.62 0.14 65);
+  --status-running: oklch(0.51 0.1 185);
+  --status-succeeded: oklch(0.51 0.135 150);
+  --status-failed: oklch(0.53 0.19 25);
+  --status-interrupted: oklch(0.53 0.125 65);
   --chart-1: #0cb67e;
   --chart-2: #46c99b;
   --chart-3: #a8e7d3;
@@ -147,7 +178,7 @@
   --sidebar-accent-foreground: oklch(0.96 0.02 165);
   --sidebar-border: oklch(0.9 0.05 165 / 10%);
   --status-running: #1bd3b3;
-  --status-succeeded: #3ccb96;
+  --status-succeeded: oklch(0.78 0.16 148);
   --status-failed: oklch(0.7 0.17 22);
   --status-interrupted: oklch(0.8 0.13 75);
   --chart-1: #2ec790;

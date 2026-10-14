@@ -817,7 +817,7 @@ export function SettingsPage() {
         </h1>
         {NAV.map((group) => (
           <div key={group.label} className="space-y-0.5">
-            <p className="px-2.5 pb-1 text-[11px] font-medium text-muted-foreground/80 @max-[44rem]/settings:sr-only">
+            <p className="px-2.5 pb-1 text-2xs font-medium text-muted-foreground/80 @max-[44rem]/settings:sr-only">
               {group.label}
             </p>
             {group.items.map((id) => (
@@ -1011,7 +1011,7 @@ function NavItem({
           />
         ) : changes > 0 ? (
           <span
-            className="shrink-0 rounded-full bg-primary/12 px-1.5 text-[10px] font-semibold text-primary tabular-nums"
+            className="shrink-0 rounded-full bg-primary/12 px-1.5 text-2xs font-semibold text-primary tabular-nums"
             title={`${changes} unsaved ${changes === 1 ? 'change' : 'changes'}`}
           >
             {changes}
@@ -1019,7 +1019,7 @@ function NavItem({
         ) : hint ? (
           <span
             className={cn(
-              'shrink-0 text-[11px] font-normal',
+              'shrink-0 text-2xs font-normal',
               hint.tone === 'warn'
                 ? 'text-status-interrupted'
                 : 'text-muted-foreground/70'
@@ -1158,7 +1158,7 @@ function Chip({
   return (
     <span
       className={cn(
-        'rounded px-1.5 text-[10px] leading-4 font-medium',
+        'rounded px-1.5 text-2xs leading-4 font-medium',
         CHIP_TONE[tone]
       )}
     >
@@ -1178,7 +1178,7 @@ function StateChip({
     <span
       title={title}
       className={cn(
-        'rounded px-1.5 text-[10px] leading-4 font-medium',
+        'rounded px-1.5 text-2xs leading-4 font-medium',
         STATE_CHIP[state].className
       )}
     >
@@ -1646,7 +1646,7 @@ function FieldRow({
           onChange={onChange}
           footers={extras?.footers}
         />
-        <div className="mt-2 flex items-center gap-1.5 font-mono text-[10.5px] text-muted-foreground/80">
+        <div className="mt-2 flex items-center gap-1.5 font-mono text-2xs text-muted-foreground/80">
           <span className="select-text">{field.key}</span>
           {changed && (
             <span
@@ -1898,7 +1898,7 @@ function Row({
       <div className="min-w-0 flex-1 @max-[36rem]/content:w-full">
         <div className="text-sm font-medium">{label}</div>
         {sub && (
-          <div className="font-mono text-[10.5px] text-muted-foreground/80 select-text">
+          <div className="font-mono text-2xs text-muted-foreground/80 select-text">
             {sub}
           </div>
         )}

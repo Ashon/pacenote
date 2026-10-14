@@ -127,7 +127,7 @@ function RunHeader({ run }: { run: RunRecord }) {
           <TabsTrigger value="attachments">
             Attachments
             {run.attachments.length > 0 && (
-              <span className="rounded bg-muted px-1 text-[10px] tabular-nums">
+              <span className="rounded bg-muted px-1 text-2xs tabular-nums">
                 {run.attachments.length}
               </span>
             )}

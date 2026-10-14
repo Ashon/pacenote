@@ -333,3 +333,15 @@
     transform: translate(var(--motion-pop-x), var(--motion-pop-y));
   }
 }
+
+/*
+ * Spinners and the running ping hold still with Reduce motion; the icon or the
+ * dot still says the work goes on. Outside the layers, so it outranks
+ * Tailwind's animate-* utilities.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-ping {
+    animation: none;
+  }
+}

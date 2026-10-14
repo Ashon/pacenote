@@ -74,7 +74,7 @@ export function McpClientRows({ className }: { className?: string }) {
             <span className="min-w-0 flex-1 text-muted-foreground select-text">
               {describe(client)}
               {client.state === 'elsewhere' && client.command && (
-                <span className="block truncate font-mono text-[11px]">
+                <span className="block truncate font-mono text-2xs">
                   {client.command}
                 </span>
               )}

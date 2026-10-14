@@ -84,7 +84,7 @@ export function Sidebar({
         <span
           data-hidden={compact || undefined}
           aria-hidden={compact || undefined}
-          className="motion-layout-label text-[15px] font-semibold tracking-tight"
+          className="motion-layout-label text-base font-semibold tracking-tight"
         >
           Pacenote
         </span>
@@ -92,7 +92,7 @@ export function Sidebar({
           <span
             data-hidden={compact || undefined}
             aria-hidden={compact || undefined}
-            className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-[11px] font-semibold text-status-interrupted"
+            className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-2xs font-semibold text-status-interrupted"
           >
             Dev
           </span>
@@ -139,7 +139,7 @@ function NavItem({
         aria-current={current ? 'page' : undefined}
         onClick={onClick}
         className={cn(
-          'relative flex h-9 items-center gap-2.5 overflow-hidden rounded-xl px-[11px] text-[13.5px] whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          'relative flex h-9 items-center gap-2.5 overflow-hidden rounded-xl px-[11px] text-body whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
           current
             ? 'bg-selected font-semibold text-foreground'
             : 'text-muted-foreground hover:bg-selected/50 hover:text-foreground'
@@ -160,7 +160,7 @@ function NavItem({
           <span
             {...labeled}
             aria-hidden={compact || undefined}
-            className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-primary tabular-nums"
+            className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-2xs font-semibold text-primary tabular-nums"
           >
             {count}
           </span>
@@ -170,7 +170,7 @@ function NavItem({
             {...iconOnly}
             aria-hidden
             className={cn(
-              'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground tabular-nums ring-2',
+              'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold text-primary-foreground tabular-nums ring-2',
               current ? 'ring-selected' : 'ring-sidebar'
             )}
           >

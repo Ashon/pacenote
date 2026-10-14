@@ -67,7 +67,7 @@ export function Timeline({ run }: { run: RunRecord }) {
           )}
         </p>
         {run.context.messages > 0 && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
+          <p className="mt-1.5 text-2xs text-muted-foreground">
             {run.context.messages} thread{' '}
             {run.context.messages === 1 ? 'message' : 'messages'}
             {run.attachments.length > 0
@@ -223,7 +223,7 @@ function Bubble({
         <div className={cn('flex items-baseline gap-2', children && 'mb-2')}>
           <span className="text-sm font-semibold">{title}</span>
           {meta && (
-            <span className="text-[11px] text-muted-foreground">{meta}</span>
+            <span className="text-2xs text-muted-foreground">{meta}</span>
           )}
         </div>
         {children}
@@ -244,7 +244,7 @@ function Disclosure({
   const [open, setOpen] = useState(false)
   return (
     <Collapsible open={open} onOpenChange={setOpen} className={className}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground">
+      <CollapsibleTrigger className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-2xs text-muted-foreground hover:text-foreground">
         <ChevronRight
           className={cn('size-3 transition-transform', open && 'rotate-90')}
         />
@@ -262,7 +262,7 @@ function Step({ event }: { event: RunEvent }) {
       return <ToolStep event={event} />
     case 'message':
       return (
-        <div className="py-1 text-[13px] leading-relaxed text-muted-foreground">
+        <div className="py-1 text-body leading-relaxed text-muted-foreground">
           <Markdown className="prose-p:my-0 text-muted-foreground">
             {event.text}
           </Markdown>
@@ -282,7 +282,7 @@ function Step({ event }: { event: RunEvent }) {
       )
     case 'note':
       return (
-        <div className="flex items-center gap-1.5 py-1 text-[11px] text-status-interrupted">
+        <div className="flex items-center gap-1.5 py-1 text-2xs text-status-interrupted">
           <Info className="size-3.5 shrink-0" />
           {event.text}
           <span className="text-muted-foreground">{formatClock(event.at)}</span>
@@ -332,7 +332,7 @@ function ToolStep({
         // The server (ops, codex_apps, etc.) is a small tag; only the tool name
         // is shown large.
         <span className="flex items-center gap-1.5">
-          <span className="flex items-center gap-1 rounded-md bg-well px-1.5 py-px text-[10px] font-medium text-muted-foreground [&_svg]:size-3">
+          <span className="flex items-center gap-1 rounded-md bg-well px-1.5 py-px text-2xs font-medium text-muted-foreground [&_svg]:size-3">
             {isTool ? <Wrench /> : <SquareTerminal />}
             {isTool ? event.server : 'shell'}
           </span>
@@ -408,7 +408,7 @@ function ExpandableRow({
             {preview}
           </span>
         )}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums">
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
           {trailing && trailing !== '-' && trailing}
           <ChevronRight
             className={cn('size-3.5 transition-transform', open && 'rotate-90')}

@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
+import { isTimeZone, systemTimeZone } from './messengers/text.js'
 import { defaultHome } from './settings/home.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
@@ -126,7 +127,11 @@ export const EnvSchema = z.object({
     .default(30_000),
   /** Logs ping/pong. (Visible when LOG_LEVEL=debug) */
   SOCKET_PING_PONG_LOG: z.enum(['on', 'off']).default('off'),
-  TIMEZONE: z.string().default('Asia/Seoul'),
+  /** Times in thread context are shown in it; this Mac's time zone if unset */
+  TIMEZONE: z
+    .string()
+    .refine(isTimeZone, 'Must be a time zone name, such as Asia/Seoul or UTC')
+    .default(systemTimeZone),
 
   /**
    * Who may ask Pace through your own Slack app. Required unless MENTION_ANYONE

@@ -44,7 +44,7 @@ export function RepoFolders() {
         <ul className="mt-2.5 divide-y divide-card overflow-hidden rounded-lg bg-well">
           {names.map((repo) => (
             <li key={repo} className="flex items-center gap-3 px-3 py-2">
-              <span className="w-44 shrink-0 truncate font-mono text-[12.5px] font-semibold">
+              <span className="w-44 shrink-0 truncate font-mono text-xs font-semibold">
                 {repo}
               </span>
               <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground select-text">

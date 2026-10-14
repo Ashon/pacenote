@@ -85,7 +85,7 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
             <TabsTrigger value="result">Result</TabsTrigger>
             <TabsTrigger value="lookups">
               Lookups
-              <span className="rounded bg-muted px-1 text-[10px] tabular-nums">
+              <span className="rounded bg-muted px-1 text-2xs tabular-nums">
                 {run.reads ?? 0}
               </span>
             </TabsTrigger>
@@ -281,7 +281,7 @@ function Result({ run }: { run: CollectionRunRecord }) {
           {skipped.map((item, index) => (
             <li
               key={`${item.link ?? ''}-${index}`}
-              className="border-t border-border py-3 text-[13px] text-muted-foreground"
+              className="border-t border-border py-3 text-body text-muted-foreground"
             >
               {item.why ?? 'Left out in Settings > Todo'}
             </li>
@@ -393,7 +393,7 @@ function Lookups({
   if (!groups.length) return <Empty>This collection made no lookups.</Empty>
   return (
     <div>
-      <p className="mb-3 text-[13px] text-muted-foreground">
+      <p className="mb-3 text-body text-muted-foreground">
         {run.reads ?? 0} lookups in Slack
         {run.durationMs !== undefined
           ? ` in ${formatDuration(run.durationMs)}`
@@ -406,7 +406,7 @@ function Lookups({
             key={index}
             className="grid grid-cols-[3.25rem_1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 border-t border-border py-2.5"
           >
-            <span className="text-[11px] leading-5 text-muted-foreground tabular-nums">
+            <span className="text-2xs leading-5 text-muted-foreground tabular-nums">
               +{formatDuration(group.offsetMs)}
             </span>
             <span className="grid h-5 place-items-center text-muted-foreground [&_svg]:size-3.5">
@@ -414,17 +414,17 @@ function Lookups({
             </span>
             <span className="min-w-0">
               <span className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[13px] font-medium">{group.label}</span>
+                <span className="text-body font-medium">{group.label}</span>
                 {group.count > 1 && (
-                  <span className="rounded-md bg-muted px-1.5 text-[11px] leading-[18px] font-medium tabular-nums">
+                  <span className="rounded-md bg-muted px-1.5 text-2xs leading-[18px] font-medium tabular-nums">
                     ×{group.count}
                   </span>
                 )}
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="font-mono text-2xs text-muted-foreground">
                   {group.tool}
                 </span>
                 {group.failed > 0 && (
-                  <span className="text-[11px] text-status-failed">
+                  <span className="text-2xs text-status-failed">
                     {group.failed} failed
                   </span>
                 )}
@@ -435,7 +435,7 @@ function Lookups({
                 </span>
               )}
             </span>
-            <span className="text-[11px] leading-5 text-muted-foreground tabular-nums">
+            <span className="text-2xs leading-5 text-muted-foreground tabular-nums">
               {group.durationMs !== undefined
                 ? formatDuration(group.durationMs)
                 : ''}

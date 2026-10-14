@@ -188,7 +188,7 @@ function SpinnerBench() {
           {SIZES.map((size) => (
             <figure
               key={size}
-              className="flex flex-col items-center gap-2 text-[11px] text-muted-foreground"
+              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
             >
               <div style={{ width: size, height: size }}>
                 <PaceSpinner className="size-full" />
@@ -304,7 +304,7 @@ function SettleBench() {
           {[24, 28, 48, 96, 192].map((size) => (
             <figure
               key={size}
-              className="flex flex-col items-center gap-2 text-[11px] text-muted-foreground"
+              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
             >
               <div style={{ width: size, height: size }}>
                 <PaceSpinner active={loading} className="size-full" />
@@ -322,13 +322,11 @@ function SettleBench() {
             <div className="flex items-baseline gap-2">
               <span className="font-semibold">Pace</span>
               {loading ? (
-                <span className="text-shimmer text-[11px] font-medium text-status-running">
+                <span className="text-shimmer text-2xs font-medium text-status-running">
                   Working
                 </span>
               ) : (
-                <span className="text-[11px] text-muted-foreground">
-                  Just now
-                </span>
+                <span className="text-2xs text-muted-foreground">Just now</span>
               )}
             </div>
             <p className="mt-2 leading-relaxed">
@@ -617,7 +615,7 @@ function MotionBench() {
               Review the payments retry PR
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <p className="pt-2 pl-6 text-[13px] text-muted-foreground">
+              <p className="pt-2 pl-6 text-body text-muted-foreground">
                 mina asked for a review of the retry change before Thursday. The
                 thread settled on 5 retries with a backoff.
               </p>
@@ -690,7 +688,7 @@ function MotionBench() {
               <DialogTitle className="text-base font-semibold">
                 Where should the session open?
               </DialogTitle>
-              <DialogDescription className="text-[13px] text-muted-foreground">
+              <DialogDescription className="text-body text-muted-foreground">
                 It lifts in and sinks back out.
               </DialogDescription>
               <div className="flex justify-end">
@@ -706,7 +704,7 @@ function MotionBench() {
                 <DialogTitle className="text-sm font-semibold">
                   Session log
                 </DialogTitle>
-                <DialogDescription className="text-[13px] text-muted-foreground">
+                <DialogDescription className="text-body text-muted-foreground">
                   It slides in and goes at once.
                 </DialogDescription>
               </DialogContent>
@@ -750,7 +748,7 @@ function Bench({
 }) {
   return (
     <div>
-      <h3 className="text-[13px] font-semibold">{title}</h3>
+      <h3 className="text-body font-semibold">{title}</h3>
       <p className="mb-3 text-xs text-muted-foreground">{note}</p>
       {children}
     </div>

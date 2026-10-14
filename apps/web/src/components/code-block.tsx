@@ -49,7 +49,7 @@ export function CodeBlock({
       )}
     >
       {label && (
-        <div className="flex h-7 items-center border-b border-card px-3 text-[11px] font-medium text-muted-foreground">
+        <div className="flex h-7 items-center border-b border-card px-3 text-2xs font-medium text-muted-foreground">
           {label}
         </div>
       )}

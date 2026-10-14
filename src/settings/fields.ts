@@ -1,4 +1,5 @@
 import type { MessengerId } from '../messengers/ids.js'
+import { systemTimeZone } from '../messengers/text.js'
 
 /**
  * Config file (.env, ~/.pacenote/.env outside the repository) entries handled
@@ -392,9 +393,9 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'TIMEZONE',
     group: 'requests',
     label: 'Time zone',
-    help: 'Used to show times in thread context.',
+    help: "Used to show times in thread context. Left empty, it is this Mac's time zone.",
     type: 'text',
-    default: 'Asia/Seoul',
+    default: systemTimeZone(),
   },
   {
     key: 'MENTION_WORKSPACE',

@@ -10,7 +10,7 @@ import {
   formatRelative,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { StatusDot } from './status'
+import { StatusMark } from './status'
 
 const KINDS: { value?: RunKind; label: string }[] = [
   { label: 'All' },
@@ -101,7 +101,7 @@ export function RunList({
         <div className="px-2 pb-3">
           {groupByDay(runs.data ?? []).map((group) => (
             <section key={group.day} className="mt-2 first:mt-0">
-              <h3 className="px-3 pt-1.5 pb-1 text-[11px] font-medium text-muted-foreground">
+              <h3 className="px-3 pt-1.5 pb-1 text-2xs font-medium text-muted-foreground">
                 {group.day}
               </h3>
               <div className="space-y-0.5">
@@ -167,14 +167,14 @@ function RunListItem({
         selected ? 'bg-selected' : 'hover:bg-selected/50'
       )}
     >
-      <StatusDot status={run.status} className="mt-[7px]" />
+      <StatusMark status={run.status} className="mt-0.5" />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 text-[13px] leading-snug font-medium">
+        <span className="line-clamp-2 text-body leading-snug font-medium">
           {run.request || (
             <span className="text-muted-foreground">(empty request)</span>
           )}
         </span>
-        <span className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground [&_svg]:size-3 [&_svg]:shrink-0">
+        <span className="mt-1.5 flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3 [&_svg]:shrink-0">
           {/* What it was: a mention from a channel, or a task collection */}
           {collection ? (
             <>

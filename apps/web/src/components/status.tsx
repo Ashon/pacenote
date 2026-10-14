@@ -42,7 +42,11 @@ export const STATUS_META: Record<
   },
 }
 
-export function StatusDot({
+/**
+ * A run's status in a list, told by its shape as well as its color: a quiet dot
+ * for succeeded, which most runs are, and the status's icon for the others
+ */
+export function StatusMark({
   status,
   className,
 }: {
@@ -51,16 +55,22 @@ export function StatusDot({
 }) {
   const meta = STATUS_META[status]
   return (
-    <span className={cn('relative flex size-2 shrink-0', className)}>
-      {status === 'running' && (
-        <span
-          className={cn(
-            'absolute inset-0 rounded-full opacity-60 animate-ping',
-            meta.dot
-          )}
+    <span
+      className={cn(
+        'flex size-3.5 shrink-0 items-center justify-center',
+        meta.text,
+        className
+      )}
+    >
+      {status === 'succeeded' ? (
+        <span className={cn('size-2 rounded-full', meta.dot)} />
+      ) : (
+        <meta.Icon
+          aria-hidden
+          className={cn('size-3.5', status === 'running' && 'animate-spin')}
         />
       )}
-      <span className={cn('relative size-2 rounded-full', meta.dot)} />
+      <span className="sr-only">{meta.label}</span>
     </span>
   )
 }

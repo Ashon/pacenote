@@ -478,7 +478,7 @@ function RecentCollections({
           {formatTokens(total)} new
         </span>
       </div>
-      <ul className="mt-4 text-[13px]">
+      <ul className="mt-4 text-body">
         {collections.slice(0, RECENT_SHOWN).map((entry, index) => (
           <li key={entry.startedAt} className="border-t border-border">
             <CollectionRow entry={entry}>

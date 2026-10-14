@@ -429,7 +429,7 @@ function DayBars({
           className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
           title={day.title}
         >
-          <span className="text-[10px] text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="text-2xs text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
             {day.hover}
           </span>
           <div className="relative flex w-2 flex-1 flex-col justify-end overflow-hidden rounded-full bg-well">
@@ -456,7 +456,7 @@ function DayBars({
           </div>
           <span
             className={cn(
-              'text-[10px] text-muted-foreground tabular-nums',
+              'text-2xs text-muted-foreground tabular-nums',
               (days.length - 1 - index) % 2 === 1 &&
                 '@max-[16rem]/bars:invisible'
             )}

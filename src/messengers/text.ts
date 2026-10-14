@@ -64,6 +64,21 @@ export function chunkText(text: string, limit: number): string[] {
   return chunks.length > 0 ? chunks : ['']
 }
 
+/** This Mac's time zone ("Asia/Seoul"), which times are shown in by default */
+export function systemTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+/** Whether Intl knows the time zone name ("Asia/Seoul", "UTC") */
+export function isTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: name })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function formatTime(ms: number, timezone: string): string {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,

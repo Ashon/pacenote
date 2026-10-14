@@ -455,13 +455,13 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
               >
                 <span className="font-mono select-text">{domain}</span>
                 {isRequired && (
-                  <span className="flex items-center gap-1 rounded bg-muted px-1.5 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1 rounded bg-muted px-1.5 text-2xs text-muted-foreground">
                     <Lock className="size-2.5" />
                     Needed by reasoner CLI
                   </span>
                 )}
                 {!saved.includes(domain) && (
-                  <span className="text-[10px] text-primary">Added</span>
+                  <span className="text-2xs text-primary">Added</span>
                 )}
                 {issue && (
                   <span className="text-status-failed">{issue.message}</span>
@@ -596,7 +596,7 @@ function JobOutput({
         className="rounded-lg bg-well"
         viewportClassName="max-h-64"
       >
-        <pre className="select-text px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words">
+        <pre className="select-text px-3 py-2 font-mono text-2xs leading-relaxed whitespace-pre-wrap break-words">
           {job.output.join('\n')}
         </pre>
       </ScrollArea>

@@ -375,7 +375,7 @@ function Info({
   return (
     // One figure in a row split by hairlines, not a card of its own
     <div className="min-w-0 px-5 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[44rem]:[&:nth-child(3)]:border-l-0 @max-[44rem]:[&:nth-child(3)]:pl-0">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground [&_svg]:size-3.5">
+      <div className="flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3.5">
         {icon}
         {label}
       </div>
@@ -386,7 +386,7 @@ function Info({
 
 function Sub({ children }: { children?: React.ReactNode }) {
   return children ? (
-    <div className="truncate text-[11px] font-normal text-muted-foreground">
+    <div className="truncate text-2xs font-normal text-muted-foreground">
       {children}
     </div>
   ) : null
@@ -506,7 +506,7 @@ function LogPanel() {
         }}
         className="min-h-0 flex-1"
       >
-        <div className="px-10 py-2 font-mono text-[11.5px] leading-[1.6] select-text">
+        <div className="px-10 py-2 font-mono text-2xs leading-[1.6] select-text">
           <div className="mx-auto max-w-5xl">
             {lines.map((line, i) => (
               <LogRow key={`${line.at}-${i}`} line={line} />

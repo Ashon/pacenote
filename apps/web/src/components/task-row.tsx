@@ -299,7 +299,7 @@ export function TaskRow({
               <button
                 type="button"
                 data-task-title
-                className="group -ml-6 flex items-start gap-2 rounded-sm text-left text-[14.5px] leading-snug font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="group -ml-6 flex items-start gap-2 rounded-sm text-left text-sm leading-snug font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <ChevronRight
                   aria-hidden="true"
@@ -618,7 +618,7 @@ function TaskOpen({
     <div className="flex flex-col gap-2 pt-2.5 pl-6">
       <div className="flex flex-col gap-0.5 rounded-xl bg-well px-3.5 py-3">
         {summary && (
-          <p className="mb-1.5 max-w-[44rem] text-[13.5px] leading-relaxed select-text">
+          <p className="mb-1.5 max-w-[44rem] text-body leading-relaxed select-text">
             {summary}
           </p>
         )}
@@ -714,7 +714,7 @@ function TaskOpen({
         {showReply && (
           <div className="mt-2 flex flex-col gap-1.5 border-t border-border pt-2.5">
             {drafting ? (
-              <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+              <p className="flex items-center gap-2 text-body text-muted-foreground">
                 <PaceSpinner active className="size-6" />
                 <span className="text-shimmer">
                   Reading the thread, read only, to draft your reply.
@@ -737,7 +737,7 @@ function TaskOpen({
                   value={replyText}
                   onChange={(event) => onReply(event.target.value)}
                   rows={4}
-                  className="w-full resize-y rounded-[10px] border border-input bg-background px-3 py-2.5 text-[13.5px] leading-relaxed outline-none select-text focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                  className="w-full resize-y rounded-[10px] border border-input bg-background px-3 py-2.5 text-body leading-relaxed outline-none select-text focus-visible:ring-[3px] focus-visible:ring-ring/40"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Button
@@ -764,13 +764,13 @@ function TaskOpen({
 
       {waiting && (
         <div className="flex flex-col gap-2 rounded-xl bg-card-accent px-3.5 py-3">
-          <p className="flex items-center gap-2 text-[13.5px] font-semibold">
+          <p className="flex items-center gap-2 text-body font-semibold">
             <PaceSpinner className="size-5" />
             {task.askedBy
               ? `${task.askedBy} is still waiting in the thread`
               : 'A reply is waiting to be sent'}
           </p>
-          <p className="text-[13px] text-foreground/80 select-text">
+          <p className="text-body text-foreground/80 select-text">
             The session drafted a reply for you: &ldquo;{waiting}&rdquo;
           </p>
           <div className="flex gap-1.5">
@@ -798,7 +798,7 @@ function Line({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
+    <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-3 text-body">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1">
         {children}
@@ -986,7 +986,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
             ? `Where is ${task.repo} on this Mac?`
             : 'Where should the session open?'}
         </DialogTitle>
-        <DialogDescription className="text-[13px] text-muted-foreground">
+        <DialogDescription className="text-body text-muted-foreground">
           {TOOL[tool]} opens in this folder with the task.
           {task.repo
             ? ' Pacenote remembers it for this repository; change it in Settings > Todo.'
@@ -999,14 +999,14 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
         className="flex flex-col gap-2"
       >
         {found === undefined && (
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             {task.repo
               ? `Looking for ${task.repo} on this Mac.`
               : 'Looking for the folders you worked in.'}
           </p>
         )}
         {found?.length === 0 && task.repo && (
-          <p className="text-[13px] text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             No checkout of {task.repo} found under your usual folders.
           </p>
         )}
@@ -1037,7 +1037,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
               )}
             </span>
             <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-mono text-[13px] font-semibold break-all">
+              <span className="font-mono text-body font-semibold break-all">
                 {folder.path}
               </span>
               <span className="text-xs text-muted-foreground">
@@ -1235,7 +1235,7 @@ function SessionLogPanel({
                       item.role === 'tool' ? (
                         <li
                           key={index}
-                          className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px]"
+                          className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-xs"
                         >
                           <span className="shrink-0 font-mono font-medium">
                             {item.name}
@@ -1268,12 +1268,12 @@ function SessionLogPanel({
                             <p className="text-sm font-semibold">
                               {item.role === 'user' ? 'You' : tool}
                               {item.at && (
-                                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                                <span className="ml-2 text-2xs font-normal text-muted-foreground">
                                   {formatDateTime(item.at)}
                                 </span>
                               )}
                             </p>
-                            <p className="mt-1 text-[13.5px] leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
+                            <p className="mt-1 text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
                               {item.text}
                             </p>
                           </div>

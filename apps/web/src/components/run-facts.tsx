@@ -28,13 +28,13 @@ export function Fact({
   )
   return (
     <div className="min-w-0 px-4 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[40rem]:[&:nth-child(3)]:border-l-0 @max-[40rem]:[&:nth-child(3)]:pl-0">
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+      <div className="flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
         {icon}
         <span className="truncate">{label}</span>
       </div>
       {tip ? <Tooltip content={tip}>{shown}</Tooltip> : shown}
       {hint && (
-        <div className="truncate text-[11px] text-muted-foreground">{hint}</div>
+        <div className="truncate text-2xs text-muted-foreground">{hint}</div>
       )}
     </div>
   )
