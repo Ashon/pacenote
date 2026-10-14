@@ -33,22 +33,53 @@ function service(backend: string): string {
   return backend.charAt(0).toUpperCase() + backend.slice(1)
 }
 
-/** What the asker reads in the conversation */
-export function failureReply(cause: FailureCause, backend: string): string {
+/** "15 minutes", "90 seconds" */
+function duration(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 120) return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`
+  const minutes = Math.round(seconds / 60)
+  return `${minutes} minutes`
+}
+
+export interface FailureReplyOptions {
+  /**
+   * The asker runs this Pace (the team hub routes each member's mentions to
+   * their own Mac), so what to fix is theirs
+   */
+  own?: boolean
+  /** How long a run may take (REASONER_TIMEOUT_SEC), said on a timeout */
+  timeoutMs?: number
+}
+
+/**
+ * What the asker reads, in a message for them alone: what the failure means
+ * and who fixes it, never the error.
+ */
+export function failureReply(
+  cause: FailureCause,
+  backend: string,
+  { own = false, timeoutMs }: FailureReplyOptions = {}
+): string {
   const name = service(backend)
   switch (cause) {
     case 'auth':
-      return `I couldn't produce an answer: my sign-in to ${name} was rejected. Whoever runs Pace needs to sign in again in Pacenote.`
+      return own
+        ? `I couldn't produce an answer: my sign-in to ${name} on your Mac was rejected. Sign in again; Pacenote shows how.`
+        : `I couldn't produce an answer: my sign-in to ${name} was rejected. Whoever runs Pace needs to sign in again; Pacenote shows them how.`
     case 'limit':
       return `I couldn't produce an answer: I've reached my ${name} usage limit for now. Please try again later.`
     case 'unavailable':
       return `I couldn't produce an answer: ${name} is unavailable right now. Please try again in a few minutes.`
     case 'setup':
-      return "I couldn't produce an answer: something in my setup isn't working. Whoever runs Pace can see what in Pacenote."
+      return own
+        ? "I couldn't produce an answer: something in my setup on your Mac isn't working. Pacenote shows what."
+        : "I couldn't produce an answer: something in my setup isn't working. Whoever runs Pace can see what in Pacenote."
     case 'timeout':
-      return "I couldn't produce an answer: the request took too long. A narrower question may help."
+      return `I couldn't produce an answer: the request took ${timeoutMs ? `longer than ${duration(timeoutMs)}` : 'too long'}. A narrower question may help.`
     case 'other':
-      return "I couldn't produce an answer. An error occurred while processing the request."
+      return own
+        ? "I couldn't produce an answer: something went wrong on my side. Pacenote on your Mac shows what."
+        : "I couldn't produce an answer: something went wrong on my side. Whoever runs Pace can see what in Pacenote."
   }
 }
 

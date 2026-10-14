@@ -217,6 +217,7 @@ async function main(): Promise<void> {
     inflight: new InflightStore(path.join(config.dataDir, 'inflight.json')),
     history,
     secrets: secretValues(process.env),
+    ownMentions: config.slack.kind === 'hub',
     onActivity: (requests) => status.update({ requests }),
     onReasoner: (problem) => {
       // An answer that went through settles what the check said before.

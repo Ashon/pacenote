@@ -430,10 +430,19 @@ export class FakeSlack {
           },
         })
       }
-      case 'conversations.replies':
+      case 'conversations.replies': {
+        // From the oldest, a page at a time, as Slack does
+        const all = this.thread(args.channel ?? '', args.ts ?? '')
+        const start = Number(args.cursor || 0)
+        const end = start + Number(args.limit ?? 1000)
         return ok({
-          messages: this.thread(args.channel ?? '', args.ts ?? '').map(wire),
+          messages: all.slice(start, end).map(wire),
+          has_more: end < all.length,
+          response_metadata: {
+            next_cursor: end < all.length ? String(end) : '',
+          },
         })
+      }
       case 'conversations.history': {
         const latest = Number(args.latest ?? Infinity)
         const limit = Number(args.limit ?? 100)

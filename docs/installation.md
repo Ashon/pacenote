@@ -72,9 +72,9 @@ count, even once another process has its pid: a process that started after the b
 
 Restart handling:
 
-- Mentions are recorded in `PACENOTE_DATA_DIR/inflight.json` and get 👀 as soon as they are taken on, also while they wait their
-  turn. After a restart the bot resumes each one once; the 👀 stays on the mention meanwhile (without `reactions:write`, the
-  asker alone is told "I restarted, so I'm picking this up again...").
+- Mentions are recorded in `PACENOTE_DATA_DIR/inflight.json` and get a reaction as soon as they are taken on: 📥 while
+  they wait their turn, 👀 once they start. After a restart the bot resumes each one once; the 👀 stays on the mention
+  meanwhile (without `reactions:write`, the asker alone is told "I restarted, so I'm picking this up again...").
   Requests already resumed once or older than 30 minutes get ⚠️, and the asker alone is told "I couldn't finish this: I
   restarted and the request was cut off. Please mention me again."
 - An answer is never posted twice: once posting has begun, a restart does not answer again. If it came partway through, the

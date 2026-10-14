@@ -1,10 +1,13 @@
+import type { WebClient } from '@slack/web-api'
 import { describe, expect, it } from 'vitest'
+import { createLogger } from '../src/logger.js'
 import { ConcurrencyLimiter } from '../src/mention/limiter.js'
 import { systemPrompt, userPrompt } from '../src/mention/prompt.js'
 import { isAllowedUser } from '../src/mention/responder.js'
+import type { Directory } from '../src/messengers/slack/directory.js'
 import { stripBotMention } from '../src/messengers/slack/format.js'
 import { SlackMessenger } from '../src/messengers/slack/messenger.js'
-import type { MessengerProfile } from '../src/messengers/types.js'
+import type { Mention, MessengerProfile } from '../src/messengers/types.js'
 
 const slack: MessengerProfile = {
   name: 'Slack',
@@ -58,6 +61,67 @@ describe('SlackMessenger.mention', () => {
     expect(
       SlackMessenger.mention({ ...event, user_team: 'T2' })?.external
     ).toBeUndefined()
+  })
+})
+
+describe('SlackMessenger.context', () => {
+  /** n replies under their parent, which Slack pages from the oldest */
+  function thread(n: number) {
+    const messages = Array.from({ length: n + 1 }, (_, i) => ({
+      ts: `${1000 + i}.000000`,
+      user: 'U1',
+      text: i === 0 ? 'the parent' : `reply ${i}`,
+    }))
+    const calls: { cursor?: string; limit?: number }[] = []
+    const client = {
+      conversations: {
+        replies: async (args: { cursor?: string; limit?: number }) => {
+          calls.push(args)
+          const start = Number(args.cursor ?? 0)
+          const end = start + (args.limit ?? 1000)
+          return {
+            messages: messages.slice(start, end),
+            has_more: end < messages.length,
+            response_metadata: {
+              next_cursor: end < messages.length ? String(end) : '',
+            },
+          }
+        },
+      },
+    } as unknown as WebClient
+    const directory = {
+      userNames: async () => new Map([['U1', 'alice']]),
+    } as unknown as Directory
+    return {
+      calls,
+      messenger: new SlackMessenger({
+        client,
+        directory,
+        botUserId: 'UBOT',
+        files: { token: 'xoxb-1' },
+        allowedUsers: [],
+        log: createLogger('error'),
+      }),
+    }
+  }
+  const mention = (n: number): Mention => ({
+    messenger: 'slack',
+    conversation: 'C1',
+    message: `${1000 + n + 1}.000000`,
+    thread: '1000.000000',
+    inThread: true,
+    userId: 'U1',
+    text: '<@UBOT> sum it up',
+    files: [],
+  })
+
+  it('reads a long thread to its end, so the latest replies are there', async () => {
+    const { messenger, calls } = thread(450)
+    const context = await messenger.context(mention(450), [])
+    expect(context[0]?.text).toBe('the parent')
+    expect(context.at(-1)?.text).toBe('reply 450')
+    expect(context).toHaveLength(451)
+    expect(calls.length).toBeGreaterThan(1)
   })
 })
 

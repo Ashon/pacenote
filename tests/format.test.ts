@@ -22,6 +22,32 @@ describe('chunkText', () => {
   it('returns one chunk even for empty text', () => {
     expect(chunkText('', 10)).toEqual([''])
   })
+
+  it('closes a code block where it splits and opens it again in the next message', () => {
+    const text = ['Intro', '```ts', 'one', 'two', 'three', '```', 'After'].join(
+      '\n'
+    )
+    expect(chunkText(text, 20)).toEqual([
+      'Intro\n```ts\none\n```',
+      '```ts\ntwo\nthree\n```',
+      'After',
+    ])
+  })
+
+  it('keeps each piece of a line too long for one message inside its code block', () => {
+    const text = ['```', 'x'.repeat(30), '```'].join('\n')
+    const chunks = chunkText(text, 20)
+    expect(chunks).toEqual([
+      `\`\`\`\n${'x'.repeat(12)}\n\`\`\``,
+      `\`\`\`\n${'x'.repeat(12)}\n\`\`\``,
+      `\`\`\`\n${'x'.repeat(6)}\n\`\`\``,
+    ])
+    for (const chunk of chunks) expect(chunk.length).toBeLessThanOrEqual(20)
+  })
+
+  it('closes a code block the text leaves open', () => {
+    expect(chunkText('Run:\n```\nls', 100)).toEqual(['Run:\n```\nls\n```'])
+  })
 })
 
 describe('toSlackMrkdwn', () => {

@@ -40,14 +40,38 @@ describe('why a reasoner run failed', () => {
       expect([error, failureCause(error)]).toEqual([error, cause])
   })
 
-  it('tells the asker what it means, never the error', () => {
+  it('tells the conversation what it means and who fixes it, never the error', () => {
     expect(failureReply('auth', 'claude')).toBe(
-      "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again in Pacenote."
+      "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again; Pacenote shows them how."
     )
     expect(failureReply('limit', 'codex')).toContain('Codex usage limit')
     expect(failureReply('other', 'claude')).toBe(
-      "I couldn't produce an answer. An error occurred while processing the request."
+      "I couldn't produce an answer: something went wrong on my side. Whoever runs Pace can see what in Pacenote."
     )
+    expect(failureReply('timeout', 'claude', { timeoutMs: 900_000 })).toBe(
+      "I couldn't produce an answer: the request took longer than 15 minutes. A narrower question may help."
+    )
+    expect(failureReply('timeout', 'claude', { timeoutMs: 90_000 })).toContain(
+      'longer than 90 seconds'
+    )
+  })
+
+  it('tells an asker who runs Pace on their own Mac (the team hub) to fix it', () => {
+    expect(failureReply('auth', 'claude', { own: true })).toBe(
+      "I couldn't produce an answer: my sign-in to Claude on your Mac was rejected. Sign in again; Pacenote shows how."
+    )
+    expect(failureReply('setup', 'codex', { own: true })).toContain(
+      'on your Mac'
+    )
+    expect(failureReply('other', 'codex', { own: true })).toContain(
+      'Pacenote on your Mac shows what'
+    )
+    for (const reply of [
+      failureReply('auth', 'claude', { own: true }),
+      failureReply('setup', 'claude', { own: true }),
+      failureReply('other', 'claude', { own: true }),
+    ])
+      expect(reply).not.toContain('Whoever runs Pace')
   })
 
   it('tells the operator what to fix, and where', () => {

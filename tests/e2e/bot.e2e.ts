@@ -163,6 +163,109 @@ describe('bot on its own Slack app', () => {
     for (const n of [1, 2, 3]) expect(text).toContain(`Section ${n}:`)
   })
 
+  it('keeps a code block split over several messages a code block in each', async () => {
+    const code = Array.from(
+      { length: 200 },
+      (_, i) => `kubectl get pods -n team-${i} -o wide`
+    )
+    world = await World.create([
+      {
+        match: 'pods',
+        answer: ['The commands:', '```bash', ...code, '```', 'Done.'].join(
+          '\n'
+        ),
+      },
+    ])
+    const { slack, ops, alice } = world
+    await world.startBot()
+
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> list the pods commands`,
+    })
+    const replies = await world.answered(ops.id, ts, 3)
+    for (const { text } of replies) {
+      expect(text.length).toBeLessThanOrEqual(3500)
+      // Every message opens and closes what it has of the block.
+      expect((text.match(/^```/gm) ?? []).length % 2).toBe(0)
+    }
+    const posted = replies.map((reply) => reply.text).join('\n')
+    for (const line of [code[0]!, code[120]!, code.at(-1)!])
+      expect(posted).toContain(line)
+    expect(replies.at(-1)!.text).toMatch(/Done\.$/)
+  })
+
+  it('reads a long thread to its end, passing its first message and the latest', async () => {
+    world = await World.create([{ match: 'sum up', answer: 'Summed up.' }])
+    const { slack, ops, alice, bob } = world
+    const root = slack.post(ops.id, {
+      user: bob.id,
+      text: 'Incident: the payments API is down',
+    })
+    for (let i = 1; i <= 250; i++)
+      slack.post(ops.id, {
+        user: i % 2 ? alice.id : bob.id,
+        text: `update ${i}`,
+        thread_ts: root,
+      })
+    await world.startBot()
+
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> sum up`,
+      thread_ts: root,
+    })
+    await world.answered(ops.id, root)
+    const [call] = world.claudeCalls()
+    expect(call!.prompt).toContain('Incident: the payments API is down')
+    // 251 before the mention: the first, then 221 left out, then the latest 29
+    expect(call!.prompt).toContain('(221 messages left out here)')
+    expect(call!.prompt).not.toContain('update 221\n')
+    expect(call!.prompt).toContain('update 222\n')
+    expect(call!.prompt).toContain('update 250\n')
+    expect(slack.callsTo('conversations.replies').length).toBeGreaterThan(1)
+  })
+
+  it('shows a mention waiting its turn with 📥 until it starts', async () => {
+    world = await World.create([
+      { match: 'first', answer: 'First.', delayMs: 1_500 },
+      { match: 'second', answer: 'Second.' },
+    ])
+    const { slack, ops, alice } = world
+    await world.startBot({ MENTION_CONCURRENCY: '1' })
+
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> first`,
+    })
+    await eventually(
+      'the reasoner to start',
+      () => world!.claudeCalls().length === 1
+    )
+    const second = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> second`,
+    })
+    await eventually(
+      'the waiting mark',
+      () => slack.message(ops.id, second)?.reactions?.join() === 'inbox_tray'
+    )
+    await world.answered(ops.id, second)
+    const marks = slack
+      .callsTo('reactions.add')
+      .filter((call) => call.args.timestamp === second)
+      .map((call) => call.args.name)
+    expect(marks).toEqual(['inbox_tray', 'eyes'])
+    await eventually(
+      'the reactions to come off',
+      () => slack.message(ops.id, second)?.reactions?.length === 0
+    )
+  })
+
   it("records the reasoner's tool steps in the run history", async () => {
     world = await World.create([
       {

@@ -145,6 +145,52 @@ describe('team hub', () => {
     })
   })
 
+  it('reads a long thread through the hub, and tells only the member what to fix when their Mac fails', async () => {
+    world = await World.create([
+      { match: 'sum up', answer: 'Summed up.' },
+      { match: 'boom', fail: 'something odd happened' },
+    ])
+    const { slack, ops, alice, bob } = world
+    const root = slack.post(ops.id, { user: bob.id, text: 'Release 4.2 plan' })
+    for (let i = 1; i <= 250; i++)
+      slack.post(ops.id, { user: bob.id, text: `step ${i}`, thread_ts: root })
+    const { url } = await withHub(world)
+    const token = await pair(world, url, alice.id)
+    const desktop = world.track(startBot(desktopEnv(world, url, token)))
+    await desktop.waitFor(/Started: /)
+    await eventually("the desktop's hub connection", async () =>
+      (await new HubClient(url).me(token)).connected ? true : undefined
+    )
+
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> sum up`,
+      thread_ts: root,
+    })
+    await world.answered(ops.id, root)
+    // The hub lets the next pages through: the latest step is there.
+    const [call] = world.claudeCalls()
+    expect(call!.prompt).toContain('Release 4.2 plan')
+    expect(call!.prompt).toContain('step 250\n')
+
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> boom`,
+      thread_ts: root,
+    })
+    // Only the member hears why, told to look on their own Mac.
+    const notice = await eventually('the failure notice', () =>
+      slack.ephemerals.find((e) => e.text.startsWith("I couldn't produce"))
+    )
+    expect(notice).toMatchObject({
+      user: alice.id,
+      text: "I couldn't produce an answer: something went wrong on my side. Pacenote on your Mac shows what.",
+    })
+    expect(slack.replies(ops.id, root)).toHaveLength(1)
+  })
+
   it('tells a member whose desktop is not paired', async () => {
     world = await World.create()
     const { url } = await withHub(world)

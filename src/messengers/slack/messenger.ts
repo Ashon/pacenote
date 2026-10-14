@@ -33,12 +33,15 @@ import {
 
 /** Messages before a mention outside a thread, for context */
 const ROOT_CONTEXT_MESSAGES = 10
-/** Thread replies read for context */
-const THREAD_CONTEXT_MESSAGES = 100
+/** Thread messages read per call, as many as Slack recommends */
+const THREAD_PAGE = 200
+/** Calls at most for one thread; a longer thread is read only this far */
+const MAX_THREAD_PAGES = 25
 /** Files looked up again with files.info per request */
 const MAX_FILE_LOOKUPS = 10
 /** The reactions Pace puts on a mention while it works on it */
 const REACTIONS: Record<Mark, string> = {
+  waiting: 'inbox_tray',
   working: 'eyes',
   slow: 'hourglass_flowing_sand',
   failed: 'warning',
@@ -161,19 +164,17 @@ export class SlackMessenger implements Messenger {
   ): Promise<ContextMessage[]> {
     const { client, directory, log } = this.options
     try {
-      const res = mention.inThread
-        ? await client.conversations.replies({
-            channel: mention.conversation,
-            ts: mention.thread,
-            limit: THREAD_CONTEXT_MESSAGES,
-          })
-        : await client.conversations.history({
-            channel: mention.conversation,
-            latest: mention.message,
-            inclusive: false,
-            limit: ROOT_CONTEXT_MESSAGES,
-          })
-      const messages = (res.messages ?? [])
+      const found = mention.inThread
+        ? await this.thread(mention)
+        : ((
+            await client.conversations.history({
+              channel: mention.conversation,
+              latest: mention.message,
+              inclusive: false,
+              limit: ROOT_CONTEXT_MESSAGES,
+            })
+          ).messages ?? [])
+      const messages = found
         .filter(
           (m) => m.ts && !exclude.includes(m.ts) && (m.text || m.files?.length)
         )
@@ -195,6 +196,31 @@ export class SlackMessenger implements Messenger {
       log.warn(`Failed to load conversation context: ${(err as Error).message}`)
       return []
     }
+  }
+
+  /**
+   * All of a thread's messages. Slack returns them from the oldest, a page at a
+   * time, so the latest come only once it is read to the end.
+   */
+  private async thread(mention: Mention): Promise<SlackMessage[]> {
+    const { client, log } = this.options
+    const messages: SlackMessage[] = []
+    let cursor: string | undefined
+    for (let page = 0; page < MAX_THREAD_PAGES; page++) {
+      const res = await client.conversations.replies({
+        channel: mention.conversation,
+        ts: mention.thread,
+        limit: THREAD_PAGE,
+        ...(cursor ? { cursor } : {}),
+      })
+      messages.push(...(res.messages ?? []))
+      cursor = res.response_metadata?.next_cursor
+      if (!cursor) return messages
+    }
+    log.warn(
+      `Read only the first ${messages.length} messages of a longer thread; its latest are left out.`
+    )
+    return messages
   }
 
   /**
@@ -367,6 +393,11 @@ export class SlackMessenger implements Messenger {
     return `@${names.get(userId) ?? userId}${bot}`
   }
 }
+
+/** A message as conversations.replies and conversations.history return it */
+type SlackMessage = NonNullable<
+  Awaited<ReturnType<WebClient['conversations']['replies']>>['messages']
+>[number]
 
 /** The error code of a failed Web API call (missing_scope), or its message */
 function slackError(err: unknown): string {

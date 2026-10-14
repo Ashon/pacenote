@@ -6,22 +6,24 @@ What happens between a mention and its answer: context, attachments, diagrams an
 @bot mention in a public channel
   -> messenger adapter (Slack: Bolt, Socket Mode or the team hub, app_mention event) -> Mention
   -> check allowed users / public channel
-  -> Pace reacts to the mention with 👀 (and ⏳ after 90 seconds)
-  -> collect thread context (the whole thread, or the last 10 messages outside a thread)
+  -> Pace reacts to the mention with 👀 (📥 first while it waits its turn, and ⏳ after 90 seconds of work)
+  -> collect context (in a thread its first message and the latest 29, or the last 10 messages outside a thread)
   -> Reasoner: claude -p or codex exec (a disposable VM when REASONER_SANDBOX=vm)
   -> post the answer as a new reply (long answers continue in more messages), and take the reactions off
 ```
 
-- The thread gets only answers. How Pace is doing shows as reactions on the mention (👀 working, ⏳ slow, ⚠️ failed),
-  and what only the asker needs goes to them in a message only they can see (ephemeral): why an answer failed, that Pace
-  is busy, that it is not allowed there. People talking in the thread are not interrupted, and the answer arrives as a
-  new reply at the bottom, which notifies them. (An edited message would not.)
+- The thread gets only answers. How Pace is doing shows as reactions on the mention (📥 waiting its turn, 👀 working,
+  ⏳ slow, ⚠️ failed), and what only the asker needs goes to them in a message only they can see (ephemeral): why an
+  answer failed, that Pace is busy, that it is not allowed there. People talking in the thread are not interrupted, and
+  the answer arrives as a new reply at the bottom, which notifies them. (An edited message would not.)
 - A Slack app without the `reactions:write` scope (created from an older manifest, or not approved in the workspace)
   works the same, except that only the asker sees that Pace is working ("Working on it...", for them alone) or failed.
   The Pace screen and Settings > Messengers > Slack > Check connection say the scope is missing; it is a limit, not a
   fault, so the status bar does not count it.
 
-- A mention inside a thread also passes the bot's earlier answers as context, so it continues from them.
+- A mention inside a thread also passes the bot's earlier answers as context, so it continues from them. The thread is
+  read to its end, however long; past 30 messages Pace passes its first message, which says what the thread is about,
+  and the latest 29, with a line saying how many are left out between them. Each message passes up to 1,500 characters.
 - On its own Slack app, the bot answers only the users in `MENTION_ALLOWED_USERS`, and does not start until it is set.
   `MENTION_ANYONE=on` answers anyone in the workspace instead, but not people from other organizations in a shared
   channel (Slack Connect). Anyone else gets a message only they can see (ephemeral): "I only answer specific people
@@ -34,8 +36,9 @@ What happens between a mention and its answer: context, attachments, diagrams an
   message only they can see, that it is busy.
 - On failure it puts ⚠️ on the mention and tells the asker alone "I couldn't produce an answer" with what that means,
   read from the reasoner's error (`src/mention/failure.ts`): its sign-in was rejected, it reached a usage limit, its
-  service was unavailable, something in the setup failed, or the request took too long. The error itself goes only to the
-  log and the run history, where the run also says what to fix and links to it. A rejected sign-in or a usage limit also shows in the
+  service was unavailable, something in the setup failed, or the request took longer than `REASONER_TIMEOUT_SEC`. It
+  says who fixes it: whoever runs Pace, or on the [team hub](team-hub.md) the asker, whose own Mac answered. The error
+  itself goes only to the log and the run history, where the run also says what to fix and links to it. A rejected sign-in or a usage limit also shows in the
   status bar's check issues until the reasoner answers again.
 
 ## Attachments

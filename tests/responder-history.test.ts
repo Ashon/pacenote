@@ -510,6 +510,81 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.marks).toEqual(['+working', '+failed', '-working'])
   })
 
+  it('says how long it allows when the run took too long', async () => {
+    const messenger = new MarkingMessenger()
+    messenger.render = (markdown: string) => [markdown]
+    const bot = responder(messenger, {
+      answer: async () => {
+        throw new Error('claude timed out (900s)')
+      },
+    })
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.notices).toEqual([
+      "I couldn't produce an answer: the request took longer than 15 minutes. A narrower question may help.",
+    ])
+  })
+
+  it('shows a mention waiting its turn with 📥, and counts the slow mark from when it starts', async () => {
+    const messenger = new MarkingMessenger()
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    let calls = 0
+    const bot = responder(messenger, {
+      concurrency: 1,
+      slowAfterMs: 50,
+      answer: async () => {
+        calls += 1
+        if (calls === 1) await held
+        return 'done'
+      },
+    })
+    await bot.handle(ask())
+    await bot.handle(ask())
+    expect(messenger.marks).toEqual(['+working', '+waiting'])
+    // The first takes long, the second only waits that long.
+    await vi.waitFor(() => expect(messenger.marks).toContain('+slow'))
+    await sleep(100)
+    release()
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.marks).toEqual([
+      '+working',
+      '+waiting',
+      '+slow',
+      '-working',
+      '-slow',
+      '+working',
+      '-waiting',
+      '-working',
+    ])
+  })
+
+  it('passes the first message and the latest of a long thread, saying how many are left out', async () => {
+    const messenger = new MarkingMessenger()
+    messenger.context = async () =>
+      Array.from({ length: 100 }, (_, i) => ({
+        id: `m${i}`,
+        at: i * 1000,
+        author: '@bob',
+        text: `message ${i}`,
+        files: [],
+      }))
+    let prompt = ''
+    const bot = responder(messenger, {
+      answer: async (request) => {
+        prompt = request.prompt
+        return 'done'
+      },
+    })
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    const thread = prompt.slice(0, prompt.indexOf('</thread>'))
+    expect(thread).toContain('@bob: message 0\n(70 messages left out here)\n')
+    expect(thread).not.toContain('message 70\n')
+    expect(thread).toContain('@bob: message 71\n')
+    expect(thread).toContain('@bob: message 99\n')
+  })
+
   it('tells only the asker it is working or failed when it cannot react', async () => {
     const messenger = new MarkingMessenger()
     messenger.canMark = false
@@ -586,7 +661,13 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
     expect(messenger.updates).toEqual([])
     // The 👀 from before the restart is still there; marking again is a no-op.
-    expect(messenger.marks).toEqual(['+working', '-working'])
+    // It starts over, so a 📥 or ⏳ it had goes.
+    expect(messenger.marks).toEqual([
+      '+working',
+      '-waiting',
+      '-slow',
+      '-working',
+    ])
     expect(inflight.list()).toEqual([])
   })
 
@@ -607,7 +688,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     const second = ask()
     await bot.handle(first)
     await bot.handle(second)
-    expect(messenger.marks).toEqual(['+working', '+working'])
+    expect(messenger.marks).toEqual(['+working', '+waiting'])
     // The first has started; the second waits, and a restart would pick it up.
     await vi.waitFor(() =>
       expect(inflight.list().map((e) => [e.key, e.attempts])).toEqual([
@@ -644,10 +725,11 @@ describe('marking a mention instead of posting a placeholder', () => {
       ).toMatchObject({ attempts: 1 })
     )
     expect(await bot.stop(50, 2_000)).toBe(true)
-    // Nothing failed: the 👀 stay, and the attempt cut off does not count.
+    // Nothing failed: the 👀 and 📥 stay, and the attempt cut off does not
+    // count.
     expect(messenger.posts).toEqual([])
     expect(messenger.notices).toEqual([])
-    expect(messenger.marks).toEqual(['+working', '+working'])
+    expect(messenger.marks).toEqual(['+working', '+waiting'])
     const attempts = () =>
       Object.fromEntries(inflight.list().map((e) => [e.key, e.attempts]))
     expect(attempts()).toEqual({
@@ -708,9 +790,11 @@ describe('marking a mention instead of posting a placeholder', () => {
       expect.stringMatching(/^I restarted while/),
     ])
     expect(messenger.marks).toEqual([
+      '-waiting',
       '-working',
       '-slow',
       '+failed',
+      '-waiting',
       '-working',
       '-slow',
     ])
@@ -736,7 +820,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(await bot.drain(5_000)).toBe(true)
     expect(messenger.posts).toEqual([])
     expect(messenger.notices).toEqual([
-      "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again in Pacenote.",
+      "I couldn't produce an answer: my sign-in to Claude was rejected. Whoever runs Pace needs to sign in again; Pacenote shows them how.",
     ])
     // The responder runs on the host here, so the advice is to sign in there.
     expect(problems).toEqual([

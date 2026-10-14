@@ -113,11 +113,11 @@ export interface Upload {
 }
 
 /**
- * A reaction the bot puts on a mention to show how it is doing: working (Slack:
- * 👀) from the start, slow (⏳) once it takes long, failed (⚠️) when it could
- * not answer
+ * A reaction the bot puts on a mention to show how it is doing: waiting (Slack:
+ * 📥) while requests ahead of it run, working (👀) once it starts, slow (⏳)
+ * once that takes long, failed (⚠️) when it could not answer
  */
-export type Mark = 'working' | 'slow' | 'failed'
+export type Mark = 'waiting' | 'working' | 'slow' | 'failed'
 
 /** How answers read in this messenger, for the system prompt */
 export interface MessengerProfile {

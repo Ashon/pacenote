@@ -43,8 +43,13 @@ import { recordAttachments, recordOutputs } from './run-record.js'
 const MAX_QUEUE = 10
 const CONTEXT_MESSAGES = 30
 const CONTEXT_MESSAGE_CHARS = 1_500
-/** How long before a marked mention also gets the slow mark (⏳) */
+/**
+ * How long after it starts working a marked mention also gets the slow mark
+ * (⏳)
+ */
 const SLOW_AFTER_MS = 90_000
+/** The marks that say a request is under way, taken off once it settles */
+const PROGRESS: readonly Mark[] = ['waiting', 'working', 'slow']
 
 export interface MentionResponderDeps {
   config: Config
@@ -73,6 +78,11 @@ export interface MentionResponderDeps {
   secrets?: readonly string[]
   /** When a mention gets the slow mark. Default SLOW_AFTER_MS (for tests) */
   slowAfterMs?: number
+  /**
+   * Each asker runs this Pace themselves: the team hub routes a member's
+   * mentions to their own Mac. A failure then tells them what to fix.
+   */
+  ownMentions?: boolean
   /**
    * Why the reasoner cannot answer, for the status: a failure that lasts until
    * fixed (a rejected sign-in, a usage limit), or undefined once it answers
@@ -109,6 +119,23 @@ export function isAllowedUser(
     : allowedUserIds.includes(mention.userId)
 }
 
+/**
+ * The context passed on: all of it when it is short, otherwise the first
+ * message, which starts a thread and says what it is about, and the latest.
+ * left: how many in between are left out.
+ */
+function recent(messages: readonly ContextMessage[]): {
+  context: ContextMessage[]
+  left: number
+} {
+  if (messages.length <= CONTEXT_MESSAGES)
+    return { context: [...messages], left: 0 }
+  return {
+    context: [messages[0]!, ...messages.slice(-(CONTEXT_MESSAGES - 1))],
+    left: messages.length - CONTEXT_MESSAGES,
+  }
+}
+
 /** How a request was taken on, which says what the asker is told */
 type Taking = 'now' | 'queued' | 'resumed'
 
@@ -124,9 +151,10 @@ interface Figure {
  * the bot. Everything messenger-specific goes through Messenger.
  *
  * The thread gets only answers, as new replies that notify. How Pace is doing
- * shows as reactions on the mention (👀 working, ⏳ slow, ⚠️ failed), and what
- * only the asker needs (why it failed, that it is busy) goes to them alone. A
- * messenger that cannot react tells the asker it is working the same way.
+ * shows as reactions on the mention (📥 waiting its turn, 👀 working, ⏳ slow,
+ * ⚠️ failed), and what only the asker needs (why it failed, that it is busy)
+ * goes to them alone. A messenger that cannot react tells the asker it is
+ * working the same way.
  *
  * A mention is recorded (InflightStore) and marked as soon as it is taken on,
  * also while it waits its turn, so a restart picks it up again.
@@ -220,11 +248,8 @@ export class MentionResponder {
     }
     this.record(entry)
     // While shutting down, it is kept for the next start.
-    const taken = this.take(
-      messenger,
-      entry,
-      this.stopping || this.limiter.saturated ? 'queued' : 'now'
-    )
+    const waits = this.stopping || this.limiter.saturated
+    const taken = this.take(messenger, entry, waits ? 'queued' : 'now', waits)
     if (!this.stopping)
       this.limiter.tryRun(async () =>
         this.respond(messenger, entry, await taken)
@@ -233,14 +258,15 @@ export class MentionResponder {
   }
 
   /**
-   * Shows the asker the request is taken on: the working mark, or where the
-   * messenger cannot react, a notice. Returns whether it is marked.
+   * Shows the asker the request is taken on: the waiting or working mark, or
+   * where the messenger cannot react, a notice. Returns the mark it put.
    */
   private async take(
     messenger: Messenger,
     entry: InflightEntry,
-    taking: Taking
-  ): Promise<boolean> {
+    taking: Taking,
+    waits: boolean
+  ): Promise<Mark | undefined> {
     const { reasoner } = this.deps
     const { mention } = entry
     // A placeholder message an older version posted, cut off by the upgrade:
@@ -252,9 +278,14 @@ export class MentionResponder {
         entry.placeholder,
         'I restarted; the answer comes below.'
       )
+    const mark: Mark = waits ? 'waiting' : 'working'
     const marked = Boolean(
-      await messenger.mark?.(mention, 'working').catch(() => false)
+      await messenger.mark?.(mention, mark).catch(() => false)
     )
+    // Picked up again after a restart, it starts over: marks it had then go.
+    if (taking === 'resumed')
+      for (const stale of PROGRESS)
+        if (stale !== mark) await messenger.unmark?.(mention, stale)
     if (!marked) {
       const where = `\`${reasoner.backend}@${reasoner.sandbox}\``
       const text = {
@@ -266,7 +297,7 @@ export class MentionResponder {
         .notice(mention, messenger.render(text)[0] ?? '')
         .catch(() => undefined)
     }
-    return marked
+    return marked ? mark : undefined
   }
 
   /** Records a request so a restart picks it up again. */
@@ -283,12 +314,12 @@ export class MentionResponder {
   private async respond(
     messenger: Messenger,
     taken: InflightEntry,
-    marked: boolean
+    put: Mark | undefined
   ) {
     // Taken on while shutting down: it stays recorded for the next start.
     if (this.stopping) return
     const { config, reasoner, log } = this.deps
-    const { key, mention, label, startedAt } = taken
+    const { key, mention, label } = taken
     const where = `${reasoner.backend}@${reasoner.sandbox}`
     const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
     /** The request as recorded for a restart, kept up to date */
@@ -297,25 +328,27 @@ export class MentionResponder {
       entry = { ...entry, ...patch }
       this.record(entry)
     }
+    // Its turn came: the mention shows it working instead of waiting.
+    let working = put === 'working'
+    if (put === 'waiting') {
+      working = Boolean(
+        await messenger.mark?.(mention, 'working').catch(() => false)
+      )
+      await messenger.unmark?.(mention, 'waiting')
+    }
     // Marks to take off when done. The slow mark comes once the answer takes
-    // long, counted from when it was taken on, across a restart.
-    const marks: Mark[] = marked ? ['working'] : []
+    // long, counted from when it started working.
+    const marks: Mark[] = working ? ['working'] : []
     let slowing: Promise<void> | undefined
-    const slow = marked
-      ? setTimeout(
-          () => {
-            slowing = messenger
-              .mark?.(mention, 'slow')
-              .then((ok) => {
-                if (ok) marks.push('slow')
-              })
-              .catch(() => undefined)
-          },
-          Math.max(
-            0,
-            startedAt + (this.deps.slowAfterMs ?? SLOW_AFTER_MS) - Date.now()
-          )
-        )
+    const slow = working
+      ? setTimeout(() => {
+          slowing = messenger
+            .mark?.(mention, 'slow')
+            .then((ok) => {
+              if (ok) marks.push('slow')
+            })
+            .catch(() => undefined)
+        }, this.deps.slowAfterMs ?? SLOW_AFTER_MS)
       : undefined
     this.requests.active += 1
     this.requests.lastAt = new Date().toISOString()
@@ -337,9 +370,9 @@ export class MentionResponder {
         attempts: taken.attempts + 1,
         placeholder: undefined,
       })
-      const context = (
+      const { context, left } = recent(
         await messenger.context(mention, [mention.message])
-      ).slice(-CONTEXT_MESSAGES)
+      )
       run?.patch({ context: { messages: context.length } })
       const time = (at: number) => formatTime(at, config.timezone)
       const render = (line: ContextMessage) => {
@@ -348,6 +381,13 @@ export class MentionResponder {
           : ''
         return `${time(line.at)} ${line.author}: ${truncate(line.text, CONTEXT_MESSAGE_CHARS)}${files}`
       }
+      const lines = context.map(render)
+      if (left > 0)
+        lines.splice(
+          1,
+          0,
+          `(${left} ${left === 1 ? 'message' : 'messages'} left out here)`
+        )
 
       // Passes the request message attachments first, then recent attachments
       // in the thread.
@@ -384,7 +424,7 @@ export class MentionResponder {
 
       const prompt = userPrompt({
         venue: label,
-        context: context.map(render),
+        context: lines,
         author: request.author,
         request: request.text,
         attachments: attachmentSection(images, documents, unreadable),
@@ -499,7 +539,12 @@ export class MentionResponder {
       await this.fail(
         messenger,
         mention,
-        say(failureReply(cause, reasoner.backend))
+        say(
+          failureReply(cause, reasoner.backend, {
+            own: this.deps.ownMentions,
+            timeoutMs: config.reasoner.timeoutMs,
+          })
+        )
       )
     } finally {
       this.running.delete(cutOff)
@@ -615,7 +660,12 @@ export class MentionResponder {
           ? `Taking up ${entry.key}, which was waiting its turn`
           : `Resuming interrupted request ${entry.key} (attempt ${entry.attempts + 1})`
       )
-      const taken = this.take(messenger, entry, 'resumed')
+      const taken = this.take(
+        messenger,
+        entry,
+        'resumed',
+        this.limiter.saturated
+      )
       this.limiter.tryRun(async () =>
         this.respond(messenger, entry, await taken)
       )
@@ -738,8 +788,7 @@ export class MentionResponder {
     messenger: Messenger,
     mention: Mention
   ): Promise<void> {
-    for (const mark of ['working', 'slow'] as const)
-      await messenger.unmark?.(mention, mark)
+    for (const mark of PROGRESS) await messenger.unmark?.(mention, mark)
   }
 
   private async cleanupStaleAttachments(): Promise<void> {
