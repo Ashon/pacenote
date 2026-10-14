@@ -351,7 +351,7 @@ describe('a collection on screen', () => {
         'close_task',
         8,
         0.1,
-        '{"closed":{"id":"t0","title":"Share the draft","why":"replied"}}'
+        '{"closed":{"id":"t0","title":"Share the draft","why":"replied","wrapUp":"ana took the draft as is."}}'
       ),
       call(
         'g',
@@ -360,6 +360,14 @@ describe('a collection on screen', () => {
         9,
         0.1,
         '{"updated":{"id":"t9","title":"Review the PR","why":"due moved to Wednesday","changed":["due"]}}'
+      ),
+      call(
+        'h',
+        'pacenote',
+        'wrap_up_task',
+        10,
+        0.1,
+        '{"wrappedUp":{"id":"t8","title":"Fix the deploy check","wrapUp":"jun merged the fix; the check passes."}}'
       ),
     ])
     const groups = lookupGroups(record)
@@ -370,6 +378,7 @@ describe('a collection on screen', () => {
       ['Added tasks', 1],
       ['Closed a task', 1],
       ['Updated a task', 1],
+      ['Wrapped up a task', 1],
     ])
     expect(groups[1]).toMatchObject({
       offsetMs: 1000,
@@ -387,12 +396,27 @@ describe('a collection on screen', () => {
       'Look at the check',
     ])
     expect(result.closed).toEqual([
-      { id: 't0', title: 'Share the draft', why: 'replied' },
+      {
+        id: 't0',
+        title: 'Share the draft',
+        why: 'replied',
+        wrapUp: 'ana took the draft as is.',
+      },
     ])
     expect(result.updated).toEqual([
       { id: 't9', title: 'Review the PR', why: 'due moved to Wednesday' },
     ])
     expect(groups[5]!.note).toBe('Review the PR: due moved to Wednesday')
+    expect(result.wrapped).toEqual([
+      {
+        id: 't8',
+        title: 'Fix the deploy check',
+        wrapUp: 'jun merged the fix; the check passes.',
+      },
+    ])
+    expect(groups[6]!.note).toBe(
+      'Fix the deploy check: jun merged the fix; the check passes.'
+    )
     expect(result.skipped).toEqual([{ link: 'x', why: '#random is left out' }])
     expect(result.rules).toContain('leaveOut')
   })

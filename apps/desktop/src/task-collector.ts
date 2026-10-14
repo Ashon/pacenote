@@ -24,6 +24,7 @@ const TASK_TOOLS = [
   'add_tasks',
   'update_task',
   'close_task',
+  'wrap_up_task',
   'my_tasks',
 ].map((name) => `mcp__pacenote__${name}`)
 const ADD_TASKS = 'mcp__pacenote__add_tasks'

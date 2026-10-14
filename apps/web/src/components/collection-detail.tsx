@@ -7,6 +7,7 @@ import { newTokens, runUsage } from '@history/usage'
 import type { TaskStatus } from '@src/tasks/types'
 import {
   CircleCheck,
+  ClipboardCheck,
   Coins,
   Cpu,
   EyeOff,
@@ -170,15 +171,24 @@ const STATE: Record<TaskStatus, { label: string; className: string }> = {
   closed: { label: 'Closed', className: 'text-muted-foreground' },
 }
 
-/** What it added, updated, closed and left out, with where each task is now */
+/**
+ * What it added, updated, closed, wrapped up and left out, with where each
+ * task is now
+ */
 function Result({ run }: { run: CollectionRunRecord }) {
   const tasks = useTasks().data?.tasks ?? []
   const now = new Map(tasks.map((task) => [task.id, task.status]))
   if (run.status === 'running')
     return <Empty>Collecting: {run.reads ?? 0} lookups so far.</Empty>
   if (!run.found) return <Stopped run={run} />
-  const { added, closed, updated, skipped } = collectionResult(run)
-  if (!added.length && !closed.length && !updated.length && !skipped.length)
+  const { added, closed, updated, wrapped, skipped } = collectionResult(run)
+  if (
+    !added.length &&
+    !closed.length &&
+    !updated.length &&
+    !wrapped.length &&
+    !skipped.length
+  )
     return (
       <p className="text-sm text-muted-foreground">
         Nothing new to add, and no open task changed or closed.
@@ -220,7 +230,9 @@ function Result({ run }: { run: CollectionRunRecord }) {
               key={task.id}
               id={task.id}
               title={task.title}
-              meta={WHY[task.why] ?? task.why}
+              meta={[WHY[task.why] ?? task.why, task.wrapUp]
+                .filter(Boolean)
+                .join(' · ')}
               state={now.get(task.id)}
             />
           ))}
@@ -238,6 +250,23 @@ function Result({ run }: { run: CollectionRunRecord }) {
               id={task.id}
               title={task.title}
               meta={task.why}
+              state={now.get(task.id)}
+            />
+          ))}
+        </Section>
+      )}
+      {wrapped.length > 0 && (
+        <Section
+          icon={<ClipboardCheck className="text-chart-1" />}
+          title="Wrapped up"
+          meta={`${wrapped.length} ${wrapped.length === 1 ? 'task' : 'tasks'}`}
+        >
+          {wrapped.map((task) => (
+            <TaskRow
+              key={task.id}
+              id={task.id}
+              title={task.title}
+              meta={task.wrapUp}
               state={now.get(task.id)}
             />
           ))}

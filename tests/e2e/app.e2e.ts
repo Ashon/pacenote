@@ -514,7 +514,6 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         reply: 'Reviewed #482: 3 comments on the idempotency key.',
       },
     })
-    await client.close()
 
     // Closed in its session, the task stays where it was, struck through,
     // with how it ended and the reply that is still to be sent.
@@ -524,6 +523,32 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await row.getByText('Closed: done in Claude Code').waitFor()
     await line('Result')
       .getByText('Done in Claude Code · Left 3 comments on #482')
+      .waitFor()
+    // The next collection reads the thread and wraps it up, and the earlier
+    // review too: how each ended, from its thread.
+    await client.callTool({
+      name: 'wrap_up_task',
+      arguments: {
+        task: current.id,
+        wrap_up: 'mina fixed the idempotency key and merged #482.',
+      },
+    })
+    await client.callTool({
+      name: 'wrap_up_task',
+      arguments: {
+        task: earlier.id,
+        wrap_up: 'The retry config shipped; backoff stays at 2s.',
+      },
+    })
+    await client.close()
+    await line('Result')
+      .getByText('mina fixed the idempotency key and merged #482.')
+      .waitFor({ timeout: 15_000 })
+    await line('Result')
+      .getByText('Done in Claude Code · Left 3 comments on #482')
+      .waitFor()
+    await line('Last time')
+      .locator('[title="The retry config shipped; backoff stays at 2s."]')
       .waitFor()
     await row.getByRole('button', { name: 'Copy and open thread' }).click()
     await eventually(

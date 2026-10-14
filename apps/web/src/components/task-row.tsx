@@ -602,9 +602,22 @@ function TaskOpen({
           </p>
         ) : (
           <>
-            {settled && detail.outcome && (
+            {settled && (task.wrapUp || detail.outcome) && (
               <Line label="Result">
-                <span className="select-text">{detail.outcome}</span>
+                {task.wrapUp ? (
+                  <>
+                    <span className="max-w-[40rem] select-text">
+                      {task.wrapUp.text}
+                    </span>
+                    {detail.outcome && (
+                      <span className="text-xs text-muted-foreground">
+                        {detail.outcome}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="select-text">{detail.outcome}</span>
+                )}
               </Line>
             )}
             {earlier.last && (
@@ -809,8 +822,10 @@ function EarlierLine({
     ) : (
       <span className="font-semibold">{text}</span>
     )
-  const quiet = (text: string) => (
-    <span className="text-xs text-muted-foreground">{text}</span>
+  const quiet = (text: string, hint?: string) => (
+    <span title={hint} className="text-xs text-muted-foreground">
+      {text}
+    </span>
   )
 
   if (run)
@@ -828,10 +843,12 @@ function EarlierLine({
     return (
       <Line label={line.label} actions={action}>
         {name(task.title, log, 'Read its session')}
+        {/* How it ended, from its thread, on hover */}
         {quiet(
           [task.outcome, formatShortDay(task.postedAt)]
             .filter(Boolean)
-            .join(' · ')
+            .join(' · '),
+          task.wrapUp
         )}
       </Line>
     )

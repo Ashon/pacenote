@@ -75,6 +75,7 @@ function related(task: TaskView, work: WorkEntry[]): RelatedTask {
     postedAt: task.postedAt,
     status: task.status,
     outcome: outcomeOf(task, work),
+    wrapUp: task.wrapUp?.text,
     session: lastSession(work, task.id),
   }
 }

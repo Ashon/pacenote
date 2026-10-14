@@ -108,6 +108,8 @@ const context: TaskContext = {
         postedAt: '2026-10-06T09:00:00.000Z',
         status: 'closed',
         outcome: 'Done in Claude Code · 2 comments',
+        wrapUp:
+          'Merged after mina looked again.\nRetries now stop at five; the alert threshold is left for later.',
         session: earlierSession,
       },
     ],
@@ -214,7 +216,7 @@ describe('the handoff', () => {
       'Earlier in the thread: you asked Pace "any retry timeouts?"'
     )
     expect(prompt).toContain(
-      'Earlier task: Review the retry config change (mina, 2026-10-06): Done in Claude Code · 2 comments. Its Claude Code session 7c1e40b2-0000-4000-8000-000000000000 can be resumed if this follows on.'
+      'Earlier task: Review the retry config change (mina, 2026-10-06): Done in Claude Code · 2 comments. How it ended: Merged after mina looked again. Retries now stop at five; the alert threshold is left for later. Its Claude Code session 7c1e40b2-0000-4000-8000-000000000000 can be resumed if this follows on.'
     )
     expect(prompt).toContain(`Link: ${LINK}`)
     expect(prompt).toContain('wait for the user before you change anything')

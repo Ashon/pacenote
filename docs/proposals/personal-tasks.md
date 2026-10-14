@@ -20,7 +20,10 @@ have to keep it in their head or scroll back to find it.
 2. **Keep.** It adds them through Pacenote's MCP server (`add_tasks`), keyed by the message's permalink, so a message is
    never a task twice, and closes the ones you answered (`close_task`). An open task whose thread changed it since (a new
    due date, a sharper ask, the repository named, you now asked by name) is updated with what changed and why
-   (`update_task`), which also fills in what older tasks lack; tasks you settled are left as they are.
+   (`update_task`), which also fills in what older tasks lack; tasks you settled are left as they are. A task you did or
+   that closed gets a wrap-up from its thread: what was done or decided and by whom, and anything left after it
+   (`close_task` with `wrap_up`, or `wrap_up_task` for tasks done in the last 7 days, five at a time). The next task like
+   it, and the session working on it, read it.
 3. **Show.** The Tasks screen in the app, and `my_tasks` for the tools; later, a short summary Pace sends you in a DM.
 
 ## Why the connector, not a token of Pacenote's (v0.4.1)
@@ -63,8 +66,8 @@ first lever is picking fewer, better tasks; Dismiss is the safety net.
 ## Design
 
 **MCP.** On Pacenote's MCP server, behind Settings > Tasks > Gather my tasks from Slack (separate from sharing the run
-history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks as they are),
-`add_tasks`, `update_task`, `close_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash
+history): `collect_context` (the rules, the channels left out, whether DMs count, since when, the open tasks as they are,
+the tasks to wrap up), `add_tasks`, `update_task`, `close_task`, `wrap_up_task`, `my_tasks`, and the `collect_tasks` prompt, which Claude Code offers as a slash
 command. `add_tasks` holds the settings whatever the tool sends: it skips messages from channels left out and DMs while
 they do not count.
 
@@ -89,7 +92,7 @@ kind: asked | promised, due?, confidence: sure | maybe, reason, postedAt, foundA
 - **Where the text goes.** The messages go to the tool's model, as anything the tool reads does.
 - **Noise.** Precision first, Maybe, closing by itself, the dismiss rate.
 - **Workspace policy.** Some workspaces do not allow the tool's Slack connector; tasks then cannot be collected.
-- **Writes from AI tools.** `add_tasks`, `update_task` and `close_task` are the MCP server's first writes; they touch only
+- **Writes from AI tools.** `add_tasks`, `update_task`, `close_task` and `wrap_up_task` are the MCP server's first writes; they touch only
   the task list, and stay closed until you turn tasks on.
 
 ## Phases

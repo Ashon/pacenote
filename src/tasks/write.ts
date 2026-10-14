@@ -165,8 +165,8 @@ export function closeTask(
   ref: string,
   why: NonNullable<Task['closed']>['why'],
   now = new Date(),
-  /** Who closed it, what was done, and a reply to send */
-  more: { by?: string; note?: string; reply?: string } = {}
+  /** Who closed it, what was done, a reply to send, and how it ended */
+  more: { by?: string; note?: string; reply?: string; wrapUp?: string } = {}
 ): Task | undefined {
   const source = findMessage(ref)
   const id = source ? SOURCES[source.app].taskId(source) : ref
@@ -183,12 +183,48 @@ export function closeTask(
       note: more.note?.trim().slice(0, 300) || undefined,
       reply: more.reply?.trim().slice(0, 4000) || undefined,
     },
+    wrapUp: wrapUpOf(more.wrapUp, now, more.by) ?? task.wrapUp,
   }
   writeTasks(dataDir, {
     ...file,
     tasks: file.tasks.map((t) => (t.id === id ? closed : t)),
   })
   return closed
+}
+
+const wrapUpOf = (text: string | undefined, now: Date, by?: string) =>
+  text?.trim()
+    ? { at: now.toISOString(), text: text.trim().slice(0, 600), by }
+    : undefined
+
+/**
+ * Writes how a task ended, from its thread, once you did it or it closed. An
+ * open task, a Maybe or one you dismissed is left as it is. undefined when
+ * there is no such task.
+ */
+export function wrapUpTask(
+  dataDir: string,
+  ref: string,
+  text: string,
+  now = new Date(),
+  by?: string
+): { task: Task } | { task: Task; refused: string } | undefined {
+  const source = findMessage(ref)
+  const id = source ? SOURCES[source.app].taskId(source) : ref
+  const file = readTasks(dataDir)
+  const task = file.tasks.find((t) => t.id === id)
+  if (!task) return undefined
+  const status = viewOf(task, readDecisions(dataDir)).status
+  if (status !== 'done' && status !== 'closed')
+    return { task, refused: `it is ${status}` }
+  const wrapUp = wrapUpOf(text, now, by)
+  if (!wrapUp) return { task, refused: 'the wrap-up is empty' }
+  const wrapped: Task = { ...task, wrapUp }
+  writeTasks(dataDir, {
+    ...file,
+    tasks: file.tasks.map((t) => (t.id === id ? wrapped : t)),
+  })
+  return { task: wrapped }
 }
 
 /** What update_task can change; null clears a due date or a repository */

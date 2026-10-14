@@ -243,10 +243,11 @@ export function handoffPrompt(
     ...earlier.map((t) =>
       [
         `Earlier task: ${t.title} (${t.askedBy ? `${t.askedBy}, ` : ''}${t.postedAt.slice(0, 10)})`,
-        t.outcome ? `: ${t.outcome}` : '',
+        t.outcome ? `: ${t.outcome}.` : '.',
+        t.wrapUp ? ` How it ended: ${t.wrapUp.replace(/\s+/g, ' ')}` : '',
         t.session?.session
-          ? `. Its ${TOOL_LABEL[t.session.tool]} session ${t.session.session} can be resumed if this follows on.`
-          : '.',
+          ? ` Its ${TOOL_LABEL[t.session.tool]} session ${t.session.session} can be resumed if this follows on.`
+          : '',
       ].join('')
     ),
     task.source.permalink ? `Link: ${task.source.permalink}` : undefined,

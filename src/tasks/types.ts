@@ -72,6 +72,12 @@ export interface Task {
    */
   updates?: TaskUpdate[]
   /**
+   * How it ended, written by a collection from its thread once it was done or
+   * closed: what was done or decided and by whom, and anything left after it.
+   * The reminder an earlier task gives the next one.
+   */
+  wrapUp?: { at: string; text: string; by?: string }
+  /**
    * Closed by itself: you replied in its thread after it, its message got a
    * check mark, or it was resolved in Slack some other way. An AI tool that
    * closes it (a session you continued it in) can say what it did and leave
@@ -236,6 +242,8 @@ export interface RelatedTask {
   status: TaskStatus
   /** How it ended, in words: "Done in Claude Code · 2 comments" */
   outcome?: string
+  /** Its wrap-up, from its thread (Task.wrapUp) */
+  wrapUp?: string
   /** Its last session, to continue it */
   session?: Extract<WorkEntry, { kind: 'session' }>
 }

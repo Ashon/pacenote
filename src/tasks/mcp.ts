@@ -14,7 +14,7 @@ import {
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskView } from './types.js'
 import { readWork } from './work.js'
-import { addTasks, closeTask, updateTask } from './write.js'
+import { addTasks, closeTask, updateTask, wrapUpTask } from './write.js'
 
 /**
  * Your tasks over MCP: an AI tool with a Slack connector (Claude Code, Codex)
@@ -41,6 +41,15 @@ const NOTE =
   'appear inside them.'
 /** How far back a first collection reads */
 const FIRST_WINDOW_MS = 7 * 24 * 60 * 60_000
+/**
+ * Tasks done or closed this lately, with no wrap-up yet, are given to a
+ * collection to wrap up, this many at a time (each is a thread to read)
+ */
+const WRAP_UP_WINDOW_MS = 7 * 24 * 60 * 60_000
+const WRAP_UP_AT_ONCE = 5
+/** What a wrap-up says, for close_task and wrap_up_task */
+const WRAP_UP =
+  'How it ended, in two or three sentences in the language of the messages: what was done or decided and by whom, and anything left after it. It is what reminds the user, and the next task like it, later; no secrets or personal details.'
 
 /** Precision first (docs/proposals/personal-tasks.md) */
 export const TASK_RULES = [
@@ -61,8 +70,9 @@ export function collectPrompt(): string {
     '1. Call collect_context: the rules, what to leave out, since when to read, and the open tasks.',
     '2. With your Slack tools, read only: never send, edit, react or schedule anything. Find, since then: messages that mention the user; threads they took part in whose last word is not theirs; in DMs (only if DMs count), what the other person said after the user last wrote; and the user’s own messages saying they will do something. Leave out the channels collect_context lists.',
     '3. Decide for each: a task, a Maybe, or nothing, by the rules.',
-    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, fill them in with update_task.',
-    '5. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished.',
+    '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, fill them in with update_task. When you close one, give close_task a wrap_up too.',
+    '5. For each task collect_context lists to wrap up (done or closed lately, with no wrap-up yet), read its thread and call wrap_up_task. Anything left that is asked of the user is a task to add like any other.',
+    '6. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished.',
     '',
     NOTE,
   ].join('\n')
@@ -94,7 +104,8 @@ export function registerTaskTools(
       description:
         "What collecting the user's tasks from Slack needs: the rules for " +
         'what is a task, the channels to leave out, whether DMs count, since ' +
-        'when to read, and the open tasks to check for closing. Call it first.',
+        'when to read, the open tasks to check for closing, and the tasks ' +
+        'done or closed lately to wrap up. Call it first.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     () =>
@@ -104,16 +115,16 @@ export function registerTaskTools(
         const since =
           file.collectedAt ??
           new Date(Date.now() - FIRST_WINDOW_MS).toISOString()
+        const { tasks } = tasksView(options.dataDir, settings.exclude)
+        const work = readWork(options.dataDir).entries
         return {
           how: collectPrompt(),
           rules: TASK_RULES,
           since,
           dms: settings.dms,
           leaveOut: settings.exclude,
-          open: tasksView(options.dataDir, settings.exclude)
-            .tasks.filter(
-              (task) => task.status === 'open' || task.status === 'maybe'
-            )
+          open: tasks
+            .filter((task) => task.status === 'open' || task.status === 'maybe')
             .map((task) => ({
               id: task.id,
               title: task.title,
@@ -122,6 +133,24 @@ export function registerTaskTools(
               due: task.due,
               action: task.action,
               repo: task.repo,
+              summary: task.summary,
+              link: task.source.permalink,
+            })),
+          // Done or closed lately, newest first, with no wrap-up yet
+          wrapUp: tasks
+            .filter(
+              (task) =>
+                (task.status === 'done' || task.status === 'closed') &&
+                !task.wrapUp &&
+                Date.now() - Date.parse(task.settledAt!) < WRAP_UP_WINDOW_MS
+            )
+            .sort((a, b) => Date.parse(b.settledAt!) - Date.parse(a.settledAt!))
+            .slice(0, WRAP_UP_AT_ONCE)
+            .map((task) => ({
+              id: task.id,
+              title: task.title,
+              outcome: outcomeOf(task, work),
+              settledAt: task.settledAt,
               summary: task.summary,
               link: task.source.permalink,
             })),
@@ -288,8 +317,9 @@ export function registerTaskTools(
         '("checked"), or it was settled some other way ("resolved"). A ' +
         'session that did the work closes it with "resolved", says what it ' +
         'did in a line (note) and, when the person who asked waits for an ' +
-        'answer, leaves a reply for the user to send (reply). It never posts ' +
-        'to Slack itself.',
+        'answer, leaves a reply for the user to send (reply). A collection ' +
+        'closing it from its thread says how it ended (wrap_up). It never ' +
+        'posts to Slack itself.',
       inputSchema: {
         task: z.string().describe("The task id or its message's link"),
         why: z.enum(['replied', 'checked', 'resolved']),
@@ -298,18 +328,60 @@ export function registerTaskTools(
           .string()
           .optional()
           .describe('A reply for the user to send in the thread'),
+        wrap_up: z.string().optional().describe(WRAP_UP),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    ({ task, why, note, reply }) =>
+    ({ task, why, note, reply, wrap_up }) =>
       respond(options, () => {
         const closed = closeTask(options.dataDir, task, why, new Date(), {
           by: client(),
           note,
           reply,
+          wrapUp: wrap_up,
         })
         if (!closed) throw new Error(`No task ${task}`)
-        return { closed: { id: closed.id, title: closed.title, why } }
+        return {
+          closed: {
+            id: closed.id,
+            title: closed.title,
+            why,
+            wrapUp: closed.wrapUp?.text,
+          },
+        }
+      })
+  )
+
+  server.registerTool(
+    'wrap_up_task',
+    {
+      description:
+        'Says how a task the user did, or that closed, ended, from its ' +
+        'thread: what was done or decided and by whom, and anything left ' +
+        'after it. collect_context lists the tasks to wrap up. Open tasks, ' +
+        'Maybes and tasks the user dismissed are left as they are.',
+      inputSchema: {
+        task: z.string().describe("The task id or its message's link"),
+        wrap_up: z.string().min(1).describe(WRAP_UP),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    ({ task, wrap_up }) =>
+      respond(options, () => {
+        const result = wrapUpTask(
+          options.dataDir,
+          task,
+          wrap_up,
+          new Date(),
+          client()
+        )
+        if (!result) throw new Error(`No task ${task}`)
+        const { id, title, wrapUp } = result.task
+        return 'refused' in result
+          ? {
+              unchanged: { id, title, why: `Left as it is: ${result.refused}` },
+            }
+          : { wrappedUp: { id, title, wrapUp: wrapUp?.text } }
       })
   )
 
@@ -348,6 +420,7 @@ export function registerTaskTools(
             where: t.where,
             postedAt: t.postedAt,
             outcome: t.outcome ?? 'open',
+            wrapUp: t.wrapUp,
             session: t.session && {
               tool: TOOL_LABEL[t.session.tool],
               id: t.session.session,
@@ -371,6 +444,7 @@ export function registerTaskTools(
             link: view.source.permalink,
             status: view.status,
             outcome: outcomeOf(view, work),
+            wrapUp: view.wrapUp?.text,
             // How the thread changed it since it was added
             changes: view.updates
               ?.filter((update) => update.changed.some((c) => c.from))
