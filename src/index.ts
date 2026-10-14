@@ -275,11 +275,10 @@ async function main(): Promise<void> {
     void imageHealth.check()
   })
   await responder.resumePending()
-  const allowed = config.mention.allowedUserIds
   log.info(
     `Started: ${messenger.profile.name} bot=${bot.user} (${bot.userId}) @ ${bot.team}, ` +
       `reasoner=${reasoner.backend}@${sandbox.kind}, ` +
-      `allowed users=${allowed.length > 0 ? `${allowed.length}` : 'all'}, ` +
+      `answers=${messenger.owner ?? 'no one'}, ` +
       `reference directory=${config.mention.workspace && reasoner.canReadFiles ? config.mention.workspace : 'none'}, ` +
       `MCP=[${reasoner.mcpServerNames.join(', ')}], diagrams=${renderer ? 'on' : 'off'}, ` +
       `data=${config.dataDir}${history ? '' : ' (history off)'}`

@@ -31,7 +31,7 @@ Mac is never touched.
 
 | File | Cases |
 | --- | --- |
-| `bot.e2e.ts` | Answers in a thread and outside one (context, mrkdwn, run history, permalink), long answers, tool steps, the allowlist, private channels, failures, attachments (text, image, files.info lookups, no access), redelivered events, finishing on SIGTERM, resuming after a crash, a rejected token |
+| `bot.e2e.ts` | Answers in a thread and outside one (context, mrkdwn, run history, permalink), long answers, tool steps, answering only you, private channels, failures, attachments (text, image, files.info lookups, no access), redelivered events, finishing on SIGTERM, resuming after a crash, a rejected token |
 | `hub.e2e.ts` | Pairing with a code sent in Slack, a member's mention answered on their desktop through the hub (files included, no Slack token on the desktop), a member without a desktop, a disconnected desktop |
 | `app.e2e.ts` | The desktop app (Playwright for Electron): setup from a first run with your own Slack app ("@Pace it's me", the first answer), getting past where it used to stop (a token in the wrong field, someone else's mention, a wrong "Yes", a failed first answer, a hub address that is not one, a cancelled code), with the team hub (picked up after a restart, reduced motion) and in the built-in sandbox (gated like the VM case), the built-in sandbox prepared as soon as setup opens, setup left for Settings with Slack tokens saved there, the connection check, starting the bot, the answered mention in the run history |
 

@@ -26,22 +26,29 @@ describe('bot readiness', () => {
 
   it('valid settings are ready to start', () => {
     expect(setupProblem(TOKENS)).toBeUndefined()
-    expect(
-      setupProblem({
-        ...TOKENS,
-        MENTION_ALLOWED_USERS: '',
-        MENTION_ANYONE: 'on',
-      })
-    ).toBeUndefined()
   })
 
-  it('your own Slack app needs to know who may ask before it starts', () => {
+  it('your own Slack app needs to know who you are before it starts', () => {
     const problem = setupProblem({ ...TOKENS, MENTION_ALLOWED_USERS: '' })
     expect(problem).toMatchObject({ kind: 'config' })
-    expect(problem?.message).toMatch(/^Choose who may ask Pace/)
+    expect(problem?.message).toMatch(/^Say who you are/)
     expect(problem?.issues.map((issue) => issue.key)).toEqual([
       'MENTION_ALLOWED_USERS',
     ])
+  })
+
+  it('does not start to answer more than you', () => {
+    for (const env of [
+      { ...TOKENS, MENTION_ALLOWED_USERS: 'U1,U2' },
+      { ...TOKENS, MENTION_ANYONE: 'on' },
+      { ...TOKENS, MENTION_ALLOWED_USERS: '', MENTION_ANYONE: 'on' },
+    ]) {
+      const problem = setupProblem(env)
+      expect(problem?.kind).toBe('config')
+      expect(problem?.issues.map((issue) => issue.key)).toEqual([
+        'MENTION_ALLOWED_USERS',
+      ])
+    }
   })
 
   it("other invalid values list the bot's own validation issues", () => {

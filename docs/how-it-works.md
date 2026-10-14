@@ -24,10 +24,11 @@ What happens between a mention and its answer: context, attachments, diagrams an
 - A mention inside a thread also passes the bot's earlier answers as context, so it continues from them. The thread is
   read to its end, however long; past 30 messages Pace passes its first message, which says what the thread is about,
   and the latest 29, with a line saying how many are left out between them. Each message passes up to 1,500 characters.
-- On its own Slack app, the bot answers only the users in `MENTION_ALLOWED_USERS`, and does not start until it is set.
-  `MENTION_ANYONE=on` answers anyone in the workspace instead, but not people from other organizations in a shared
-  channel (Slack Connect). Anyone else gets a message only they can see (ephemeral): "I only answer specific people
-  here." On the [team hub](team-hub.md), each desktop gets only its own member's mentions.
+- Pace answers only you: it runs on your Mac with your login. On its own Slack app, that is the one member ID in
+  `MENTION_ALLOWED_USERS`, and the bot does not start until it is set (more than one does not start either). On the
+  [team hub](team-hub.md), it is the member the desktop is paired as: the hub sends only that member's mentions, and
+  the desktop drops any other. Anyone else gets a message only they can see (ephemeral): "I only answer the person I
+  work for." A request left waiting from someone else is not resumed after a restart.
 - Before an answer is posted, the secrets the bot holds (its Slack tokens, the hub token, the sandbox login) and
   common secret formats (API keys, private keys, tokens) are replaced with `[REDACTED ...]`. The run history keeps
   the answer as posted, with a note of how many were redacted.

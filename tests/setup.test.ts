@@ -271,7 +271,7 @@ describe('diagrams', () => {
   const env = {
     SLACK_BOT_TOKEN: 'xoxb-1',
     SLACK_APP_TOKEN: 'xapp-1',
-    MENTION_ANYONE: 'on',
+    MENTION_ALLOWED_USERS: 'U1',
   }
 
   it('are on unless turned off, and asked for only by name', () => {

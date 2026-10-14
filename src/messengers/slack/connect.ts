@@ -144,7 +144,11 @@ export async function connectSlack(
     botUserId,
     workspaceUrl: auth.url,
     files: slackFileAccess(slack),
-    allowedUsers: config.mention.allowedUserIds,
+    // You, with your own app; with the team hub, the member it connected as
+    owner:
+      receiver instanceof HubReceiver
+        ? () => receiver.member
+        : () => config.mention.owner,
     scopes: auth.response_metadata?.scopes,
     onLimits: options.onLimits,
     log: log.child('slack'),

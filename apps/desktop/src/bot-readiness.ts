@@ -54,7 +54,7 @@ export function setupProblem(
     return {
       kind: 'config',
       message:
-        'Choose who may ask Pace: add your Slack member ID in Settings > Messengers > Slack, or let anyone in the workspace ask.',
+        'Say who you are: add your own Slack member ID in Settings > Messengers > Slack. Pace answers only you.',
       issues,
     }
   return {

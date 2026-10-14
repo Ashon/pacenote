@@ -97,6 +97,26 @@ TIMEZONE=UTC
     expect(readFileSync(envFile, 'utf8')).toBe(before)
   })
 
+  it('saves you as the one Pace answers, and nothing that would answer more', () => {
+    const { store: s, envFile } = store()
+    expect(s.save({ MENTION_ALLOWED_USERS: 'u0me' })).toEqual([])
+    expect(readFileSync(envFile, 'utf8')).toMatch(
+      /^MENTION_ALLOWED_USERS=u0me$/m
+    )
+    const before = readFileSync(envFile, 'utf8')
+    expect(s.save({ MENTION_ALLOWED_USERS: 'U0ME, U0BOB' })).toEqual([
+      expect.objectContaining({ key: 'MENTION_ALLOWED_USERS' }),
+    ])
+    // Answering the whole workspace is not a setting any more.
+    expect(s.save({ MENTION_ANYONE: 'on' })).toEqual([
+      {
+        key: 'MENTION_ANYONE',
+        message: 'This entry cannot be changed from the Settings screen.',
+      },
+    ])
+    expect(readFileSync(envFile, 'utf8')).toBe(before)
+  })
+
   it('validates with app environment variables taking precedence over .env', () => {
     const { store: s } = store({
       REASONER_SANDBOX: 'vm',

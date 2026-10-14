@@ -740,7 +740,7 @@ describe('config', () => {
   const base = {
     SLACK_BOT_TOKEN: 'xoxb-1',
     SLACK_APP_TOKEN: 'xapp-1',
-    MENTION_ANYONE: 'on',
+    MENTION_ALLOWED_USERS: 'U1',
     PACENOTE_HOME: '/home/me/.pacenote',
   }
 
@@ -776,8 +776,6 @@ describe('config', () => {
       ...base,
       SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
       OPS_TOOLS: 'on',
-      MENTION_ANYONE: 'off',
-      MENTION_ALLOWED_USERS: 'U1',
       PACENOTE_SANDBOX_DIR:
         '/Applications/Pacenote.app/Contents/Resources/app/sandbox',
     }

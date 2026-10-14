@@ -107,8 +107,8 @@ export class World {
       RENDER_DIAGRAMS: 'off',
       TIMEZONE: 'UTC',
       LOG_LEVEL: 'debug',
-      // Anyone in the fake workspace may ask, unless a test names who may.
-      ...(extra.MENTION_ALLOWED_USERS ? {} : { MENTION_ANYONE: 'on' }),
+      // Pace answers only its owner: alice, unless a test says otherwise.
+      MENTION_ALLOWED_USERS: this.alice.id,
       ...extra,
     }
   }
@@ -176,6 +176,12 @@ export class World {
   async stop(): Promise<void> {
     await Promise.all(this.processes.map((process) => process.stop()))
     await this.slack.stop()
-    rmSync(this.root, { recursive: true, force: true })
+    // A process that just stopped may still be writing its last lines.
+    rmSync(this.root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    })
   }
 }

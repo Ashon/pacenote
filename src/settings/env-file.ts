@@ -97,20 +97,31 @@ export function writeEnvFile(file: string, text: string): void {
 }
 
 /**
- * A setting whose value changed meaning, rewritten as Pace reads it now:
- * REASONER_SANDBOX=docker, the sandbox Pacenote had before the built-in one,
- * becomes vm. Returns the text unchanged when there is nothing to rewrite.
+ * Settings whose meaning changed, rewritten as Pace reads them now, each with
+ * a line for the log: REASONER_SANDBOX=docker, the sandbox Pacenote had before
+ * the built-in one, becomes vm; MENTION_ANYONE, from when Pace could answer a
+ * whole workspace, goes, since it answers only you. Returns the text unchanged
+ * when there is nothing to rewrite.
  */
 export function migrateEnvText(text: string): {
   text: string
   changed: boolean
+  notes: string[]
 } {
-  if (readEnvValues(text).REASONER_SANDBOX !== 'docker')
-    return { text, changed: false }
-  return {
-    text: updateEnvText(text, { REASONER_SANDBOX: 'vm' }),
-    changed: true,
+  const notes: string[] = []
+  let next = text
+  if (readEnvValues(next).REASONER_SANDBOX === 'docker') {
+    next = updateEnvText(next, { REASONER_SANDBOX: 'vm' })
+    notes.push('REASONER_SANDBOX=docker is now vm (the built-in sandbox)')
   }
+  if (envKeys(next).includes('MENTION_ANYONE')) {
+    next = next
+      .split('\n')
+      .filter((line) => ASSIGNMENT.exec(line)?.[1] !== 'MENTION_ANYONE')
+      .join('\n')
+    notes.push('MENTION_ANYONE is removed: Pace answers only you')
+  }
+  return { text: next, changed: notes.length > 0, notes }
 }
 
 export function readEnvFile(file: string): string {

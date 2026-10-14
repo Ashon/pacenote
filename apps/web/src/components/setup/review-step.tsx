@@ -1,7 +1,7 @@
 import type { SettingsView } from '@src/settings/fields'
 import { stepToFix, type SetupRecord } from '@src/settings/setup'
 import type { SupervisorState } from '@src/runtime/types'
-import { LoaderCircle, Lock, X } from 'lucide-react'
+import { LoaderCircle, Lock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ type Stopped = { error: string; step?: SetupStep; part?: string }
 type Starting = 'idle' | 'saving' | 'waiting' | 'starting' | Stopped
 
 /**
- * 4. Who may ask and what Pace may use, once more before it starts: these
+ * 4. Who Pace answers and what it may use, once more before it starts: these
  * shape what it can reach, so they are confirmed together. Starting waits for
  * the built-in sandbox, if it is still being prepared, and says what stopped
  * it, with the way to fix it, when it does not start.
@@ -175,23 +175,17 @@ export function ReviewStep({
     vm &&
     backend === 'claude' &&
     !settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
-  // Your own app answers no one until it knows who may ask.
-  const anyone = values?.MENTION_ANYONE === 'on'
+  // Pace answers only you: your own app, once it knows who you are (one
+  // member ID; a list from before Pace answered only you is not you yet).
   const allowed = allowedIds(values?.MENTION_ALLOWED_USERS)
-  const nobody = !hub && !anyone && allowed.length === 0
+  const owner = !hub && allowed.length === 1 ? allowed[0] : undefined
+  const unknown = !hub && !owner
   const blocked = needsLogin
     ? 'Get the sandbox its Claude login first'
-    : nobody
-      ? 'Say who may ask first'
+    : unknown
+      ? 'Say who you are first'
       : undefined
   const stopped = typeof starting === 'object' ? starting : undefined
-
-  const remove = async (id: string) => {
-    await window.pacenoteDesktop?.settings.save({
-      MENTION_ALLOWED_USERS: allowed.filter((each) => each !== id).join(','),
-    })
-    settings.refresh()
-  }
 
   return (
     <StepFrame
@@ -263,15 +257,11 @@ export function ReviewStep({
       <section className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
         <b className="text-sm font-semibold">Who can ask Pace</b>
         <span className="flex flex-wrap items-center gap-2">
-          {hub ? (
-            <Person you name={record.me?.name} />
-          ) : anyone ? (
-            <span className="text-body text-muted-foreground">
-              Anyone in your workspace
-            </span>
-          ) : nobody ? (
+          {unknown ? (
             <span className="text-body text-status-failed">
-              No one yet.{' '}
+              {allowed.length > 1
+                ? 'Pace answers only you now, and the settings name more than one person.'
+                : "Pace doesn't know who you are yet."}{' '}
               <button
                 type="button"
                 disabled={busy}
@@ -282,22 +272,18 @@ export function ReviewStep({
               </button>
             </span>
           ) : (
-            allowed.map((id) =>
-              id === record.me?.id ? (
-                <Person key={id} you name={record.me.name} />
-              ) : (
-                <Person
-                  key={id}
-                  name={id}
-                  onRemove={busy ? undefined : () => void remove(id)}
-                />
-              )
-            )
-          )}
-          {!nobody && (
-            <span className="text-body text-muted-foreground">
-              Let more people ask later in Settings.
-            </span>
+            <>
+              <Person
+                name={
+                  hub || owner === record.me?.id ? record.me?.name : undefined
+                }
+                id={hub ? undefined : owner}
+              />
+              <span className="text-body text-muted-foreground">
+                Only you. Teammates each pair a Pace of their own through your
+                team's hub.
+              </span>
+            </>
           )}
         </span>
         <span className="flex items-center gap-2 text-body text-muted-foreground">
@@ -398,39 +384,17 @@ export function ReviewStep({
   )
 }
 
-/** Someone who may ask: you, by name, or a member ID let in before */
-function Person({
-  you,
-  name,
-  onRemove,
-}: {
-  you?: boolean
-  name?: string
-  onRemove?: () => void
-}) {
+/** You, the one who may ask: by the name Slack showed, or your member ID */
+function Person({ name, id }: { name?: string; id?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-card py-1 pr-1.5 pl-3 text-sm ring-1 ring-border">
-      {you ? (
-        <>
-          You
-          {name && (
-            <span className="pr-1.5 text-body text-muted-foreground">
-              @{name}
-            </span>
-          )}
-        </>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm ring-1 ring-border">
+      You
+      {name ? (
+        <span className="text-body text-muted-foreground">@{name}</span>
       ) : (
-        <span className="font-mono text-xs">{name}</span>
-      )}
-      {onRemove && (
-        <button
-          type="button"
-          aria-label={`Remove ${name}`}
-          onClick={onRemove}
-          className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-well hover:text-foreground"
-        >
-          <X className="size-3.5" />
-        </button>
+        id && (
+          <span className="font-mono text-xs text-muted-foreground">{id}</span>
+        )
       )}
     </span>
   )

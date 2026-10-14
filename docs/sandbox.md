@@ -99,8 +99,8 @@ the command (under `script`, which gives it the terminal it needs), you approve 
 saved to `SANDBOX_CLAUDE_OAUTH_TOKEN` without being shown, then checked with the API: the screen says whether Claude accepts it.
 The token is checked the same way, with a call that uses no quota (the model list), when Pace starts (a rejected one shows
 in the status bar's check issues) and in Settings > Sandbox's status ("Sandbox claude token"). The token is a one-year token for your own Claude subscription
-(Pro, Max, Team or Enterprise); the bot answers only the people in `MENTION_ALLOWED_USERS` (start with yourself), and on
-the [team hub](team-hub.md) each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
+(Pro, Max, Team or Enterprise); the bot answers only you (`MENTION_ALLOWED_USERS`), and on the [team hub](team-hub.md)
+each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
 is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
 
 From a terminal, `claude setup-token` prints the same token; put it in `SANDBOX_CLAUDE_OAUTH_TOKEN` in `~/.pacenote/.env`.

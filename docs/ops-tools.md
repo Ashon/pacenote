@@ -27,8 +27,8 @@ reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH
   codex's ChatGPT app connectors (`codex_apps`, including the GitHub connector) have a different permission scope and send data
   over a different path, so they are turned off in sandbox runs. (`codex exec --disable apps`)
 - Every call is logged by the broker, in Pace's own log.
-- Because it uses credentials, the bot does not start without the built-in sandbox (`REASONER_SANDBOX=vm`) and
-  `MENTION_ALLOWED_USERS`, with `MENTION_ANYONE` off.
+- Because it uses credentials, the bot does not start without the built-in sandbox (`REASONER_SANDBOX=vm`). Pace
+  answers only you, so the tools act only for you.
 - To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts`, bundle the broker (`pnpm bundle`) and restart Pace.
 
 ## In the built-in sandbox

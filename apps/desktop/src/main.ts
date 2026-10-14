@@ -155,15 +155,13 @@ const log = createLogger('info', 'desktop', [
   fileSink(path.join(dataDir, DESKTOP_LOG_FILE)),
 ])
 log.info(`Starting ${app.getVersion()} (pid ${process.pid})`)
-// The Docker sandbox is gone: a setting that chose it chooses the built-in
-// sandbox now, which Settings > Sandbox then sets up.
+// Settings that changed meaning are rewritten as Pace reads them now: the
+// Docker sandbox is the built-in one, and answering anyone but you is gone.
 try {
   const migrated = migrateEnvText(readEnvFile(envFile))
   if (migrated.changed) {
     writeEnvFile(envFile, migrated.text)
-    log.info(
-      'Settings: REASONER_SANDBOX=docker is now vm (the built-in sandbox)'
-    )
+    for (const note of migrated.notes) log.info(`Settings: ${note}`)
   }
 } catch (err) {
   log.warn(`Could not update the settings file: ${(err as Error).message}`)
@@ -1181,15 +1179,10 @@ function registerBotIpc(): void {
         )
           throw new Error('That is not a Slack member.')
         await stopClaim()
-        // Saying it again replaces the one setup let in before, so a wrong
-        // "Yes" is undone by the right one.
-        const before = setup.view().record.me?.id
-        const listed = (settings.effectiveEnv().MENTION_ALLOWED_USERS ?? '')
-          .split(/[\s,]+/)
-          .filter((id) => id && id !== before)
-        const issues = settings.save({
-          MENTION_ALLOWED_USERS: [...new Set([...listed, user.id])].join(','),
-        })
+        // Pace answers only you, so this is the one it answers: saying it
+        // again replaces the one before, and a wrong "Yes" is undone by the
+        // right one.
+        const issues = settings.save({ MENTION_ALLOWED_USERS: user.id })
         if (issues.length === 0) {
           claimPaused = false
           setup.save({ me: { id: user.id, name: user.name } })

@@ -26,7 +26,7 @@ voice of the app.
 - Answers mentions in the thread, with the thread and its attachments (text, images, PDFs) as context.
 - Reasons with your own `claude` or `codex` CLI login: on your Mac, reading only a folder you choose, or in a
   disposable Linux VM built into Pacenote that reaches only allowed domains.
-- Answers only the people you name, and keeps its own tokens and other secrets out of what it posts.
+- Answers only you, and keeps its own tokens and other secrets out of what it posts.
 - Optional ops tools: read-only lookups on servers, k8s clusters and a work directory, GitHub and Jira, and code
   changes as draft PRs, through a broker that keeps credentials out of the reasoner.
 - Renders diagrams and charts to images, and keeps a run history with every tool step in the desktop app.

@@ -60,7 +60,7 @@ describe('reactions:write as a limit in the status', () => {
       directory: {} as Directory,
       botUserId: 'U0PACE',
       files: { token: 'xoxb-1' },
-      allowedUsers: [],
+      owner: () => 'U0ME',
       log: createLogger('error'),
       ...options,
     })

@@ -10,11 +10,11 @@ export interface ClaimListener {
 
 /**
  * "@Pace it's me": before Pace answers anyone, setup listens on your own Slack
- * app for a mention and says who made it, so that person can become the first
- * who may ask. It reads only who mentioned Pace, where, and the few words they
+ * app for a mention and says who made it, so that person can become the one
+ * Pace answers. It reads only who mentioned Pace, where, and the few words they
  * wrote (shown beside their name), tells them alone to confirm in Pacenote,
- * and never asks the AI. People from other organizations
- * in a shared channel are passed over.
+ * and never asks the AI. People from other organizations in a shared channel
+ * are passed over.
  */
 export async function listenForClaim(options: {
   appToken: string

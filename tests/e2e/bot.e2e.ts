@@ -305,10 +305,10 @@ describe('bot on its own Slack app', () => {
     )
   })
 
-  it('tells a member who is not allowed, without asking the reasoner', async () => {
+  it('answers only you: anyone else is told alone, and the reasoner is never asked', async () => {
     world = await World.create()
-    const { slack, ops, alice, bob } = world
-    await world.startBot({ MENTION_ALLOWED_USERS: alice.id })
+    const { slack, ops, bob } = world
+    await world.startBot()
 
     const ts = await slack.mention({
       channel: ops.id,
@@ -320,12 +320,31 @@ describe('bot on its own Slack app', () => {
       {
         channel: ops.id,
         user: bob.id,
-        text: 'I only answer specific people here.',
+        text: 'I only answer the person I work for.',
         thread_ts: undefined,
       },
     ])
     await sleep(300)
     expect(slack.replies(ops.id, ts)).toEqual([])
+    expect(world.claudeCalls()).toEqual([])
+  })
+
+  it('does not start to answer more than you: a list of people, or the whole workspace', async () => {
+    world = await World.create()
+    for (const [extra, said] of [
+      [
+        { MENTION_ALLOWED_USERS: `${world.alice.id},${world.bob.id}` },
+        /takes one Slack member ID, your own/,
+      ],
+      [{ MENTION_ANYONE: 'on' }, /MENTION_ANYONE is gone/],
+    ] as const) {
+      const bot = startBot(world.botEnv(extra))
+      const { code } = await bot.exited
+      expect(code).toBe(1)
+      expect(bot.output).toMatch(said)
+      expect(bot.output).not.toMatch(/Started: /)
+    }
+    expect(world.slack.ephemerals).toEqual([])
     expect(world.claudeCalls()).toEqual([])
   })
 

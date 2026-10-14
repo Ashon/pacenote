@@ -346,11 +346,10 @@ export function SettingsPage() {
             )
           : undefined
         // With both tokens in, your own app still answers no one until it
-        // knows who may ask.
+        // knows who you are.
         const askers =
           SLACK_APP_TOKENS.includes(field.key) &&
-          !isSet('MENTION_ALLOWED_USERS') &&
-          valueOf('MENTION_ANYONE') !== 'on'
+          !isSet('MENTION_ALLOWED_USERS')
         setNotice(
           other
             ? {
@@ -400,8 +399,9 @@ export function SettingsPage() {
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
   const pending = sandbox.status?.pending ?? []
-  const opsReady = builtIn && isSet('MENTION_ALLOWED_USERS')
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
+  // Pace answers only you; with your own app, once it knows who you are
+  const opsReady = builtIn && (hubMode || isSet('MENTION_ALLOWED_USERS'))
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
     : isSet('SLACK_APP_TOKEN') && isSet('SLACK_BOT_TOKEN')
@@ -645,14 +645,16 @@ export function SettingsPage() {
                     : { label: 'Open Sandbox', section: 'sandbox' },
                 },
                 {
-                  ok: isSet('MENTION_ALLOWED_USERS'),
-                  label: 'Allowed users',
-                  detail: isSet('MENTION_ALLOWED_USERS')
-                    ? 'Only the allowed users can ask.'
-                    : 'Limit who can ask, since the tools use your credentials.',
-                  action: isSet('MENTION_ALLOWED_USERS')
-                    ? undefined
-                    : { label: 'Open Messengers', section: 'messengers' },
+                  ok: hubMode || isSet('MENTION_ALLOWED_USERS'),
+                  label: 'Only you can ask',
+                  detail:
+                    hubMode || isSet('MENTION_ALLOWED_USERS')
+                      ? 'Pace answers only you, so the tools act only for you.'
+                      : 'Add your Slack member ID, since the tools use your credentials.',
+                  action:
+                    hubMode || isSet('MENTION_ALLOWED_USERS')
+                      ? undefined
+                      : { label: 'Open Messengers', section: 'messengers' },
                 },
               ]}
               onOpen={go}

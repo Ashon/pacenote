@@ -106,18 +106,18 @@ export interface MentionResponderDeps {
 const STALE_ATTACHMENTS_MS = 60 * 60_000
 
 /**
- * Whether Pace answers this asker. An empty list means anyone in the workspace,
- * but not people from other organizations in shared channels; a list names
- * whoever may ask, from anywhere.
+ * Whether Pace answers this asker: only its owner, you. With no owner known
+ * yet, no one.
  */
-export function isAllowedUser(
-  mention: Pick<Mention, 'userId' | 'external'>,
-  allowedUserIds: readonly string[]
+export function isOwner(
+  mention: Pick<Mention, 'userId'>,
+  owner: string | undefined
 ): boolean {
-  return allowedUserIds.length === 0
-    ? !mention.external
-    : allowedUserIds.includes(mention.userId)
+  return Boolean(owner) && mention.userId === owner
 }
+
+/** What anyone else is told, alone */
+export const NOT_OWNER_NOTICE = 'I only answer the person I work for.'
 
 /**
  * The context passed on: all of it when it is short, otherwise the first
@@ -206,18 +206,11 @@ export class MentionResponder {
       this.seen.delete(this.seen.values().next().value!)
 
     const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
-    if (!isAllowedUser(mention, messenger.allowedUsers)) {
+    if (!isOwner(mention, messenger.owner)) {
       log.info(
-        `Ignoring mention from ${mention.external ? 'someone outside the workspace' : 'a user not on the allowlist'}: ${mention.userId} in ${mention.conversation}`
+        `Ignoring mention from someone other than the owner: ${mention.userId}${mention.external ? ' (outside the workspace)' : ''} in ${mention.conversation}`
       )
-      await messenger.notice(
-        mention,
-        say(
-          mention.external
-            ? 'I only answer people in this workspace.'
-            : 'I only answer specific people here.'
-        )
-      )
+      await messenger.notice(mention, say(NOT_OWNER_NOTICE))
       return
     }
     const venue = await messenger.venue(mention)
@@ -634,6 +627,20 @@ export class MentionResponder {
           messenger.render(
             'I restarted while posting my answer, so it may be cut short. Please mention me again if it is.'
           )[0] ?? ''
+        )
+        continue
+      }
+      // Waiting since before Pace answered only you: not taken up for anyone
+      // else.
+      if (!isOwner(entry.mention, messenger.owner)) {
+        this.forget(entry.key)
+        await this.clearMarks(messenger, entry.mention)
+        if (entry.runId)
+          history?.reopen(entry.runId)?.finish('interrupted', {
+            error: 'Not resumed: Pace answers only the person it works for',
+          })
+        log.warn(
+          `Dropping ${entry.key}: it was asked by someone other than the owner`
         )
         continue
       }

@@ -113,8 +113,8 @@ Bot management:
   this Mac; its progress follows in the step list. Its own Claude login is asked for before Pace starts, and Start Pace
   waits for it to be ready. With your own Slack app, "Show Pace it's you" listens on
   the app (Socket Mode, before Pace runs) for a mention, tells that person alone to confirm in Pacenote, and once you
-  confirm it is you, makes you the first who may ask. The first to mention it stays on screen until you say it is not
-  you, and confirming again replaces the one setup let in before; Pace starting stops the listening, and leaving without
+  confirm it is you, makes you the one Pace answers. The first to mention it stays on screen until you say it is not
+  you, and confirming again replaces the one before; Pace starting stops the listening, and leaving without
   confirming starts Pace again if listening stopped it. Any answer in Slack since Pace started ends setup: a failed one
   says why and waits for the next. Its progress is `PACENOTE_DATA_DIR/setup.json`; leaving it ("Finish later") puts a
   card on Overview to pick it up again or to set things up in Settings instead, and the Setup needed card leads back to
@@ -141,7 +141,7 @@ Settings:
   | Section | What it holds |
   | --- | --- |
   | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
-  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (allowed users, or anyone in the workspace), Socket Mode keepalive (advanced) |
+  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
   | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login, allowed domains |
   | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
@@ -195,9 +195,10 @@ Status and logs:
   sandbox check problems, a reasoner whose sign-in was rejected or that reached its usage limit, and limits of the setup such
   as a Slack app without `reactions:write`) to `PACENOTE_DATA_DIR/bot.json`.
   The status bar counts the problems; the limits show only on the Pace screen. The app reads it the same way no matter who started the bot.
-- With its own Slack app, the bot needs to know who may ask: until "Who can ask" names someone (or anyone in the workspace
-  may ask), the Overview shows "Set up Pace" with a way to Settings, and the bot does not start. Setup fills it in from
-  "@Pace it's me".
+- Pace answers only you. With its own Slack app, the bot needs to know who you are: until "Who can ask" holds your Slack
+  member ID (one only), the Overview shows "Set up Pace" with a way to Settings or back to setup, and the bot does not
+  start. Setup fills it in from "@Pace it's me". `MENTION_ANYONE`, from when Pace could answer a whole workspace, is
+  removed from the settings file when the app starts.
 - On this Mac, the status also says when the reasoner CLI is missing, signed out or (codex) too old, with what to do; it is
   checked at startup, every 5 minutes, and after an answer that went through.
 - Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`) The app's own

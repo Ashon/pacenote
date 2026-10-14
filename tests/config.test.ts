@@ -23,7 +23,7 @@ describe('loadConfig', () => {
     })
     expect(config.reasoner.vm).toBeUndefined()
     expect(config.mention).toEqual({
-      allowedUserIds: ['U0ME'],
+      owner: 'U0ME',
       workspace: undefined,
       concurrency: 2,
     })
@@ -47,38 +47,61 @@ describe('loadConfig', () => {
     expect(config.reasoner.model).toBe('claude-opus-5-5')
   })
 
-  it('normalizes and validates the allowed user ID list', () => {
-    const config = loadConfig({
-      ...env,
-      MENTION_ALLOWED_USERS: 'u0boss, W0TEAM,U0BOSS',
-    })
-    expect(config.mention.allowedUserIds).toEqual(['U0BOSS', 'W0TEAM'])
+  it('normalizes and validates your member ID', () => {
+    expect(
+      loadConfig({ ...env, MENTION_ALLOWED_USERS: ' u0boss ' }).mention.owner
+    ).toBe('U0BOSS')
+    // The same ID twice is still one person.
+    expect(
+      loadConfig({ ...env, MENTION_ALLOWED_USERS: 'U0BOSS,u0boss' }).mention
+        .owner
+    ).toBe('U0BOSS')
     expect(() => loadConfig({ ...env, MENTION_ALLOWED_USERS: '@bob' })).toThrow(
       /MENTION_ALLOWED_USERS/
     )
   })
 
-  it('answers no one through your own Slack app until you say who may ask', () => {
-    const noList = { ...env, MENTION_ALLOWED_USERS: '' }
-    expect(() => loadConfig(noList)).toThrow(/Choose who may ask Pace/)
-    expect(checkConfig(noList)).toEqual([
+  it('answers only you: no one until you say who you are, never a list or a whole workspace', () => {
+    const nobody = { ...env, MENTION_ALLOWED_USERS: '' }
+    expect(() => loadConfig(nobody)).toThrow(/Say who you are/)
+    expect(checkConfig(nobody)).toEqual([
       expect.objectContaining({ key: 'MENTION_ALLOWED_USERS', missing: true }),
     ])
-    // Anyone in the workspace, said outright; the list then has no say.
+    // More than one person is refused outright, not narrowed to one.
+    const two = { ...env, MENTION_ALLOWED_USERS: 'U0ME,U0BOB' }
+    expect(() => loadConfig(two)).toThrow(/takes one Slack member ID, your own/)
+    // Not merely missing, so Settings will not save it.
+    expect(checkConfig(two)).toEqual([
+      {
+        key: 'MENTION_ALLOWED_USERS',
+        message: expect.stringMatching(/your own: Pace answers only you/),
+      },
+    ])
+    // Answering anyone in the workspace is gone, with or without a list, and
+    // says so instead of quietly answering only you.
+    for (const anyone of [
+      { ...env, MENTION_ANYONE: 'on' },
+      { ...nobody, MENTION_ANYONE: 'ON' },
+    ]) {
+      expect(() => loadConfig(anyone)).toThrow(/MENTION_ANYONE is gone/)
+      expect(checkConfig(anyone)).toEqual([
+        expect.objectContaining({ key: 'MENTION_ALLOWED_USERS' }),
+      ])
+    }
+    expect(loadConfig({ ...env, MENTION_ANYONE: 'off' }).mention.owner).toBe(
+      'U0ME'
+    )
+    // A hub desktop answers the member it is paired as, which the hub names
+    // once connected; a list left from your own app has no say.
+    const hub = {
+      HUB_URL: 'https://hub.example.com',
+      HUB_TOKEN: 'a'.repeat(64),
+      SLACK_CONNECTION: 'hub',
+    }
+    expect(loadConfig(hub).mention.owner).toBeUndefined()
     expect(
-      loadConfig({ ...noList, MENTION_ANYONE: 'on' }).mention.allowedUserIds
-    ).toEqual([])
-    expect(
-      loadConfig({ ...env, MENTION_ANYONE: 'on' }).mention.allowedUserIds
-    ).toEqual([])
-    // A hub desktop gets only its own member's mentions.
-    expect(
-      loadConfig({
-        HUB_URL: 'https://hub.example.com',
-        HUB_TOKEN: 'a'.repeat(64),
-        SLACK_CONNECTION: 'hub',
-      }).mention.allowedUserIds
-    ).toEqual([])
+      loadConfig({ ...hub, MENTION_ALLOWED_USERS: 'U0ME,U0BOB' }).mention.owner
+    ).toBeUndefined()
   })
 
   it("never lets the reasoner read Pacenote's folders or credentials on this Mac", () => {
@@ -138,7 +161,7 @@ describe('loadConfig', () => {
     )
     expect(() =>
       loadConfig({ ...base, REASONER_SANDBOX: 'vm', MENTION_ANYONE: 'on' })
-    ).toThrow(/MENTION_ALLOWED_USERS/)
+    ).toThrow(/MENTION_ANYONE is gone/)
     const config = loadConfig({
       ...base,
       REASONER_SANDBOX: 'vm',
@@ -224,7 +247,7 @@ describe('checkConfig', () => {
     ).toEqual([
       { key: 'SLACK_BOT_TOKEN', missing: true },
       { key: 'SLACK_APP_TOKEN', missing: true },
-      { key: 'OPS_TOOLS', missing: undefined },
+      { key: 'MENTION_ALLOWED_USERS', missing: undefined },
     ])
     expect(checkConfig({ ...env, REASONER_SANDBOX: 'vm' })).toEqual([
       expect.objectContaining({

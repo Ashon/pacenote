@@ -32,7 +32,7 @@ describe('diagnostics', () => {
         settings: {
           SLACK_BOT_TOKEN: 'xoxb-12345678901-abcdef',
           HUB_TOKEN: hub,
-          MENTION_ANYONE: 'on',
+          TASKS: 'on',
         },
         secrets: [hub],
         logs: [
@@ -50,7 +50,7 @@ describe('diagnostics', () => {
     expect(text).toContain('Pacenote 0.4.6')
     expect(text).toContain('SLACK_BOT_TOKEN=(set)')
     expect(text).toContain('HUB_TOKEN=(set)')
-    expect(text).toContain('MENTION_ANYONE=on')
+    expect(text).toContain('TASKS=on')
     expect(text).toContain('"phase": "crashed"')
     expect(text).not.toContain(hub)
     expect(text).not.toContain('xoxb-')

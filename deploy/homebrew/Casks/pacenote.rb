@@ -37,7 +37,8 @@ cask "pacenote" do
       - log in to claude or codex (codex 0.138 or later)
       - open Pacenote: a first run opens on setup, from the AI service on this Mac to Pace's
         first answer, with the built-in sandbox prepared in the background (macOS 15 or later),
-        your team's hub or your own Slack app, and "@Pace it's me" to say who may ask
+        your team's hub or your own Slack app, and "@Pace it's me" to say which account is yours
+    Pace answers only you; teammates each run their own Pace through your team's hub.
     Setup can be left and picked up from Overview, or done in Settings instead.
     Config and run history are in ~/.pacenote and are kept when the app is removed.
   EOS

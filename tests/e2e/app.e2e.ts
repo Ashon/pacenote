@@ -200,8 +200,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     world = await World.create([
       { match: 'web-01', answer: '**Healthy**. Up 3 days.' },
     ])
-    const { slack, ops, alice } = world
-    const page = await launch(world, { firstRun: true })
+    const { slack, ops, alice, bob } = world
+    // Left from when Pace could answer a whole workspace
+    const page = await launch(world, {
+      firstRun: true,
+      settings: ['MENTION_ANYONE=on'],
+    })
 
     // A first run opens on setup. Left for later, Overview holds the way back
     // to it, or to Settings instead, which ends it.
@@ -252,9 +256,26 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('button', { name: 'Check connection' }).click()
     await page.getByText('Socket Mode', { exact: true }).waitFor()
 
+    // Pace answers only you: one member ID, and no switch for anyone else.
+    // The setting that answered a whole workspace left the file as the app
+    // started.
+    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).not.toMatch(
+      /MENTION_ANYONE/
+    )
+    expect(
+      await page.getByText('Anyone in the workspace may ask').count()
+    ).toBe(0)
+    const owner = page.locator('[data-setting="MENTION_ALLOWED_USERS"] input')
+    await owner.fill(`${alice.id}, ${bob.id}`)
+    await page.getByRole('button', { name: 'Save and start Pace' }).click()
     await page
-      .locator('[data-setting="MENTION_ALLOWED_USERS"] input')
-      .fill(alice.id)
+      .getByText(/takes one Slack member ID, your own/)
+      .first()
+      .waitFor()
+    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).not.toMatch(
+      /U0BOB/
+    )
+    await owner.fill(alice.id)
     await page.getByRole('button', { name: 'Save and start Pace' }).click()
     await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
 
@@ -1215,7 +1236,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         settings: [
           `SLACK_APP_TOKEN=${slack.appToken}`,
           `SLACK_BOT_TOKEN=${slack.botToken}`,
-          'MENTION_ANYONE=on',
+          `MENTION_ALLOWED_USERS=${alice.id}`,
         ],
         env: {
           PACENOTE_VM_BIN: vm.BIN,

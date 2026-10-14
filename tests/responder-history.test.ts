@@ -92,14 +92,14 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
     botUserId: 'U0PACE',
     workspaceUrl: 'https://example.slack.com/',
     files: { token: 'xoxb-1' },
-    allowedUsers: [],
+    owner: () => 'U0BOSS',
     log,
   })
   const responder = new MentionResponder({
     config: loadConfig({
       SLACK_BOT_TOKEN: 'xoxb-1',
       SLACK_APP_TOKEN: 'xapp-1',
-      MENTION_ANYONE: 'on',
+      MENTION_ALLOWED_USERS: 'U0BOSS',
     }),
     messengers: [messenger],
     reasoner,
@@ -217,7 +217,7 @@ class MemoryMessenger implements Messenger {
   answerable = true
   failUpload = false
 
-  constructor(readonly allowedUsers: readonly string[] = []) {}
+  constructor(public owner: string | undefined = 'u1') {}
 
   async venue() {
     return this.answerable
@@ -298,7 +298,7 @@ describe('answering through any messenger', () => {
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
-        MENTION_ANYONE: 'on',
+        MENTION_ALLOWED_USERS: 'U1',
       }),
       messengers: [messenger],
       reasoner: {
@@ -356,18 +356,47 @@ describe('answering through any messenger', () => {
     expect(posted).toContain('[REDACTED SLACK TOKEN]')
   })
 
-  it('tells the asker when they are not allowed or the venue is not answered', async () => {
-    const closed = new MemoryMessenger(['u2'])
-    await base(closed).handle(ask('hi'))
-    expect(closed.notices[0]).toMatch(/^I only answer specif/)
-
-    // Anyone in the workspace, but not someone from another organization
-    const shared = new MemoryMessenger()
-    await base(shared).handle({ ...ask('hi'), external: true })
-    expect(shared.notices).toEqual([
-      expect.stringMatching(/^I only answer people/),
+  it('answers only its owner, telling anyone else alone, and says where it does not answer', async () => {
+    const others = new MemoryMessenger('u2')
+    const asked: string[] = []
+    const responder = new MentionResponder({
+      config: loadConfig({
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U2',
+      }),
+      messengers: [others],
+      reasoner: {
+        backend: 'claude',
+        sandbox: 'host',
+        canReadFiles: false,
+        mcpServerNames: [],
+        complete: async (request) => {
+          asked.push(request.prompt)
+          return 'answer'
+        },
+      },
+      log: createLogger('error'),
+      extractPdfText: async () => '',
+    })
+    await responder.handle(ask('hi'))
+    // Someone from another organization, too
+    await responder.handle({ ...ask('hi'), userId: 'u9', external: true })
+    // (This messenger renders 20 characters at a time.)
+    expect(others.notices).toEqual([
+      'I only answer the pe',
+      'I only answer the pe',
     ])
-    expect(shared.posts).toEqual([])
+    expect(others.posts).toEqual([])
+    expect(asked).toEqual([])
+
+    // An owner not known yet (a hub desktop before the hub names its member)
+    // answers no one.
+    const unknown = new MemoryMessenger()
+    unknown.owner = undefined
+    await base(unknown).handle(ask('hi'))
+    expect(unknown.notices).toEqual(['I only answer the pe'])
+    expect(unknown.posts).toEqual([])
 
     const elsewhere = new MemoryMessenger()
     elsewhere.answerable = false
@@ -384,7 +413,7 @@ describe('answering through any messenger', () => {
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
-        MENTION_ANYONE: 'on',
+        MENTION_ALLOWED_USERS: 'U1',
         MENTION_CONCURRENCY: '1',
       }),
       messengers: [messenger],
@@ -441,7 +470,7 @@ describe('marking a mention instead of posting a placeholder', () => {
       config: loadConfig({
         SLACK_BOT_TOKEN: 'xoxb-1',
         SLACK_APP_TOKEN: 'xapp-1',
-        MENTION_ANYONE: 'on',
+        MENTION_ALLOWED_USERS: 'U1',
         MENTION_CONCURRENCY: String(options.concurrency ?? 2),
       }),
       messengers: [messenger],
@@ -642,6 +671,32 @@ describe('marking a mention instead of posting a placeholder', () => {
     await again.resumePending()
     expect(await again.drain(5_000)).toBe(true)
     expect(stuck.updates).toEqual(['I restarted; the ans'])
+  })
+
+  it('does not take up, after a restart, a request someone else left waiting', async () => {
+    const inflight = new InflightStore(path.join(root, 'not-owner.json'))
+    const mention = { ...ask(), userId: 'u2' }
+    inflight.upsert({
+      key: mentionKey(mention),
+      mention,
+      label: 'room-1',
+      attempts: 0,
+      startedAt: Date.now(),
+    })
+    const messenger = new MarkingMessenger()
+    let asked = 0
+    const bot = responder(messenger, {
+      inflight,
+      answer: async () => {
+        asked += 1
+        return 'answer'
+      },
+    })
+    await bot.resumePending()
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(asked).toBe(0)
+    expect(messenger.posts).toEqual([])
+    expect(inflight.list()).toEqual([])
   })
 
   it('resumes a marked mention after a restart, answering in a new reply', async () => {

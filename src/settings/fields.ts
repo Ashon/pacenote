@@ -138,7 +138,7 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     section: 'messengers',
     messenger: 'slack',
     label: 'Who can ask',
-    help: 'Mentions from anyone else get a note that only they see. With the team hub, Pace answers only you.',
+    help: 'Only you. Pace runs on this Mac with your login, so anyone else who mentions it gets a note that only they see. With the team hub, each teammate pairs a Pace of their own.',
   },
   {
     id: 'reasoner',
@@ -342,19 +342,10 @@ export const SETTING_FIELDS: SettingField[] = [
   {
     key: 'MENTION_ALLOWED_USERS',
     group: 'access',
-    label: 'Allowed users',
-    help: 'Slack user IDs of the people who may ask Pace, separated by commas. Start with your own: in Slack, open your profile, click ⋮ and Copy member ID. Pace answers no one until this is set, unless anyone in the workspace may ask. Required when ops tools are on.',
+    label: 'Your Slack member ID',
+    help: 'Pace answers only you: it runs on this Mac with your login. In Slack, open your profile, click ⋮ and Copy member ID; setup fills it in when you say "@Pace it\'s me". Teammates each run their own Pace through your team\'s hub.',
     type: 'text',
-    placeholder: 'U0123ABCD, U0456EFGH',
-    shownWhen: { key: 'MENTION_ANYONE', equals: 'off' },
-  },
-  {
-    key: 'MENTION_ANYONE',
-    group: 'access',
-    label: 'Anyone in the workspace may ask',
-    help: 'Answers anyone in your Slack workspace instead of the people listed, but not people from other organizations in shared channels. Each answer runs on this Mac and uses your plan. Ops tools stay off while this is on.',
-    type: 'toggle',
-    default: 'off',
+    placeholder: 'U0123ABCD',
     shownWhen: { key: 'SLACK_CONNECTION', equals: 'app' },
   },
   {

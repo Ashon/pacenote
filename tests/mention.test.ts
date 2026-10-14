@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createLogger } from '../src/logger.js'
 import { ConcurrencyLimiter } from '../src/mention/limiter.js'
 import { systemPrompt, userPrompt } from '../src/mention/prompt.js'
-import { isAllowedUser } from '../src/mention/responder.js'
+import { isOwner } from '../src/mention/responder.js'
 import type { Directory } from '../src/messengers/slack/directory.js'
 import { stripBotMention } from '../src/messengers/slack/format.js'
 import { SlackMessenger } from '../src/messengers/slack/messenger.js'
@@ -25,17 +25,14 @@ describe('stripBotMention', () => {
   })
 })
 
-describe('isAllowedUser', () => {
-  it('allows the workspace when the list is empty, otherwise only listed users', () => {
-    expect(isAllowedUser({ userId: 'U1' }, [])).toBe(true)
-    expect(isAllowedUser({ userId: 'U1' }, ['U1'])).toBe(true)
-    expect(isAllowedUser({ userId: 'U2' }, ['U1'])).toBe(false)
-  })
-
-  it('leaves out other organizations unless they are listed', () => {
-    const outsider = { userId: 'U9', external: true }
-    expect(isAllowedUser(outsider, [])).toBe(false)
-    expect(isAllowedUser(outsider, ['U9'])).toBe(true)
+describe('isOwner', () => {
+  it('answers only the owner, and no one while the owner is not known', () => {
+    expect(isOwner({ userId: 'U1' }, 'U1')).toBe(true)
+    expect(isOwner({ userId: 'U2' }, 'U1')).toBe(false)
+    // Not known (a hub desktop before the hub names its member): no one, not
+    // everyone.
+    expect(isOwner({ userId: 'U1' }, undefined)).toBe(false)
+    expect(isOwner({ userId: '' }, '')).toBe(false)
   })
 })
 
@@ -99,7 +96,7 @@ describe('SlackMessenger.context', () => {
         directory,
         botUserId: 'UBOT',
         files: { token: 'xoxb-1' },
-        allowedUsers: [],
+        owner: () => 'U1',
         log: createLogger('error'),
       }),
     }

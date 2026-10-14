@@ -134,15 +134,12 @@ export const EnvSchema = z.object({
     .default(systemTimeZone),
 
   /**
-   * Who may ask Pace through your own Slack app. Required unless MENTION_ANYONE
-   * is on; with the team hub, each desktop answers only its own member.
+   * You: the one Slack member Pace answers through your own Slack app. Pace
+   * runs on your Mac with your login, so it answers only you; teammates each
+   * run their own Pace through the team hub, which sends a desktop only its
+   * member's mentions. The name is from when it took a list.
    */
   MENTION_ALLOWED_USERS: userIds,
-  /**
-   * Answers anyone in your workspace instead of a list, but not people from
-   * other organizations in shared channels (Slack Connect)
-   */
-  MENTION_ANYONE: z.enum(['on', 'off']).default('off'),
   MENTION_WORKSPACE: z.string().optional(),
   MENTION_CONCURRENCY: z.coerce.number().int().positive().default(2),
 
@@ -236,11 +233,10 @@ export interface Config {
   timezone: string
   mention: {
     /**
-     * Answers mentions only from these users. Empty means anyone in the
-     * workspace: MENTION_ANYONE, or a hub desktop, which gets only its own
-     * member's mentions
+     * The one person Pace answers: you, with your own Slack app. With the team
+     * hub it is the member the hub names once connected, so it is not here.
      */
-    allowedUserIds: string[]
+    owner?: string
     /** Directory to consult read-only when answering */
     workspace?: string
     /** Number of CLIs to run concurrently */
@@ -424,17 +420,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   const slack = slackConnection(e)
-  // Your own Slack app answers no one until you say who: a mention in a public
-  // channel drives a model on this Mac, as you.
-  if (
-    slack.kind === 'app' &&
-    e.MENTION_ANYONE !== 'on' &&
-    e.MENTION_ALLOWED_USERS.length === 0
-  )
+  // Pace answers only you: it runs on your Mac with your login, and a mention
+  // in a public channel drives it as you. Answering anyone else, or a whole
+  // workspace, is not a setting.
+  if (env.MENTION_ANYONE?.trim().toLowerCase() === 'on')
+    throw new Error(
+      'MENTION_ANYONE is gone: Pace answers only you. Remove it, and keep your own Slack member ID in MENTION_ALLOWED_USERS.'
+    )
+  const owners = [...new Set(e.MENTION_ALLOWED_USERS)]
+  if (slack.kind === 'app' && owners.length === 0)
     throw new MissingSettingError(
       'MENTION_ALLOWED_USERS',
-      'Choose who may ask Pace: list their Slack user IDs in MENTION_ALLOWED_USERS, or set MENTION_ANYONE=on to answer anyone in your workspace.',
+      'Say who you are: put your own Slack member ID in MENTION_ALLOWED_USERS (in Slack, your profile, then ⋮, Copy member ID). Pace answers only you.',
       'U0STANDIN'
+    )
+  if (slack.kind === 'app' && owners.length > 1)
+    throw new Error(
+      'MENTION_ALLOWED_USERS takes one Slack member ID, your own: Pace answers only you. Teammates each run their own Pace through the team hub.'
     )
 
   const dataDir = e.PACENOTE_DATA_DIR
@@ -445,8 +447,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     slack,
     timezone: e.TIMEZONE,
     mention: {
-      allowedUserIds:
-        e.MENTION_ANYONE === 'on' ? [] : [...new Set(e.MENTION_ALLOWED_USERS)],
+      ...(slack.kind === 'app' ? { owner: owners[0]! } : {}),
       workspace,
       concurrency: e.MENTION_CONCURRENCY,
     },
@@ -568,15 +569,10 @@ function buildReasonerConfig(
   }
   if (e.OPS_TOOLS === 'on') {
     // ops-broker uses SSH keys, a cluster read token, and the work directory.
-    // It stays off without the sandbox and an allowed user list.
+    // It stays off without the sandbox; Pace answers only you either way.
     if (e.REASONER_SANDBOX === 'none') {
       throw new Error(
         'OPS_TOOLS=on requires the built-in sandbox: REASONER_SANDBOX=vm.'
-      )
-    }
-    if (e.MENTION_ALLOWED_USERS.length === 0 || e.MENTION_ANYONE === 'on') {
-      throw new Error(
-        'OPS_TOOLS=on requires MENTION_ALLOWED_USERS to list who may use it, with MENTION_ANYONE off.'
       )
     }
     // The broker is relayed into each VM at this address (vm-broker.ts).

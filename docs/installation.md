@@ -47,8 +47,8 @@ brew install --cask pacenote
    - Turn on Socket Mode
 2. Basic Information -> App-Level Tokens: create a token with `connections:write` -> `SLACK_APP_TOKEN`
 3. Invite the bot to the public channels where it should answer. (`/invite @botname`) Put your own Slack member ID (your
-   profile > ⋮ > Copy member ID) in `MENTION_ALLOWED_USERS`: with your own app, the bot does not start until it knows who
-   may ask, or `MENTION_ANYONE=on` lets anyone in the workspace ask.
+   profile > ⋮ > Copy member ID) in `MENTION_ALLOWED_USERS`: Pace answers only you, and with your own app the bot does
+   not start until it knows who you are.
 4. Write the config file and check it. Config lives outside the repository in `~/.pacenote/.env`. (`PACENOTE_HOME` changes the location)
    The bot (app, terminal) and the sandbox jobs read this file, so values of the target environment never land in the repository.
 

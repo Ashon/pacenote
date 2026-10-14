@@ -52,8 +52,18 @@ export class HubReceiver implements Receiver {
    * PONG_TIMEOUT_MS drops the connection
    */
   private lastHeard = 0
+  /** The member this desktop is paired as, from the hub's ready message */
+  private connectedAs?: string
 
   constructor(private readonly options: HubReceiverOptions) {}
+
+  /**
+   * The member whose mentions this desktop answers, once the hub says who.
+   * Events for anyone else are dropped here, whatever the hub sends.
+   */
+  get member(): string | undefined {
+    return this.connectedAs
+  }
 
   init(app: App): void {
     this.app = app
@@ -121,6 +131,7 @@ export class HubReceiver implements Receiver {
       switch (message.type) {
         case 'ready':
           ready = true
+          this.connectedAs = message.user.id
           this.attempt = 0
           onState('connected')
           log.info(
@@ -171,10 +182,15 @@ export class HubReceiver implements Receiver {
   }
 
   private dispatch(body: Record<string, unknown>): void {
-    const event = body.event as { type?: string } | undefined
-    this.options.log.info(
-      `Received event ${[body.type, event?.type].filter(Boolean).join('/')} from the hub`
-    )
+    const event = body.event as { type?: string; user?: string } | undefined
+    const kind = [body.type, event?.type].filter(Boolean).join('/')
+    if (!this.connectedAs || event?.user !== this.connectedAs) {
+      this.options.log.warn(
+        `Dropped event ${kind} from the hub: it is not from this desktop's member`
+      )
+      return
+    }
+    this.options.log.info(`Received event ${kind} from the hub`)
     this.app
       ?.processEvent({ body, ack: async () => undefined })
       .catch((err: unknown) =>

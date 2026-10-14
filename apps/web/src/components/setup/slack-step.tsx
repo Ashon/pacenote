@@ -69,7 +69,7 @@ export function SlackStep({
         before={
           saved === 'app' &&
           me &&
-          allowedIds(values?.MENTION_ALLOWED_USERS).includes(me.id)
+          allowedIds(values?.MENTION_ALLOWED_USERS).join() === me.id
             ? me
             : undefined
         }
@@ -802,7 +802,7 @@ function TokenField({
 
 /**
  * 3b. "@Pace it's me": Pace, invited to a channel, is mentioned once, and the
- * person who did becomes the first who may ask once you confirm it is you.
+ * person who did becomes the one Pace answers once you confirm it is you.
  * The first to mention it stays shown until you say it is not you, so the
  * name cannot change under the button.
  */
@@ -873,7 +873,7 @@ function ItsMe({
       step="slack"
       part="Your own Slack app"
       title="Show Pace it's you"
-      lead="Pace answers only the people you allow. Mention it once in Slack, and you're the first."
+      lead="Pace answers only you. Mention it once in Slack so it knows which account is yours."
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
@@ -985,8 +985,8 @@ function ItsMe({
       )}
       <p className="text-body text-muted-foreground">
         While this is open, Pace answers no one: it only notes who mentions it
-        and tells that person alone to confirm here. You can let more people ask
-        later in Settings.
+        and tells that person alone to confirm here. After that, it answers only
+        you.
       </p>
     </StepFrame>
   )

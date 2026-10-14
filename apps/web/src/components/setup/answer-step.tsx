@@ -118,7 +118,7 @@ export function AnswerStep({
       {waited && (
         <Hint>
           Nothing yet? If Pace said in Slack that it can't answer there, mention
-          it in a public channel it's in, as someone allowed to ask.
+          it in a public channel it's in, as yourself.
         </Hint>
       )}
     </StepFrame>

@@ -19,7 +19,7 @@ export interface SetupRecord {
   step: SetupStep
   /** How Pace reaches Slack, once chosen */
   slack?: 'hub' | 'app'
-  /** The first who may ask: you, as Slack showed you */
+  /** You, the one Pace answers, as Slack showed you */
   me?: { id: string; name: string }
   /** When the wizard reached its last step; the first answer is one after it */
   answerSince?: string
@@ -122,7 +122,8 @@ export function stepToFix(
     const found = step(key)
     if (found) return found
   }
-  if (/\b(slack|hub|token|who may ask)\b/i.test(message)) return 'slack'
+  if (/\b(slack|hub|token|who you are|member id)\b/i.test(message))
+    return 'slack'
   if (/\b(sandbox|vm)\b/i.test(message)) return 'runtime'
   if (/\b(claude|codex|sign(?:ed)?[- ]in|login)\b/i.test(message)) return 'ai'
   return undefined

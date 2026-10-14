@@ -137,8 +137,11 @@ export interface MessengerProfile {
 export interface Messenger {
   readonly id: MessengerId
   readonly profile: MessengerProfile
-  /** User IDs allowed to ask; empty allows everyone */
-  readonly allowedUsers: readonly string[]
+  /**
+   * The one person Pace answers: you. undefined until it is known (the team
+   * hub names its member once connected), and Pace answers no one meanwhile.
+   */
+  readonly owner: string | undefined
 
   venue(mention: Mention): Promise<Venue>
   request(mention: Mention): Promise<Request>

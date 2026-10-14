@@ -1,9 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
+import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import WebSocket from 'ws'
+import WebSocket, { WebSocketServer } from 'ws'
 import {
   setupProblem,
   startFailureProblem,
@@ -533,6 +534,51 @@ describe('desktop side of the hub', () => {
     await new HubClient(base).disconnect(token)
     expect((await fatal).message).toMatch(/hub_revoked/)
     await receiver.stop()
+  })
+
+  it('answers only the member it is paired as, whatever the hub sends it', async () => {
+    // A hub that misroutes: before it says who the desktop is, and after,
+    // mentions by someone else.
+    const server = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+    await new Promise((resolve) => server.once('listening', resolve))
+    const { port } = server.address() as AddressInfo
+    const event = (user: string, text: string): HubMessage => ({
+      type: 'event',
+      body: {
+        type: 'event_callback',
+        event: { type: 'app_mention', user, text, channel: 'C1', ts: '1.1' },
+      },
+    })
+    server.on('connection', (ws) => {
+      for (const message of [
+        event(alice.id, 'before ready'),
+        { type: 'ready', user: alice, team: { id: 'T1', name: 'ashon' } },
+        event('U0BOB', 'from bob'),
+        event(alice.id, 'from alice'),
+      ] satisfies HubMessage[])
+        ws.send(JSON.stringify(message))
+    })
+    const processed: { event: { text: string } }[] = []
+    const receiver = new HubReceiver({
+      url: `http://127.0.0.1:${port}`,
+      token: 'a'.repeat(64),
+      log: quietLog,
+      onState: () => undefined,
+      onFatal: () => undefined,
+      createSocket: () => new WebSocket(`ws://127.0.0.1:${port}`),
+    })
+    receiver.init({
+      processEvent: async (event: { body: unknown }) =>
+        void processed.push(event.body as { event: { text: string } }),
+    } as never)
+    expect(receiver.member).toBeUndefined()
+    await receiver.start()
+    expect(receiver.member).toBe(alice.id)
+    await vi.waitFor(() => expect(processed).toHaveLength(1))
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(processed.map((body) => body.event.text)).toEqual(['from alice'])
+    await receiver.stop()
+    await new Promise((resolve) => server.close(resolve))
   })
 
   it('refuses to start with a token the hub does not know', async () => {

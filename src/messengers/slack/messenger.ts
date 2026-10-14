@@ -67,7 +67,8 @@ export interface SlackMessengerOptions {
    */
   workspaceUrl?: string
   files: SlackFileAccess
-  allowedUsers: readonly string[]
+  /** Who Pace answers (Messenger.owner), read on each mention */
+  owner: () => string | undefined
   /** The bot token's scopes, when Slack said (auth.test) */
   scopes?: readonly string[]
   /** Called when limits changes */
@@ -88,14 +89,16 @@ export class SlackMessenger implements Messenger {
     markup: 'Slack mrkdwn',
     public: true,
   }
-  readonly allowedUsers: readonly string[]
   /** Reaction errors already logged, so each shows once */
   private readonly reactionWarnings = new Set<string>()
   /** Why reactions do not work, until one does */
   private reactionLimit: string | undefined
 
+  get owner(): string | undefined {
+    return this.options.owner()
+  }
+
   constructor(private readonly options: SlackMessengerOptions) {
-    this.allowedUsers = options.allowedUsers
     if (options.scopes && !options.scopes.includes('reactions:write'))
       this.reactionLimit = REACTION_LIMITS.missing_scope
   }

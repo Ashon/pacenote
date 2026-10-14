@@ -103,12 +103,28 @@ MENTION_ALLOWED_USERS='U1, U2'
     expect(migrateEnvText(text)).toEqual({
       text: '# mine\nREASONER_SANDBOX=vm\nSANDBOX_IMAGE=x\n',
       changed: true,
+      notes: ['REASONER_SANDBOX=docker is now vm (the built-in sandbox)'],
     })
     for (const unchanged of ['REASONER_SANDBOX=vm\n', 'A=1\n', ''])
       expect(migrateEnvText(unchanged)).toEqual({
         text: unchanged,
         changed: false,
+        notes: [],
       })
+  })
+
+  it('drops answering the whole workspace, on or off: Pace answers only you', () => {
+    for (const value of ['on', 'off']) {
+      const text = `MENTION_ALLOWED_USERS=U1\nMENTION_ANYONE=${value}\nTASKS=on\n`
+      const migrated = migrateEnvText(text)
+      expect(migrated).toMatchObject({ changed: true })
+      expect(migrated.notes).toEqual([
+        'MENTION_ANYONE is removed: Pace answers only you',
+      ])
+      expect(migrated.text).not.toMatch(/MENTION_ANYONE/)
+      expect(migrated.text).toMatch(/^MENTION_ALLOWED_USERS=U1$/m)
+      expect(migrated.text).toMatch(/^TASKS=on$/m)
+    }
   })
 })
 
