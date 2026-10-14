@@ -13,6 +13,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
@@ -39,7 +40,24 @@ import type {
 const run = promisify(execFile)
 
 export type Session = Extract<WorkEntry, { kind: 'session' }>
-export type Terminal = 'terminal' | 'iterm'
+
+/**
+ * The terminals a session opens in (TASKS_TERMINAL): each runs a .command
+ * file it is opened with. Their bundle id, and the executable ps shows while
+ * one is open.
+ */
+export const TERMINALS = {
+  iterm: { name: 'iTerm2', bundle: 'com.googlecode.iterm2', exe: 'iTerm2' },
+  ghostty: { name: 'Ghostty', bundle: 'com.mitchellh.ghostty', exe: 'ghostty' },
+  terminal: { name: 'Terminal', bundle: 'com.apple.Terminal', exe: 'Terminal' },
+} as const
+export type TerminalApp = keyof typeof TERMINALS
+/** auto: the terminal you use (yourTerminal) */
+export type Terminal = TerminalApp | 'auto'
+
+/** TASKS_TERMINAL as a terminal; unset or unknown: auto */
+export const terminalOf = (value?: string): Terminal =>
+  value && Object.hasOwn(TERMINALS, value) ? (value as TerminalApp) : 'auto'
 
 // ---------------------------------------------------------------------------
 // Repository folders
@@ -305,17 +323,75 @@ function handoffDir(dataDir: string, now: number): string {
   return dir
 }
 
-/** Opens a .command file: Terminal.app or iTerm run it with your shell */
+/**
+ * Automatic's choice: of the terminals open now, else of those used on this
+ * Mac, the one used last; with nothing to tell them apart, one you installed
+ * over Terminal
+ */
+export function chooseTerminal(
+  seen: { app: TerminalApp; running: boolean; usedAt?: number }[]
+): TerminalApp {
+  const open = seen.filter((terminal) => terminal.running)
+  const order = Object.keys(TERMINALS)
+  const [chosen] = (open.length > 0 ? open : seen).toSorted(
+    (a, b) =>
+      (b.usedAt ?? 0) - (a.usedAt ?? 0) ||
+      order.indexOf(a.app) - order.indexOf(b.app)
+  )
+  return chosen?.app ?? 'terminal'
+}
+
+/**
+ * The terminal you use, for Automatic: each one's preferences file says it
+ * was used here and when (an app writes it as you use it), and ps which are
+ * open now. Terminal is always there.
+ */
+export async function yourTerminal(home: string): Promise<TerminalApp> {
+  const processes = await run('ps', ['-axo', 'comm=']).then(
+    ({ stdout }) => stdout.split('\n'),
+    () => []
+  )
+  const seen = Object.entries(TERMINALS).flatMap(([app, { bundle, exe }]) => {
+    let usedAt: number | undefined
+    try {
+      usedAt = statSync(
+        path.join(home, 'Library', 'Preferences', `${bundle}.plist`)
+      ).mtimeMs
+    } catch {
+      if (app !== 'terminal') return []
+    }
+    const running = processes.some((line) =>
+      line.endsWith(`.app/Contents/MacOS/${exe}`)
+    )
+    return [{ app: app as TerminalApp, running, usedAt }]
+  })
+  return chooseTerminal(seen)
+}
+
+/**
+ * Opens a .command file in the terminal, which runs it with your shell.
+ * Automatic falls back to Terminal when the one it chose is gone.
+ */
 export async function openInTerminal(
   file: string,
   terminal: Terminal
 ): Promise<void> {
   const opener = process.env.PACENOTE_HANDOFF_OPENER
-  const [command, args] = opener
-    ? [opener, [file]]
-    : ['open', ['-a', terminal === 'iterm' ? 'iTerm' : 'Terminal', file]]
+  if (!opener) {
+    const app = terminal === 'auto' ? await yourTerminal(homedir()) : terminal
+    const open = (which: TerminalApp) =>
+      run('open', ['-b', TERMINALS[which].bundle, file])
+    await open(app).catch((error: Error) => {
+      if (terminal === 'auto' && app !== 'terminal') return open('terminal')
+      throw new Error(
+        `${TERMINALS[app].name} did not open (${error.message.trim()}). ` +
+          'Choose another terminal in Settings > Todo.'
+      )
+    })
+    return
+  }
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'ignore', detached: true })
+    const child = spawn(opener, [file], { stdio: 'ignore', detached: true })
     child.on('error', reject)
     child.on('spawn', () => {
       child.unref()

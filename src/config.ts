@@ -199,7 +199,9 @@ export const EnvSchema = z.object({
    * you start yourself are looked for
    */
   TASKS_CLI: z.enum(['claude', 'codex']).default('claude'),
-  TASKS_TERMINAL: z.enum(['terminal', 'iterm']).default('terminal'),
+  TASKS_TERMINAL: z
+    .enum(['auto', 'terminal', 'iterm', 'ghostty'])
+    .default('auto'),
   TASKS_PLAN_FIRST: z.enum(['on', 'off']).default('on'),
   TASKS_LINK_SESSIONS: z.enum(['on', 'off']).default('off'),
 

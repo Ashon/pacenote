@@ -88,6 +88,7 @@ import {
   saveRepo,
   sessionFile,
   startSession,
+  terminalOf,
   type HandoffOptions,
   type Session,
 } from './handoff.js'
@@ -766,7 +767,7 @@ function registerBotIpc(): void {
     home: homedir(),
     bin: (tool) =>
       (tool === 'claude' ? env().CLAUDE_BIN : env().CODEX_BIN)?.trim() || tool,
-    terminal: () => (env().TASKS_TERMINAL === 'iterm' ? 'iterm' : 'terminal'),
+    terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
   })
   let lookedForSessions = 0

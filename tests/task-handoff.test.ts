@@ -19,6 +19,7 @@ import {
 } from '../apps/desktop/src/drafter.js'
 import {
   checkFolder,
+  chooseTerminal,
   commandScript,
   discoverSessions,
   findCodexSession,
@@ -35,6 +36,7 @@ import {
   sessionFile,
   shellQuote,
   startSession,
+  terminalOf,
   type HandoffOptions,
   type Session,
 } from '../apps/desktop/src/handoff.js'
@@ -325,6 +327,40 @@ describe('the handoff', () => {
     await expect(resumeSession(options, codex)).rejects.toThrow(
       /not been found/
     )
+  })
+
+  it('opens in the terminal you use, unless you chose one', () => {
+    const day = 86_400_000
+    // iTerm open and used today; Terminal open too (a session opened there)
+    expect(
+      chooseTerminal([
+        { app: 'iterm', running: true, usedAt: 3 * day },
+        { app: 'ghostty', running: false, usedAt: 4 * day },
+        { app: 'terminal', running: true, usedAt: day },
+      ])
+    ).toBe('iterm')
+    // None open: the one used last
+    expect(
+      chooseTerminal([
+        { app: 'iterm', running: false, usedAt: day },
+        { app: 'ghostty', running: false, usedAt: 2 * day },
+        { app: 'terminal', running: false },
+      ])
+    ).toBe('ghostty')
+    // Nothing tells them apart: one you installed over Terminal
+    expect(
+      chooseTerminal([
+        { app: 'terminal', running: false },
+        { app: 'iterm', running: false },
+      ])
+    ).toBe('iterm')
+    expect(chooseTerminal([{ app: 'terminal', running: false }])).toBe(
+      'terminal'
+    )
+
+    expect(terminalOf('iterm')).toBe('iterm')
+    expect(terminalOf(undefined)).toBe('auto')
+    expect(terminalOf('toString')).toBe('auto')
   })
 })
 
