@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { thirdPartyNotices } from './third-party-notices.mjs'
 
 /**
  * Builds single-file executables with their dependencies bundled in. The
@@ -11,7 +12,8 @@ import { build } from 'esbuild'
  * - build/tools/history-mcp.mjs: the run history's MCP server (AI tools launch
  *   it with the packaged app's Node)
  * - sandbox/ops-broker/dist/server.mjs: ops-broker (mounted in its VM at /app)
- * - deploy/hub/dist/hub.mjs: the team hub (goes into its image, deploy/hub)
+ * - deploy/hub/dist/hub.mjs: the team hub (goes into its image, deploy/hub),
+ *   with the licenses it ships with
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const { version } = JSON.parse(
@@ -45,3 +47,14 @@ for (const [entry, out] of targets) {
   })
   console.log(`${out}`)
 }
+
+// The hub's image carries the licenses beside its bundle
+// (deploy/hub/Dockerfile).
+const hubDist = path.join(root, 'deploy/hub/dist')
+copyFileSync(path.join(root, 'LICENSE'), path.join(hubDist, 'LICENSE'))
+copyFileSync(path.join(root, 'NOTICE'), path.join(hubDist, 'NOTICE'))
+writeFileSync(
+  path.join(hubDist, 'THIRD-PARTY-NOTICES.txt'),
+  `${thirdPartyNotices()}\n`
+)
+console.log('deploy/hub/dist/THIRD-PARTY-NOTICES.txt')

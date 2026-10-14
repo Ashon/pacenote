@@ -15,6 +15,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { thirdPartyNotices } from '../../../scripts/third-party-notices.mjs'
 
 /**
  * Builds the installable macOS app (Pacenote.app) and its release zip. (pnpm
@@ -246,6 +247,24 @@ run('/usr/bin/codesign', [
 await cp(path.join(binDir, 'pacenote-vm'), vmBin)
 // Debug symbols take half its size, and nobody debugs the shipped one.
 run('/usr/bin/strip', ['-S', '-x', vmBin])
+
+// Licenses: Pacenote's, the third-party software it bundles (pacenote-vm's
+// Swift packages are checked out by now), and Electron's with Chromium's
+// notices, from Electron's release beside its app.
+await cp(path.join(root, 'LICENSE'), path.join(resourcesDir, 'LICENSE'))
+await cp(path.join(root, 'NOTICE'), path.join(resourcesDir, 'NOTICE'))
+await writeFile(
+  path.join(resourcesDir, 'THIRD-PARTY-NOTICES.txt'),
+  `${thirdPartyNotices({ swift: true })}\n`
+)
+await cp(
+  path.join(extractedElectron, 'LICENSE'),
+  path.join(resourcesDir, 'LICENSE.electron.txt')
+)
+await cp(
+  path.join(extractedElectron, 'LICENSES.chromium.html'),
+  path.join(resourcesDir, 'LICENSES.chromium.html')
+)
 
 run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', appPath])
 // --deep signs nested code without entitlements; pacenote-vm needs its own to

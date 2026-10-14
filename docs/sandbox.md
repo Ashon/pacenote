@@ -82,6 +82,15 @@ Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in 
 5. With ops tools on, the ops broker's image: the broker then runs in a VM of its own while Pace runs, its way out
    limited to what its settings name (see [Ops tools](ops-tools.md#in-the-built-in-sandbox)).
 
+### The kernel's source
+
+The kernel is Linux 6.12.28 as Kata Containers builds it for its 3.17.0 release (`vmlinux-6.12.28-153`, kernel
+configuration version 153), republished unchanged. It is licensed under the GNU General Public License, version 2. Its
+source is the [Linux 6.12.28 release](https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.28.tar.xz) with the
+configuration, patches and build script in
+[kata-containers 3.17.0, tools/packaging/kernel](https://github.com/kata-containers/kata-containers/tree/3.17.0/tools/packaging/kernel).
+If you cannot get it there, open an issue in this repository and the source is sent to you.
+
 Each image is built from a recipe (`src/sandbox/vm-images.ts`): its script and the other files of `sandbox/vm` it
 installs, the versions it pins in `VERSIONS`, and its settings. The image keeps its recipe's hash, so when a newer
 Pacenote changes a recipe, Settings > Sandbox says "Update needed" and the status bar says which images were built for

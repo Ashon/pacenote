@@ -2,6 +2,7 @@
   "name": "@pacenote/desktop",
   "version": "0.5.14",
   "private": true,
+  "license": "Apache-2.0",
   "description": "Pacenote desktop app: runs the bot and shows its status, logs and run history",
   "type": "module",
   "main": "dist/main.js",

@@ -159,3 +159,10 @@ See [Development](docs/development.md) for more.
 ## Names
 
 **Pacenote** is the app and the project. **Pace** is who you talk to: the assistant in Slack and the voice of the app.
+
+## License
+
+Pacenote is a personal project, maintained by one person and offered as is. It is licensed under the
+[Apache License 2.0](LICENSE). The app and the hub's image carry the licenses of the software they bundle
+(THIRD-PARTY-NOTICES.txt), and the sandbox's Linux kernel is GPL-2.0, with its source described in
+[Reasoner sandbox](docs/sandbox.md#the-kernels-source).

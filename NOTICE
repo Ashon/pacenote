@@ -1,0 +1,11 @@
+Pacenote
+Copyright 2026 Ashon
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The desktop app and the team hub's image bundle third-party software under
+their own licenses, listed in THIRD-PARTY-NOTICES.txt beside them.
+
+The built-in sandbox boots a Linux kernel (GPL-2.0) built by Kata Containers,
+which Pacenote republishes unchanged as ghcr.io/ashon/pacenote-kernel. Where
+its source is: docs/sandbox.md, "The kernel's source".
