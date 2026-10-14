@@ -12,7 +12,8 @@ the pieces are drawn in [Architecture](architecture.md#your-tasks-and-ai-tools).
 2. In Pacenote, Settings > Todo: turn on "Gather my tasks from Slack". DMs stay out unless you turn on "Count DMs and group
    DMs"; "Leave out channels" skips the ones you list.
 3. On the Todo screen, click **Collect now**. It takes a minute or two; the screen shows how far it got, and what it added.
-   On other screens, the status bar shows it is still collecting.
+   On other screens, the status bar shows it is still collecting. Tasks it adds while you look at the list wait behind a
+   "2 new tasks" notice, so the rows you are reading stay put; click it to show them.
 
 The settings apply at once, without restarting Pace.
 

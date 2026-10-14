@@ -26,7 +26,6 @@ import {
   Undo2,
   X,
 } from 'lucide-react'
-import { Dialog } from 'radix-ui'
 import { useEffect, useId, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -36,11 +35,19 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { motionItem } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
@@ -152,6 +159,7 @@ export type TaskDecision = {
 
 export function TaskRow({
   task,
+  motion,
   cli,
   open,
   gone,
@@ -160,6 +168,8 @@ export function TaskRow({
   onDecide,
 }: {
   task: TaskView
+  /** Its list's motion as it comes and goes (useListMotion) */
+  motion?: Parameters<typeof motionItem>[0]
   /** Where code tasks continue */
   cli: WorkTool
   open: boolean
@@ -175,7 +185,12 @@ export function TaskRow({
   // Its repository's folder: Continue opens there without asking.
   const folder = repoFolderOf(useRepoFolders().data, task.repo)
   const [dismissing, setDismissing] = useState(false)
-  const [folderFor, setFolderFor] = useState<WorkTool>()
+  // The folder dialog, kept for the tool it was for while it closes
+  const [folderAsk, setFolderAsk] = useState<{
+    tool: WorkTool
+    open: boolean
+  }>()
+  const askFolder = (tool: WorkTool) => setFolderAsk({ tool, open: true })
   const [drafting, setDrafting] = useState(false)
   const [reply, setReply] = useState<string>()
   const [error, setError] = useState<string>()
@@ -192,7 +207,7 @@ export function TaskRow({
     // A folder the repository was opened in before goes straight on.
     const detail = await client.fetchQuery(taskDetailQuery(task.id))
     if (detail?.folder) setError(await act.continueIn(tool, detail.folder))
-    else setFolderFor(tool)
+    else askFolder(tool)
   }
   const draft = async () => {
     setError(undefined)
@@ -251,7 +266,7 @@ export function TaskRow({
             run: () => {
               setError(undefined)
               if (!open) onToggle()
-              setFolderFor(cli)
+              askFolder(cli)
             },
           },
         ]
@@ -271,6 +286,7 @@ export function TaskRow({
     <li
       ref={row}
       data-task-row={task.id}
+      {...(motion && motionItem(motion))}
       className={cn(
         'border-t border-border py-3.5',
         task.faded && !open && 'opacity-60'
@@ -288,7 +304,7 @@ export function TaskRow({
                 <ChevronRight
                   aria-hidden="true"
                   className={cn(
-                    'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:text-primary motion-reduce:transition-none',
+                    'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:text-primary',
                     open && 'rotate-90'
                   )}
                 />
@@ -462,7 +478,7 @@ export function TaskRow({
             {error}
           </p>
         )}
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down motion-reduce:animate-none">
+        <CollapsibleContent>
           <TaskOpen
             task={task}
             drafting={drafting}
@@ -475,15 +491,16 @@ export function TaskRow({
         </CollapsibleContent>
       </Collapsible>
 
-      {folderFor && (
+      {folderAsk && (
         <FolderDialog
           task={task}
-          tool={folderFor}
-          onClose={() => setFolderFor(undefined)}
+          tool={folderAsk.tool}
+          open={folderAsk.open}
+          onClose={() => setFolderAsk({ ...folderAsk, open: false })}
           onOpen={async (folder) => {
-            const failed = await act.continueIn(folderFor, folder)
+            const failed = await act.continueIn(folderAsk.tool, folder)
             if (failed) return failed
-            setFolderFor(undefined)
+            setFolderAsk({ ...folderAsk, open: false })
             return undefined
           }}
         />
@@ -914,21 +931,32 @@ function OpensIn({
   return <Tooltip content={`Opens in ${tilde(folder)}`}>{children}</Tooltip>
 }
 
-/**
- * Where the session opens, when its repository has no folder yet (or you
- * choose another): the likeliest folders, the first one chosen
- */
-function FolderDialog({
-  task,
-  tool,
-  onClose,
-  onOpen,
-}: {
+type FolderProps = {
   task: TaskView
   tool: WorkTool
-  onClose: () => void
   onOpen: (folder: string) => Promise<string | undefined>
-}) {
+}
+
+/**
+ * Where the session opens, when its repository has no folder yet (or you
+ * choose another): the likeliest folders, the first one chosen. The folders
+ * are looked up each time it opens.
+ */
+function FolderDialog({
+  open,
+  onClose,
+  ...props
+}: FolderProps & { open: boolean; onClose: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="w-[34rem] max-w-[calc(100vw-2rem)] gap-4 p-6">
+        <FolderChoice {...props} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function FolderChoice({ task, tool, onOpen }: FolderProps) {
   const bridge = window.pacenoteDesktop?.tasks
   const [found, setFound] = useState<FolderCheck[]>()
   const [chosen, setChosen] = useState<string>()
@@ -951,134 +979,129 @@ function FolderDialog({
   }
   const chosenCheck = found?.find((folder) => folder.path === chosen)
   return (
-    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/25" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 flex w-[34rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-[20px] bg-card p-6 shadow-2xl outline-none">
-          <div className="flex flex-col gap-1.5">
-            <Dialog.Title className="text-base font-semibold">
-              {task.repo
-                ? `Where is ${task.repo} on this Mac?`
-                : 'Where should the session open?'}
-            </Dialog.Title>
-            <Dialog.Description className="text-[13px] text-muted-foreground">
-              {TOOL[tool]} opens in this folder with the task.
-              {task.repo
-                ? ' Pacenote remembers it for this repository; change it in Settings > Todo.'
-                : ''}
-            </Dialog.Description>
-          </div>
-          <div
-            role="radiogroup"
-            aria-label="Folder"
-            className="flex flex-col gap-2"
-          >
-            {found === undefined && (
-              <p className="text-[13px] text-muted-foreground">
-                {task.repo
-                  ? `Looking for ${task.repo} on this Mac.`
-                  : 'Looking for the folders you worked in.'}
-              </p>
-            )}
-            {found?.length === 0 && task.repo && (
-              <p className="text-[13px] text-muted-foreground">
-                No checkout of {task.repo} found under your usual folders.
-              </p>
-            )}
-            {found?.map((folder) => (
-              <button
-                key={folder.path}
-                type="button"
-                role="radio"
-                aria-checked={folder.path === chosen}
-                onClick={() => setChosen(folder.path)}
-                className={cn(
-                  'flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors',
-                  folder.path === chosen
-                    ? 'border-primary/50 bg-primary/6'
-                    : 'border-border hover:border-primary/30'
-                )}
-              >
-                <span
-                  className={cn(
-                    'mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border',
-                    folder.path === chosen
-                      ? 'border-primary'
-                      : 'border-muted-foreground/40'
-                  )}
-                >
-                  {folder.path === chosen && (
-                    <span className="size-1.5 rounded-full bg-primary" />
-                  )}
-                </span>
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-mono text-[13px] font-semibold break-all">
-                    {folder.path}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {[
-                      folder.error?.replace(/\.$/, '') ??
-                        [
-                          folder.remote
-                            ? `Its remote is ${folder.remote}`
-                            : 'No remote',
-                          folder.changes
-                            ? `${folder.changes} changes not committed`
-                            : 'clean',
-                        ].join(' · '),
-                      !folder.matches && !folder.error && task.repo
-                        ? `not ${task.repo}`
-                        : undefined,
-                      folder.usedAt
-                        ? `used ${formatRelative(folder.usedAt)}`
-                        : undefined,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </span>
-              </button>
-            ))}
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => void choose()}
-            >
-              <FolderOpen />
-              Choose another folder
-            </Button>
-          </div>
-          <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-xs text-muted-foreground">
-            <Lock className="mt-px size-3.5 shrink-0" />
-            {TOOL[tool]} runs as you, with your own permissions, and asks you
-            before it changes anything. Pacenote opens the session and hands it
-            the task; it runs no commands itself.
+    <>
+      <div className="flex flex-col gap-1.5">
+        <DialogTitle className="text-base font-semibold">
+          {task.repo
+            ? `Where is ${task.repo} on this Mac?`
+            : 'Where should the session open?'}
+        </DialogTitle>
+        <DialogDescription className="text-[13px] text-muted-foreground">
+          {TOOL[tool]} opens in this folder with the task.
+          {task.repo
+            ? ' Pacenote remembers it for this repository; change it in Settings > Todo.'
+            : ''}
+        </DialogDescription>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Folder"
+        className="flex flex-col gap-2"
+      >
+        {found === undefined && (
+          <p className="text-[13px] text-muted-foreground">
+            {task.repo
+              ? `Looking for ${task.repo} on this Mac.`
+              : 'Looking for the folders you worked in.'}
           </p>
-          {error && (
-            <p role="alert" className="text-sm text-status-failed">
-              {error}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <Dialog.Close asChild>
-              <Button variant="secondary">Cancel</Button>
-            </Dialog.Close>
-            <Button
-              disabled={!chosen || opening || !!chosenCheck?.error}
-              onClick={async () => {
-                setOpening(true)
-                setError(await onOpen(chosen!))
-                setOpening(false)
-              }}
+        )}
+        {found?.length === 0 && task.repo && (
+          <p className="text-[13px] text-muted-foreground">
+            No checkout of {task.repo} found under your usual folders.
+          </p>
+        )}
+        {found?.map((folder) => (
+          <button
+            key={folder.path}
+            type="button"
+            role="radio"
+            aria-checked={folder.path === chosen}
+            onClick={() => setChosen(folder.path)}
+            className={cn(
+              'flex items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors',
+              folder.path === chosen
+                ? 'border-primary/50 bg-primary/6'
+                : 'border-border hover:border-primary/30'
+            )}
+          >
+            <span
+              className={cn(
+                'mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border',
+                folder.path === chosen
+                  ? 'border-primary'
+                  : 'border-muted-foreground/40'
+              )}
             >
-              <SquareTerminal />
-              Open {TOOL[tool]} here
-            </Button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+              {folder.path === chosen && (
+                <span className="size-1.5 rounded-full bg-primary" />
+              )}
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-mono text-[13px] font-semibold break-all">
+                {folder.path}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {[
+                  folder.error?.replace(/\.$/, '') ??
+                    [
+                      folder.remote
+                        ? `Its remote is ${folder.remote}`
+                        : 'No remote',
+                      folder.changes
+                        ? `${folder.changes} changes not committed`
+                        : 'clean',
+                    ].join(' · '),
+                  !folder.matches && !folder.error && task.repo
+                    ? `not ${task.repo}`
+                    : undefined,
+                  folder.usedAt
+                    ? `used ${formatRelative(folder.usedAt)}`
+                    : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </span>
+          </button>
+        ))}
+        <Button
+          size="sm"
+          variant="outline"
+          className="self-start"
+          onClick={() => void choose()}
+        >
+          <FolderOpen />
+          Choose another folder
+        </Button>
+      </div>
+      <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-xs text-muted-foreground">
+        <Lock className="mt-px size-3.5 shrink-0" />
+        {TOOL[tool]} runs as you, with your own permissions, and asks you before
+        it changes anything. Pacenote opens the session and hands it the task;
+        it runs no commands itself.
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-status-failed">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end gap-2">
+        <DialogClose asChild>
+          <Button variant="secondary">Cancel</Button>
+        </DialogClose>
+        <Button
+          disabled={!chosen || opening || !!chosenCheck?.error}
+          onClick={async () => {
+            setOpening(true)
+            setError(await onOpen(chosen!))
+            setOpening(false)
+          }}
+        >
+          <SquareTerminal />
+          Open {TOOL[tool]} here
+        </Button>
+      </div>
+    </>
   )
 }
 
@@ -1129,149 +1152,147 @@ function SessionLogPanel({
   const tool = entry ? TOOL[entry.tool] : 'The session'
 
   return (
-    <Dialog.Root open onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-foreground/15 animate-in fade-in-0 motion-reduce:animate-none" />
-        <Dialog.Content
-          aria-describedby={undefined}
-          className="fixed inset-y-2 right-2 z-50 flex w-[40rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[18px] bg-card shadow-2xl outline-none animate-in fade-in-0 slide-in-from-right-8 duration-200 motion-reduce:animate-none"
-        >
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
-            <Dialog.Title className="text-sm font-semibold">
-              Session log
-            </Dialog.Title>
-            <span className="flex-1" />
-            <Dialog.Close asChild>
-              <Button size="icon-sm" variant="ghost" aria-label="Close the log">
-                <X />
-              </Button>
-            </Dialog.Close>
-          </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-4 px-6 py-5">
-              {!entry ? (
-                <p className="text-sm text-muted-foreground">
-                  {detail.isPending
-                    ? 'Finding the session.'
-                    : 'There is no such session.'}
-                </p>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <h2 className="text-base font-semibold tracking-tight">
-                      {found.title}
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      {tool} session ·{' '}
-                      <span className="font-mono">{entry.cwd}</span> ·{' '}
-                      {formatDateTime(entry.startedAt)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        variant="sheet"
+        aria-describedby={undefined}
+        className="w-[40rem] max-w-[calc(100vw-1rem)]"
+      >
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
+          <DialogTitle className="text-sm font-semibold">
+            Session log
+          </DialogTitle>
+          <span className="flex-1" />
+          <DialogClose asChild>
+            <Button size="icon-sm" variant="ghost" aria-label="Close the log">
+              <X />
+            </Button>
+          </DialogClose>
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col gap-4 px-6 py-5">
+            {!entry ? (
+              <p className="text-sm text-muted-foreground">
+                {detail.isPending
+                  ? 'Finding the session.'
+                  : 'There is no such session.'}
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-base font-semibold tracking-tight">
+                    {found.title}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    {tool} session ·{' '}
+                    <span className="font-mono">{entry.cwd}</span> ·{' '}
+                    {formatDateTime(entry.startedAt)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => void act.resume(entry.id).then(setError)}
+                    disabled={!entry.session}
+                  >
+                    <SquareTerminal />
+                    Continue in {tool}
+                  </Button>
+                  {entry.session && (
                     <Button
                       size="sm"
-                      onClick={() => void act.resume(entry.id).then(setError)}
-                      disabled={!entry.session}
-                    >
-                      <SquareTerminal />
-                      Continue in {tool}
-                    </Button>
-                    {entry.session && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          void navigator.clipboard.writeText(
-                            `${entry.tool === 'claude' ? 'claude --resume' : 'codex resume'} ${entry.session}`
-                          )
-                        }
-                      >
-                        <Copy />
-                        <span className="font-mono text-xs">
-                          {entry.tool === 'claude'
-                            ? 'claude --resume'
-                            : 'codex resume'}{' '}
-                          {entry.session.slice(0, 8)}…
-                        </span>
-                      </Button>
-                    )}
-                  </div>
-                  {error && (
-                    <p role="alert" className="text-sm text-status-failed">
-                      {error}
-                    </p>
-                  )}
-                  {!log ? (
-                    <p className="text-sm text-muted-foreground">
-                      Reading the session&apos;s log.
-                    </p>
-                  ) : log.error ? (
-                    <p className="text-sm text-muted-foreground">{log.error}</p>
-                  ) : (
-                    <ol className="flex flex-col gap-3">
-                      {(log.items ?? []).map((item, index) =>
-                        item.role === 'tool' ? (
-                          <li
-                            key={index}
-                            className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px]"
-                          >
-                            <span className="shrink-0 font-mono font-medium">
-                              {item.name}
-                            </span>
-                            <span className="min-w-0 truncate font-mono text-muted-foreground">
-                              {item.text}
-                            </span>
-                          </li>
-                        ) : (
-                          <li key={index} className="flex items-start gap-3">
-                            <span
-                              className={cn(
-                                'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                                item.role === 'user'
-                                  ? 'bg-secondary text-secondary-foreground'
-                                  : 'bg-foreground text-background'
-                              )}
-                              aria-hidden="true"
-                            >
-                              {item.role === 'user' ? 'Y' : tool[0]}
-                            </span>
-                            <div
-                              className={cn(
-                                'min-w-0 flex-1 rounded-[20px] px-4 py-3',
-                                item.role === 'user'
-                                  ? 'bg-well'
-                                  : 'border border-border'
-                              )}
-                            >
-                              <p className="text-sm font-semibold">
-                                {item.role === 'user' ? 'You' : tool}
-                                {item.at && (
-                                  <span className="ml-2 text-[11px] font-normal text-muted-foreground">
-                                    {formatDateTime(item.at)}
-                                  </span>
-                                )}
-                              </p>
-                              <p className="mt-1 text-[13.5px] leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
-                                {item.text}
-                              </p>
-                            </div>
-                          </li>
+                      variant="outline"
+                      onClick={() =>
+                        void navigator.clipboard.writeText(
+                          `${entry.tool === 'claude' ? 'claude --resume' : 'codex resume'} ${entry.session}`
                         )
-                      )}
-                    </ol>
+                      }
+                    >
+                      <Copy />
+                      <span className="font-mono text-xs">
+                        {entry.tool === 'claude'
+                          ? 'claude --resume'
+                          : 'codex resume'}{' '}
+                        {entry.session.slice(0, 8)}…
+                      </span>
+                    </Button>
                   )}
-                  <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                    <MessagesSquare className="mt-px size-3.5 shrink-0" />
-                    Read from {tool}&apos;s own session log on this Mac when you
-                    opened it. Pacenote keeps only the session&apos;s id, folder
-                    and times.
+                </div>
+                {error && (
+                  <p role="alert" className="text-sm text-status-failed">
+                    {error}
                   </p>
-                </>
-              )}
-            </div>
-          </ScrollArea>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+                )}
+                {!log ? (
+                  <p className="text-sm text-muted-foreground">
+                    Reading the session&apos;s log.
+                  </p>
+                ) : log.error ? (
+                  <p className="text-sm text-muted-foreground">{log.error}</p>
+                ) : (
+                  <ol className="flex flex-col gap-3">
+                    {(log.items ?? []).map((item, index) =>
+                      item.role === 'tool' ? (
+                        <li
+                          key={index}
+                          className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-[12.5px]"
+                        >
+                          <span className="shrink-0 font-mono font-medium">
+                            {item.name}
+                          </span>
+                          <span className="min-w-0 truncate font-mono text-muted-foreground">
+                            {item.text}
+                          </span>
+                        </li>
+                      ) : (
+                        <li key={index} className="flex items-start gap-3">
+                          <span
+                            className={cn(
+                              'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                              item.role === 'user'
+                                ? 'bg-secondary text-secondary-foreground'
+                                : 'bg-foreground text-background'
+                            )}
+                            aria-hidden="true"
+                          >
+                            {item.role === 'user' ? 'Y' : tool[0]}
+                          </span>
+                          <div
+                            className={cn(
+                              'min-w-0 flex-1 rounded-[20px] px-4 py-3',
+                              item.role === 'user'
+                                ? 'bg-well'
+                                : 'border border-border'
+                            )}
+                          >
+                            <p className="text-sm font-semibold">
+                              {item.role === 'user' ? 'You' : tool}
+                              {item.at && (
+                                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                                  {formatDateTime(item.at)}
+                                </span>
+                              )}
+                            </p>
+                            <p className="mt-1 text-[13.5px] leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
+                              {item.text}
+                            </p>
+                          </div>
+                        </li>
+                      )
+                    )}
+                  </ol>
+                )}
+                <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <MessagesSquare className="mt-px size-3.5 shrink-0" />
+                  Read from {tool}&apos;s own session log on this Mac when you
+                  opened it. Pacenote keeps only the session&apos;s id, folder
+                  and times.
+                </p>
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   )
 }

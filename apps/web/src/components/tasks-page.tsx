@@ -1,10 +1,16 @@
 import { newTokens } from '@history/usage'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
 import { ChevronRight, History, RefreshCw, Settings } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  type ListEntry,
+  Swap,
+  useListMotion,
+  usePresence,
+} from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -45,6 +51,11 @@ function declinedOffers(): string[] {
  * Slack connector collects them through Pacenote's MCP server; Done and
  * Dismiss are one click. A task opens in its row (#/tasks/<id>), one at a
  * time: up and down step through the list, Esc closes it.
+ *
+ * The list moves only for what you do: a settled task leaves its tab
+ * (settle), and tasks that come in while you look, from a collection or an AI
+ * tool, wait behind a notice that shows them (arrive), so the rows you are
+ * reading stay put.
  */
 export function TasksPage({
   openId,
@@ -64,6 +75,14 @@ export function TasksPage({
   // session, say), it stays where it was until it is closed.
   const [held, setHeld] = useState<{ id: string; tab: Tab }>()
   const data = tasks.data
+  // The tasks you have seen listed. Others that come into the tab wait for
+  // you to show them; moving to a tab shows all of its tasks.
+  const [seen, setSeen] = useState<ReadonlySet<string>>()
+  // The first of them once shown, brought into view
+  const [revealed, setRevealed] = useState<string>()
+  const ids = data?.tasks.map((task) => task.id) ?? []
+  if (data && !seen) setSeen(new Set(ids))
+  const showAll = () => setSeen(new Set(ids))
 
   // A task opened from a link shows under its own tab.
   useEffect(() => {
@@ -98,13 +117,22 @@ export function TasksPage({
   const maybe = data.tasks.filter((task) => task.status === 'maybe')
   const kept = (task: TaskView) =>
     task.id === openId && held?.id === openId && held.tab === tab
-  const shown = data.tasks.filter((task) => tabOf(task) === tab || kept(task))
+  const listed = data.tasks.filter((task) => tabOf(task) === tab || kept(task))
   if (tab === 'done')
-    shown.sort(
+    listed.sort(
       (a, b) =>
         (Date.parse(b.settledAt ?? '') || 0) -
         (Date.parse(a.settledAt ?? '') || 0)
     )
+  // New tasks wait unless there is nothing in the list for them to move
+  const isNew = (task: TaskView) =>
+    seen !== undefined && !seen.has(task.id) && task.id !== openId
+  const waiting = listed.some((task) => !isNew(task))
+    ? listed.filter(isNew)
+    : []
+  const shown = listed.filter((task) => !waiting.includes(task))
+  if (seen && shown.some((task) => !seen.has(task.id)))
+    setSeen(new Set([...seen, ...shown.map((task) => task.id)]))
 
   // Up and down step through the tasks (the open one follows); Esc closes it.
   const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
@@ -112,8 +140,11 @@ export function TasksPage({
     // Keys in a dialog or menu over the list, or while typing, are theirs.
     if (!event.currentTarget.contains(target)) return
     if (target.closest('textarea, input, select')) return
+    // Not the rows on their way out
     const titles = [
-      ...event.currentTarget.querySelectorAll<HTMLElement>('[data-task-title]'),
+      ...event.currentTarget.querySelectorAll<HTMLElement>(
+        '[data-task-row]:not([inert]) [data-task-title]'
+      ),
     ]
     const rowOf = (element: Element) =>
       element.closest<HTMLElement>('[data-task-row]')?.dataset.taskRow
@@ -178,56 +209,138 @@ export function TasksPage({
         </Banner>
       )}
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          setTab(value as Tab)
+          showAll()
+        }}
+      >
         <TabsList className="mt-5">
           <TabsTrigger value="open">Open {open.length}</TabsTrigger>
           <TabsTrigger value="maybe">Maybe {maybe.length}</TabsTrigger>
           <TabsTrigger value="done">Done</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === 'maybe' && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Guesses Pace is not sure about. They stay out of the list until you
-          keep one.
-        </p>
-      )}
 
-      <ul className="mt-3" onKeyDown={onKeyDown}>
-        {shown.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            cli={data.settings.cli}
-            open={task.id === openId}
-            gone={tabOf(task) !== tab}
-            logEntry={task.id === openId ? logEntry : undefined}
-            onToggle={() =>
-              go(task.id === openId ? '#/tasks' : taskHash(task.id))
-            }
-            onDecide={(decision) => void decide(task.id, decision)}
-          />
-        ))}
-      </ul>
-      {shown.length === 0 && (
-        <p className="border-t border-border py-8 text-sm text-muted-foreground">
-          {tab === 'open'
-            ? data.collectedAt
-              ? 'Nothing open. The next collection reads what is new since this one.'
-              : 'Nothing yet. A first collection reads the last 7 days.'
-            : tab === 'maybe'
-              ? 'No Maybes.'
-              : 'Nothing settled in the last 14 days.'}
-        </p>
-      )}
-      {tab === 'done' && data.dismissRate !== undefined && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          You dismissed {Math.round(data.dismissRate * 100)}% of the tasks you
-          settled. Above about 30%, Pace is picking too loosely.
-        </p>
-      )}
+      {/* Another tab's list takes this one's place (swap) */}
+      <Swap id={tab}>
+        <NewTasks
+          count={waiting.length}
+          onShow={() => {
+            showAll()
+            setRevealed(waiting[0]?.id)
+          }}
+        />
+        {tab === 'maybe' && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Guesses Pace is not sure about. They stay out of the list until you
+            keep one.
+          </p>
+        )}
+        <TaskList
+          tasks={shown}
+          onKeyDown={onKeyDown}
+          revealed={revealed}
+          row={(task, motion) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              motion={motion}
+              cli={data.settings.cli}
+              open={task.id === openId}
+              gone={tabOf(task) !== tab}
+              logEntry={task.id === openId ? logEntry : undefined}
+              onToggle={() =>
+                go(task.id === openId ? '#/tasks' : taskHash(task.id))
+              }
+              onDecide={(decision) => void decide(task.id, decision)}
+            />
+          )}
+        />
+        {shown.length === 0 && (
+          <p className="border-t border-border py-8 text-sm text-muted-foreground">
+            {tab === 'open'
+              ? data.collectedAt
+                ? 'Nothing open. The next collection reads what is new since this one.'
+                : 'Nothing yet. A first collection reads the last 7 days.'
+              : tab === 'maybe'
+                ? 'No Maybes.'
+                : 'Nothing settled in the last 14 days.'}
+          </p>
+        )}
+        {tab === 'done' && data.dismissRate !== undefined && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            You dismissed {Math.round(data.dismissRate * 100)}% of the tasks you
+            settled. Above about 30%, Pace is picking too loosely.
+          </p>
+        )}
+      </Swap>
 
       <RecentCollections collections={data.collections ?? []} />
     </Page>
+  )
+}
+
+/**
+ * A tab's rows. A task that leaves the tab, settled, is pushed aside and the
+ * rows below close up (settle); one that comes in unfolds (arrive).
+ */
+function TaskList({
+  tasks,
+  revealed,
+  onKeyDown,
+  row,
+}: {
+  tasks: TaskView[]
+  /** A task just shown: it is brought into view */
+  revealed?: string
+  onKeyDown: (event: React.KeyboardEvent<HTMLUListElement>) => void
+  row: (task: TaskView, motion: ListEntry<TaskView>) => React.ReactNode
+}) {
+  const { ref, entries } = useListMotion(tasks, (task) => task.id)
+  useEffect(() => {
+    if (!revealed) return
+    ref.current
+      ?.querySelector(`[data-task-row="${CSS.escape(revealed)}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [revealed, ref])
+  return (
+    <ul ref={ref} className="mt-3" onKeyDown={onKeyDown}>
+      {entries.map((entry) => row(entry.item, entry))}
+    </ul>
+  )
+}
+
+/**
+ * Tasks that came in while you were looking, from a collection or an AI tool:
+ * a notice on the tabs' line, clear of the rows, that shows them where they
+ * belong. It slides in from above (pop) and stays in view as you scroll.
+ */
+function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
+  const notice = usePresence<HTMLButtonElement>(count > 0)
+  // Leaving, it still says how many it showed
+  const said = useRef(count)
+  if (count > 0) said.current = count
+  return (
+    <div
+      aria-live="polite"
+      // On the tabs' line above it; stuck, 12px below the top
+      className="sticky top-[42px] z-10 flex h-0 justify-center"
+    >
+      {notice.mounted && (
+        <button
+          ref={notice.ref}
+          type="button"
+          data-state={notice.state}
+          data-side="bottom"
+          onClick={onShow}
+          className="motion-pop -mt-[30px] h-7 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          {said.current} new {said.current === 1 ? 'task' : 'tasks'}
+        </button>
+      )}
+    </div>
   )
 }
 

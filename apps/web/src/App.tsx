@@ -5,6 +5,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -149,7 +150,7 @@ export default function App() {
         <header className="titlebar-drag grid h-12 shrink-0 grid-cols-[1fr_minmax(0,520px)_1fr] items-center gap-3 px-3">
           <div
             className={cn(
-              'flex transition-[padding] duration-200 motion-reduce:transition-none',
+              'motion-layout flex',
               isMacDesktop && (fullScreen ? 'pl-1' : 'pl-[72px]')
             )}
           >
@@ -170,33 +171,36 @@ export default function App() {
             showDebug={showDebug}
           />
           {/* One surface holds the whole screen. Its parts are told apart by
-              space and hairlines, not by cards of their own. */}
+              space and hairlines, not by cards of their own. Moving to
+              another section swaps what it shows. */}
           <main
             className="content-surface mr-3 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-card"
             style={{ boxShadow: 'var(--card-shadow)' }}
           >
-            {route.page === 'bot' ? (
-              <BotPage />
-            ) : route.page === 'tasks' ? (
-              // The same list whether a task is open or not, so its tab and
-              // scroll stay as they were
-              <TasksPage openId={route.id} logEntry={route.entry} />
-            ) : route.page === 'settings' ? (
-              <SettingsPage />
-            ) : route.page === 'debug' ? (
-              <Suspense>{DebugPage && <DebugPage />}</Suspense>
-            ) : route.page === 'runs' ? (
-              <RunsPage
-                q={q}
-                selectedId={route.id}
-                width={surfaceWidth}
-                onSelect={(id) => go(id ? `#/runs/${id}` : '#/runs')}
-              />
-            ) : (
-              <ScrollArea className="h-full">
-                <Overview />
-              </ScrollArea>
-            )}
+            <Swap id={route.page} className="h-full">
+              {route.page === 'bot' ? (
+                <BotPage />
+              ) : route.page === 'tasks' ? (
+                // The same list whether a task is open or not, so its tab and
+                // scroll stay as they were
+                <TasksPage openId={route.id} logEntry={route.entry} />
+              ) : route.page === 'settings' ? (
+                <SettingsPage />
+              ) : route.page === 'debug' ? (
+                <Suspense>{DebugPage && <DebugPage />}</Suspense>
+              ) : route.page === 'runs' ? (
+                <RunsPage
+                  q={q}
+                  selectedId={route.id}
+                  width={surfaceWidth}
+                  onSelect={(id) => go(id ? `#/runs/${id}` : '#/runs')}
+                />
+              ) : (
+                <ScrollArea className="h-full">
+                  <Overview />
+                </ScrollArea>
+              )}
+            </Swap>
           </main>
         </div>
         <StatusBar onOpenRoute={go} />

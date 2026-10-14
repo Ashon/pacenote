@@ -46,7 +46,7 @@ export function SearchField({
         }}
         placeholder="Search runs by request, channel or reply"
         aria-label="Search runs"
-        className="h-8 w-full rounded-lg border border-sidebar-border bg-card pr-14 pl-8.5 text-[13px] shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
+        className="h-8 w-full rounded-lg border border-sidebar-border bg-card pr-14 pl-8.5 text-[13px] shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
       />
       <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
         {value ? (

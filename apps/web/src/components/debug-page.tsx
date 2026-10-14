@@ -5,10 +5,39 @@ import type {
   SupervisorState,
 } from '@runtime/types'
 import type { TasksCollect } from '@src/tasks/types'
-import { Pause, Play, Square } from 'lucide-react'
+import {
+  ChevronRight,
+  CircleCheck,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Plus,
+  Square,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { motionItem, Swap, useListMotion } from '@/components/ui/motion'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { BotMark } from './bot-page'
 import { TONE_CLASS, type BotTone } from './bot-state'
@@ -57,7 +86,7 @@ const WIDTHS = [0, 820, 700, 630, 530]
 export function DebugPage() {
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-4xl space-y-8 px-8 py-7">
+      <div className="@container max-w-4xl space-y-8 px-8 py-7">
         <header>
           <h1 className="text-lg font-semibold tracking-tight">Debug</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -68,6 +97,7 @@ export function DebugPage() {
         <SpinnerBench />
         <SettleBench />
         <MarkBench />
+        <MotionBench />
         <StatusBench />
       </div>
     </ScrollArea>
@@ -506,6 +536,224 @@ function StatusBench() {
           : 'Click an item to see where it would go. (the folder button opens Finder)'}
       </p>
     </section>
+  )
+}
+
+const SCREENS = ['Overview', 'Todo', 'Runs']
+const TABS = ['Open', 'Maybe', 'Done']
+
+/**
+ * The app's motion patterns (motion.css) on its own primitives, to look at
+ * slowly: the speed applies to every pattern in the app while this page is
+ * open (--motion-scale), menus and dialogs included.
+ */
+function MotionBench() {
+  const [speed, setSpeed] = useState(1)
+  useEffect(() => {
+    const root = document.documentElement.style
+    root.setProperty('--motion-scale', String(1 / speed))
+    return () => {
+      root.removeProperty('--motion-scale')
+    }
+  }, [speed])
+  const [screen, setScreen] = useState(SCREENS[0]!)
+  const [tab, setTab] = useState(TABS[0]!)
+  const [open, setOpen] = useState(false)
+  const [layer, setLayer] = useState<'center' | 'sheet'>()
+  const [added, setAdded] = useState(3)
+  const [tasks, setTasks] = useState([1, 2, 3])
+  const list = useListMotion(tasks, String)
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="mr-auto text-sm font-semibold">Motion</h2>
+        <SpeedPicker value={speed} onChange={setSpeed} />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Each pattern on the components the screens use. With reduced motion on,
+        nothing moves or resizes and what comes and goes fades.
+      </p>
+      <div className="grid gap-x-10 gap-y-8 @min-[44rem]:grid-cols-2">
+        <Bench title="swap" note="A screen or a tab's list giving way">
+          <Choice
+            options={SCREENS.map((name) => ({ value: name, label: name }))}
+            value={screen}
+            onChange={setScreen}
+          />
+          <Swap id={screen} className="mt-3">
+            <p className="rounded-xl bg-well px-4 py-6 text-sm">
+              {screen}: the old screen fades out, then this one rises in.
+            </p>
+          </Swap>
+        </Bench>
+
+        <Bench title="indicator" note="The selected tab, with its list">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              {TABS.map((name) => (
+                <TabsTrigger key={name} value={name}>
+                  {name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <Swap id={tab} className="mt-3">
+            <p className="rounded-xl bg-well px-4 py-6 text-sm">
+              The {tab} list.
+            </p>
+          </Swap>
+        </Bench>
+
+        <Bench title="reveal" note="A row opening in place">
+          <Collapsible open={open} onOpenChange={setOpen}>
+            <CollapsibleTrigger className="group flex items-center gap-2 text-sm font-semibold">
+              <ChevronRight
+                className={cn(
+                  'size-4 text-muted-foreground transition-transform',
+                  open && 'rotate-90'
+                )}
+              />
+              Review the payments retry PR
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <p className="pt-2 pl-6 text-[13px] text-muted-foreground">
+                mina asked for a review of the retry change before Thursday. The
+                thread settled on 5 retries with a backoff.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
+        </Bench>
+
+        <Bench
+          title="arrive and settle"
+          note="Rows coming into a list and leaving it"
+        >
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              setTasks([added + 1, ...tasks])
+              setAdded(added + 1)
+            }}
+          >
+            <Plus />
+            Add a task
+          </Button>
+          <ul ref={list.ref} className="mt-3">
+            {list.entries.map((entry) => (
+              <li
+                key={entry.key}
+                {...motionItem(entry)}
+                className="flex items-center border-t border-border py-2.5 text-sm"
+              >
+                <span className="flex-1">Task {entry.item}</span>
+                <Button
+                  size="xs"
+                  onClick={() =>
+                    setTasks(tasks.filter((task) => task !== entry.item))
+                  }
+                >
+                  <CircleCheck />
+                  Done
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Bench>
+
+        <Bench
+          title="dialog and sheet"
+          note="A question, and a panel at the side"
+        >
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setLayer('center')}
+            >
+              Open a dialog
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setLayer('sheet')}
+            >
+              Open a sheet
+            </Button>
+          </div>
+          <Dialog
+            open={layer === 'center'}
+            onOpenChange={() => setLayer(undefined)}
+          >
+            <DialogContent className="w-[28rem] gap-4 p-6">
+              <DialogTitle className="text-base font-semibold">
+                Where should the session open?
+              </DialogTitle>
+              <DialogDescription className="text-[13px] text-muted-foreground">
+                It lifts in and sinks back out.
+              </DialogDescription>
+              <div className="flex justify-end">
+                <DialogClose asChild>
+                  <Button variant="secondary">Close</Button>
+                </DialogClose>
+              </div>
+            </DialogContent>
+          </Dialog>
+          {layer === 'sheet' && (
+            <Dialog open onOpenChange={() => setLayer(undefined)}>
+              <DialogContent variant="sheet" className="w-[28rem] gap-3 p-6">
+                <DialogTitle className="text-sm font-semibold">
+                  Session log
+                </DialogTitle>
+                <DialogDescription className="text-[13px] text-muted-foreground">
+                  It slides in and goes at once.
+                </DialogDescription>
+              </DialogContent>
+            </Dialog>
+          )}
+        </Bench>
+
+        <Bench title="pop" note="A menu and a tooltip out of their anchors">
+          <div className="flex items-center gap-2">
+            <Tooltip content="Opens in ~/git/payments">
+              <Button size="sm" variant="outline">
+                Hover for a tooltip
+              </Button>
+            </Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon-sm" variant="ghost" aria-label="A menu">
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>Continue in Codex</DropdownMenuItem>
+                <DropdownMenuItem>Draft a reply</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </Bench>
+      </div>
+    </section>
+  )
+}
+
+function Bench({
+  title,
+  note,
+  children,
+}: {
+  title: string
+  note: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <h3 className="text-[13px] font-semibold">{title}</h3>
+      <p className="mb-3 text-xs text-muted-foreground">{note}</p>
+      {children}
+    </div>
   )
 }
 

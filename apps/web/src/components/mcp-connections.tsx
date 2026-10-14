@@ -201,7 +201,7 @@ function ByHand() {
           />
           Add it by hand
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 overflow-hidden pt-2 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        <CollapsibleContent className="space-y-3 pt-2">
           <CodeBlock label="Claude Code: run in a terminal" code={claude} />
           <CodeBlock label="Codex: add to ~/.codex/config.toml" code={codex} />
         </CollapsibleContent>

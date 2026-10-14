@@ -706,6 +706,31 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
     await page.getByRole('button', { name: 'Cancel' }).click()
 
+    // A task that comes in while you look waits behind a notice, so the rows
+    // you are reading stay put; the notice shows it in the list.
+    const arrived = addTasks(
+      home,
+      [
+        {
+          title: 'Look at the failed nightly backup',
+          asked_by: 'dara',
+          where: '#ops',
+          link: link(now - 60_000),
+          confidence: 'sure',
+          action: 'other',
+          summary: 'dara asked why the nightly backup failed.',
+        },
+      ],
+      { settings: on, now: new Date() }
+    ).added[0]!
+    const notice = page.getByRole('button', { name: '1 new task' })
+    await notice.waitFor({ timeout: 15_000 })
+    const arrivedRow = page.locator(`[data-task-row="${arrived.id}"]`)
+    expect(await arrivedRow.count()).toBe(0)
+    await notice.click()
+    await arrivedRow.waitFor()
+    await notice.waitFor({ state: 'detached' })
+
     // Settings > Todo shows where the repository opens.
     await page.evaluate("window.location.hash = '#/settings/tasks'")
     await page.getByText('Continuing work').waitFor()

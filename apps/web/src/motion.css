@@ -1,0 +1,335 @@
+/*
+ * Motion: how things move in Pacenote, in one place.
+ *
+ * Motion answers what a person just did: opened a row, moved to a screen,
+ * finished a task. Nothing else moves on its own, except Pace at work (its
+ * spinner, the status dot). Things come in decelerating (enter), leave
+ * accelerating (exit) and move or resize within the window on standard;
+ * leaving takes about 2/3 of coming in.
+ *
+ * Screens do not style motion themselves. They use the primitives in
+ * components/ui, which carry these patterns (Collapsible, Dialog, the menu,
+ * the tooltip, Tabs, Swap, useListMotion, usePresence), or a pattern class
+ * below (motion-layout); tests/web-motion.test.ts fails on durations, easings
+ * and animations written anywhere else. The drafts these values were picked
+ * from are in the Pacenote Motion canvas; the Debug section shows each one in
+ * the app, with slow motion (--motion-scale).
+ *
+ * Every pattern has a reduced form, at the end: nothing moves or resizes, and
+ * what comes and goes fades in 120ms.
+ */
+
+:root {
+  --motion-scale: 1;
+  --motion-quick: calc(120ms * var(--motion-scale));
+  --motion-base: calc(180ms * var(--motion-scale));
+  --motion-moderate: calc(240ms * var(--motion-scale));
+  --motion-slow: calc(320ms * var(--motion-scale));
+  /* What follows a size change starts this much after it */
+  --motion-lag: calc(60ms * var(--motion-scale));
+  /* A dialog leaves in 2/3 of the time it came in */
+  --motion-exit: calc(var(--motion-moderate) * 2 / 3);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Distances: new content rises, an anchored layer slides out of its anchor,
+     a dialog lifts, a settled row is pushed aside */
+  --motion-rise: 4px;
+  --motion-nudge: 4px;
+  --motion-lift: 8px;
+  --motion-push: 24px;
+
+  /* Heights animate to and from auto (a row folding out of a list) */
+  interpolate-size: allow-keywords;
+}
+
+/* Feedback (hover, focus, a chevron turning): transition-colors and the like
+   take quick on standard */
+@theme {
+  --default-transition-duration: var(--motion-quick);
+  --default-transition-timing-function: var(--ease-standard);
+}
+
+@layer components {
+  /*
+   * reveal: content opening in place (a Todo row, a run's step, a settings
+   * group). Its height unfolds on standard while the content rises 4px a
+   * moment later; closing, the content fades first as it folds.
+   */
+  .motion-reveal {
+    overflow: hidden;
+  }
+  .motion-reveal[data-state='open'] {
+    animation:
+      motion-unfold var(--motion-moderate) var(--ease-standard),
+      motion-rise-in var(--motion-moderate) var(--ease-enter) var(--motion-lag)
+        backwards;
+  }
+  .motion-reveal[data-state='closed'] {
+    /* Both end together: Radix unmounts on the first that ends */
+    animation:
+      motion-fold calc(var(--motion-moderate) * 5 / 6) var(--ease-standard)
+        forwards,
+      motion-fade-early calc(var(--motion-moderate) * 5 / 6) var(--ease-exit)
+        forwards;
+  }
+
+  /*
+   * swap: one content giving way to another (a screen, a tab's list). The old
+   * one fades out, then the new one rises in (Swap). A tab's content, which
+   * Radix removes at once, only rises in.
+   */
+  .motion-swap[data-motion='out'] {
+    animation: motion-fade-out var(--motion-quick) var(--ease-exit) forwards;
+  }
+  .motion-swap[data-motion='in'],
+  .motion-swap[data-state='active'] {
+    animation: motion-rise-in var(--motion-moderate) var(--ease-enter);
+  }
+
+  /*
+   * layout: the window's chrome changing size (the sidebar, the title bar's
+   * room for the traffic lights). Labels that need the room leave before it
+   * shrinks and come in once it has grown (motion-layout-label, hidden with
+   * data-hidden).
+   */
+  .motion-layout {
+    transition-property: width, padding, margin;
+    transition-duration: var(--motion-slow);
+    transition-timing-function: var(--ease-standard);
+  }
+  .motion-layout-label {
+    transition: opacity var(--motion-base) var(--ease-enter) var(--motion-quick);
+  }
+  .motion-layout-label[data-hidden] {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease-exit);
+  }
+
+  /*
+   * arrive and settle: a row coming into a list or leaving it
+   * (useListMotion). A new row unfolds and its content fades in; a settled
+   * row is pushed aside as it fades, and the rows below close the gap.
+   */
+  [data-motion-item][data-motion='enter'] {
+    overflow: hidden;
+    animation: motion-grow var(--motion-moderate) var(--ease-standard);
+  }
+  [data-motion-item][data-motion='enter'] > * {
+    animation: motion-fade-in var(--motion-moderate) var(--ease-enter)
+      var(--motion-lag) backwards;
+  }
+  [data-motion-item][data-motion='exit'] {
+    overflow: hidden;
+    pointer-events: none;
+    animation: motion-shrink var(--motion-moderate) var(--ease-standard)
+      var(--motion-lag) forwards;
+  }
+  [data-motion-item][data-motion='exit'] > * {
+    animation: motion-push-out var(--motion-base) var(--ease-exit) forwards;
+  }
+
+  /*
+   * sheet: a panel over the window's right side (a session's log). It slides
+   * in 32px and fades; closing, it goes at once.
+   */
+  .motion-sheet-overlay[data-state='open'] {
+    animation: motion-fade-in calc(150ms * var(--motion-scale)) ease;
+  }
+  .motion-sheet[data-state='open'] {
+    animation: motion-sheet-in calc(200ms * var(--motion-scale)) ease;
+  }
+
+  /*
+   * dialog: a question over the window (where a session opens). It lifts 8px
+   * as it fades in and sinks back as it leaves; the backdrop keeps time.
+   */
+  .motion-dialog-overlay[data-state='open'] {
+    animation: motion-fade-in var(--motion-moderate) var(--ease-enter);
+  }
+  .motion-dialog-overlay[data-state='closed'] {
+    animation: motion-fade-out var(--motion-exit) var(--ease-exit) forwards;
+  }
+  .motion-dialog[data-state='open'] {
+    animation: motion-lift-in var(--motion-moderate) var(--ease-enter);
+  }
+  .motion-dialog[data-state='closed'] {
+    animation: motion-lift-out var(--motion-exit) var(--ease-exit) forwards;
+  }
+
+  /*
+   * pop: a layer anchored to what opened it (a menu, a tooltip, the new tasks
+   * notice). It slides 4px out of its anchor's side, without scaling, and back
+   * in as it closes. data-side is the side of the anchor it sits on.
+   */
+  .motion-pop {
+    --motion-pop-x: 0px;
+    --motion-pop-y: 0px;
+  }
+  .motion-pop[data-side='bottom'] {
+    --motion-pop-y: calc(var(--motion-nudge) * -1);
+  }
+  .motion-pop[data-side='top'] {
+    --motion-pop-y: var(--motion-nudge);
+  }
+  .motion-pop[data-side='right'] {
+    --motion-pop-x: calc(var(--motion-nudge) * -1);
+  }
+  .motion-pop[data-side='left'] {
+    --motion-pop-x: var(--motion-nudge);
+  }
+  .motion-pop:not([data-state='closed']) {
+    animation: motion-pop-in var(--motion-base) var(--ease-enter);
+  }
+  .motion-pop[data-state='closed'] {
+    animation: motion-pop-out var(--motion-quick) var(--ease-exit) forwards;
+  }
+
+  /*
+   * indicator: what is selected, sliding to the new choice (the tabs' pill)
+   */
+  .motion-indicator {
+    transition-property: translate, width;
+    transition-duration: var(--motion-moderate);
+    transition-timing-function: var(--ease-standard);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .motion-reveal[data-state='open'],
+    .motion-swap[data-motion='in'],
+    .motion-swap[data-state='active'],
+    [data-motion-item][data-motion='enter'],
+    .motion-sheet-overlay[data-state='open'],
+    .motion-sheet[data-state='open'],
+    .motion-dialog-overlay[data-state='open'],
+    .motion-dialog[data-state='open'],
+    .motion-pop:not([data-state='closed']) {
+      animation: motion-fade-in calc(120ms * var(--motion-scale)) ease;
+    }
+    .motion-reveal[data-state='closed'],
+    .motion-swap[data-motion='out'],
+    [data-motion-item][data-motion='exit'],
+    .motion-dialog-overlay[data-state='closed'],
+    .motion-dialog[data-state='closed'],
+    .motion-pop[data-state='closed'] {
+      animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
+    }
+    [data-motion-item][data-motion='enter'] > *,
+    [data-motion-item][data-motion='exit'] > * {
+      animation: none;
+    }
+    .motion-layout,
+    .motion-indicator {
+      transition: none;
+    }
+    .motion-layout-label,
+    .motion-layout-label[data-hidden] {
+      transition: opacity calc(120ms * var(--motion-scale)) ease;
+    }
+  }
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Gone by 60% of the fold it runs with */
+@keyframes motion-fade-early {
+  60%,
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-rise));
+  }
+}
+
+@keyframes motion-unfold {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes motion-fold {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes motion-grow {
+  from {
+    height: 0;
+    padding-block: 0;
+    border-top-width: 0;
+  }
+}
+
+@keyframes motion-shrink {
+  to {
+    height: 0;
+    padding-block: 0;
+    border-top-width: 0;
+  }
+}
+
+@keyframes motion-push-out {
+  to {
+    opacity: 0;
+    transform: translateX(var(--motion-push));
+  }
+}
+
+@keyframes motion-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes motion-lift-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-lift));
+  }
+}
+
+@keyframes motion-lift-out {
+  to {
+    opacity: 0;
+    transform: translateY(var(--motion-lift));
+  }
+}
+
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--motion-pop-x), var(--motion-pop-y));
+  }
+}
+
+@keyframes motion-pop-out {
+  to {
+    opacity: 0;
+    transform: translate(var(--motion-pop-x), var(--motion-pop-y));
+  }
+}

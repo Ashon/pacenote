@@ -2115,7 +2115,7 @@ function Advanced({
         />
         Advanced ({count})
       </CollapsibleTrigger>
-      <CollapsibleContent className="divide-y divide-border overflow-hidden border-t border-border data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+      <CollapsibleContent className="divide-y divide-border border-t border-border">
         {children}
       </CollapsibleContent>
     </Collapsible>

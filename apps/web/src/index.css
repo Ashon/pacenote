@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import 'tw-animate-css';
+@import './motion.css';
 
 @plugin "@tailwindcss/typography";
 
@@ -50,8 +50,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
-  --animate-collapsible-down: collapsible-down 0.18s ease-out;
-  --animate-collapsible-up: collapsible-up 0.18s ease-out;
 }
 
 /*
@@ -281,23 +279,5 @@
   50% {
     transform: scale(1.15);
     opacity: 1;
-  }
-}
-
-@keyframes collapsible-down {
-  from {
-    height: 0;
-  }
-  to {
-    height: var(--radix-collapsible-content-height);
-  }
-}
-
-@keyframes collapsible-up {
-  from {
-    height: var(--radix-collapsible-content-height);
-  }
-  to {
-    height: 0;
   }
 }

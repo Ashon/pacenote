@@ -16,8 +16,8 @@ folder and single-instance lock, so they start next to an installed Pacenote. Th
 same config and data folder (`~/.pacenote`), so the bot lock still keeps a single bot running.
 
 These runs also have a Debug section above Settings, for things to look at in motion (Pace's spinner at each size, with speed,
-pause, a scrubber and the frame rate, loads of a few lengths that end with the mark easing back into the logo, and the Pace
-screen's mark from state to state) and the status bar in made-up states (Pace's state, requests, a task collection, check issues, narrower windows). Its code is only
+pause, a scrubber and the frame rate, loads of a few lengths that end with the mark easing back into the logo, the Pace
+screen's mark from state to state, and the app's motion patterns at a chosen speed) and the status bar in made-up states (Pace's state, requests, a task collection, check issues, narrower windows). Its code is only
 in builds made for development: `pnpm desktop` builds the UI with `VITE_PACENOTE_DEBUG=1`, and the Vite dev server always
 includes it. `pnpm desktop:build` and `pnpm package:mac`, which release builds use, leave it out.
 
@@ -63,6 +63,15 @@ Layout:
   collection's detail has no chat: what it added, closed and left out, its lookups in Slack (which tool, when, how long;
   what Slack returned is not kept), the rules Pacenote gave it, and the record.
 - The window can be as narrow as 600 pixels. Narrow screens stack their rows, and Settings shows its sections as icons.
+- Motion answers what you just did, and only Pace at work moves on its own. Moving to another screen or Todo tab fades the
+  old content out and the new one in; the sidebar's width eases, its labels fading out before it narrows and in after it
+  widens; a Todo row unfolds in place; a task you settle is pushed aside and the rows below close up; a menu or tooltip
+  slides out of what opened it; the folder dialog lifts in and sinks back out; the session log slides in from the right.
+  Tasks that come in while you look at Todo wait behind a "2 new tasks" notice on the tabs' line, so the rows you are
+  reading stay put. With reduced motion on in macOS, nothing moves or resizes and what comes and goes fades.
+  The patterns live in `apps/web/src/motion.css` and the primitives in `apps/web/src/components/ui` (Collapsible, Dialog,
+  the menu, the tooltip, Tabs, `Swap`, `useListMotion`, `usePresence`); `tests/web-motion.test.ts` fails on durations,
+  easings or animations written anywhere else. The Debug section has a Motion bench that plays each pattern slowly.
 
 Bot management:
 

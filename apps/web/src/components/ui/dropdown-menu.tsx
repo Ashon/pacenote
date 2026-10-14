@@ -17,7 +17,7 @@ function DropdownMenuContent({
         sideOffset={4}
         collisionPadding={8}
         className={cn(
-          'z-50 min-w-48 rounded-xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-border animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none',
+          'motion-pop z-50 min-w-48 rounded-xl bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-border',
           className
         )}
         {...props}
