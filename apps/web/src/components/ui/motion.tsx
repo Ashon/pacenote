@@ -170,3 +170,73 @@ export function usePresence<E extends HTMLElement = HTMLDivElement>(
     state: present ? ('open' as const) : ('closed' as const),
   }
 }
+
+/**
+ * indicator: one mark under what is selected, sliding to the next choice (the
+ * tabs' pill, the setup step you are on). It is placed from the box of the
+ * element `selected` finds in `ref`, again whenever `attribute` changes on one
+ * of them or an `items` element's size does, and slides only once placed. Put
+ * `ref` on the container (positioned) and `box`, `className` on the mark.
+ */
+export function useIndicator<E extends HTMLElement = HTMLDivElement>({
+  selected,
+  items,
+  attribute,
+}: {
+  selected: string
+  items: string
+  attribute: string
+}) {
+  const ref = useRef<E>(null)
+  const [box, setBox] = useState<{
+    x: number
+    y: number
+    width: number
+    height: number
+  }>()
+  const [placed, setPlaced] = useState(false)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+    const place = () => {
+      const item = element.querySelector<HTMLElement>(selected)
+      setBox((was) =>
+        !item
+          ? undefined
+          : was?.x === item.offsetLeft &&
+              was.y === item.offsetTop &&
+              was.width === item.offsetWidth &&
+              was.height === item.offsetHeight
+            ? was
+            : {
+                x: item.offsetLeft,
+                y: item.offsetTop,
+                width: item.offsetWidth,
+                height: item.offsetHeight,
+              }
+      )
+    }
+    place()
+    // The selection moves when the attribute changes, or when the selected
+    // element is put in place of another (a step that becomes a link).
+    const selection = new MutationObserver(place)
+    selection.observe(element, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: [attribute],
+    })
+    const sizes = new ResizeObserver(place)
+    for (const item of element.querySelectorAll(items)) sizes.observe(item)
+    return () => {
+      selection.disconnect()
+      sizes.disconnect()
+    }
+  }, [selected, items, attribute])
+  useEffect(() => {
+    if (!box || placed) return
+    const frame = requestAnimationFrame(() => setPlaced(true))
+    return () => cancelAnimationFrame(frame)
+  }, [box, placed])
+  return { ref, box, className: placed ? 'motion-indicator' : undefined }
+}

@@ -21,8 +21,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
+import { withHub } from './support/hub.js'
 import { eventually, REPO } from './support/processes.js'
 import * as vm from './support/vm.js'
+import { vmUnsupported } from '../../src/sandbox/vm.js'
 import { World } from './support/world.js'
 
 /**
@@ -64,23 +66,42 @@ afterEach(async (context) => {
 /**
  * Opens the app on the world. settings: lines the settings file has besides
  * what any member would have set before (all but the Slack tokens, which the
- * first test enters in Settings); env: the app's environment on top.
+ * setup tests enter); env: the app's environment on top; firstRun: setup is
+ * not done yet, so the app opens on it (otherwise it is marked done, as for
+ * someone who set Pacenote up before).
  */
 async function launch(
   world: World,
-  options: { settings?: string[]; env?: Record<string, string> } = {}
+  options: {
+    settings?: string[]
+    env?: Record<string, string>
+    firstRun?: boolean
+  } = {}
 ): Promise<Page> {
   mkdirSync(world.home, { recursive: true })
+  if (!options.firstRun)
+    writeFileSync(
+      path.join(world.home, 'setup.json'),
+      JSON.stringify({ step: 'answer', finishedAt: new Date().toISOString() })
+    )
+  // A setting given in options takes the place of the one here.
+  const given = new Set(
+    (options.settings ?? []).map((line) => line.split('=')[0])
+  )
   writeFileSync(
     path.join(world.home, '.env'),
     [
-      'REASONER=claude',
-      'REASONER_SANDBOX=none',
-      'RENDER_DIAGRAMS=off',
-      'TIMEZONE=UTC',
-      `SLACK_API_URL=${world.slack.apiUrl}`,
-      `CLAUDE_BIN=${world.claudeBin}`,
-      `FAKE_CLAUDE_DIR=${world.claudeDir}`,
+      ...[
+        'REASONER=claude',
+        'REASONER_SANDBOX=none',
+        'RENDER_DIAGRAMS=off',
+        'TIMEZONE=UTC',
+        `SLACK_API_URL=${world.slack.apiUrl}`,
+        `CLAUDE_BIN=${world.claudeBin}`,
+        `FAKE_CLAUDE_DIR=${world.claudeDir}`,
+        // Not a codex this Mac may have: setup finds none.
+        `CODEX_BIN=${path.join(world.root, 'no-codex')}`,
+      ].filter((line) => !given.has(line.split('=')[0])),
       ...(options.settings ?? []),
       '',
     ].join('\n')
@@ -112,6 +133,54 @@ async function launch(
   return page
 }
 
+/**
+ * Setup's Slack step with your own app (3a, 3b): both tokens, checked with
+ * Slack as they go in, then "@Pace it's me" from alice, who is told alone to
+ * confirm in Pacenote and is let in once confirmed there
+ */
+async function connectOwnApp(page: Page, world: World) {
+  const { slack, ops, alice } = world
+  await page.getByRole('heading', { name: 'Connect Pace to Slack' }).waitFor()
+  await page.getByText('Use your own Slack app').click()
+  await page.getByRole('button', { name: 'Set up your own app' }).click()
+  await page.getByRole('heading', { name: 'Create your Slack app' }).waitFor()
+  const token = (setting: string) =>
+    page.locator(`[data-setting="${setting}"] input`)
+  if (
+    !(await token('SLACK_APP_TOKEN').getAttribute('placeholder'))?.startsWith(
+      'Saved'
+    )
+  )
+    await token('SLACK_APP_TOKEN').fill(slack.appToken)
+  if (
+    !(await token('SLACK_BOT_TOKEN').getAttribute('placeholder'))?.startsWith(
+      'Saved'
+    )
+  )
+    await token('SLACK_BOT_TOKEN').fill(slack.botToken)
+  await page
+    .locator('[data-setting="SLACK_BOT_TOKEN"]')
+    .getByText(/^Valid/)
+    .waitFor()
+  await page.getByRole('button', { name: 'Connect Slack' }).click()
+
+  await page.getByRole('heading', { name: "Show Pace it's you" }).waitFor()
+  await page.getByText('Waiting for your mention').waitFor()
+  await slack.mention({
+    channel: ops.id,
+    user: alice.id,
+    text: `<@${slack.botUserId}> it's me`,
+  })
+  await page.getByText('Is this you?').waitFor()
+  await page.getByText('mentioned Pace in #ops just now').waitFor()
+  await eventually('the note for alice alone', () =>
+    slack.ephemerals.find(
+      (note) => note.user === alice.id && /Confirm in Pacenote/.test(note.text)
+    )
+  )
+  await page.getByRole('button', { name: "Yes, that's me" }).click()
+}
+
 async function enterSecret(
   page: Page,
   key: string,
@@ -132,13 +201,25 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       { match: 'web-01', answer: '**Healthy**. Up 3 days.' },
     ])
     const { slack, ops, alice } = world
-    const page = await launch(world)
+    const page = await launch(world, { firstRun: true })
 
-    // A first run has no Slack tokens: the bot waits for setup and the status
-    // bar says so.
-    await page.getByText('Pace: Setup needed').waitFor()
-    await page.getByRole('button', { name: 'Open Settings' }).first().click()
+    // A first run opens on setup. Left for later, Overview holds the way back
+    // to it, or to Settings instead, which ends it.
+    await page
+      .getByRole('heading', { name: 'Which AI service do you already use?' })
+      .waitFor()
+    await page.getByRole('button', { name: 'Finish later' }).click()
+    await page.getByText('Finish setting up Pace').waitFor()
+    await page.getByText('0 of 5 steps done.', { exact: false }).waitFor()
+    await page
+      .getByRole('button', { name: 'Set it up in Settings instead' })
+      .click()
     await page.getByRole('heading', { name: 'Messengers' }).waitFor()
+    // The bot waits for setup, and the status bar says so.
+    await page.getByText('Pace: Setup needed').waitFor()
+    expect(
+      JSON.parse(readFileSync(path.join(world.home, 'setup.json'), 'utf8'))
+    ).toMatchObject({ finishedAt: expect.any(String) })
 
     // Each token is saved on its own, from beside its input.
     await enterSecret(page, 'SLACK_APP_TOKEN', slack.appToken, 'enter')
@@ -218,6 +299,195 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       async () => (await toggleLeft()) === 84
     )
   })
+
+  it('sets Pace up from a first run: its own Slack app, "it\'s me", and the first answer', async () => {
+    world = await World.create([
+      { match: 'web-01', answer: '**Healthy**. Up 3 days.' },
+    ])
+    const { slack, ops, alice } = world
+    const page = await launch(world, { firstRun: true })
+    const step = page.locator('[aria-current="step"]')
+
+    // 1. The AI service: the fake claude is found and signed in, and there is
+    // no codex on this Mac.
+    await page
+      .getByRole('heading', { name: 'Which AI service do you already use?' })
+      .waitFor()
+    expect(await step.textContent()).toContain('AI service')
+    const services = page.getByRole('radiogroup', { name: 'AI service' })
+    await services.getByText('Signed in').waitFor()
+    await services.getByText('Not on this Mac').waitFor()
+    await page.getByRole('button', { name: 'Use Claude' }).click()
+
+    // 2. Where it runs: this Mac, as its settings say.
+    await page
+      .getByRole('heading', { name: 'Where should Pace work out answers?' })
+      .waitFor()
+    await eventually('the step list on Where it runs', async () =>
+      (await step.textContent())?.includes('Where it runs')
+    )
+    await page.getByRole('button', { name: 'Run directly on this Mac' }).click()
+
+    // 3. Your own Slack app, and "@Pace it's me"
+    await connectOwnApp(page, world)
+
+    // 4. Review: you may ask; this Mac has no sandbox, so no diagrams.
+    await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
+    await page.getByText('@alice', { exact: true }).waitFor()
+    expect(
+      await page.getByRole('switch', { name: 'Diagrams' }).isDisabled()
+    ).toBe(true)
+    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).toContain(
+      `MENTION_ALLOWED_USERS=${alice.id}`
+    )
+    await page.getByRole('button', { name: 'Start Pace', exact: true }).click()
+
+    // 5. The first answer ends setup.
+    await page
+      .getByRole('heading', { name: 'Say hello to Pace in Slack' })
+      .waitFor({ timeout: 30_000 })
+    await page.getByText('Waiting for your first mention').waitFor()
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> how is web-01?`,
+    })
+    const [reply] = await world.answered(ops.id, ts)
+    expect(reply!.text).toBe('*Healthy*. Up 3 days.')
+    await page.getByText('First answer sent').waitFor()
+    await page.getByText('"how is web-01?"').waitFor()
+    await eventually(
+      'setup to be done',
+      () =>
+        JSON.parse(readFileSync(path.join(world!.home, 'setup.json'), 'utf8'))
+          .finishedAt
+    )
+    expect(
+      JSON.parse(readFileSync(path.join(world.home, 'setup.json'), 'utf8'))
+    ).toMatchObject({ me: { id: alice.id, name: 'alice' }, slack: 'app' })
+    await page.getByRole('button', { name: 'Go to Overview' }).click()
+    await page.getByRole('heading', { name: 'Overview' }).waitFor()
+    await page.getByText(/Pace: Connected/).waitFor()
+    expect(await page.getByText('Finish setting up Pace').count()).toBe(0)
+  })
+
+  it('pairs with the team hub in setup, picks up where it was after a restart, and starts once reviewed', async () => {
+    world = await World.create([{ match: 'hello', answer: 'Hi, I am Pace.' }])
+    const { slack, ops, alice } = world
+    const { url } = await withHub(world)
+    let page = await launch(world, { firstRun: true })
+    // With reduced motion, things only fade: setup works the same.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.getByRole('button', { name: 'Use Claude' }).click()
+    await page.getByRole('button', { name: 'Run directly on this Mac' }).click()
+    await page.getByRole('heading', { name: 'Connect Pace to Slack' }).waitFor()
+
+    // Quitting halfway: the next start opens where it got to.
+    await app!.close()
+    app = undefined
+    page = await launch(world, { firstRun: true })
+    await page.getByRole('heading', { name: 'Connect Pace to Slack' }).waitFor()
+
+    await page.getByText("Join your team's hub").click()
+    await page.getByLabel('Hub address').fill(url)
+    await page.getByRole('button', { name: 'Get a pairing code' }).click()
+    const command = (await page
+      .locator('code', { hasText: '@Pace connect' })
+      .textContent({ timeout: 15_000 }))!
+    const code = command.replace('@Pace connect ', '').trim()
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> connect ${code}`,
+    })
+    await page.getByText('Is this you?').waitFor({ timeout: 15_000 })
+    await page.getByRole('button', { name: "Yes, that's me" }).click()
+
+    // Paired, but not started: that waits for the review.
+    await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
+    await page.getByText(`Through the hub at ${url}`).waitFor()
+    await page.getByText('@alice', { exact: true }).waitFor()
+    expect(
+      await page.evaluate('window.pacenoteDesktop.bot.state()')
+    ).toMatchObject({
+      phase: expect.not.stringMatching(/^(running|starting)$/),
+    })
+    await page.getByRole('button', { name: 'Start Pace', exact: true }).click()
+    await page
+      .getByRole('heading', { name: 'Say hello to Pace in Slack' })
+      .waitFor({ timeout: 30_000 })
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> hello`,
+    })
+    await world.answered(ops.id, ts)
+    await page.getByText('First answer sent').waitFor()
+  })
+
+  it.skipIf(vmUnsupported() !== undefined)(
+    'starts preparing the built-in sandbox as soon as setup opens, before it is chosen or signed in to',
+    async () => {
+      world = await World.create()
+      // A kernel in place, and no pacenote-vm: the setup gets going at once
+      // and stops at the next part, without downloading anything.
+      const root = path.join(world.root, 'vm')
+      mkdirSync(path.join(root, 'kernel'), { recursive: true })
+      writeFileSync(path.join(root, 'kernel/vmlinux'), 'kernel')
+      const page = await launch(world, {
+        firstRun: true,
+        // Nothing chosen yet for where Pace runs
+        settings: ['REASONER_SANDBOX='],
+        env: {
+          PACENOTE_VM_ROOT: root,
+          PACENOTE_VM_BIN: path.join(world.root, 'no-vm'),
+        },
+      })
+      await page
+        .getByRole('heading', { name: 'Which AI service do you already use?' })
+        .waitFor()
+      // Already under way on the first step
+      const job = await eventually(
+        'the setup job',
+        async () =>
+          ((await page.evaluate('window.pacenoteDesktop.sandbox.job()')) as {
+            kind: string
+            output: string[]
+          } | null) ?? undefined
+      )
+      expect(job.kind).toBe('vm')
+      await eventually('the kernel part', async () =>
+        (
+          (await page.evaluate('window.pacenoteDesktop.sandbox.job()')) as {
+            output: string[]
+          }
+        ).output.includes('Linux kernel: present')
+      )
+
+      await page.getByRole('button', { name: 'Use Claude' }).click()
+      await page
+        .getByRole('heading', { name: 'Where should Pace work out answers?' })
+        .waitFor()
+      // The built-in sandbox can be chosen before its own login.
+      const use = page.getByRole('button', { name: 'Use the built-in sandbox' })
+      expect(await use.isDisabled()).toBe(false)
+      await page.getByText('Get it now, or before Pace starts.').waitFor()
+      await use.click()
+      await page
+        .getByRole('heading', { name: 'Preparing the built-in sandbox' })
+        .waitFor()
+      // Where it stopped, and a way to try again
+      await page.getByText('Preparing stopped').waitFor()
+      await page.getByRole('button', { name: 'Try again' }).waitFor()
+      expect(
+        await page
+          .getByRole('listitem')
+          .filter({ hasText: 'Linux kernel, downloaded and checked' })
+          .getByText('Ready')
+          .count()
+      ).toBe(1)
+    }
+  )
 
   /** Waits for an element to finish fading in, for a screenshot */
   const faded = (element: Locator, what: string) =>
@@ -741,6 +1011,69 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByText(checkout).or(page.getByText(folder)).first().waitFor()
     expect(existsSync(path.join(home, 'tasks-repos.json'))).toBe(true)
   }, 180_000)
+
+  it.skipIf(vm.skip !== undefined)(
+    'sets Pace up in the built-in sandbox, its default here, and answers from a VM',
+    async () => {
+      await vm.prepare()
+      world = await World.create()
+      const { slack, ops, alice } = world
+      mkdirSync(path.join(world.home, 'sandbox'), { recursive: true })
+      writeFileSync(
+        path.join(world.home, 'sandbox/allowed-domains.txt'),
+        'api.anthropic.com\n'
+      )
+      const page = await launch(world, {
+        firstRun: true,
+        // Its own login, which setup would get from Claude in the browser
+        settings: ['SANDBOX_CLAUDE_OAUTH_TOKEN=sk-ant-oat01-e2e'],
+        env: {
+          PACENOTE_VM_BIN: vm.BIN,
+          PACENOTE_VM_ROOT: vm.ROOT,
+          ANTHROPIC_BASE_URL: 'http://127.0.0.1:9',
+        },
+      })
+      await page.getByRole('button', { name: 'Use Claude' }).click()
+      await page
+        .getByRole('heading', { name: 'Where should Pace work out answers?' })
+        .waitFor()
+      // The built-in sandbox is the choice; its login is in already, and it
+      // was prepared before, so setup goes straight on.
+      await page.getByRole('radio', { name: /Built-in sandbox/ }).click()
+      await page.getByText('Signed in').waitFor()
+      await page
+        .getByRole('button', { name: 'Use the built-in sandbox' })
+        .click()
+      await connectOwnApp(page, world)
+
+      await page
+        .getByRole('heading', { name: 'Review and start Pace' })
+        .waitFor()
+      await page.getByText('Built-in sandbox').waitFor()
+      await page.getByText('Ready', { exact: true }).waitFor()
+      // Diagrams can be made here; the settings have them off.
+      const diagrams = page.getByRole('switch', { name: 'Diagrams' })
+      expect(await diagrams.isDisabled()).toBe(false)
+      expect(await diagrams.getAttribute('aria-checked')).toBe('false')
+      await page
+        .getByRole('button', { name: 'Start Pace', exact: true })
+        .click()
+      await page
+        .getByRole('heading', { name: 'Say hello to Pace in Slack' })
+        .waitFor({ timeout: 60_000 })
+      expect(world.status()?.reasoner).toBe('claude@vm')
+
+      const ts = await slack.mention({
+        channel: ops.id,
+        user: alice.id,
+        text: `<@${slack.botUserId}> where do you run?`,
+      })
+      const [reply] = await world.answered(ops.id, ts)
+      expect(reply!.text).toMatch(/^From the VM: Linux aarch64/)
+      await page.getByText('First answer sent').waitFor()
+    },
+    240_000
+  )
 
   it.skipIf(vm.skip !== undefined)(
     'runs Pace in the built-in sandbox chosen in Settings',

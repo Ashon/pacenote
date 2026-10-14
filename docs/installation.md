@@ -20,11 +20,13 @@ brew install --cask pacenote
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
   `codex` CLI login (codex 0.138 or later), and `gh` and `git` for the ops tools. The built-in sandbox, which also renders
   diagrams, needs nothing installed, on Apple silicon with macOS 15 or later.
-- Open Pacenote. Settings > Messengers > Slack opens Slack with Pacenote's manifest filled in ("Create the Slack app") and
-  takes the app's two tokens; "Who can ask" takes your Slack member ID. Pace answers no one until you name who may ask,
-  or turn on "Anyone in the workspace may ask".
-- Answers run on this Mac by default (Settings > Sandbox > Run environment). For the built-in sandbox, choose it there, then
-  run "Set up built-in sandbox". Diagrams need that setup too, with answers on this Mac or not.
+- Open Pacenote. A first run opens on setup: the AI service (the CLIs found on this Mac, signed in or not), where
+  answers run (the built-in sandbox where this Mac runs it, prepared in the background from the start, or this Mac),
+  Slack (the team hub, or your own app from Pacenote's manifest with its two tokens, then "@Pace it's me" to say who you
+  are), a review, and the first answer. Each choice is saved as it is made; Overview picks setup up again, or hands it to Settings instead.
+- Settings holds the same choices afterwards: Settings > Messengers > Slack (the connection and who can ask), Settings >
+  Sandbox > Run environment and "Set up built-in sandbox". Diagrams need that setup too, with answers on this Mac or not;
+  until it is done, they stay as text.
 - At startup Pace checks that the CLI is installed, signed in and, for codex, new enough; what is missing shows in the
   status bar with what to do.
 - Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive

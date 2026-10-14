@@ -96,6 +96,8 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'))
   process.on('SIGTERM', () => void shutdown('SIGTERM'))
 
+  /** What diagrams wait for, when they are on by default (a limit) */
+  const renderLimits: string[] = []
   const connection = await connectSlack({
     config,
     log,
@@ -104,7 +106,8 @@ async function main(): Promise<void> {
       log.error(err.message)
       process.exit(1)
     },
-    onLimits: () => status.update({ limits: connection.limits() }),
+    onLimits: () =>
+      status.update({ limits: [...connection.limits(), ...renderLimits] }),
   })
   started.connection = connection
   const { messenger, bot } = connection
@@ -130,9 +133,18 @@ async function main(): Promise<void> {
       timeoutMs: 60_000,
     })
     const rendererProblems = await candidate.verify()
+    // Turned on by name, a renderer that cannot run is a problem to fix; left
+    // at its default, diagrams wait for the built-in sandbox, a limit.
     for (const problem of rendererProblems) {
-      log.warn(`Diagram rendering disabled: ${problem}`)
-      problems.push(`Diagram rendering disabled: ${problem}`)
+      if (config.render.asked) {
+        log.warn(`Diagram rendering disabled: ${problem}`)
+        problems.push(`Diagram rendering disabled: ${problem}`)
+      } else {
+        log.info(`Diagrams stay off for now: ${problem}`)
+        renderLimits.push(
+          'Diagrams stay as text until the built-in sandbox is set up for them (Settings > Sandbox).'
+        )
+      }
     }
     if (rendererProblems.length === 0) renderer = candidate
   }
@@ -237,7 +249,7 @@ async function main(): Promise<void> {
     diagrams: renderer !== undefined,
     history: history !== undefined,
     problems: allProblems(),
-    limits: connection.limits(),
+    limits: [...connection.limits(), ...renderLimits],
   })
   // A claude credential the API rejects (cut short, revoked) shows in the
   // status at once, not only when a mention fails on it.

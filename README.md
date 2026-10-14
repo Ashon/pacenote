@@ -50,19 +50,18 @@ once there too.
 Then:
 
 1. Log in to `claude` or `codex` (0.138 or later) on your Mac.
-2. Open Pacenote. In Settings > Messengers > Slack, click "Create the Slack app": Slack opens with Pacenote's
-   [manifest](slack-app-manifest.yaml) filled in. Install the app, then save its app token and bot token in Pacenote.
-   (On a team with a hub, pair with the hub instead: see [Team hub](docs/team-hub.md).)
-3. Under "Who can ask", add your Slack member ID (in Slack: your profile > ⋮ > Copy member ID). Pace answers no one
-   until you name who may ask, or let anyone in your workspace ask.
-4. Choose where answers run, in Settings > Sandbox > Run environment:
-   - **On this Mac** (the default): the CLI runs with your login and reads only the reference directory set in
-     Settings > Answers, never its `.env` files, Pacenote's folder or the usual credential folders.
-   - **Built-in sandbox**: a lightweight Linux VM for each answer, reaching only allowed domains, with nothing to
-     install (Apple silicon, macOS 15 or later). Run "Set up built-in sandbox" in Settings > Sandbox.
+2. Open Pacenote. A first run opens on setup, five steps from the AI service to Pace's first answer:
+   - **AI service**: Claude, or ChatGPT through Codex, whichever is installed and signed in on this Mac.
+   - **Where it runs**: the built-in sandbox, a lightweight Linux VM for each answer that reaches only allowed domains
+     (Apple silicon, macOS 15 or later), prepared in the background from the moment setup opens; or directly on this
+     Mac, where the CLI runs with your login and reads only the reference directory set in Settings > Answers.
+   - **Slack**: pair with your team's hub (see [Team hub](docs/team-hub.md)), or create your own app from Pacenote's
+     [manifest](slack-app-manifest.yaml) and paste its two tokens. With your own app, invite `@Pace` to a public
+     channel and mention it with `@Pace it's me`: Pacenote shows who did, and once you confirm it is you, you may ask.
+   - **Review**, then **Start Pace**, and mention it once in Slack for its first answer.
 
-   Ops tools need the built-in sandbox, and diagrams its setup in either run environment.
-5. Invite `@Pace` to a public channel and mention it.
+   Setup can be left at any step and picked up from Overview, or done in Settings instead. Ops tools need the built-in
+   sandbox, and diagrams its setup in either run environment.
 
 `brew upgrade --cask pacenote` updates the app. Config and run history live in `~/.pacenote` and are kept across
 upgrades and uninstalls. To run from source instead, see [Installation](docs/installation.md).

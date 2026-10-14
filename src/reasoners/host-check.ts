@@ -1,7 +1,10 @@
 import { tmpdir } from 'node:os'
 import { hostEnv } from '../sandbox/host.js'
 import { runProcess, type RunResult } from '../sandbox/process.js'
+import type { CliCheck } from '../settings/setup.js'
 import type { ReasonerId } from './ids.js'
+
+export type { CliCheck }
 
 /**
  * The first codex with permission profiles, which keep its shell to the
@@ -25,9 +28,9 @@ export type CliRunner = (args: string[]) => Promise<RunResult>
 /**
  * Whether the CLI can answer on this Mac: installed, signed in, and for codex
  * new enough to keep to the reference directory. Each problem says what to do,
- * for the status, before a mention fails on it.
+ * for setup and the status, before a mention fails on it.
  */
-export async function hostCliProblems(
+export async function checkCli(
   backend: ReasonerId,
   command: string,
   run: CliRunner = (args) =>
@@ -37,30 +40,54 @@ export async function hostCliProblems(
       timeoutMs: 20_000,
       env: hostEnv(process.env),
     })
-): Promise<string[]> {
-  let version: string
+): Promise<CliCheck> {
+  let output: string
   try {
-    version = (await run(['--version'])).stdout
+    output = (await run(['--version'])).stdout
   } catch (err) {
-    return [
-      /not found/.test((err as Error).message)
-        ? `${backend} is not installed on this Mac, or not on its PATH: install ${PRODUCTS[backend]} and sign in, or choose the other reasoner in Settings > Answers.`
-        : `${backend} --version failed: ${(err as Error).message}`,
-    ]
+    return {
+      backend,
+      installed: false,
+      signedIn: false,
+      problems: [
+        /not found/.test((err as Error).message)
+          ? `${backend} is not installed on this Mac, or not on its PATH: install ${PRODUCTS[backend]} and sign in, or choose the other reasoner in Settings > Answers.`
+          : `${backend} --version failed: ${(err as Error).message}`,
+      ],
+    }
   }
+  const version = /(\d+\.\d+\.\d+)/.exec(output)?.[1]
   const problems: string[] = []
-  if (backend === 'codex') {
-    const found = /(\d+\.\d+\.\d+)/.exec(version)?.[1]
-    if (found && olderThan(found, CODEX_MIN_VERSION))
-      problems.push(
-        `codex ${found} is too old: Pace needs ${CODEX_MIN_VERSION} or later, which keeps codex to the reference directory. Update codex (npm install -g @openai/codex, or brew upgrade codex).`
-      )
-  }
-  if (!(await signedIn(backend, run)))
+  const tooOld =
+    backend === 'codex' &&
+    version !== undefined &&
+    olderThan(version, CODEX_MIN_VERSION)
+  if (tooOld)
+    problems.push(
+      `codex ${version} is too old: Pace needs ${CODEX_MIN_VERSION} or later, which keeps codex to the reference directory. Update codex (npm install -g @openai/codex, or brew upgrade codex).`
+    )
+  const signed = await signedIn(backend, run)
+  if (!signed)
     problems.push(
       `${backend} is not signed in on this Mac: ${SIGN_IN[backend]}.`
     )
-  return problems
+  return {
+    backend,
+    installed: true,
+    ...(version ? { version } : {}),
+    signedIn: signed,
+    ...(tooOld ? { tooOld } : {}),
+    problems,
+  }
+}
+
+/** checkCli's problems alone, for the status */
+export async function hostCliProblems(
+  backend: ReasonerId,
+  command: string,
+  run?: CliRunner
+): Promise<string[]> {
+  return (await checkCli(backend, command, run)).problems
 }
 
 /**

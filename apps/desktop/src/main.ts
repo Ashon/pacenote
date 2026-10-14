@@ -101,6 +101,16 @@ import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
+import { SetupStore } from './setup.js'
+import { setupProblem } from './bot-readiness.js'
+import {
+  listenForClaim,
+  type ClaimListener,
+} from '../../../src/messengers/slack/claim.js'
+import { checkCli } from '../../../src/reasoners/host-check.js'
+import { hostEnv } from '../../../src/sandbox/host.js'
+import { runProcess } from '../../../src/sandbox/process.js'
+import { vmUnsupported } from '../../../src/sandbox/vm.js'
 
 /**
  * Pacenote desktop app. Runs and manages Pace (the bot) (Slack Socket Mode) as
@@ -257,6 +267,21 @@ const settings = new SettingsStore({
   env: process.env,
 })
 const hubPairing = new HubPairing(settings)
+/**
+ * The first-run wizard's progress. A Pacenote that could already start Pace,
+ * or has answered, was set up before the wizard and never opens on it.
+ */
+const setup = new SetupStore(dataDir, () => ({
+  configured: setupProblem(settings.effectiveEnv()) === undefined,
+  answered: reader.list({ kind: 'mention' }).length > 0,
+}))
+/** Setup listening for "@Pace it's me" on your own Slack app */
+let claim: ClaimListener | undefined
+async function stopClaim(): Promise<void> {
+  const listening = claim
+  claim = undefined
+  await listening?.stop().catch(() => undefined)
+}
 /**
  * Settings > Sandbox "Get token from Claude": runs claude setup-token and saves
  * its token to .env
@@ -553,13 +578,18 @@ function updateTray(): void {
         live
           ? { label: 'Restart Pace', click: () => void supervisor.restart() }
           : phase === 'setup'
-            ? {
-                label: 'Open Settings...',
-                click: () =>
-                  showMainWindow(
-                    setupSettingsRoute(supervisor?.current.issues)
-                  ),
-              }
+            ? setup.view().open
+              ? {
+                  label: 'Set up Pace...',
+                  click: () => showMainWindow('#/setup'),
+                }
+              : {
+                  label: 'Open Settings...',
+                  click: () =>
+                    showMainWindow(
+                      setupSettingsRoute(supervisor?.current.issues)
+                    ),
+                }
             : {
                 label: 'Start Pace',
                 enabled:
@@ -1056,13 +1086,90 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:hub:pair-status', (event) =>
     hubCall(event, () => hubPairing.status())
   )
-  ipcMain.handle('pacenote:hub:pair-confirm', (event) =>
+  // Settings starts Pace once paired; setup starts it after its review.
+  ipcMain.handle('pacenote:hub:pair-confirm', (event, options: unknown) =>
     hubCall(event, async () => {
       const confirmed = await hubPairing.confirm()
-      const started = confirmed.issues.length === 0 && (await applySettings())
+      const start =
+        (options as { start?: unknown } | undefined)?.start !== false
+      const started =
+        start && confirmed.issues.length === 0 && (await applySettings())
       return { ...confirmed, started }
     })
   )
+  // The first-run wizard: where it got to, what this Mac has, and "@Pace
+  // it's me" on your own Slack app.
+  ipcMain.handle('pacenote:setup:state', (event) =>
+    fromMainWindow(event) ? setup.view() : null
+  )
+  ipcMain.handle('pacenote:setup:save', (event, patch: unknown) =>
+    fromMainWindow(event) ? setup.save(patch) : null
+  )
+  ipcMain.handle('pacenote:setup:detect', async (event) => {
+    if (!fromMainWindow(event)) return null
+    const env = settings.effectiveEnv()
+    const runner = (command: string) => (args: string[]) =>
+      runProcess(command, args, {
+        cwd: tmpdir(),
+        input: '',
+        timeoutMs: 20_000,
+        env: { ...hostEnv(process.env), PATH: toolPath() },
+      })
+    const cli = (backend: 'claude' | 'codex', setting: string | undefined) => {
+      const command = setting?.trim() || backend
+      return checkCli(backend, command, runner(command))
+    }
+    const [claude, codex] = await Promise.all([
+      cli('claude', env.CLAUDE_BIN),
+      cli('codex', env.CODEX_BIN),
+    ])
+    return { cli: { claude, codex }, sandbox: { unsupported: vmUnsupported() } }
+  })
+  ipcMain.handle('pacenote:setup:claim-start', (event) =>
+    hubCall(event, async () => {
+      await stopClaim()
+      const env = settings.effectiveEnv()
+      const appToken = env.SLACK_APP_TOKEN?.trim()
+      const botToken = env.SLACK_BOT_TOKEN?.trim()
+      if (!appToken || !botToken)
+        throw new Error('Connect your Slack app with both tokens first.')
+      // Pace on the same app would take some of the mentions meanwhile.
+      if (supervisor?.managing) await supervisor.stop()
+      claim = await listenForClaim({
+        appToken,
+        botToken,
+        apiUrl: env.SLACK_API_URL,
+        log: log.child('setup'),
+        onMention: (user) =>
+          mainWindow?.webContents.send('pacenote:setup:claimed', user),
+      })
+      return { ok: true as const }
+    })
+  )
+  ipcMain.handle('pacenote:setup:claim-confirm', (event, raw: unknown) =>
+    hubCall(event, async () => {
+      const user = (raw ?? {}) as { id?: unknown; name?: unknown }
+      if (
+        typeof user.id !== 'string' ||
+        !/^[UW][A-Z0-9]+$/.test(user.id) ||
+        typeof user.name !== 'string'
+      )
+        throw new Error('That is not a Slack member.')
+      await stopClaim()
+      const listed = (settings.effectiveEnv().MENTION_ALLOWED_USERS ?? '')
+        .split(/[\s,]+/)
+        .filter(Boolean)
+      const issues = settings.save({
+        MENTION_ALLOWED_USERS: [...new Set([...listed, user.id])].join(','),
+      })
+      if (issues.length === 0)
+        setup.save({ me: { id: user.id, name: user.name } })
+      return { issues }
+    })
+  )
+  ipcMain.handle('pacenote:setup:claim-stop', async (event) => {
+    if (fromMainWindow(event)) await stopClaim()
+  })
   ipcMain.handle('pacenote:hub:pair-cancel', (event) => {
     if (fromMainWindow(event)) hubPairing.cancel()
   })
@@ -1297,7 +1404,7 @@ if (!app.requestSingleInstanceLock()) {
       // A test server answers at once; GitHub can wait for the app to settle.
       updates?.start(updateUrl ? 1_000 : 30_000)
       if (atLogin) log.info('Opened at login; the window waits')
-      else await createWindow()
+      else await createWindow(setup.view().open ? '#/setup' : '')
       app.on('activate', () => showMainWindow())
     })
     .catch(reportStartupError)
@@ -1315,6 +1422,7 @@ let botStopping: Promise<void> | undefined
 app.on('before-quit', (event) => {
   isQuitting = true
   taskCollector.cancel()
+  void stopClaim()
   supervisor?.dispose()
   // A bot started by the app finishes active requests before it stops. (up to
   // 30 seconds)

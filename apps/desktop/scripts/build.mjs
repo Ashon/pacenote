@@ -24,6 +24,11 @@ await build({
   outfile: path.join(distDir, 'main.js'),
   external: ['electron'],
   format: 'esm',
+  // CommonJS packages bundled in (Slack's Bolt, for setup's "@Pace it's me")
+  // require Node's modules at run time, which ESM has no require for.
+  banner: {
+    js: "import { createRequire as __pacenoteCreateRequire } from 'node:module'; const require = __pacenoteCreateRequire(import.meta.url);",
+  },
 })
 await build({
   ...common,

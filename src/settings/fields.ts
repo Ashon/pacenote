@@ -409,7 +409,7 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'RENDER_DIAGRAMS',
     group: 'diagrams',
     label: 'Render diagrams',
-    help: 'Renders mermaid, dot, vega-lite, and svg blocks in answers as PNG and uploads them, in a VM of the built-in sandbox (set it up in Settings > Sandbox, even with Pace on this Mac).',
+    help: 'Renders mermaid, dot, vega-lite, and svg blocks in answers as PNG and uploads them, in a VM of the built-in sandbox (set it up in Settings > Sandbox, even with Pace on this Mac). Until it is set up, they stay as text.',
     type: 'toggle',
     default: 'on',
   },

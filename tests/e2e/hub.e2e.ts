@@ -1,12 +1,7 @@
-import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HubClient, newHubToken } from '../../src/hub/client.js'
-import {
-  eventually,
-  type ManagedProcess,
-  startBot,
-  startHub,
-} from './support/processes.js'
+import { withHub } from './support/hub.js'
+import { eventually, startBot } from './support/processes.js'
 import { World } from './support/world.js'
 
 /**
@@ -20,29 +15,6 @@ afterEach(async () => {
   await world?.stop()
   world = undefined
 })
-
-async function withHub(
-  world: World
-): Promise<{ hub: ManagedProcess; url: string }> {
-  const hub = world.track(
-    startHub({
-      HOME: world.root,
-      SLACK_BOT_TOKEN: world.slack.botToken,
-      SLACK_APP_TOKEN: world.slack.appToken,
-      SLACK_API_URL: world.slack.apiUrl,
-      HUB_PORT: '0',
-      HUB_HOST: '127.0.0.1',
-      HUB_DATA_DIR: path.join(world.root, 'hub'),
-      LOG_LEVEL: 'debug',
-    })
-  )
-  const [, port] = await hub.waitFor(/listening on 127\.0\.0\.1:(\d+)/)
-  await eventually(
-    "the hub's Socket Mode connection",
-    () => world.slack.connections === 1
-  )
-  return { hub, url: `http://127.0.0.1:${port}` }
-}
 
 /**
  * Pairs a desktop for the member the way Settings does: a code, sent to the bot

@@ -18,6 +18,12 @@ import type {
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type {
+  ClaimedUser,
+  CliCheck,
+  SetupStep,
+  SetupView,
+} from '@src/settings/setup'
+import type {
   CollectionRecord,
   CollectOutcome,
   FolderCheck,
@@ -177,7 +183,8 @@ declare global {
       hub: {
         pairStart(url: string): Promise<PairStartResponse | { error: string }>
         pairStatus(): Promise<PairStatus | { error: string }>
-        pairConfirm(): Promise<
+        /** start: false leaves Pace stopped (setup starts it after review) */
+        pairConfirm(options?: { start?: boolean }): Promise<
           | {
               user: HubUser
               team: HubTeam
@@ -188,6 +195,30 @@ declare global {
         >
         pairCancel(): Promise<void>
         disconnect(): Promise<{ issues: SettingsIssue[] } | { error: string }>
+      }
+      /** The first-run wizard. Calls that can fail return { error }. */
+      setup: {
+        state(): Promise<SetupView | null>
+        save(patch: {
+          step?: SetupStep
+          slack?: 'hub' | 'app'
+          me?: { id: string; name: string } | null
+          answerSince?: string
+          finished?: boolean
+        }): Promise<SetupView | null>
+        /** The CLIs on this Mac, and whether it runs the built-in sandbox */
+        detect(): Promise<{
+          cli: Record<'claude' | 'codex', CliCheck>
+          sandbox: { unsupported?: string }
+        } | null>
+        /** Listens on your own Slack app for "@Pace it's me" */
+        claimStart(): Promise<{ ok: true } | { error: string }>
+        /** Lets the person who mentioned Pace ask it, and stops listening */
+        claimConfirm(
+          user: ClaimedUser
+        ): Promise<{ issues: SettingsIssue[] } | { error: string }>
+        claimStop(): Promise<void>
+        onClaim(callback: (user: ClaimedUser) => void): () => void
       }
       sandbox: {
         status(): Promise<SandboxStatus | null>

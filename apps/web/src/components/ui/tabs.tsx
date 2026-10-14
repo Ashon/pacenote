@@ -1,76 +1,41 @@
 import { Tabs as TabsPrimitive } from 'radix-ui'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type * as React from 'react'
+import { useIndicator } from '@/components/ui/motion'
 import { cn } from '@/lib/utils'
 
 const Tabs = TabsPrimitive.Root
 
 /**
  * The tabs, with one pill under the selected tab that slides to the next one
- * (indicator). It is placed from the selected tab's box, again whenever the
- * selection or a tab's width changes.
+ * (useIndicator).
  */
 function TabsList({
   className,
   children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List>) {
-  const list = useRef<HTMLDivElement>(null)
-  const [pill, setPill] = useState<{ x: number; width: number }>()
-  // The pill slides once it has been placed, not into its first place
-  const [placed, setPlaced] = useState(false)
-  useLayoutEffect(() => {
-    const element = list.current
-    if (!element) return
-    const place = () => {
-      const tab = element.querySelector<HTMLElement>(
-        '[role="tab"][data-state="active"]'
-      )
-      setPill((was) =>
-        !tab
-          ? undefined
-          : was?.x === tab.offsetLeft && was.width === tab.offsetWidth
-            ? was
-            : { x: tab.offsetLeft, width: tab.offsetWidth }
-      )
-    }
-    place()
-    const selection = new MutationObserver(place)
-    selection.observe(element, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['data-state'],
-    })
-    const sizes = new ResizeObserver(place)
-    for (const tab of element.querySelectorAll('[role="tab"]'))
-      sizes.observe(tab)
-    return () => {
-      selection.disconnect()
-      sizes.disconnect()
-    }
-  }, [])
-  useEffect(() => {
-    if (!pill || placed) return
-    const frame = requestAnimationFrame(() => setPlaced(true))
-    return () => cancelAnimationFrame(frame)
-  }, [pill, placed])
+  const pill = useIndicator({
+    selected: '[role="tab"][data-state="active"]',
+    items: '[role="tab"]',
+    attribute: 'data-state',
+  })
   return (
     <TabsPrimitive.List
-      ref={list}
+      ref={pill.ref}
       className={cn(
         'relative inline-flex h-8 items-center justify-center rounded-lg bg-muted p-0.5 text-muted-foreground',
         className
       )}
       {...props}
     >
-      {pill && (
+      {pill.box && (
         <span
           aria-hidden="true"
           className={cn(
             'absolute top-0.5 left-0 h-7 rounded-md bg-background shadow-sm dark:bg-accent',
-            placed && 'motion-indicator'
+            pill.className
           )}
-          style={{ width: pill.width, translate: `${pill.x}px 0` }}
+          style={{ width: pill.box.width, translate: `${pill.box.x}px 0` }}
         />
       )}
       {children}

@@ -114,9 +114,28 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     pairStart: (url: string) =>
       ipcRenderer.invoke('pacenote:hub:pair-start', url),
     pairStatus: () => ipcRenderer.invoke('pacenote:hub:pair-status'),
-    pairConfirm: () => ipcRenderer.invoke('pacenote:hub:pair-confirm'),
+    pairConfirm: (options?: { start?: boolean }) =>
+      ipcRenderer.invoke('pacenote:hub:pair-confirm', options),
     pairCancel: () => ipcRenderer.invoke('pacenote:hub:pair-cancel'),
     disconnect: () => ipcRenderer.invoke('pacenote:hub:disconnect'),
+  },
+  // The first-run wizard: its progress, what this Mac has, and "@Pace it's
+  // me" on your own Slack app
+  setup: {
+    state: () => ipcRenderer.invoke('pacenote:setup:state'),
+    save: (patch: unknown) => ipcRenderer.invoke('pacenote:setup:save', patch),
+    detect: () => ipcRenderer.invoke('pacenote:setup:detect'),
+    claimStart: () => ipcRenderer.invoke('pacenote:setup:claim-start'),
+    claimConfirm: (user: unknown) =>
+      ipcRenderer.invoke('pacenote:setup:claim-confirm', user),
+    claimStop: () => ipcRenderer.invoke('pacenote:setup:claim-stop'),
+    onClaim: (callback: (user: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, user: unknown) =>
+        callback(user)
+      ipcRenderer.on('pacenote:setup:claimed', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:setup:claimed', listener)
+    },
   },
   sandbox: {
     status: () => ipcRenderer.invoke('pacenote:sandbox:status'),

@@ -267,6 +267,11 @@ export interface Config {
    */
   render: {
     enabled: boolean
+    /**
+     * Turned on by name (RENDER_DIAGRAMS=on). Left unset it is on too, but a
+     * sandbox not set up for it is a limit rather than a problem.
+     */
+    asked: boolean
     /** pacenote-vm, its folder and the renderer's image */
     vm: { bin: string; root: string; image: string }
     /**
@@ -464,6 +469,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }),
     render: {
       enabled: e.RENDER_DIAGRAMS === 'on',
+      // Set by name, not left at its default
+      asked: providedValues(env).RENDER_DIAGRAMS === 'on',
       vm: {
         bin: defaultVmBin(env),
         root: vmRootPath(env),

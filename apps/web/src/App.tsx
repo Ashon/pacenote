@@ -24,6 +24,7 @@ import { SettingsPage } from './components/settings-page'
 import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
+import { SetupWizard } from './components/setup/wizard'
 
 /**
  * The Debug section is only in builds made for development: the Vite dev
@@ -54,13 +55,14 @@ type Route =
   | { page: 'bot' }
   | { page: 'settings' }
   | { page: 'debug' }
+  | { page: 'setup' }
 
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
  * the list), #/bot: Pace's status and logs,
- * #/settings: Settings, #/debug: Debug (development builds), otherwise:
- * Overview
+ * #/settings: Settings, #/setup: setting Pace up (the first run's wizard),
+ * #/debug: Debug (development builds), otherwise: Overview
  */
 function readRoute(): Route {
   const hash = window.location.hash
@@ -77,6 +79,7 @@ function readRoute(): Route {
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
   if (hash.startsWith('#/bot')) return { page: 'bot' }
   if (hash.startsWith('#/settings')) return { page: 'settings' }
+  if (hash.startsWith('#/setup')) return { page: 'setup' }
   if (hash.startsWith('#/debug') && showDebug) return { page: 'debug' }
   return { page: 'overview' }
 }
@@ -113,7 +116,7 @@ export default function App() {
     false
   )
   const compact = collapsed || windowWidth < SIDEBAR.below
-  const section: Section = route.page
+  const section: Section = route.page === 'setup' ? 'overview' : route.page
 
   // Cmd+B shows or hides the sidebar's labels, as in most macOS apps.
   useEffect(() => {
@@ -140,71 +143,80 @@ export default function App() {
   const surfaceWidth =
     windowWidth - (compact ? SIDEBAR.compact : SIDEBAR.full) - SURFACE_MARGIN
 
+  // Setup takes the whole window; leaving it swaps the app back in.
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex h-full flex-col bg-sidebar">
-        {/* Three columns keep the search centered on the window; the left one
-            clears the traffic lights and holds the sidebar toggle. In full
-            screen there are none, and the toggle lines up with the sidebar's
-            icons. */}
-        <header className="titlebar-drag grid h-12 shrink-0 grid-cols-[1fr_minmax(0,520px)_1fr] items-center gap-3 px-3">
-          <div
-            className={cn(
-              'motion-layout flex',
-              isMacDesktop && (fullScreen ? 'pl-1' : 'pl-[72px]')
-            )}
-          >
-            <SidebarToggle
-              compact={compact}
-              forced={windowWidth < SIDEBAR.below}
-              onToggle={() => setCollapsed(!collapsed)}
-            />
-          </div>
-          <SearchField value={q} onChange={search} />
-          <div />
-        </header>
-        <div className="flex min-h-0 flex-1">
-          <Sidebar
-            active={section}
-            compact={compact}
-            onNavigate={(next) => go(next === 'overview' ? '#/' : `#/${next}`)}
-            showDebug={showDebug}
-          />
-          {/* One surface holds the whole screen. Its parts are told apart by
-              space and hairlines, not by cards of their own. Moving to
-              another section swaps what it shows. */}
-          <main
-            className="content-surface mr-3 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-card"
-            style={{ boxShadow: 'var(--card-shadow)' }}
-          >
-            <Swap id={route.page} className="h-full">
-              {route.page === 'bot' ? (
-                <BotPage />
-              ) : route.page === 'tasks' ? (
-                // The same list whether a task is open or not, so its tab and
-                // scroll stay as they were
-                <TasksPage openId={route.id} logEntry={route.entry} />
-              ) : route.page === 'settings' ? (
-                <SettingsPage />
-              ) : route.page === 'debug' ? (
-                <Suspense>{DebugPage && <DebugPage />}</Suspense>
-              ) : route.page === 'runs' ? (
-                <RunsPage
-                  q={q}
-                  selectedId={route.id}
-                  width={surfaceWidth}
-                  onSelect={(id) => go(id ? `#/runs/${id}` : '#/runs')}
+      <Swap id={route.page === 'setup' ? 'setup' : 'app'} className="h-full">
+        {route.page === 'setup' ? (
+          <SetupWizard onLeave={go} />
+        ) : (
+          <div className="flex h-full flex-col bg-sidebar">
+            {/* Three columns keep the search centered on the window; the
+                left one clears the traffic lights and holds the sidebar
+                toggle. In full screen there are none, and the toggle lines
+                up with the sidebar's icons. */}
+            <header className="titlebar-drag grid h-12 shrink-0 grid-cols-[1fr_minmax(0,520px)_1fr] items-center gap-3 px-3">
+              <div
+                className={cn(
+                  'motion-layout flex',
+                  isMacDesktop && (fullScreen ? 'pl-1' : 'pl-[72px]')
+                )}
+              >
+                <SidebarToggle
+                  compact={compact}
+                  forced={windowWidth < SIDEBAR.below}
+                  onToggle={() => setCollapsed(!collapsed)}
                 />
-              ) : (
-                <ScrollArea className="h-full">
-                  <Overview />
-                </ScrollArea>
-              )}
-            </Swap>
-          </main>
-        </div>
-        <StatusBar onOpenRoute={go} />
-      </div>
+              </div>
+              <SearchField value={q} onChange={search} />
+              <div />
+            </header>
+            <div className="flex min-h-0 flex-1">
+              <Sidebar
+                active={section}
+                compact={compact}
+                onNavigate={(next) =>
+                  go(next === 'overview' ? '#/' : `#/${next}`)
+                }
+                showDebug={showDebug}
+              />
+              {/* One surface holds the whole screen. Its parts are told
+                  apart by space and hairlines, not by cards of their own.
+                  Moving to another section swaps what it shows. */}
+              <main
+                className="content-surface mr-3 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-card"
+                style={{ boxShadow: 'var(--card-shadow)' }}
+              >
+                <Swap id={route.page} className="h-full">
+                  {route.page === 'bot' ? (
+                    <BotPage />
+                  ) : route.page === 'tasks' ? (
+                    // The same list whether a task is open or not, so its
+                    // tab and scroll stay as they were
+                    <TasksPage openId={route.id} logEntry={route.entry} />
+                  ) : route.page === 'settings' ? (
+                    <SettingsPage />
+                  ) : route.page === 'debug' ? (
+                    <Suspense>{DebugPage && <DebugPage />}</Suspense>
+                  ) : route.page === 'runs' ? (
+                    <RunsPage
+                      q={q}
+                      selectedId={route.id}
+                      width={surfaceWidth}
+                      onSelect={(id) => go(id ? `#/runs/${id}` : '#/runs')}
+                    />
+                  ) : (
+                    <ScrollArea className="h-full">
+                      <Overview />
+                    </ScrollArea>
+                  )}
+                </Swap>
+              </main>
+            </div>
+            <StatusBar onOpenRoute={go} />
+          </div>
+        )}
+      </Swap>
     </TooltipProvider>
   )
 }

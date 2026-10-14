@@ -104,9 +104,21 @@ Bot management:
   answer is not cut off halfway. The display still sleeps, and closing the lid still sleeps the Mac.
 - Stop and app quit send SIGTERM. The bot gives requests in progress up to 15 seconds, then stops their reasoner runs (the CLI
   and whatever it started, or the container). Those, and the mentions still waiting their turn, resume on the next start.
+- A first run opens on setup (`apps/web/src/components/setup`), which takes the whole window: the steps on the left
+  (AI service, Where it runs, Slack, Review, First answer), a pill that slides to the one you are on, and the step on the
+  content surface, which swaps as you go. Each step checks what it needs where it is: the CLIs installed and signed in
+  (`claude --version`, `claude auth status`, `codex login status`), whether this Mac runs the built-in sandbox, the
+  Slack tokens as they are typed, the hub's pairing code. Where this Mac runs the built-in sandbox, setup starts
+  preparing it as soon as it opens (it is the default, takes minutes and needs no login), unless Pace is set to run on
+  this Mac; its progress follows in the step list. Its own Claude login is asked for before Pace starts, and Start Pace
+  waits for it to be ready. With your own Slack app, "Show Pace it's you" listens on
+  the app (Socket Mode, before Pace runs) for a mention, tells that person alone to confirm in Pacenote, and once you
+  confirm it is you, makes you the first who may ask. The first answer in Slack ends setup. Its progress is
+  `PACENOTE_DATA_DIR/setup.json`; leaving it ("Finish later") puts a card on Overview to pick it up again or to set
+  things up in Settings instead. A Pacenote set up before setup existed never opens on it.
 - Before launching the bot, the app checks the settings with the bot's own rules. When the Slack tokens are missing (a first run) or a
   value is invalid, it does not launch the bot and shows "Setup needed" with a way to Settings (on the Pace screen, the Overview,
-  the status bar, and the tray menu). That way opens the section to fix: Slack for missing or rejected tokens, otherwise the section
+  the status bar, and the tray menu; while setup is unfinished, the tray opens setup instead). That way opens the section to fix: Slack for missing or rejected tokens, otherwise the section
   of the first invalid value. Tokens Slack rejects (`invalid_auth` and the like) also end up there. Saving in Settings then starts
   the bot ("Save and start Pace").
 - If the bot exits when no one asked it to, the app starts it again: after 3 seconds, then 6, 12 and so on up to 5 minutes for
@@ -181,7 +193,8 @@ Status and logs:
   as a Slack app without `reactions:write`) to `PACENOTE_DATA_DIR/bot.json`.
   The status bar counts the problems; the limits show only on the Pace screen. The app reads it the same way no matter who started the bot.
 - With its own Slack app, the bot needs to know who may ask: until "Who can ask" names someone (or anyone in the workspace
-  may ask), the Overview shows "Set up Pace" with a way to Settings, and the bot does not start.
+  may ask), the Overview shows "Set up Pace" with a way to Settings, and the bot does not start. Setup fills it in from
+  "@Pace it's me".
 - On this Mac, the status also says when the reasoner CLI is missing, signed out or (codex) too old, with what to do; it is
   checked at startup, every 5 minutes, and after an answer that went through.
 - Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`) The app's own

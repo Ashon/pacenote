@@ -188,11 +188,22 @@
   }
 
   /*
-   * indicator: what is selected, sliding to the new choice (the tabs' pill)
+   * indicator: what is selected, sliding to the new choice (the tabs' pill,
+   * the setup step you are on)
    */
   .motion-indicator {
-    transition-property: translate, width;
+    transition-property: translate, width, height;
     transition-duration: var(--motion-moderate);
+    transition-timing-function: var(--ease-standard);
+  }
+
+  /*
+   * progress: a bar filling as work goes on (the built-in sandbox being
+   * prepared). It eases to each new length.
+   */
+  .motion-progress {
+    transition-property: width;
+    transition-duration: var(--motion-slow);
     transition-timing-function: var(--ease-standard);
   }
 
@@ -221,7 +232,8 @@
       animation: none;
     }
     .motion-layout,
-    .motion-indicator {
+    .motion-indicator,
+    .motion-progress {
       transition: none;
     }
     .motion-layout-label,
