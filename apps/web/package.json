@@ -1,6 +1,6 @@
 {
   "name": "@pacenote/web",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "private": true,
   "description": "Pacenote UI for status, settings and run history (bundled into the desktop app)",
   "type": "module",
