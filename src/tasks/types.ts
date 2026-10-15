@@ -152,6 +152,25 @@ export interface TasksView {
   leaveOut?: { conversation: string; label: string; count: number }
 }
 
+/**
+ * How a handled task ended, as the Overview counts it: in Claude Code or
+ * Codex (a session for it, or closed by one), closed in Slack (a reply, a
+ * check mark), or marked done by you
+ */
+export type HandledHow = 'tool' | 'slack' | 'you'
+
+/** Your tasks over the last 14 days, for the Overview (src/tasks/trend.ts) */
+export interface TaskTrend {
+  /** Tasks handled each day, oldest first, today last */
+  daily: { day: string; handled: number }[]
+  /** The days' handled tasks, by how they ended */
+  how: Record<HandledHow, number>
+  /** Open now, as Todo lists them */
+  open: number
+  /** The median time from a task's message to its handling, over the days */
+  medianMs?: number
+}
+
 /** How a collection from the app ended, and what it spent */
 export type CollectOutcome = (
   | { at: string; ok: true; added: number; maybe: number; skipped: number }

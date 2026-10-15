@@ -22,7 +22,9 @@ import {
   SOURCES,
   sourceOf,
 } from '../src/tasks/sources.js'
-import type { Task, TasksFile } from '../src/tasks/types.js'
+import { taskTrend } from '../src/tasks/trend.js'
+import type { Task, TasksFile, WorkEntry } from '../src/tasks/types.js'
+import { dayDirFor } from '../src/history/layout.js'
 import { addTasks, closeTask } from '../src/tasks/write.js'
 import { settingsText } from '../src/settings/settings-file.js'
 
@@ -165,6 +167,92 @@ describe('the tasks view', () => {
         at: new Date(NOW).toISOString(),
       },
     })
+  })
+})
+
+describe('the task trend', () => {
+  const HOUR = 60 * 60_000
+  const at = (ms: number) => new Date(ms).toISOString()
+  const session = (task: string): WorkEntry => ({
+    kind: 'session',
+    id: `work-${task}`,
+    task,
+    tool: 'claude',
+    cwd: '/tmp',
+    startedAt: at(NOW - 2 * HOUR),
+  })
+
+  it('counts what you handled each day, by how it ended', () => {
+    const tasks = buildView(
+      {
+        version: 1,
+        tasks: [
+          // Closed in Slack: a reply, two hours after its message
+          task('replied', {
+            postedAt: at(NOW - 3 * HOUR),
+            closed: { at: at(NOW - HOUR), why: 'replied' },
+          }),
+          // Closed by an AI tool
+          task('by-tool', {
+            postedAt: at(NOW - 2 * DAY),
+            closed: {
+              at: at(NOW - 2 * DAY + 4 * HOUR),
+              why: 'resolved',
+              by: 'claude-code',
+            },
+          }),
+          // Marked done a day after its message, after a session for it
+          task('worked', { postedAt: at(NOW - 4 * DAY) }),
+          // Marked done; dismissed as done already
+          task('done', { postedAt: at(NOW - 4 * DAY) }),
+          task('done-already', { postedAt: at(NOW - 4 * DAY) }),
+          // Not handled: dismissed as not yours, open, a maybe
+          task('not-mine'),
+          task('open'),
+          task('maybe', { confidence: 'maybe' }),
+        ],
+      },
+      {
+        worked: { status: 'done', at: at(NOW - 3 * DAY) },
+        done: { status: 'done', at: at(NOW - 3 * DAY) },
+        'done-already': {
+          status: 'dismissed',
+          reason: 'done-already',
+          at: at(NOW - 3 * DAY),
+        },
+        'not-mine': {
+          status: 'dismissed',
+          reason: 'not-mine',
+          at: at(NOW - HOUR),
+        },
+      },
+      { now: NOW }
+    ).tasks
+    const trend = taskTrend(tasks, [session('worked')], new Date(NOW))
+
+    expect(trend.daily).toHaveLength(14)
+    expect(trend.daily.at(-1)?.day).toBe(dayDirFor(new Date(NOW)))
+    const day = (ms: number) =>
+      trend.daily.find((entry) => entry.day === dayDirFor(new Date(ms)))
+        ?.handled
+    expect(trend.daily.reduce((sum, entry) => sum + entry.handled, 0)).toBe(5)
+    expect(day(NOW - 3 * DAY)).toBe(3)
+    expect(trend.how).toEqual({ tool: 2, slack: 1, you: 2 })
+    expect(trend.open).toBe(1)
+    // 2 hours, 4 hours, and a day three times
+    expect(trend.medianMs).toBe(DAY)
+  })
+
+  it('leaves out what was handled before the 14 days', () => {
+    const old = {
+      ...buildView({ version: 1, tasks: [task('old')] }, {}, { now: NOW })
+        .tasks[0]!,
+      status: 'done' as const,
+      settledAt: at(NOW - 15 * DAY),
+    }
+    const trend = taskTrend([old], [], new Date(NOW))
+    expect(trend.how).toEqual({ tool: 0, slack: 0, you: 0 })
+    expect(trend.medianMs).toBeUndefined()
   })
 })
 

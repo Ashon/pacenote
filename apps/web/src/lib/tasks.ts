@@ -18,6 +18,17 @@ export function useTasks() {
   })
 }
 
+/** Your tasks over the last 14 days, for the Overview; null with Todo off */
+export function useTaskTrend() {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: ['task-trend'],
+    queryFn: async () => (await bridge?.trend()) ?? null,
+    enabled: Boolean(bridge),
+    refetchInterval: 10_000,
+  })
+}
+
 /** Records a decision on a task (or takes it back) and refreshes the list */
 export function useDecide() {
   const client = useQueryClient()

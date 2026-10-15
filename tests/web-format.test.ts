@@ -3,6 +3,7 @@ import {
   formatDuration,
   formatShortDay,
   formatTokens,
+  formatWait,
   previewArgs,
 } from '../apps/web/src/lib/format.js'
 import { slackToMarkdown } from '../apps/web/src/lib/slack.js'
@@ -61,6 +62,17 @@ describe('formatTokens', () => {
     expect(formatTokens(37_220)).toBe('37k')
     expect(formatTokens(999_600)).toBe('1M')
     expect(formatTokens(1_541_000)).toBe('1.54M')
+  })
+})
+
+describe('formatWait', () => {
+  it('says a wait in minutes, hours or days', () => {
+    expect(formatWait(0)).toBe('1 min')
+    expect(formatWait(40 * 60_000)).toBe('40 min')
+    expect(formatWait(60 * 60_000)).toBe('1 hour')
+    expect(formatWait(5.4 * 3_600_000)).toBe('5 hours')
+    expect(formatWait(24 * 3_600_000)).toBe('1 day')
+    expect(formatWait(36 * 3_600_000)).toBe('1.5 days')
   })
 })
 

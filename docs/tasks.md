@@ -66,6 +66,9 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
 - Open tasks fade after 7 days and drop after 14; done, dismissed and closed ones are kept 14 days.
 - Under Done, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked too
   loosely.
+- The Overview shows what you handled over the last 14 days: how many each day, how they ended (in Claude Code or Codex,
+  closed in Slack, or marked done), and how long they usually took from their message. Done, closed, and dismissed as
+  already done count; dismissed as not for you or not worth it does not.
 
 ## Continuing a task
 

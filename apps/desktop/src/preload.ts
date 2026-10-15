@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   // Your tasks: the list and your decisions (AI tools add them over MCP)
   tasks: {
     list: () => ipcRenderer.invoke('pacenote:tasks:list'),
+    trend: () => ipcRenderer.invoke('pacenote:tasks:trend'),
     decide: (id: string, decision: unknown) =>
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     leaveOut: (label: string) =>

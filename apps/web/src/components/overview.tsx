@@ -1,12 +1,15 @@
 import { setupSettingsRoute } from '@src/settings/fields'
 import type { TokenStats } from '@history/types'
+import type { HandledHow, TaskTrend } from '@src/tasks/types'
 import { newTokens } from '@history/usage'
 import {
   Activity,
   BarChart3,
   CircleCheck,
   Coins,
+  Flag,
   Layers,
+  ListChecks,
   LoaderCircle,
   Settings,
   Timer,
@@ -17,7 +20,13 @@ import { Button } from '@/components/ui/button'
 import { useStats } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
 import { useSetup } from '@/lib/setup'
-import { formatDuration, formatNumber, formatTokens } from '@/lib/format'
+import {
+  formatDuration,
+  formatNumber,
+  formatTokens,
+  formatWait,
+} from '@/lib/format'
+import { useTaskTrend } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { ResumeSetup, SetupFacts } from './setup/resume'
 
@@ -73,6 +82,7 @@ export function Overview() {
   const stats = useStats()
   const supervisor = useSupervisor()
   const setup = useSetup()
+  const trend = useTaskTrend()
   const setupOpen = setup.view?.open === true
   const data = stats.data
   const finished = data
@@ -99,8 +109,8 @@ export function Overview() {
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          How Pace has answered your Slack mentions and collected your tasks:
-          how many, how well, with which tools, and with how many tokens.
+          How Pace has answered your Slack mentions and how your tasks went: how
+          many, how well, with which tools, and with how many tokens.
         </p>
       </header>
 
@@ -242,9 +252,104 @@ export function Overview() {
             </section>
           </div>
 
+          <TaskBand trend={trend.data ?? undefined} />
+
           <TokenBand tokens={data?.tokens} />
         </>
       )}
+    </div>
+  )
+}
+
+const HOW: { how: HandledHow; label: string }[] = [
+  { how: 'tool', label: 'In Claude Code or Codex' },
+  { how: 'slack', label: 'Closed in Slack' },
+  { how: 'you', label: 'Marked done' },
+]
+
+/**
+ * Your tasks over the same 14 days, with Todo on: how many you handled each
+ * day and how they ended. With none handled, a line says so.
+ */
+function TaskBand({ trend }: { trend?: TaskTrend }) {
+  if (!trend) return null
+  const handled = trend.daily.reduce((sum, day) => sum + day.handled, 0)
+  if (handled === 0)
+    return (
+      <section className="mt-10 border-t border-border pt-9">
+        <CardHeader
+          icon={<ListChecks className="text-primary" />}
+          label="Tasks handled"
+        />
+        <p className="mt-3 text-sm text-muted-foreground">
+          None handled in the last 14 days.
+          {trend.open > 0 && ` ${trend.open} still open.`}
+        </p>
+      </section>
+    )
+  const top = Math.max(1, ...Object.values(trend.how))
+  return (
+    <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
+      <section className="flex flex-col">
+        <CardHeader
+          icon={<ListChecks className="text-primary" />}
+          label="Tasks handled"
+          meta="Per day"
+        />
+        <ChartTotal
+          value={formatNumber(handled)}
+          unit="handled"
+          hint={trend.open ? `${trend.open} still open` : 'None open'}
+        />
+        <div className="mt-4 flex min-h-32 flex-1">
+          <DayBars
+            label="Tasks you handled per day for the last 14 days"
+            topClassName="bg-chart-4"
+            days={trend.daily.map((day) => ({
+              day: day.day,
+              value: day.handled,
+              top: 0,
+              hover: String(day.handled),
+              title: `${day.day}: ${day.handled} handled`,
+            }))}
+          />
+        </div>
+      </section>
+
+      <section>
+        <CardHeader
+          icon={<Flag className="text-chart-1" />}
+          label="How they ended"
+          meta="Last 14 days"
+        />
+        <ul className="mt-5 space-y-3">
+          {HOW.map(({ how, label }) => (
+            <li key={how} className="text-xs">
+              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <span className="truncate font-medium">{label}</span>
+                <span className="shrink-0 font-medium tabular-nums">
+                  {trend.how[how]}
+                </span>
+              </div>
+              <LineBar
+                share={trend.how[how] / top}
+                className="pacenote-gradient"
+              />
+            </li>
+          ))}
+        </ul>
+        {trend.medianMs !== undefined && (
+          <div
+            className="mt-3.5 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"
+            title="The median, from a task's message to when it was handled"
+          >
+            <span className="font-medium">Usually handled within</span>
+            <span className="ml-auto font-medium tabular-nums">
+              {formatWait(trend.medianMs)}
+            </span>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

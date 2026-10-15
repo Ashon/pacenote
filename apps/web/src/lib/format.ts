@@ -60,6 +60,16 @@ export function formatDuration(ms: number | undefined): string {
   return sec ? `${min}m ${sec}s` : `${min}m`
 }
 
+/** A longer wait, in words: 40 min, 3 hours, 1.5 days */
+export function formatWait(ms: number): string {
+  const min = Math.round(ms / 60_000)
+  if (min < 60) return `${Math.max(1, min)} min`
+  const hours = Math.round(ms / 3_600_000)
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  const days = Number((ms / 86_400_000).toFixed(1))
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
 export const formatNumber = (n: number) => n.toLocaleString('en-US')
 
 /** Token counts, short: 950, 8.6k, 37k, 1.54M */

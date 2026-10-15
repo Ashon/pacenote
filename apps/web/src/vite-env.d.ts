@@ -30,6 +30,7 @@ import type {
   SessionItem,
   TaskDecision,
   TaskDetail,
+  TaskTrend,
   TasksCollect,
   TasksView,
   WorkEntry,
@@ -133,6 +134,8 @@ declare global {
             })
           | null
         >
+        /** What you handled over the last 14 days; null with Todo off */
+        trend(): Promise<TaskTrend | null>
         decide(
           id: string,
           decision: Omit<TaskDecision, 'at'> | null

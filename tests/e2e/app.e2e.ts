@@ -1168,6 +1168,25 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await arrivedRow.waitFor()
     await notice.waitFor({ state: 'detached' })
 
+    // Overview: the two reviews were handled in Claude Code in the last 14
+    // days, and the question and the new task are still open.
+    await page.evaluate("window.location.hash = '#/'")
+    const handledBand = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Tasks handled' }),
+    })
+    await handledBand.getByText('2 still open').waitFor()
+    expect(await handledBand.textContent()).toContain('2handled')
+    const inTool = page.locator('li', { hasText: 'In Claude Code or Codex' })
+    expect(await inTool.textContent()).toBe('In Claude Code or Codex2')
+    expect(
+      await page.locator('li', { hasText: 'Closed in Slack' }).textContent()
+    ).toBe('Closed in Slack0')
+    await page.getByText('Usually handled within').waitFor()
+    await handledBand.evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/overview-tasks.png'),
+    })
+
     // Settings > Todo shows where the repository opens.
     await page.evaluate("window.location.hash = '#/settings/tasks'")
     await page.getByText('Continuing work').waitFor()

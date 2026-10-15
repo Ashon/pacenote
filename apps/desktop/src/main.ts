@@ -64,6 +64,7 @@ import {
 } from '../../../src/tasks/collections.js'
 import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
+import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
   TaskDecision,
   WorkEntry,
@@ -810,6 +811,14 @@ function registerBotIpc(): void {
       ...view,
       working: working(view.tasks.filter((task) => task.status === 'open')),
     }
+  })
+  // The Overview's tasks: what you handled over the last 14 days
+  ipcMain.handle('pacenote:tasks:trend', (event) => {
+    if (!fromMainWindow(event)) return null
+    const current = tasksSettings()
+    if (!current.on) return null
+    const view = tasksView(dataDir, current.exclude)
+    return taskTrend(view.tasks, readWork(dataDir).entries)
   })
   ipcMain.handle('pacenote:tasks:collect', (event) => {
     if (!fromMainWindow(event)) return undefined
