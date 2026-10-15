@@ -7,11 +7,10 @@
     "src/hub/**/*.ts",
     "src/mention/**/*.ts",
     "src/messengers/**/*.ts",
-    "src/reasoner/**/*.ts",
+    "src/reasoners/**/*.ts",
     "src/render/**/*.ts",
     "src/runtime/**/*.ts",
-    "src/settings/legacy.ts",
-    "src/settings/load-env.ts"
+    "src/settings/load-settings.ts"
   ],
   "exclude": [
     "src/history/reader.ts",
