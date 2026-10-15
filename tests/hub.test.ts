@@ -16,7 +16,11 @@ import { normalizeCode, Pairings, PAIRING_TTL_MS } from '../src/hub/pairing.js'
 import { fileIdOf, Grants } from '../src/hub/policy.js'
 import { slackFilesOrigin } from '../src/messengers/slack/api.js'
 import { HUB_CLOSE, type HubMessage } from '../src/hub/protocol.js'
-import { HubServer, type SlackGateway } from '../src/hub/server.js'
+import {
+  HubServer,
+  type SlackGateway,
+  withoutToken,
+} from '../src/hub/server.js'
 import { DesktopStore } from '../src/hub/store.js'
 import { HubReceiver } from '../src/messengers/slack/hub-receiver.js'
 
@@ -379,6 +383,16 @@ describe('hub server', () => {
       ok: true,
     })
     expect(calls.at(-1)?.method).toBe('chat.postMessage')
+    // The hub token a desktop's Slack client puts in a call stays here: Slack
+    // would take it over the bot token, and answer invalid_auth.
+    expect(await api('auth.test', { token })).toMatchObject({ ok: true })
+    expect(calls.at(-1)).toEqual({ method: 'auth.test', body: '' })
+    expect(
+      withoutToken(
+        JSON.stringify({ token, channel: 'C1' }),
+        'application/json; charset=utf-8'
+      )
+    ).toBe('{"channel":"C1"}')
     const before = calls.length
     expect(
       await api('chat.postMessage', {

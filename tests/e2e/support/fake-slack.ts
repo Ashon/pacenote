@@ -339,8 +339,9 @@ export class FakeSlack {
         body,
         req.headers['content-type'] ?? ''
       )
+      // As Slack does, a token in the body wins over the header's.
       const token =
-        req.headers.authorization?.replace(/^Bearer /, '') ?? bodyToken
+        bodyToken ?? req.headers.authorization?.replace(/^Bearer /, '')
       this.calls.push({ method, args, token })
       const { json, headers } = this.api(method, args, token)
       res.writeHead(200, { 'content-type': 'application/json', ...headers })

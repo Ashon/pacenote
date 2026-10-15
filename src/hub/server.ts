@@ -320,7 +320,11 @@ export class HubServer {
       // as one.
       return json(res, 200, { ok: false, error: decision.error })
     }
-    const result = await this.options.slack.call(method, raw, contentType)
+    const result = await this.options.slack.call(
+      method,
+      withoutToken(raw, contentType),
+      contentType
+    )
     grants.observe(method, args, result.json)
     if (
       method === 'files.getUploadURLExternal' &&
@@ -517,6 +521,31 @@ async function readJson(
  * Web API arguments as strings, the way the policy reads them (nested values
  * stay JSON strings)
  */
+/**
+ * A call's body as the hub passes it on: without the token in it. The
+ * desktop's Slack client puts its hub token in some calls (Bolt's auth.test),
+ * and Slack takes a token in the body over the bot token in the header, so
+ * it would answer invalid_auth, and the hub token would reach Slack.
+ */
+export function withoutToken(raw: string, contentType: string): string {
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      if (!parsed || typeof parsed !== 'object' || !('token' in parsed))
+        return raw
+      const rest = { ...(parsed as Record<string, unknown>) }
+      delete rest.token
+      return JSON.stringify(rest)
+    } catch {
+      return raw
+    }
+  }
+  const params = new URLSearchParams(raw)
+  if (!params.has('token')) return raw
+  params.delete('token')
+  return params.toString()
+}
+
 export function parseArgs(
   raw: string,
   contentType: string
