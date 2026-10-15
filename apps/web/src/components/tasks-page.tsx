@@ -263,6 +263,12 @@ export function TasksPage({
               cli={data.settings.cli}
               working={data.working?.[task.id]}
               live={live?.working[task.id]}
+              proposal={data.proposals?.[task.id]}
+              follows={
+                task.follows
+                  ? data.tasks.find((each) => each.id === task.follows)?.title
+                  : undefined
+              }
               open={task.id === openId}
               gone={tabOf(task) !== tab}
               logEntry={task.id === openId ? logEntry : undefined}
@@ -452,11 +458,13 @@ function liveLine(
           ? `${tool} closed ${it}.`
           : event.kind === 'wrap-up'
             ? `${tool} wrote how ${it} ended.`
-            : event.kind === 'add' && event.finished !== false
-              ? event.added
-                ? `${tool} added ${event.added} ${event.added === 1 ? 'task' : 'tasks'}.`
-                : `${tool} found nothing new to add.`
-              : undefined
+            : event.kind === 'follow-up'
+              ? `${tool} kept ${it} for later.`
+              : event.kind === 'add' && event.finished !== false
+                ? event.added
+                  ? `${tool} added ${event.added} ${event.added === 1 ? 'task' : 'tasks'}.`
+                  : `${tool} found nothing new to add.`
+                : undefined
   if (!text) return undefined
   return {
     key: `${event.kind}:${event.task ?? ''}:${event.at}`,

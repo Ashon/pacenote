@@ -29,6 +29,7 @@ import type {
   FolderCheck,
   SessionItem,
   TaskDecision,
+  Proposal,
   TaskDetail,
   TaskTrend,
   TasksCollect,
@@ -132,6 +133,8 @@ declare global {
               collections: CollectionRecord[]
               /** Each open task's latest session: its tool and last activity */
               working: Record<string, { tool: WorkTool; at: string }>
+              /** Open tasks whose quiet session says they look done */
+              proposals: Record<string, Proposal>
             })
           | null
         >
@@ -151,6 +154,16 @@ declare global {
         stopCollect(): Promise<void>
         /** A task with what came before it and its work log */
         detail(id: string): Promise<TaskDetail | null>
+        /** A task that looks done: close it with how it ended, or not yet */
+        answerProposal(
+          id: string,
+          answer: 'close' | 'not-yet'
+        ): Promise<{ error?: string } | undefined>
+        /** Keeps a thing left after a task as a task of its own */
+        keepLeft(
+          id: string,
+          text: string
+        ): Promise<{ id?: string; error?: string } | undefined>
         /** A session that looked like a task's work: it is, or it is not */
         answerSuggestion(entryId: string, yes: boolean): Promise<void>
         /** Where a task may open on this Mac, likeliest first */

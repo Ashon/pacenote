@@ -1,8 +1,12 @@
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   renameSync,
+  rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
@@ -72,6 +76,39 @@ export function readTasks(dataDir: string): TasksFile {
     version: 1,
     collectedAt: file.collectedAt,
     tasks: Array.isArray(file.tasks) ? file.tasks : [],
+  }
+}
+
+/** A lock this old was left by a process that ended while holding it */
+const STALE_LOCK_MS = 10_000
+const pause = (ms: number) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/**
+ * Runs change holding tasks.json's lock. Each AI tool session runs an MCP
+ * server of its own, and the desktop app closes tasks too, so whatever reads
+ * tasks.json to change it does so under the lock, and two changes at once
+ * never undo each other.
+ */
+export function withTasksLock<T>(dataDir: string, change: () => T): T {
+  mkdirSync(dataDir, { recursive: true })
+  const lock = path.join(dataDir, `${TASKS_FILE}.lock`)
+  for (;;) {
+    try {
+      closeSync(openSync(lock, 'wx'))
+      break
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      const held = statSync(lock, { throwIfNoEntry: false })?.mtimeMs
+      if (held !== undefined && Date.now() - held > STALE_LOCK_MS)
+        rmSync(lock, { force: true })
+      else pause(20)
+    }
+  }
+  try {
+    return change()
+  } finally {
+    rmSync(lock, { force: true })
   }
 }
 

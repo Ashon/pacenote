@@ -119,6 +119,7 @@ Each table is one group of the file. Select values are in the last column; the S
 | `tasks.terminal` | `TASKS_TERMINAL` | `auto` | Terminal: `auto`, `terminal`, `iterm` or `ghostty` |
 | `tasks.planFirst` | `TASKS_PLAN_FIRST` | `true` | Start with a plan |
 | `tasks.linkSessions` | `TASKS_LINK_SESSIONS` | `false` | Show sessions you start yourself |
+| `tasks.suggestDone` | `TASKS_SUGGEST_DONE` | `false` | Say when a task looks done |
 
 ### history
 

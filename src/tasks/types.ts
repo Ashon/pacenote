@@ -9,7 +9,7 @@
  */
 
 import type { TokenUsage } from '../history/usage.js'
-import type { SourceId } from './sources.js'
+import type { TaskOrigin } from './sources.js'
 
 /** asked: someone asked you; promised: you said you would */
 export type TaskKind = 'asked' | 'promised'
@@ -24,8 +24,11 @@ export type TaskConfidence = 'sure' | 'maybe'
 export type TaskAction = 'code' | 'reply' | 'other'
 
 export interface TaskSource {
-  /** The source it was found in; tasks from before there were sources: Slack */
-  app?: SourceId
+  /**
+   * The source it was found in, or local for one from a session on this Mac;
+   * tasks from before there were sources: Slack
+   */
+  app?: TaskOrigin
   /** Where in the source: a Slack conversation ID */
   conversation: string
   /** "#payments", "DM with mina" */
@@ -61,6 +64,8 @@ export interface Task {
   action?: TaskAction
   /** The repository it is about, as owner/name */
   repo?: string
+  /** The task it carries on from: work a session left after that one */
+  follows?: string
   /**
    * The thread in two or three sentences, written when it was collected: who
    * wants what, and why. Pacenote keeps no messages, so this is the reminder.
@@ -173,7 +178,7 @@ export interface TaskTrend {
 
 /** Which task tool an AI tool called */
 export type ActivityKind =
-  'collect' | 'add' | 'look' | 'update' | 'close' | 'wrap-up'
+  'collect' | 'add' | 'look' | 'update' | 'close' | 'wrap-up' | 'follow-up'
 
 /**
  * One call of an AI tool to Pacenote's task tools, as tasks-activity.jsonl
@@ -300,6 +305,31 @@ export type SessionSuggestion = Omit<
   shares: string[]
 }
 
+/**
+ * What Pacenote made of a task's session once it went quiet: whether the task
+ * looks done, how it ended and what is left after it. A session is judged
+ * again only once it was active after; a proposal waits for you to answer it.
+ */
+export interface Proposal {
+  task: string
+  /** The session judged, by its tool's own id */
+  tool: WorkTool
+  session: string
+  /** When the session was last active, as judged */
+  activeAt: string
+  /** When it was judged */
+  at: string
+  done: boolean
+  /** How it ended, in two or three sentences */
+  summary?: string
+  /** What is left after it, each a task you may keep */
+  left?: string[]
+  /** The pull request of the session's branch, when it has one */
+  pr?: { number: number; state: string; url: string }
+  /** What you said: closed it, or not yet */
+  answer?: 'closed' | 'not-yet'
+}
+
 export interface WorkFile {
   version: 1
   entries: WorkEntry[]
@@ -307,6 +337,8 @@ export interface WorkFile {
   suggested?: SessionSuggestion[]
   /** Sessions you said were not a task's work, not asked about again */
   notIt?: { task: string; session: string; at: string }[]
+  /** What quiet sessions looked like, done or not (done-watch.ts) */
+  proposals?: Proposal[]
 }
 
 /** A run of Pace's in the task's thread, as its detail lists it */

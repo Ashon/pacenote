@@ -198,8 +198,9 @@ export const EnvSchema = z.object({
   TASKS_EXCLUDE_CHANNELS: z.string().optional(),
   /**
    * Continuing a task (the desktop app): where code tasks open, in which
-   * terminal, whether the session starts with a plan, and whether sessions
-   * you start yourself are looked for
+   * terminal, whether the session starts with a plan, whether sessions
+   * you start yourself are looked for, and whether a quiet session is read
+   * for whether its task looks done
    */
   TASKS_CLI: z.enum(['claude', 'codex']).default('claude'),
   TASKS_TERMINAL: z
@@ -207,6 +208,7 @@ export const EnvSchema = z.object({
     .default('auto'),
   TASKS_PLAN_FIRST: z.enum(['on', 'off']).default('on'),
   TASKS_LINK_SESSIONS: z.enum(['on', 'off']).default('off'),
+  TASKS_SUGGEST_DONE: z.enum(['on', 'off']).default('off'),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
@@ -311,6 +313,7 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS_TERMINAL',
   'TASKS_PLAN_FIRST',
   'TASKS_LINK_SESSIONS',
+  'TASKS_SUGGEST_DONE',
 ])
 
 /**

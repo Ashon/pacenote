@@ -2,6 +2,7 @@ import { sourceOf } from '@src/tasks/sources'
 import type {
   DismissReason,
   FolderCheck,
+  Proposal,
   RelatedRun,
   RelatedTask,
   SessionItem,
@@ -53,6 +54,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import {
   taskDetailQuery,
+  useProposal,
   useRepoFolders,
   useTaskDetail,
   useTaskWork,
@@ -163,6 +165,8 @@ export function TaskRow({
   cli,
   working,
   live,
+  follows,
+  proposal,
   open,
   gone,
   logEntry,
@@ -178,6 +182,10 @@ export function TaskRow({
   working?: { tool: WorkTool; at: string }
   /** An AI tool working on it now over MCP (tasks-activity.jsonl) */
   live?: { by?: string; at: string }
+  /** The title of the task it carries on from, for one a session left */
+  follows?: string
+  /** Its quiet session says it looks done (done-watch.ts) */
+  proposal?: Proposal
   open: boolean
   /** Settled while it was open: it stays in place until it is closed */
   gone?: boolean
@@ -188,6 +196,11 @@ export function TaskRow({
 }) {
   const client = useQueryClient()
   const act = useTaskWork(task.id)
+  const proposed = useProposal(task.id)
+  // Looks done: a mark on the closed row that fades in and out
+  const looksDone = usePresence<HTMLSpanElement>(
+    Boolean(proposal) && task.status === 'open' && !open
+  )
   // Its repository's folder: Continue opens there without asking.
   const folder = repoFolderOf(useRepoFolders().data, task.repo)
   const [dismissing, setDismissing] = useState(false)
@@ -234,8 +247,13 @@ export function TaskRow({
     setError(failed)
   }
 
-  const who =
-    task.kind === 'promised'
+  // From a session on this Mac, it has no thread: no reply to draft.
+  const local = task.source.app === 'local'
+  const who = local
+    ? follows
+      ? `Left after \u201c${follows}\u201d`
+      : 'Kept from a session'
+    : task.kind === 'promised'
       ? 'You said you would'
       : task.askedBy
         ? `${task.askedBy} asked you`
@@ -286,7 +304,7 @@ export function TaskRow({
           },
         ]
       : []),
-    ...(task.action === 'reply'
+    ...(task.action === 'reply' || local
       ? []
       : [
           {
@@ -378,6 +396,16 @@ export function TaskRow({
                   {TOOL[working.tool]} {formatRelative(working.at)}
                 </span>
               )}
+              {looksDone.mounted && (
+                <span
+                  ref={looksDone.ref}
+                  data-state={looksDone.state}
+                  title={proposal?.summary}
+                  className="motion-fade rounded-full bg-primary/12 px-2 py-px font-medium text-primary"
+                >
+                  Looks done
+                </span>
+              )}
               {recent && !open && (
                 <span
                   title={recent.why}
@@ -436,7 +464,7 @@ export function TaskRow({
                     </Button>
                   </OpensIn>
                 )}
-                {task.action === 'reply' && (
+                {task.action === 'reply' && !local && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -534,6 +562,9 @@ export function TaskRow({
             onCopy={(text) => void act.copyReply(text).then(setError)}
             onResume={(entryId) => void act.resume(entryId).then(setError)}
             onAnswer={(entryId, yes) => void act.answer(entryId, yes)}
+            proposal={task.status === 'open' ? proposal : undefined}
+            onProposal={(answer) => void proposed.answer(answer).then(setError)}
+            onKeep={(text) => void proposed.keep(text).then(setError)}
           />
         </CollapsibleContent>
       </Collapsible>
@@ -623,6 +654,9 @@ function TaskOpen({
   onCopy,
   onResume,
   onAnswer,
+  proposal,
+  onProposal,
+  onKeep,
 }: {
   task: TaskView
   drafting: boolean
@@ -633,6 +667,11 @@ function TaskOpen({
   onResume: (entryId: string) => void
   /** A suggested session: the task's work, or not */
   onAnswer: (entryId: string, yes: boolean) => void
+  /** What its quiet session looked like, waiting for you */
+  proposal?: Proposal
+  onProposal: (answer: 'close' | 'not-yet') => void
+  /** Keeps a thing left after it as a task of its own */
+  onKeep: (text: string) => void
 }) {
   const detail = useTaskDetail(task.id).data
   const [all, setAll] = useState(false)
@@ -696,6 +735,13 @@ function TaskOpen({
           </p>
         ) : (
           <>
+            {proposal && (
+              <LooksDone
+                proposal={proposal}
+                onAnswer={onProposal}
+                onKeep={onKeep}
+              />
+            )}
             {settled && (task.wrapUp || detail.outcome) && (
               <Line label="Result">
                 {task.wrapUp ? (
@@ -995,6 +1041,71 @@ type Suggestion = NonNullable<TaskDetail['suggested']>[number]
  * A session that only looks like the task's work, by what they share: you
  * say whether it is, and its log opens like any other
  */
+/**
+ * What the task's quiet session looked like: done, how it ended, what is left.
+ * Close it closes the task with that; Not yet waits for the session to go on.
+ * Each thing left can be kept as a task of its own.
+ */
+function LooksDone({
+  proposal,
+  onAnswer,
+  onKeep,
+}: {
+  proposal: Proposal
+  onAnswer: (answer: 'close' | 'not-yet') => void
+  onKeep: (text: string) => void
+}) {
+  const tool = TOOL[proposal.tool]
+  return (
+    <>
+      <Line
+        label="Looks done"
+        actions={
+          <>
+            <Button size="xs" onClick={() => onAnswer('close')}>
+              <CircleCheck />
+              Close it
+            </Button>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => onAnswer('not-yet')}
+            >
+              Not yet
+            </Button>
+          </>
+        }
+      >
+        <span className="max-w-[40rem] select-text">
+          {proposal.summary ?? `Its ${tool} session looks finished.`}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {[
+            `From its ${tool} session`,
+            proposal.pr &&
+              `#${proposal.pr.number} ${proposal.pr.state.toLowerCase()}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      </Line>
+      {(proposal.left ?? []).map((item) => (
+        <Line
+          key={item}
+          label="Left"
+          actions={
+            <Button size="xs" variant="outline" onClick={() => onKeep(item)}>
+              Keep as a task
+            </Button>
+          }
+        >
+          <span className="select-text">{item}</span>
+        </Line>
+      ))}
+    </>
+  )
+}
+
 function SuggestedLine({
   suggestion,
   taskId,

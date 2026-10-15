@@ -106,6 +106,24 @@ instructions only say how many tasks are open. Two prompts make it one command:
 - `/mcp__pacenote__done` wraps the session up into its task: it closes it with what was done, a wrap-up and a reply for
   you to send, or, when the work is not done, leaves it open and says what is left.
 
+### Tasks a session keeps
+
+Work left after a task, or something you ask your AI tool to keep for later ("remember to bump the SDK after the
+release"), becomes a task of your own with `add_followup`: its source is **This Mac**, it is in the repository of the
+task it follows or the session's folder, and its row says which task it was left after ("Left after “Review the payment
+retry PR”"). The same title left after the same task, still open, is kept once. It has no thread, so a collection never
+checks it in Slack and there is no reply to draft; the session that does it, or you, closes it.
+
+### When a task looks done
+
+With Settings > Todo > "Say when a task looks done" on, Pacenote does not wait for a session to close its task. When the
+latest session of an open task has been quiet for 10 minutes, Claude Code, headless and with no tools or MCP servers,
+reads the session's last turns and, through `gh`, read only, the state of its branch's pull request, and says whether
+the work is done, how it ended and what is left. A task that looks done says so on its row; open, it shows how it ended
+with **Close it** (closed as done in its session, with that as its wrap-up) and **Not yet**, and each thing left with
+**Keep as a task**. A session is read again only after it was active again, at most two at a time, while Todo is open.
+It uses your Claude Code login, and is off until you turn it on.
+
 ## The MCP tools
 
 | Tool | What it does |
@@ -113,6 +131,7 @@ instructions only say how many tasks are open. Two prompts make it one command:
 | `collect_context` | The rules, what to leave out, since when, and the open tasks |
 | `add_tasks` | Adds tasks, each from one Slack message (its permalink), and marks the collection finished |
 | `close_task` | Closes an open task: you replied, it got a check mark, or it was settled some other way |
+| `add_followup` | Keeps a task of your own from the session: work left after a task, or something to do later |
 | `my_tasks` | Your open tasks, with who asked, where, a due hint, why, and a link; Maybes are left out |
 | `collect_tasks` (prompt) | The steps of a collection, as a slash command in Claude Code |
 | `task` (prompt) | Brings one of your tasks into the session you are in |

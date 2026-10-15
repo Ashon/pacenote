@@ -16,7 +16,13 @@ import {
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskActivity, TaskView } from './types.js'
 import { readWork } from './work.js'
-import { addTasks, closeTask, updateTask, wrapUpTask } from './write.js'
+import {
+  addFollowUp,
+  addTasks,
+  closeTask,
+  updateTask,
+  wrapUpTask,
+} from './write.js'
 
 /**
  * Your tasks over MCP: an AI tool with a Slack connector (Claude Code, Codex)
@@ -126,6 +132,7 @@ export function taskInstructions(options: TaskToolsOptions): string {
     "Pacenote keeps the user's tasks from Slack: what people asked of them and what they said they would do.",
     'When the work the user asks for is one of these tasks, or carries one on, call task_context with its id before you start: it has what was asked, by whom, and what came before.',
     'When that work is done, call close_task with why "resolved", a note on what you did in a line and, if the person who asked waits for an answer, a reply for the user to send. Never post to Slack yourself.',
+    'When work is left after it, or the user asks you to keep something to do later, add it with add_followup (after: the task it carries on from). Not for work you are about to do now.',
   ]
   if (here.length > 0) {
     lines.push(`This folder is ${options.repo}. Its open tasks:`)
@@ -177,8 +184,8 @@ export function donePrompt(): string {
     'Wrap this session up into its task in Pacenote.',
     '',
     '1. Find the task this session worked on: the one you called task_context for, else the open task of this folder’s repository that the work matches (my_tasks lists them). If none or several fit, ask the user which.',
-    '2. If the work is done, call close_task with why "resolved", a note on what was done in a line, a reply for the user to send if the person who asked waits for an answer, and a wrap_up: how it ended, and anything left after it.',
-    '3. If it is not done, do not close it. Tell the user what is left.',
+    '2. If the work is done, call close_task with why "resolved", a note on what was done in a line, a reply for the user to send if the person who asked waits for an answer, and a wrap_up: how it ended, and anything left after it. For each thing left that the user will do later, call add_followup with after: this task\u2019s id.',
+    '3. If it is not done, do not close it. Tell the user what is left, and keep it with add_followup only if they want it kept.',
     '4. Never post to Slack yourself: a reply is for the user to send.',
     '',
     NOTE,
@@ -281,7 +288,12 @@ export function registerTaskTools(
           dms: settings.dms,
           leaveOut: settings.exclude,
           open: tasks
-            .filter((task) => task.status === 'open' || task.status === 'maybe')
+            // Tasks from a session on this Mac have no thread to read.
+            .filter(
+              (task) =>
+                (task.status === 'open' || task.status === 'maybe') &&
+                task.source.app !== 'local'
+            )
             .map((task) => ({
               id: task.id,
               title: task.title,
@@ -298,6 +310,7 @@ export function registerTaskTools(
             .filter(
               (task) =>
                 (task.status === 'done' || task.status === 'closed') &&
+                task.source.app !== 'local' &&
                 !task.wrapUp &&
                 Date.now() - Date.parse(task.settledAt!) < WRAP_UP_WINDOW_MS
             )
@@ -391,6 +404,66 @@ export function registerTaskTools(
             confidence: task.confidence,
           })),
           skipped: result.skipped,
+        }
+      })
+  )
+
+  server.registerTool(
+    'add_followup',
+    {
+      description:
+        "Adds a task of the user's own from this session, kept on this Mac: " +
+        'work left after a task (after: that task) or something the user ' +
+        'asks you to keep for later. Only when the work leaves something or ' +
+        'the user asks; not for what you are about to do now. Its repository ' +
+        "is the one it follows, or this folder's.",
+      inputSchema: {
+        title: z
+          .string()
+          .describe(
+            'What to do, a short imperative: "Add retries to the export job"'
+          ),
+        why: z.string().describe('Why it is a task, in a line'),
+        after: z
+          .string()
+          .optional()
+          .describe(
+            "The task it carries on from: its id or its message's link"
+          ),
+        due: z
+          .string()
+          .optional()
+          .describe('A due hint in words, if there is one'),
+        summary: z
+          .string()
+          .optional()
+          .describe(
+            'What it is about and what is known so far, in two or three sentences'
+          ),
+        action: z.enum(['code', 'reply', 'other']).optional(),
+        repo: z
+          .string()
+          .optional()
+          .describe('The repository it is about, as owner/name'),
+      },
+      annotations: { readOnlyHint: false, openWorldHint: false },
+    },
+    (item) =>
+      respond(options, () => {
+        const result = addFollowUp(options.dataDir, item, {
+          addedBy: client(),
+          repo: options.repo,
+        })
+        if ('error' in result) throw new Error(result.error)
+        const { task, added } = result
+        if (added) track({ kind: 'follow-up', task: task.id })
+        return {
+          [added ? 'added' : 'alreadyThere']: {
+            id: task.id,
+            title: task.title,
+            repo: task.repo,
+            follows: task.follows,
+          },
         }
       })
   )

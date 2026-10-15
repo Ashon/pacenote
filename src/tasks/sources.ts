@@ -94,9 +94,20 @@ export const SOURCES: Record<SourceId, Source> = {
   },
 }
 
+/**
+ * Where a task is from: a source's message, or a session on this Mac (local):
+ * work left after a task, or something you asked your AI tool to keep
+ */
+export type TaskOrigin = SourceId | 'local'
+
+/** A task from a session on this Mac, as a source is named */
+export const LOCAL = { id: 'local', label: 'This Mac' } as const
+
 /** A task's source; tasks from before there were sources are Slack's */
-export const sourceOf = (task: { source: { app?: SourceId } }): Source =>
-  SOURCES[task.source.app ?? 'slack']
+export const sourceOf = (task: {
+  source: { app?: TaskOrigin }
+}): { id: TaskOrigin; label: string } =>
+  task.source.app === 'local' ? LOCAL : SOURCES[task.source.app ?? 'slack']
 
 /** The sources' names, for what people and tools read: "Slack or Gmail" */
 export const sourceNames = (ids: readonly SourceId[] = SOURCE_IDS): string =>

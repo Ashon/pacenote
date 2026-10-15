@@ -1,10 +1,18 @@
+import { randomBytes } from 'node:crypto'
 import type { TasksSettings } from './settings.js'
-import { findMessage, SOURCES, sourceNames, type SourceId } from './sources.js'
+import {
+  findMessage,
+  LOCAL,
+  SOURCES,
+  sourceNames,
+  type SourceId,
+} from './sources.js'
 import {
   HISTORY_MS,
   readDecisions,
   readTasks,
   viewOf,
+  withTasksLock,
   writeTasks,
 } from './store.js'
 import type {
@@ -79,84 +87,89 @@ export function addTasks(
     now?: Date
   }
 ): { added: Task[]; skipped: Skipped[] } {
-  const now = options.now ?? new Date()
-  const file = readTasks(dataDir)
-  const known = new Set(file.tasks.map((task) => task.id))
-  const added: Task[] = []
-  const skipped: Skipped[] = []
-  for (const item of items) {
-    const source = findMessage(item.link, item.source)
-    if (!source) {
-      skipped.push({
-        link: item.link,
-        why: `not a ${sourceNames(item.source ? [item.source] : undefined)} message link`,
+  return withTasksLock(dataDir, () => {
+    const now = options.now ?? new Date()
+    const file = readTasks(dataDir)
+    const known = new Set(file.tasks.map((task) => task.id))
+    const added: Task[] = []
+    const skipped: Skipped[] = []
+    for (const item of items) {
+      const source = findMessage(item.link, item.source)
+      if (!source) {
+        skipped.push({
+          link: item.link,
+          why: `not a ${sourceNames(item.source ? [item.source] : undefined)} message link`,
+        })
+        continue
+      }
+      const id = SOURCES[source.app].taskId(source)
+      const title = item.title.trim()
+      // Channels left out and DMs are Slack's settings.
+      const slack = source.app === 'slack'
+      const excluded = slack
+        ? leftOut(source.conversation, item.where, options.settings.exclude)
+        : undefined
+      const why = !title
+        ? 'no title'
+        : known.has(id)
+          ? 'already a task'
+          : excluded
+            ? `${excluded} is left out`
+            : slack &&
+                !options.settings.dms &&
+                isDm(source.conversation, item.where)
+              ? 'DMs are off'
+              : undefined
+      if (why) {
+        skipped.push({ link: item.link, why })
+        continue
+      }
+      known.add(id)
+      const posted = item.posted_at ? Date.parse(item.posted_at) : NaN
+      const kind = item.kind ?? 'asked'
+      added.push({
+        id,
+        source: {
+          app: source.app,
+          conversation: source.conversation,
+          label: item.where.trim(),
+          message: source.message,
+          thread: source.thread,
+          permalink: item.link,
+        },
+        title: title.slice(0, 120),
+        askedBy:
+          kind === 'promised' ? 'you' : item.asked_by?.trim() || undefined,
+        kind,
+        due: item.due?.trim() || undefined,
+        confidence: item.confidence ?? 'maybe',
+        reason: (item.reason ?? '').trim().slice(0, 300),
+        action: item.action,
+        repo:
+          item.repo && REPO.test(item.repo.trim())
+            ? item.repo.trim()
+            : undefined,
+        summary: item.summary?.trim().slice(0, 600) || undefined,
+        postedAt: new Date(
+          Number.isNaN(posted)
+            ? (SOURCES[source.app].postedAt?.(source) ?? now.getTime())
+            : posted
+        ).toISOString(),
+        foundAt: now.toISOString(),
+        addedBy: options.addedBy,
       })
-      continue
     }
-    const id = SOURCES[source.app].taskId(source)
-    const title = item.title.trim()
-    // Channels left out and DMs are Slack's settings.
-    const slack = source.app === 'slack'
-    const excluded = slack
-      ? leftOut(source.conversation, item.where, options.settings.exclude)
-      : undefined
-    const why = !title
-      ? 'no title'
-      : known.has(id)
-        ? 'already a task'
-        : excluded
-          ? `${excluded} is left out`
-          : slack &&
-              !options.settings.dms &&
-              isDm(source.conversation, item.where)
-            ? 'DMs are off'
-            : undefined
-    if (why) {
-      skipped.push({ link: item.link, why })
-      continue
-    }
-    known.add(id)
-    const posted = item.posted_at ? Date.parse(item.posted_at) : NaN
-    const kind = item.kind ?? 'asked'
-    added.push({
-      id,
-      source: {
-        app: source.app,
-        conversation: source.conversation,
-        label: item.where.trim(),
-        message: source.message,
-        thread: source.thread,
-        permalink: item.link,
-      },
-      title: title.slice(0, 120),
-      askedBy: kind === 'promised' ? 'you' : item.asked_by?.trim() || undefined,
-      kind,
-      due: item.due?.trim() || undefined,
-      confidence: item.confidence ?? 'maybe',
-      reason: (item.reason ?? '').trim().slice(0, 300),
-      action: item.action,
-      repo:
-        item.repo && REPO.test(item.repo.trim()) ? item.repo.trim() : undefined,
-      summary: item.summary?.trim().slice(0, 600) || undefined,
-      postedAt: new Date(
-        Number.isNaN(posted)
-          ? (SOURCES[source.app].postedAt?.(source) ?? now.getTime())
-          : posted
-      ).toISOString(),
-      foundAt: now.toISOString(),
-      addedBy: options.addedBy,
-    })
-  }
-  if (added.length > 0 || options.finished)
-    writeTasks(dataDir, {
-      version: 1,
-      collectedAt: options.finished ? now.toISOString() : file.collectedAt,
-      // Kept as the history earlier tasks are read from, then dropped
-      tasks: [...file.tasks, ...added].filter(
-        (task) => now.getTime() - Date.parse(task.foundAt) < HISTORY_MS
-      ),
-    })
-  return { added, skipped }
+    if (added.length > 0 || options.finished)
+      writeTasks(dataDir, {
+        version: 1,
+        collectedAt: options.finished ? now.toISOString() : file.collectedAt,
+        // Kept as the history earlier tasks are read from, then dropped
+        tasks: [...file.tasks, ...added].filter(
+          (task) => now.getTime() - Date.parse(task.foundAt) < HISTORY_MS
+        ),
+      })
+    return { added, skipped }
+  })
 }
 
 /** Closes an open task by its id or its message's link; undefined when none */
@@ -168,28 +181,30 @@ export function closeTask(
   /** Who closed it, what was done, a reply to send, and how it ended */
   more: { by?: string; note?: string; reply?: string; wrapUp?: string } = {}
 ): Task | undefined {
-  const source = findMessage(ref)
-  const id = source ? SOURCES[source.app].taskId(source) : ref
-  const file = readTasks(dataDir)
-  const task = file.tasks.find((t) => t.id === id)
-  if (!task) return undefined
-  if (task.closed) return task
-  const closed: Task = {
-    ...task,
-    closed: {
-      at: now.toISOString(),
-      why,
-      by: more.by,
-      note: more.note?.trim().slice(0, 300) || undefined,
-      reply: more.reply?.trim().slice(0, 4000) || undefined,
-    },
-    wrapUp: wrapUpOf(more.wrapUp, now, more.by) ?? task.wrapUp,
-  }
-  writeTasks(dataDir, {
-    ...file,
-    tasks: file.tasks.map((t) => (t.id === id ? closed : t)),
+  return withTasksLock(dataDir, () => {
+    const source = findMessage(ref)
+    const id = source ? SOURCES[source.app].taskId(source) : ref
+    const file = readTasks(dataDir)
+    const task = file.tasks.find((t) => t.id === id)
+    if (!task) return undefined
+    if (task.closed) return task
+    const closed: Task = {
+      ...task,
+      closed: {
+        at: now.toISOString(),
+        why,
+        by: more.by,
+        note: more.note?.trim().slice(0, 300) || undefined,
+        reply: more.reply?.trim().slice(0, 4000) || undefined,
+      },
+      wrapUp: wrapUpOf(more.wrapUp, now, more.by) ?? task.wrapUp,
+    }
+    writeTasks(dataDir, {
+      ...file,
+      tasks: file.tasks.map((t) => (t.id === id ? closed : t)),
+    })
+    return closed
   })
-  return closed
 }
 
 const wrapUpOf = (text: string | undefined, now: Date, by?: string) =>
@@ -209,22 +224,24 @@ export function wrapUpTask(
   now = new Date(),
   by?: string
 ): { task: Task } | { task: Task; refused: string } | undefined {
-  const source = findMessage(ref)
-  const id = source ? SOURCES[source.app].taskId(source) : ref
-  const file = readTasks(dataDir)
-  const task = file.tasks.find((t) => t.id === id)
-  if (!task) return undefined
-  const status = viewOf(task, readDecisions(dataDir)).status
-  if (status !== 'done' && status !== 'closed')
-    return { task, refused: `it is ${status}` }
-  const wrapUp = wrapUpOf(text, now, by)
-  if (!wrapUp) return { task, refused: 'the wrap-up is empty' }
-  const wrapped: Task = { ...task, wrapUp }
-  writeTasks(dataDir, {
-    ...file,
-    tasks: file.tasks.map((t) => (t.id === id ? wrapped : t)),
+  return withTasksLock(dataDir, () => {
+    const source = findMessage(ref)
+    const id = source ? SOURCES[source.app].taskId(source) : ref
+    const file = readTasks(dataDir)
+    const task = file.tasks.find((t) => t.id === id)
+    if (!task) return undefined
+    const status = viewOf(task, readDecisions(dataDir)).status
+    if (status !== 'done' && status !== 'closed')
+      return { task, refused: `it is ${status}` }
+    const wrapUp = wrapUpOf(text, now, by)
+    if (!wrapUp) return { task, refused: 'the wrap-up is empty' }
+    const wrapped: Task = { ...task, wrapUp }
+    writeTasks(dataDir, {
+      ...file,
+      tasks: file.tasks.map((t) => (t.id === id ? wrapped : t)),
+    })
+    return { task: wrapped }
   })
-  return { task: wrapped }
 }
 
 /** What update_task can change; null clears a due date or a repository */
@@ -257,54 +274,135 @@ export function updateTask(
   | { task: Task; changed: TaskUpdate['changed'] }
   | { task: Task; refused: string }
   | undefined {
-  const source = findMessage(ref)
-  const id = source ? SOURCES[source.app].taskId(source) : ref
-  const file = readTasks(dataDir)
-  const task = file.tasks.find((t) => t.id === id)
-  if (!task) return undefined
-  const decisions = readDecisions(dataDir)
-  const decision = decisions[id]
-  const status = viewOf(task, decisions).status
-  if (status !== 'open' && status !== 'maybe')
-    return { task, refused: `it is ${status}` }
+  return withTasksLock(dataDir, () => {
+    const source = findMessage(ref)
+    const id = source ? SOURCES[source.app].taskId(source) : ref
+    const file = readTasks(dataDir)
+    const task = file.tasks.find((t) => t.id === id)
+    if (!task) return undefined
+    const decisions = readDecisions(dataDir)
+    const decision = decisions[id]
+    const status = viewOf(task, decisions).status
+    if (status !== 'open' && status !== 'maybe')
+      return { task, refused: `it is ${status}` }
 
-  const next: Partial<Record<TaskField, string | undefined>> = {}
-  if (changes.title !== undefined && changes.title.trim())
-    next.title = changes.title.trim().slice(0, 120)
-  if (changes.due !== undefined) next.due = changes.due?.trim() || undefined
-  if (changes.summary !== undefined && changes.summary.trim())
-    next.summary = changes.summary.trim().slice(0, 600)
-  if (changes.action) next.action = changes.action
-  if (changes.repo === null) next.repo = undefined
-  else if (changes.repo !== undefined && REPO.test(changes.repo.trim()))
-    next.repo = changes.repo.trim()
-  // A Maybe you kept is yours: a collection does not make it a Maybe again.
-  if (changes.confidence && decision?.status !== 'kept')
-    next.confidence = changes.confidence
+    const next: Partial<Record<TaskField, string | undefined>> = {}
+    if (changes.title !== undefined && changes.title.trim())
+      next.title = changes.title.trim().slice(0, 120)
+    if (changes.due !== undefined) next.due = changes.due?.trim() || undefined
+    if (changes.summary !== undefined && changes.summary.trim())
+      next.summary = changes.summary.trim().slice(0, 600)
+    if (changes.action) next.action = changes.action
+    if (changes.repo === null) next.repo = undefined
+    else if (changes.repo !== undefined && REPO.test(changes.repo.trim()))
+      next.repo = changes.repo.trim()
+    // A Maybe you kept is yours: a collection does not make it a Maybe again.
+    if (changes.confidence && decision?.status !== 'kept')
+      next.confidence = changes.confidence
 
-  const changed: TaskUpdate['changed'] = []
-  for (const [field, to] of Object.entries(next) as [
-    TaskField,
-    string | undefined,
-  ][]) {
-    const from = task[field] as string | undefined
-    if (from !== to) changed.push({ field, from, to })
-  }
-  if (!changed.length) return { task, changed }
-  const update: TaskUpdate = {
-    at: now.toISOString(),
-    why: why.trim().slice(0, 300),
-    by,
-    changed,
-  }
-  const updated: Task = {
-    ...task,
-    ...Object.fromEntries(changed.map(({ field, to }) => [field, to])),
-    updates: [...(task.updates ?? []), update].slice(-UPDATES_KEPT),
-  }
-  writeTasks(dataDir, {
-    ...file,
-    tasks: file.tasks.map((t) => (t.id === id ? updated : t)),
+    const changed: TaskUpdate['changed'] = []
+    for (const [field, to] of Object.entries(next) as [
+      TaskField,
+      string | undefined,
+    ][]) {
+      const from = task[field] as string | undefined
+      if (from !== to) changed.push({ field, from, to })
+    }
+    if (!changed.length) return { task, changed }
+    const update: TaskUpdate = {
+      at: now.toISOString(),
+      why: why.trim().slice(0, 300),
+      by,
+      changed,
+    }
+    const updated: Task = {
+      ...task,
+      ...Object.fromEntries(changed.map(({ field, to }) => [field, to])),
+      updates: [...(task.updates ?? []), update].slice(-UPDATES_KEPT),
+    }
+    writeTasks(dataDir, {
+      ...file,
+      tasks: file.tasks.map((t) => (t.id === id ? updated : t)),
+    })
+    return { task: updated, changed }
   })
-  return { task: updated, changed }
+}
+
+/** A task an AI tool keeps from a session on this Mac */
+export interface NewFollowUp {
+  title: string
+  /** Why it is a task, in a line */
+  why: string
+  /** The task it carries on from: its id or its message's link */
+  after?: string
+  due?: string
+  summary?: string
+  action?: TaskAction
+  repo?: string
+}
+
+/** The task a reference names: its id, or its message's link */
+const idOf = (ref: string) => {
+  const source = findMessage(ref)
+  return source ? SOURCES[source.app].taskId(source) : ref
+}
+
+/**
+ * Adds a task of your own from a session on this Mac (its source is local):
+ * work left after a task, which it then follows, or something you asked your
+ * AI tool to keep for later. Its repository is the one named, the one of the
+ * task it follows, or the session's. The same title left after the same task,
+ * still open, is not added again.
+ */
+export function addFollowUp(
+  dataDir: string,
+  item: NewFollowUp,
+  options: { addedBy?: string; repo?: string; now?: Date } = {}
+): { task: Task; added: boolean } | { error: string } {
+  return withTasksLock(dataDir, () => {
+    const now = options.now ?? new Date()
+    const title = item.title.trim().slice(0, 120)
+    if (!title) return { error: 'A task needs a title.' }
+    const file = readTasks(dataDir)
+    const after = item.after
+      ? file.tasks.find((t) => t.id === idOf(item.after!))
+      : undefined
+    if (item.after && !after) return { error: `No task ${item.after}` }
+    const named = item.repo?.trim()
+    const repo =
+      named && REPO.test(named) ? named : (after?.repo ?? options.repo)
+    const same = file.tasks.find(
+      (t) =>
+        t.source.app === 'local' &&
+        t.follows === after?.id &&
+        !t.closed &&
+        t.title.toLowerCase() === title.toLowerCase()
+    )
+    if (same) return { task: same, added: false }
+    const key = randomBytes(6).toString('hex')
+    const task: Task = {
+      id: `local:${key}`,
+      source: {
+        app: 'local',
+        conversation: repo ?? 'local',
+        label: repo ?? LOCAL.label,
+        message: key,
+      },
+      title,
+      askedBy: 'you',
+      kind: 'promised',
+      due: item.due?.trim() || undefined,
+      confidence: 'sure',
+      reason: item.why.trim().slice(0, 300) || 'Kept from a session',
+      postedAt: now.toISOString(),
+      foundAt: now.toISOString(),
+      addedBy: options.addedBy,
+      action: item.action ?? (repo ? 'code' : 'other'),
+      repo,
+      follows: after?.id,
+      summary: item.summary?.trim().slice(0, 600) || undefined,
+    }
+    writeTasks(dataDir, { ...file, tasks: [...file.tasks, task] })
+    return { task, added: true }
+  })
 }

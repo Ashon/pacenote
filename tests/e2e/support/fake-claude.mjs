@@ -8,6 +8,7 @@
 //                 "tools": [{ "name": "mcp__ops__host_check", "input": {},
 //                            "result": "..." }] }],
 //     "answer": "default answer" }
+// With --output-format json, only the result comes back, as one object.
 // The bot's startup check (claude --version, claude auth status) is answered
 // without a record: a fake that is installed and signed in.
 // An interactive session the desktop app opens to continue a task
@@ -140,6 +141,29 @@ const rule =
     new RegExp(r.match, 'i').test(request || prompt)
   ) ?? {}
 if (rule.delayMs) await setTimeout(rule.delayMs)
+
+// --output-format json: the final result alone, as one object
+if (args[args.indexOf('--output-format') + 1] === 'json') {
+  process.stdout.write(
+    `${JSON.stringify(
+      rule.fail
+        ? {
+            type: 'result',
+            subtype: 'error_during_execution',
+            is_error: true,
+            result: rule.fail,
+          }
+        : {
+            type: 'result',
+            subtype: 'success',
+            is_error: false,
+            result: rule.answer ?? script.answer ?? 'OK',
+            usage: { input_tokens: 100, output_tokens: 20 },
+          }
+    )}\n`
+  )
+  process.exit(rule.fail ? 1 : 0)
+}
 
 const out = (event) => process.stdout.write(`${JSON.stringify(event)}\n`)
 out({ type: 'system', subtype: 'init' })

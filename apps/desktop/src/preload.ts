@@ -94,6 +94,10 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     // A task's detail, and continuing it: in a terminal (Claude Code or
     // Codex), or with a reply drafted for you to send
     detail: (id: string) => ipcRenderer.invoke('pacenote:tasks:detail', id),
+    answerProposal: (id: string, answer: 'close' | 'not-yet') =>
+      ipcRenderer.invoke('pacenote:tasks:answer-proposal', id, answer),
+    keepLeft: (id: string, text: string) =>
+      ipcRenderer.invoke('pacenote:tasks:keep-left', id, text),
     answerSuggestion: (entryId: string, yes: boolean) =>
       ipcRenderer.invoke('pacenote:tasks:answer-suggestion', entryId, yes),
     folders: (id: string) => ipcRenderer.invoke('pacenote:tasks:folders', id),

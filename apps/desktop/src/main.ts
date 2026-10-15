@@ -67,6 +67,7 @@ import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
 import { liveTasks, readActivity } from '../../../src/tasks/activity.js'
 import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
+  Proposal,
   TaskDecision,
   WorkEntry,
   WorkTool,
@@ -84,10 +85,19 @@ import {
   addWork,
   answerSuggestion,
   changeWork,
+  openProposals,
   readWork,
   updateWork,
   workFor,
 } from '../../../src/tasks/work.js'
+import { addFollowUp, closeTask } from '../../../src/tasks/write.js'
+import {
+  dueForJudging,
+  judge,
+  judgePrompt,
+  pullRequestOf,
+  QUIET_MS,
+} from './done-watch.js'
 import { draftReply } from './drafter.js'
 import { SessionIndex } from './session-index.js'
 import { isTaskBranch, linkSessions, RepoLookup } from './session-links.js'
@@ -808,12 +818,18 @@ function registerBotIpc(): void {
     const current = tasksSettings()
     const view = tasksView(dataDir, current.exclude)
     linkSessionsSoon()
+    judgeSoon()
+    const open = view.tasks.filter((task) => task.status === 'open')
     return {
       settings: current,
       collect: taskCollector.state,
       collections: recentCollections(dataDir, collectionRuns(7)),
       ...view,
-      working: working(view.tasks.filter((task) => task.status === 'open')),
+      working: working(open),
+      proposals: openProposals(
+        readWork(dataDir),
+        new Set(open.map((task) => task.id))
+      ),
     }
   })
   // The Overview's tasks: what you handled over the last 14 days
@@ -971,6 +987,76 @@ function registerBotIpc(): void {
       lastActiveAt: lastActive(homedir(), entry as Session),
     }
   }
+  // A task whose latest session went quiet: whether it looks done
+  // (done-watch.ts), a pass at a time, while Todo is open. End-to-end tests
+  // wait less (PACENOTE_TASKS_QUIET_MS).
+  const QUIET = Number(process.env.PACENOTE_TASKS_QUIET_MS) || QUIET_MS
+  let judging: Promise<void> | undefined
+  let judgedAt = 0
+  const judgeSoon = (): void => {
+    if (env().TASKS !== 'on' || env().TASKS_SUGGEST_DONE !== 'on') return
+    if (judging || Date.now() - judgedAt < Math.min(LINK_EVERY_MS, QUIET))
+      return
+    judging = (async () => {
+      const due = dueForJudging({
+        tasks: allTaskViews(dataDir),
+        work: readWork(dataDir),
+        activeAt: (entry) => sessionNow(entry).lastActiveAt,
+        now: Date.now(),
+        quietMs: QUIET,
+      })
+      for (const { task, entry, activeAt } of due) {
+        const file = sessionFile(homedir(), entry)
+        const items = file ? readSessionLog(file, entry.tool) : []
+        const pr = await pullRequestOf(
+          task.repo,
+          entry.branch ?? sessionNow(entry).branch,
+          toolPath()
+        )
+        const result = items.length
+          ? await judge({
+              bin: env().CLAUDE_BIN?.trim() || 'claude',
+              toolPath: toolPath(),
+              cwd: dataDir,
+              prompt: judgePrompt(task, items, pr),
+            })
+          : { error: 'its session has no log on this Mac' }
+        // Kept either way, so the same quiet is not judged again.
+        if ('error' in result)
+          log.warn(
+            `Could not tell whether ${task.id} looks done: ${result.error}`
+          )
+        else
+          log.info(
+            `Task ${task.id} ${result.done ? 'looks done' : 'is not done yet'}, from its ${entry.tool} session`
+          )
+        changeWork(dataDir, (work) => ({
+          ...work,
+          proposals: [
+            ...(work.proposals ?? []).filter(
+              (p) => !(p.task === task.id && p.session === entry.session)
+            ),
+            {
+              task: task.id,
+              tool: entry.tool,
+              session: entry.session,
+              activeAt,
+              at: new Date().toISOString(),
+              ...('error' in result ? { done: false } : result),
+              ...(pr ? { pr } : {}),
+            },
+          ],
+        }))
+      }
+    })()
+      .catch((error: Error) =>
+        log.warn(`Could not read the quiet sessions: ${error.message}`)
+      )
+      .finally(() => {
+        judging = undefined
+        judgedAt = Date.now()
+      })
+  }
   /** Each open task's latest session, for its row: the tool and when */
   const working = (tasks: { id: string }[]) => {
     const work = readWork(dataDir).entries
@@ -1043,6 +1129,52 @@ function registerBotIpc(): void {
   }
   ipcMain.handle('pacenote:tasks:detail', (event, id: unknown) =>
     fromMainWindow(event) && typeof id === 'string' ? taskDetail(id) : null
+  )
+  // What a task's quiet session looked like: close the task with how it
+  // ended, or not yet; or keep a thing left after it as a task
+  const proposalOf = (id: string) =>
+    openProposals(readWork(dataDir), new Set([id]))[id]
+  const answered = (id: string, change: (p: Proposal) => Proposal) =>
+    changeWork(dataDir, (work) => ({
+      ...work,
+      proposals: (work.proposals ?? []).map((p) =>
+        p.task === id && !p.answer ? change(p) : p
+      ),
+    }))
+  ipcMain.handle(
+    'pacenote:tasks:answer-proposal',
+    (event, id: unknown, answer: unknown) => {
+      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+      const proposal = proposalOf(id)
+      if (!proposal) return { error: 'There is nothing to answer.' }
+      if (answer === 'close') {
+        // Done in its session; how it ended is the wrap-up, not a note too
+        closeTask(dataDir, id, 'resolved', new Date(), {
+          by: proposal.tool === 'claude' ? 'claude-code' : 'codex',
+          wrapUp: proposal.summary,
+        })
+        answered(id, (p) => ({ ...p, answer: 'closed' }))
+      } else answered(id, (p) => ({ ...p, answer: 'not-yet' }))
+      return {}
+    }
+  )
+  ipcMain.handle(
+    'pacenote:tasks:keep-left',
+    (event, id: unknown, text: unknown) => {
+      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+      if (typeof text !== 'string' || !text.trim()) return undefined
+      const result = addFollowUp(
+        dataDir,
+        { title: text, why: 'Left after it, from its session', after: id },
+        { addedBy: 'pacenote' }
+      )
+      if ('error' in result) return result
+      answered(id, (p) => ({
+        ...p,
+        left: (p.left ?? []).filter((item) => item !== text),
+      }))
+      return { id: result.task.id }
+    }
   )
   // A suggested session: yours for the task, or not
   ipcMain.handle(

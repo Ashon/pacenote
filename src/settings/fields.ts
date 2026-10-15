@@ -783,6 +783,17 @@ export const SETTING_FIELDS: SettingField[] = [
     shownWhen: { key: 'TASKS', equals: 'on' },
   },
   {
+    key: 'TASKS_SUGGEST_DONE',
+    path: 'tasks.suggestDone',
+    group: 'work',
+    label: 'Say when a task looks done',
+    help: "When a task's latest session has been quiet for 10 minutes, Claude Code reads its last turns, with no tools, and the state of its pull request, and says on the task whether it looks done, how it ended and what is left. You close it or not. It uses your Claude Code login.",
+    type: 'toggle',
+    default: 'off',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
     key: 'LOG_LEVEL',
     path: 'logs.level',
     group: 'logs',

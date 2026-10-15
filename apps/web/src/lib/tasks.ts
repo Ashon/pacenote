@@ -59,6 +59,31 @@ export function useTasksPush() {
   )
 }
 
+/**
+ * A task that looks done from its quiet session: close it, not yet, or keep
+ * a thing left after it as a task. Each refreshes the list and the task.
+ */
+export function useProposal(id: string) {
+  const bridge = window.pacenoteDesktop?.tasks
+  const client = useQueryClient()
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['tasks'] })
+    await client.invalidateQueries({ queryKey: ['task', id] })
+  }
+  return {
+    answer: async (answer: 'close' | 'not-yet') => {
+      const result = await bridge?.answerProposal(id, answer)
+      await refresh()
+      return result?.error
+    },
+    keep: async (text: string) => {
+      const result = await bridge?.keepLeft(id, text)
+      await refresh()
+      return result?.error
+    },
+  }
+}
+
 /** Records a decision on a task (or takes it back) and refreshes the list */
 export function useDecide() {
   const client = useQueryClient()

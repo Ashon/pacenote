@@ -1,6 +1,11 @@
 import path from 'node:path'
 import { HISTORY_MS, readJson, writeJson } from './store.js'
-import type { SessionSuggestion, WorkEntry, WorkFile } from './types.js'
+import type {
+  Proposal,
+  SessionSuggestion,
+  WorkEntry,
+  WorkFile,
+} from './types.js'
 
 /**
  * A task's work log: the Claude Code and Codex sessions the desktop app opened
@@ -18,6 +23,7 @@ export function readWork(dataDir: string): WorkFile {
     entries: Array.isArray(file.entries) ? file.entries : [],
     suggested: Array.isArray(file.suggested) ? file.suggested : [],
     notIt: Array.isArray(file.notIt) ? file.notIt : [],
+    proposals: Array.isArray(file.proposals) ? file.proposals : [],
   }
 }
 
@@ -33,6 +39,7 @@ function save(dataDir: string, file: WorkFile, now: number): void {
     entries: file.entries.filter((entry) => kept(entryAt(entry))),
     suggested: (file.suggested ?? []).filter((s) => kept(s.startedAt)),
     notIt: (file.notIt ?? []).filter((n) => kept(n.at)),
+    proposals: (file.proposals ?? []).filter((p) => kept(p.at)),
   } satisfies WorkFile)
 }
 
@@ -131,4 +138,24 @@ export function workFor(entries: WorkEntry[], task: string): WorkEntry[] {
   return entries
     .filter((entry) => entry.task === task)
     .sort((a, b) => Date.parse(entryAt(b)) - Date.parse(entryAt(a)))
+}
+
+/**
+ * Each open task's proposal waiting for you: the latest that says it looks
+ * done, unanswered, for the session it was judged on
+ */
+export function openProposals(
+  file: WorkFile,
+  open: ReadonlySet<string>
+): Record<string, Proposal> {
+  const result: Record<string, Proposal> = {}
+  for (const proposal of file.proposals ?? []) {
+    if (!open.has(proposal.task)) continue
+    const was = result[proposal.task]
+    if (was && Date.parse(was.at) > Date.parse(proposal.at)) continue
+    result[proposal.task] = proposal
+  }
+  for (const [task, proposal] of Object.entries(result))
+    if (!proposal.done || proposal.answer) delete result[task]
+  return result
 }

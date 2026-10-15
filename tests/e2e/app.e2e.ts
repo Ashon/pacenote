@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs'
 import { once } from 'node:events'
@@ -1246,6 +1247,49 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
     await page.getByText(checkout).or(page.getByText(folder)).first().waitFor()
     expect(existsSync(path.join(home, 'tasks-repos.json'))).toBe(true)
+
+    // A later session in the checkout keeps what the review left as a task of
+    // its own, after the review and in its repository.
+    const later = new Client({ name: 'claude-code', version: '1' })
+    await later.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [path.join(REPO, 'build/tools/history-mcp.mjs')],
+        cwd: checkout,
+        env: {
+          ...(process.env as Record<string, string>),
+          HOME: root,
+          PACENOTE_HOME: home,
+          PACENOTE_DATA_DIR: home,
+        },
+      })
+    )
+    await later.callTool({
+      name: 'add_followup',
+      arguments: {
+        title: 'Add a test for the retry backoff',
+        why: 'Left after the review',
+        after: current.id,
+      },
+    })
+    await later.close()
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page
+      .getByText(
+        'Claude Code kept \u201cAdd a test for the retry backoff\u201d for later.',
+        { exact: true }
+      )
+      .waitFor({ timeout: 10_000 })
+    // Todo opened afresh lists it with the others.
+    const kept = page.locator('[data-task-row]', {
+      hasText: 'Add a test for the retry backoff',
+    })
+    await kept
+      .getByText('Left after \u201cReview the payment retry PR\u201d', {
+        exact: false,
+      })
+      .waitFor()
+    await kept.getByText('Ashon/payments').first().waitFor()
   }, 180_000)
 
   it('links the sessions you start yourself to the task they worked on, and asks about the ones that only look related', async () => {
@@ -1613,6 +1657,142 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     },
     240_000
   )
+
+  it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {
+    const judged = JSON.stringify({
+      done: true,
+      summary: 'Reviewed #471 and left 2 comments; mina merged it.',
+      left: ['Add a test for the retry config'],
+    })
+    world = await World.create([
+      { match: "finished the user's task", answer: judged },
+    ])
+    const { home, root } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    const on = { on: true, dms: false, exclude: [] }
+    const [review] = addTasks(
+      home,
+      [
+        {
+          title: 'Review the retry config change',
+          asked_by: 'mina',
+          where: '#ops',
+          link: `https://acme.slack.com/archives/C0OPS/p${Math.floor((now - 3 * HOUR) / 1000)}000100`,
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'mina asked for a review of PR #471.',
+        },
+      ],
+      { settings: on, now: new Date(now - 2 * HOUR) }
+    ).added as [NonNullable<ReturnType<typeof addTasks>['added'][0]>]
+    // Its session, opened from Todo an hour ago and quiet since
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    const session = '9a1c40b2-0000-4000-8000-000000000000'
+    addWork(home, {
+      kind: 'session',
+      id: 'review-work',
+      task: review.id,
+      tool: 'claude',
+      session,
+      cwd: checkout,
+      startedAt: new Date(now - HOUR).toISOString(),
+    })
+    const project = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[/.]/g, '-')
+    )
+    mkdirSync(project, { recursive: true })
+    const transcript = path.join(project, `${session}.jsonl`)
+    writeFileSync(
+      transcript,
+      [
+        { type: 'user', message: { role: 'user', content: 'review #471' } },
+        {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Left 2 comments on #471.' }],
+          },
+        },
+      ]
+        .map(
+          (line) =>
+            `${JSON.stringify({ sessionId: session, cwd: checkout, ...line })}\n`
+        )
+        .join('')
+    )
+    const quiet = new Date(now - 20 * 60_000)
+    utimesSync(transcript, quiet, quiet)
+
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_SUGGEST_DONE=on'],
+      env: {
+        PACENOTE_TASKS_QUIET_MS: '1000',
+        PACENOTE_TASKS_LINK_MS: '1000',
+        FAKE_CLAUDE_DIR: world.claudeDir,
+      },
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const row = page.locator(`[data-task-row="${review.id}"]`)
+    await row.getByText('Looks done').waitFor({ timeout: 20_000 })
+    // Claude Code read the session's end with no tools and no MCP servers.
+    const call = world
+      .claudeCalls()
+      .find((c) => c.prompt.includes("finished the user's task"))!
+    expect(call.args[call.args.indexOf('--tools') + 1]).toBe('')
+    expect(call.args).toContain('--strict-mcp-config')
+    expect(call.prompt).toContain('Review the retry config change')
+    expect(call.prompt).toContain('[assistant] Left 2 comments on #471.')
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-looks-done.png'),
+    })
+
+    // Open, it says how it ended and what is left.
+    await row
+      .getByRole('button', { name: 'Review the retry config change' })
+      .click()
+    const line = (label: string) =>
+      row.locator('div.grid', { has: page.getByText(label, { exact: true }) })
+    await line('Looks done')
+      .getByText('Reviewed #471 and left 2 comments; mina merged it.')
+      .waitFor()
+    await line('Left').getByText('Add a test for the retry config').waitFor()
+    // Once the row has opened (its reveal's motion done)
+    await row.evaluate(
+      `Promise.all(document.getAnimations().map((a) => a.finished))`
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-looks-done-open.png'),
+    })
+    // What is left is kept as a task of its own, after the review.
+    await line('Left').getByRole('button', { name: 'Keep as a task' }).click()
+    await line('Left').waitFor({ state: 'detached' })
+    await page.getByRole('button', { name: '1 new task' }).click()
+    const kept = page.locator('[data-task-row]', {
+      hasText: 'Add a test for the retry config',
+    })
+    await kept
+      .getByText('Left after “Review the retry config change”', {
+        exact: false,
+      })
+      .waitFor()
+    // Closed with how it ended, as done in its Claude Code session
+    await line('Looks done').getByRole('button', { name: 'Close it' }).click()
+    await row.getByText('Closed: done in Claude Code').waitFor()
+    await line('Result')
+      .getByText('Reviewed #471 and left 2 comments; mina merged it.')
+      .waitFor()
+    expect(
+      JSON.parse(
+        readFileSync(path.join(home, 'tasks.json'), 'utf8')
+      ).tasks.find((t: { id: string }) => t.id === review.id).closed
+    ).toMatchObject({ why: 'resolved', by: 'claude-code' })
+  }, 120_000)
 
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {
     world = await World.create()
