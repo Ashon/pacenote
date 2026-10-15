@@ -1,5 +1,11 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,7 +49,7 @@ let root: string
 const supervisors: InstanceType<typeof BotSupervisor>[] = []
 
 /** A supervisor whose settings would start the bot */
-function supervisor() {
+function supervisor(more: { repoRoot?: string; toolPath?: string } = {}) {
   const settingsFile = path.join(root, 'settings.json')
   writeFileSync(
     settingsFile,
@@ -58,7 +64,8 @@ function supervisor() {
     cwd: root,
     settingsFile,
     dataDir: root,
-    toolPath: () => '/usr/bin:/bin',
+    toolPath: () => more.toolPath ?? '/usr/bin:/bin',
+    repoRoot: more.repoRoot,
     log: () => undefined,
   })
   supervisors.push(made)
@@ -121,5 +128,24 @@ describe('the bot supervisor while the app quits', () => {
     expect(forked[0]!.kill).toHaveBeenCalledTimes(1)
     expect(bot.managing).toBe(false)
     expect(bot.current.phase).toBe('idle')
+  })
+})
+
+describe('the bot supervisor in a dev run', () => {
+  it('goes from building straight to starting in a dev run, never idle between', async () => {
+    // A pnpm that builds at once, for the bot that is not built yet
+    const bin = path.join(root, 'bin')
+    mkdirSync(bin)
+    writeFileSync(path.join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n')
+    chmodSync(path.join(bin, 'pnpm'), 0o755)
+    const bot = supervisor({ repoRoot: root, toolPath: `${bin}:/usr/bin:/bin` })
+    const phases: string[] = []
+    bot.on('change', (state) => phases.push(state.phase))
+    await bot.start()
+    expect(forked).toHaveLength(1)
+    const built = phases.lastIndexOf('building')
+    expect(built).toBeGreaterThanOrEqual(0)
+    expect(phases.slice(built + 1)).not.toContain('idle')
+    expect(phases).toContain('starting')
   })
 })

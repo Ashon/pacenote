@@ -243,7 +243,9 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
             resolve(false)
             return
           }
-          this.set({ phase: 'idle', message: undefined, output })
+          // Still building until Pace starts, right after: setup's review
+          // would read a moment of idle as Pace not starting.
+          this.set({ output })
           resolve(true)
         }
       )
