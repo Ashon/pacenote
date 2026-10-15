@@ -2,8 +2,8 @@
 
 Start with the [project README](../README.md) for what Pacenote is and how to install it.
 
-- [Architecture](architecture.md): the design in six diagrams: the pieces, one mention, your tasks and AI tools, the
-  team hub, the layers (messenger, reasoner, sandbox), the code layout
+- [Architecture](architecture.md): the design in seven diagrams: the pieces, one mention, your tasks and AI tools, a
+  task's trajectory, the team hub, the layers (messenger, reasoner, sandbox), the code layout
 - [How it works](how-it-works.md): the path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs
 - [Reasoner sandbox](sandbox.md): where answers run: on this Mac and what the CLI may read there, or the built-in VM sandbox
   with its egress proxy, allowed domains and login

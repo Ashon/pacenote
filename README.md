@@ -54,7 +54,15 @@ list, and a message never becomes a task twice. Collecting is off until you turn
 
 **Continue in Claude Code** (or Codex) opens a terminal session with the task, the thread, what Pace found there, and
 how related work ended last time, even when that work was done in the other tool. When the session is done, it closes
-the task with a note on how it ended and, if someone is waiting on you, a reply for you to send.
+the task with a note on how it ended and, if someone is waiting on you, a reply for you to send. A session you start
+yourself in a repository is told its open tasks from the start, and Todo shows the work as it happens.
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/trajectory-dark.svg">
+  <img alt="A task's trajectory in six stages on a track: asked, collected, picked up, worked on, settled and wrapped up; four ways through them (continued from Todo in Claude Code, a session you start yourself that is told the repository's open tasks, settled in Slack with a drafted reply, and your own promise done in Codex); and what a trajectory leaves: the next one remembers how it ended, whoever does the work, live on Todo, links rather than messages" src="docs/diagrams/trajectory-light.svg">
+</picture>
+</p>
 
 ### Share the history with your AI tools
 
@@ -133,7 +141,7 @@ Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 
 | Doc | What it covers |
 | --- | --- |
-| [Architecture](docs/architecture.md) | The design in six diagrams: the pieces, one mention, your tasks and AI tools, the team hub, the layers, the code layout |
+| [Architecture](docs/architecture.md) | The design in seven diagrams: the pieces, one mention, your tasks and AI tools, a task's trajectory, the team hub, the layers, the code layout |
 | [How it works](docs/how-it-works.md) | The path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs |
 | [Reasoner sandbox](docs/sandbox.md) | Where answers run: on your Mac and what the CLI may read there, or the built-in VM sandbox, its allowed domains and login |
 | [Ops tools](docs/ops-tools.md) | Read-only lookups on hosts, k8s, a work directory, GitHub and Jira, and code changes as draft PRs |

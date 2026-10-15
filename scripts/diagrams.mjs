@@ -170,13 +170,16 @@ const ICONS = [
   'key-round',
   'laptop',
   'link',
+  'list-checks',
   'messages-square',
   'plug',
   'server',
   'settings-2',
   'shield-check',
+  'square-terminal',
   'terminal',
   'user-check',
+  'user-round',
   'workflow',
 ]
 
@@ -231,6 +234,8 @@ class Canvas {
     this.left = FRAME.inset + FRAME.pad
     this.right = width - FRAME.inset - FRAME.pad
     this.parts = []
+    /** Definitions a drawing needs beyond the usual ones */
+    this.defs = []
   }
 
   add(svg) {
@@ -523,6 +528,24 @@ class Canvas {
     })
   }
 
+  /**
+   * A bar in the brand's gradient, as the app's charts fill theirs
+   * (pacenote-gradient), left to right across its own width
+   */
+  gradientBar(x, y, w, h) {
+    if (!this.defs.length) {
+      const stops = this.t.gradient
+        .map(([color, at]) => `<stop offset="${at}" stop-color="${color}"/>`)
+        .join('')
+      this.defs.push(
+        `<linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">${stops}</linearGradient>`
+      )
+    }
+    return this.add(
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="url(#bar)"/>`
+    )
+  }
+
   /** The Pacenote mark (assets/pacenote.svg), size px wide */
   mark(x, y, size) {
     const s = size / 412
@@ -579,7 +602,7 @@ class Canvas {
   <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="54" y1="314" x2="458" y2="198">${stops}</linearGradient>
   <filter id="lift" x="-5%" y="-5%" width="110%" height="115%">${shadows}</filter>
   ${arrow('arrow', t.faint)}
-  ${arrow('arrow-main', t.primary)}
+  ${arrow('arrow-main', t.primary)}${this.defs.map((d) => `\n  ${d}`).join('')}
 </defs>
 <rect width="${width}" height="${height}" rx="24" fill="${t.chrome}"/>
 ${brand.parts.join('\n')}
@@ -1737,6 +1760,201 @@ function codeLayout(c) {
   )
 }
 
+/**
+ * One task's trajectory, from the message that asked for it to how it ended:
+ * the stages on the brand's track, four ways through them, and what the
+ * trajectory leaves for the next task like it
+ */
+function trajectory(c) {
+  c.page(
+    "A task's trajectory",
+    'From the ask to how it ended',
+    'Pacenote carries one task’s context from the message that asked for it to how it ended, whoever does the work.'
+  )
+
+  // Who acts at each step, as the cells mark them
+  const ACTORS = {
+    slack: { icon: 'messages-square', name: 'Slack' },
+    pacenote: { icon: 'list-checks', name: 'Pacenote' },
+    tool: { icon: 'square-terminal', name: 'Claude Code or Codex' },
+    you: { icon: 'user-round', name: 'You' },
+  }
+  // The legend, right-aligned on the help's line
+  const legend = ['slack', 'pacenote', 'tool', 'you'].map((key) => ({
+    ...ACTORS[key],
+    key,
+    width: 20 + textWidth(ACTORS[key].name, 11.5),
+  }))
+  let lx = c.right - legend.reduce((sum, item) => sum + item.width + 14, -14)
+  for (const item of legend) {
+    c.icon(item.icon, lx, 114, {
+      size: 14,
+      color: item.key === 'pacenote' ? c.t.primary : c.t.muted,
+    })
+    c.text(lx + 19, 125.5, item.name, { size: 11.5, fill: c.t.muted })
+    lx += item.width + 14
+  }
+
+  // Six stages across the content, each a column the cases below keep to
+  const X = 64
+  const INNER = 1072
+  const GAP = 22
+  const W = (INNER - GAP * 5) / 6
+  const col = (i) => X + i * (W + GAP)
+  const STAGES = [
+    ['Asked', 'A message and its link'],
+    ['Collected', 'A summary, its repository'],
+    ['Picked up', 'All that came before it'],
+    ['Worked on', 'Its sessions, the branch'],
+    ['Settled', 'What was done, a reply'],
+    ['Wrapped up', 'How it ended'],
+  ]
+  const TRACK = 182
+  // The track runs through the stages' steps, in the brand's gradient, with
+  // each stage and what carries its context under its step
+  c.gradientBar(col(0) + 10, TRACK - 2, col(5) - col(0), 4)
+  STAGES.forEach(([name, carries], i) => {
+    c.add(
+      `<circle cx="${col(i) + 10}" cy="${TRACK}" r="13" fill="${c.t.surface}"/>`
+    )
+    c.step(col(i) + 10, TRACK, String(i + 1))
+    c.text(col(i), TRACK + 32, name, { size: 13, weight: 600 })
+    c.text(col(i), TRACK + 50, carries, { size: 11.5, fill: c.t.muted })
+  })
+
+  // Four ways through them
+  const CASES = [
+    {
+      title: 'Continued from Todo',
+      meta: 'Continue in Claude Code',
+      steps: [
+        ['slack', 'mina asks', ['Review PR #482,', 'in #ops, by Thursday']],
+        ['pacenote', 'Collected', ['Collect now adds it', 'with a summary']],
+        ['you', 'Continued', ['Claude Code opens', 'with what came before']],
+        ['tool', 'Working', ['Its session, live on', 'the task’s row']],
+        ['tool', 'Closed', ['Resolved, with a note', 'and a reply to send']],
+        ['pacenote', 'Wrapped up', ['How it ended,', 'from its thread']],
+      ],
+    },
+    {
+      title: 'A session you start yourself',
+      meta: 'claude in the repository',
+      steps: [
+        ['slack', 'dara asks', ['Fix the backup job,', 'in #infra']],
+        ['tool', 'Collected', ['By your AI tool,', 'over MCP']],
+        [
+          'pacenote',
+          'Told at start',
+          ['Its repository’s open', 'tasks, in the session'],
+        ],
+        ['tool', 'Looked up', ['task_context first,', 'linked by its branch']],
+        ['tool', '/done', ['Closed with', 'what was done']],
+        ['pacenote', 'Wrapped up', ['How it ended,', 'from its thread']],
+      ],
+    },
+    {
+      title: 'Settled in Slack',
+      meta: 'Draft a reply',
+      steps: [
+        ['slack', 'hyun asks', ['How many retries?', 'in a thread']],
+        ['pacenote', 'Collected', ['As a reply to write']],
+        ['tool', 'Drafted', ['From the thread,', 'read only']],
+        ['you', 'You reply', ['Copied and sent', 'by you, in the thread']],
+        ['pacenote', 'Closed', ['The next collection', 'sees your reply']],
+        ['pacenote', 'Wrapped up', ['Who answered what']],
+      ],
+    },
+    {
+      title: 'Your own promise',
+      meta: '“I’ll do it”',
+      steps: [
+        ['slack', 'You promise', ['“I’ll update the', 'runbook”']],
+        ['pacenote', 'Collected', ['As a promise,', 'from you']],
+        ['you', 'Continued', ['Codex opens in', 'its folder']],
+        ['tool', 'Working', ['A session found', 'by its branch']],
+        ['you', 'Done', ['One click on Todo']],
+        ['pacenote', 'Wrapped up', ['And counted on', 'the Overview']],
+      ],
+    },
+  ]
+  const ROW = 126
+  const H = 64
+  let top = TRACK + 70
+  for (const way of CASES) {
+    c.well(48, top, 1104, ROW)
+    c.heading(X, top + 28, INNER, { title: way.title, meta: way.meta })
+    const y = top + 44
+    way.steps.forEach(([actor, title, help], i) => {
+      const x = col(i)
+      const ours = actor === 'pacenote'
+      c.box(x, y, W, H, { accent: ours })
+      c.icon(ACTORS[actor].icon, x + 12, y + 11, {
+        size: 14,
+        color: ours ? c.t.primary : c.t.muted,
+      })
+      c.text(x + 32, y + 23, title, {
+        size: 12.5,
+        weight: 600,
+        fill: ours ? c.t.primary : c.t.foreground,
+      })
+      help.forEach((line, j) =>
+        c.text(x + 12, y + 41 + j * 14.5, line, { size: 11.5, fill: c.t.muted })
+      )
+      if (i < 5)
+        c.arrow(
+          [
+            [x + W + 3, y + H / 2],
+            [x + W + GAP - 3, y + H / 2],
+          ],
+          { main: true }
+        )
+    })
+    top += ROW + 10
+  }
+
+  // What a trajectory leaves behind
+  const FOOT = top + 14
+  c.hairline(48, 1152, FOOT)
+  c.columns(
+    48,
+    FOOT + 24,
+    1104,
+    60,
+    [
+      [
+        'history',
+        'Next time',
+        'Remembered',
+        'The next one opens with how it ended.',
+      ],
+      [
+        'square-terminal',
+        'Your AI tools',
+        'Whoever does the work',
+        'Claude Code or Codex, the same task.',
+      ],
+      [
+        'list-checks',
+        'Todo',
+        'Live as it happens',
+        'Each step shows as it is written.',
+      ],
+      [
+        'key-round',
+        'Kept',
+        'Links, not messages',
+        'A summary and ids; Slack keeps the rest.',
+      ],
+    ],
+    (left, [icon, label, title, help]) => {
+      c.icon(icon, left, FOOT + 24, { size: 14, color: c.t.muted })
+      c.text(left + 20, FOOT + 35, label, { size: 11, fill: c.t.muted })
+      c.text(left, FOOT + 58, title, { size: 13, weight: 600 })
+      c.help(left, FOOT + 77, help, 44)
+    }
+  )
+}
+
 const DIAGRAMS = [
   ['architecture', 'Pacenote architecture', 1200, 816, architecture],
   ['todo', 'Pacenote: Todo and AI tools', 1200, 846, todo],
@@ -1744,6 +1962,7 @@ const DIAGRAMS = [
   ['team-hub', 'Pacenote team hub', 1200, 608, teamHub],
   ['layers', 'Pacenote layers', 1200, 872, layers],
   ['code-layout', 'Pacenote code layout', 1200, 828, codeLayout],
+  ['trajectory', "Pacenote: a task's trajectory", 1200, 932, trajectory],
 ]
 
 const only = process.argv.slice(2)

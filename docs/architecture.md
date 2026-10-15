@@ -1,6 +1,6 @@
 # Architecture
 
-How Pacenote is put together, in six pictures. The diagrams are drawn by `scripts/diagrams.mjs`
+How Pacenote is put together, in seven pictures. The diagrams are drawn by `scripts/diagrams.mjs`
 (`pnpm docs:diagrams`) in the desktop app's look, with a light and a dark variant; the colors and icons are read from the
 app, so drawing them again keeps them in step with it.
 
@@ -50,6 +50,20 @@ your tasks and, while you share it, the run history.
 </picture>
 
 More: [Your tasks from Slack](tasks.md), [Run history for AI tools](history-mcp.md).
+
+## A task's trajectory
+
+A task keeps its context from the message that asked for it to how it ended, whoever does the work. Collected, it has
+the message's link, a summary and its repository. Picked up, from Todo or in a session you start in the repository,
+which Pacenote tells its open tasks, it brings what came before: earlier tasks in the thread, the repository and from
+the same person, and Pace's answers. Worked on, its sessions join its work log and Todo shows them as they go. Settled
+by the session, by your reply in Slack or by you, it says what was done; the next collection wraps it up from its
+thread, and the next task like it opens with that.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/trajectory-dark.svg">
+  <img alt="A task's trajectory in six stages on a track: asked, collected, picked up, worked on, settled and wrapped up; four ways through them (continued from Todo in Claude Code, a session you start yourself that is told the repository's open tasks, settled in Slack with a drafted reply, and your own promise done in Codex); and what a trajectory leaves: the next one remembers how it ended, whoever does the work, live on Todo, links rather than messages" src="diagrams/trajectory-light.svg">
+</picture>
 
 ## Team hub
 
