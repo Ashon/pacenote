@@ -16,6 +16,7 @@ import { FakeSlack } from './fake-slack.js'
 import { eventually, type ManagedProcess, REPO, startBot } from './processes.js'
 
 export const FAKE_CLAUDE = path.join(REPO, 'tests/e2e/support/fake-claude.mjs')
+export const FAKE_CODEX = path.join(REPO, 'tests/e2e/support/fake-codex.mjs')
 
 export interface ClaudeRule {
   /** Regex on the request (case-insensitive) */
@@ -24,9 +25,13 @@ export interface ClaudeRule {
   delayMs?: number
   fail?: string
   tools?: { name: string; input?: unknown; result?: string }[]
+  /** codex only: leaves a generated PNG, as codex does when it draws one */
+  image?: boolean
 }
 
 export interface ClaudeCall {
+  /** codex for the fake codex; the fake claude leaves it out */
+  cli?: 'codex'
   args: string[]
   system: string
   prompt: string
@@ -50,6 +55,8 @@ export class World {
    * shell, here under the test's own HOME).
    */
   readonly claudeBin = path.join(this.root, 'claude', 'claude')
+  /** CODEX_BIN: the fake codex, by the same rules, for REASONER=codex */
+  readonly codexBin = path.join(this.root, 'claude', 'codex')
   readonly alice = this.slack.addUser({ id: 'U0ALICE', name: 'alice' })
   readonly bob = this.slack.addUser({ id: 'U0BOB', name: 'bob' })
   readonly ops = this.slack.addChannel({
@@ -72,6 +79,11 @@ export class World {
       `#!/bin/sh\nexec "${process.execPath}" "${FAKE_CLAUDE}" "$@"\n`
     )
     chmodSync(this.claudeBin, 0o755)
+    writeFileSync(
+      this.codexBin,
+      `#!/bin/sh\nexec "${process.execPath}" "${FAKE_CODEX}" "$@"\n`
+    )
+    chmodSync(this.codexBin, 0o755)
   }
 
   static async create(rules: ClaudeRule[] = [], answer = 'OK'): Promise<World> {
@@ -103,6 +115,7 @@ export class World {
       REASONER: 'claude',
       REASONER_SANDBOX: 'none',
       CLAUDE_BIN: this.claudeBin,
+      CODEX_BIN: this.codexBin,
       FAKE_CLAUDE_DIR: this.claudeDir,
       RENDER_DIAGRAMS: 'off',
       TIMEZONE: 'UTC',

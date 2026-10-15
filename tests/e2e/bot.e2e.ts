@@ -580,6 +580,127 @@ describe('bot on its own Slack app', () => {
     expect(world.runs()).toHaveLength(1)
   })
 
+  it('answers with codex: the thread on stdin, a tool step and tokens in the run, an attached image as a file, and one it drew in the thread', async () => {
+    world = await World.create([
+      {
+        match: 'uptime chart',
+        answer: 'Up 3 days; the chart is attached.',
+        image: true,
+        tools: [
+          {
+            name: 'mcp__ops__host_check',
+            input: { host: 'web-01', check: 'uptime' },
+            result: 'up 3 days',
+          },
+        ],
+      },
+    ])
+    const { slack, ops, alice, bob } = world
+    slack.addFile({
+      id: 'F0PNG',
+      name: 'graph.png',
+      mimetype: 'image/png',
+      content: PNG,
+    })
+    const root = slack.post(ops.id, { user: bob.id, text: 'web-01 rebooted?' })
+    await world.startBot({ REASONER: 'codex' })
+    expect(world.status()).toMatchObject({ problems: [] })
+
+    await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> uptime chart for web-01, like this one`,
+      thread_ts: root,
+      files: ['F0PNG'],
+    })
+    const [reply] = await world.answered(ops.id, root)
+    expect(reply!.text).toBe('Up 3 days; the chart is attached.')
+    const [call] = world.claudeCalls()
+    expect(call).toMatchObject({
+      cli: 'codex',
+      request: 'uptime chart for web-01, like this one',
+      images: 1,
+    })
+    // The instructions go before the prompt; codex reads the thread only, and
+    // keeps to no folder on this Mac, with no app connectors.
+    expect(call!.system).toContain('answers mentions in Slack public channels')
+    expect(call!.prompt).toContain('@bob: web-01 rebooted?')
+    expect(call!.args.slice(0, 2)).toEqual(['exec', '--skip-git-repo-check'])
+    expect(call!.args).toEqual(
+      expect.arrayContaining([
+        '--json',
+        '--ignore-user-config',
+        'approval_policy="never"',
+        'apps',
+      ])
+    )
+    expect(call!.args.at(-1)).toBe('-')
+    // The image codex drew comes back into the thread.
+    await eventually('the drawn image in the thread', () =>
+      slack.uploads.find(
+        (upload) => upload.channel === ops.id && upload.thread_ts === root
+      )
+    )
+    const run = await eventually('the finished run', () =>
+      world!.runs().find((r) => r.status === 'succeeded')
+    )
+    expect(run.backend.reasoner).toBe('codex')
+    expect(run.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'tool',
+        server: 'ops',
+        tool: 'host_check',
+        status: 'completed',
+        result: 'up 3 days',
+      })
+    )
+    // codex counts the cache in its input; the run keeps the two apart.
+    expect(run.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'usage',
+        inputTokens: 40,
+        cacheReadTokens: 80,
+        outputTokens: 20,
+      })
+    )
+  })
+
+  it('tells the asker when codex is out of its usage, and the status what that means', async () => {
+    world = await World.create([
+      {
+        match: 'boom',
+        fail: "You've hit your usage limit. Try again later.",
+      },
+    ])
+    const { slack, ops, alice } = world
+    await world.startBot({ REASONER: 'codex' })
+    const ts = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> boom`,
+    })
+    await eventually(
+      'the failure mark alone',
+      () => slack.message(ops.id, ts)?.reactions?.join() === 'warning'
+    )
+    expect(slack.ephemerals).toEqual([
+      expect.objectContaining({
+        user: alice.id,
+        text: "I couldn't produce an answer: I've reached my Codex usage limit for now. Please try again later.",
+      }),
+    ])
+    const run = await eventually('the failed run', () =>
+      world!.runs().find((r) => r.status === 'failed')
+    )
+    expect(run).toMatchObject({
+      error: expect.stringContaining('codex run failed: You'),
+      cause: 'limit',
+    })
+    expect(world.status()?.problems).toEqual([
+      expect.stringMatching(/^Reasoner: codex reached its usage limit\./),
+    ])
+  })
+
   it('stops at startup when Slack rejects the token', async () => {
     world = await World.create()
     world.slack.authError = 'invalid_auth'

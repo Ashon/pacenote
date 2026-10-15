@@ -3,7 +3,7 @@
 ```sh
 pnpm check          # typecheck (bot, UI, app) + lint + format:check + test
 pnpm test
-pnpm test:e2e       # end-to-end: the bot and the hub against a fake Slack and a fake claude (about 15 s)
+pnpm test:e2e       # end-to-end: the bot and the hub against a fake Slack, claude and codex (about 15 s)
 pnpm test:e2e:coverage  # the same, with the bot's and the hub's coverage (coverage/e2e/index.html)
 pnpm test:e2e:app   # end-to-end through the desktop app's window (builds first; opens a window)
 ```
@@ -18,20 +18,21 @@ URLs may run longer. `pnpm format` rewrites; `pnpm lint` and `pnpm format:check`
 ## End-to-end tests
 
 `tests/e2e` runs Pacenote the way it runs for real, on this computer and without network access: the bot (and the
-team hub) as their own processes, a Slack workspace stand-in they reach through `SLACK_API_URL`, and a stand-in
-for the claude CLI. Each test gets its own workspace, data folder and `HOME`, so a real Pacenote running on the same
-Mac is never touched.
+team hub) as their own processes, a Slack workspace stand-in they reach through `SLACK_API_URL`, and stand-ins
+for the claude and codex CLIs. Each test gets its own workspace, data folder and `HOME`, so a real Pacenote running on
+the same Mac is never touched.
 
 | Piece | What it is |
 | --- | --- |
 | `support/fake-slack.ts` | Web API, Socket Mode (events as acked envelopes), file downloads (Slack's login page without access) and uploads, with channels, users and threads behind them |
 | `support/fake-claude.mjs` | Answers by rules matched on the request: an answer, a delay, a failure, tool steps. Records each call's prompt, system prompt and images |
-| `support/world.ts` | One test's workspace (#ops public, #secret private, alice, bob), the fake claude's rules, and the bot's environment, status and run history |
+| `support/fake-codex.mjs` | `codex exec` by the same rules, in codex's `--json` events: tool calls, the answer, tokens with the cache counted in, a failed turn, and an image it drew, left where codex leaves them |
+| `support/world.ts` | One test's workspace (#ops public, #secret private, alice, bob), the fakes' rules, and the bot's environment (`REASONER=codex` for the fake codex), status and run history |
 | `support/processes.ts` | The bot and the hub as processes (from source with tsx; `E2E_BOT=bundle` runs the bot's bundle after `pnpm bundle`) |
 
 | File | Cases |
 | --- | --- |
-| `bot.e2e.ts` | Answers in a thread and outside one (context, mrkdwn, run history, permalink), long answers, tool steps, answering only you, private channels, failures, attachments (text, image, files.info lookups, no access), redelivered events, finishing on SIGTERM, resuming after a crash, a rejected token |
+| `bot.e2e.ts` | Answers in a thread and outside one (context, mrkdwn, run history, permalink), long answers, tool steps, answering only you, private channels, failures, attachments (text, image, files.info lookups, no access), redelivered events, finishing on SIGTERM, resuming after a crash, a rejected token, and with codex: the thread on stdin, a tool step and tokens, an attached image as a file, a drawn image in the thread, a usage limit |
 | `hub.e2e.ts` | Pairing with a code sent in Slack, a member's mention answered on their desktop through the hub (files included, no Slack token on the desktop), a member without a desktop, a disconnected desktop |
 | `app.e2e.ts` | The desktop app (Playwright for Electron): setup from a first run with your own Slack app ("@Pace it's me", the first answer), getting past where it used to stop (a token in the wrong field, someone else's mention, a wrong "Yes", a failed first answer, a hub address that is not one, a cancelled code), with the team hub (picked up after a restart, reduced motion) and in the built-in sandbox (gated like the VM case), the built-in sandbox prepared as soon as setup opens, setup left for Settings with Slack tokens saved there, the connection check, starting the bot, the answered mention in the run history |
 
