@@ -172,6 +172,31 @@ export function usePresence<E extends HTMLElement = HTMLDivElement>(
 }
 
 /**
+ * flash: values that changed while they were in view (an AI tool updating a
+ * task over MCP) light up and fade. A value is not lit when it first shows,
+ * only when it changes after. Spread `flash(name)` on the element showing
+ * each value and give it the class motion-flash.
+ */
+export function useFlash(values: Record<string, string | undefined>) {
+  const [before, setBefore] = useState(values)
+  const [lit, setLit] = useState<ReadonlySet<string>>(new Set())
+  const changed = Object.keys(values).filter(
+    (name) => values[name] !== before[name]
+  )
+  if (changed.length > 0) {
+    setBefore(values)
+    setLit(new Set([...lit, ...changed]))
+  }
+  return (name: string) => ({
+    'data-flash': lit.has(name) ? '' : undefined,
+    onAnimationEnd: (event: React.AnimationEvent) => {
+      if (event.target !== event.currentTarget) return
+      setLit((was) => new Set([...was].filter((each) => each !== name)))
+    },
+  })
+}
+
+/**
  * indicator: one mark under what is selected, sliding to the next choice (the
  * tabs' pill, the setup step you are on). It is placed from the box of the
  * element `selected` finds in `ref`, again whenever `attribute` changes on one

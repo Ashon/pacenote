@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { afterAll, describe, expect, it } from 'vitest'
+
 import { registerTaskTools } from '../src/tasks/mcp.js'
 import { readTasksSettings, type TasksSettings } from '../src/tasks/settings.js'
 import {
@@ -22,6 +23,7 @@ import {
   SOURCES,
   sourceOf,
 } from '../src/tasks/sources.js'
+import { readActivity } from '../src/tasks/activity.js'
 import { taskTrend } from '../src/tasks/trend.js'
 import type { Task, TasksFile, WorkEntry } from '../src/tasks/types.js'
 import { dayDirFor } from '../src/history/layout.js'
@@ -588,6 +590,20 @@ describe('the task tools over MCP', () => {
     expect(
       await call('close_task', { task: 'C9:1.0', why: 'resolved' })
     ).toEqual({ error: true, text: 'No task C9:1.0' })
+
+    // Each call that did something is kept for the app to show as it
+    // happens: the tool, what it did and to which task, never what Slack said.
+    const activity = readActivity(data)
+    expect(activity.map((event) => event.kind)).toEqual([
+      'collect',
+      'add',
+      'collect',
+      'close',
+    ])
+    expect(activity.every((event) => event.by === 'claude-code')).toBe(true)
+    expect(activity[1]).toMatchObject({ added: 2, finished: true })
+    expect(activity[3]!.task).toBe(readTasks(data).tasks[0]!.id)
+    expect(JSON.stringify(activity)).not.toContain('Review the retry PR')
     await client.close()
   })
 

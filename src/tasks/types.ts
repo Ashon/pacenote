@@ -171,6 +171,44 @@ export interface TaskTrend {
   medianMs?: number
 }
 
+/** Which task tool an AI tool called */
+export type ActivityKind =
+  'collect' | 'add' | 'look' | 'update' | 'close' | 'wrap-up'
+
+/**
+ * One call of an AI tool to Pacenote's task tools, as tasks-activity.jsonl
+ * keeps it (src/tasks/activity.ts)
+ */
+export interface TaskActivity {
+  at: string
+  kind: ActivityKind
+  /** The AI tool, by its MCP client name ("claude-code") */
+  by?: string
+  /** From a collection or draft the app ran, which shows its own progress */
+  app?: boolean
+  /** The task it was about */
+  task?: string
+  /** add: how many tasks and Maybes it added */
+  added?: number
+  /** add: the collection is done */
+  finished?: boolean
+  /** update: what changed */
+  fields?: TaskField[]
+}
+
+/** What AI tools are doing with your tasks now, for the Todo screen */
+export interface TasksLive {
+  /**
+   * A collection an AI tool is running (not one from Collect now): when it
+   * started and how many tasks and Maybes it has added so far
+   */
+  collecting?: { by?: string; since: string; added: number }
+  /** Tasks an AI tool looked at or changed in the last two minutes */
+  working: Record<string, { by?: string; at: string }>
+  /** The last thing an AI tool did, in the last two minutes */
+  latest?: TaskActivity
+}
+
 /** How a collection from the app ended, and what it spent */
 export type CollectOutcome = (
   | { at: string; ok: true; added: number; maybe: number; skipped: number }

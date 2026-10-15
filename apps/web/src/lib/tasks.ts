@@ -1,5 +1,6 @@
 import type { TaskDecision, WorkTool } from '@src/tasks/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 
 /** A task with what came before it and its work log, from the desktop app */
 export const taskDetailQuery = (id: string) => ({
@@ -27,6 +28,35 @@ export function useTaskTrend() {
     enabled: Boolean(bridge),
     refetchInterval: 10_000,
   })
+}
+
+/** What AI tools do with your tasks now (activity.ts); null with Todo off */
+export function useTasksLive() {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: ['tasks-live'],
+    queryFn: async () => (await bridge?.live()) ?? null,
+    enabled: Boolean(bridge),
+    // What was live goes stale with nothing written
+    refetchInterval: 15_000,
+  })
+}
+
+/**
+ * Refreshes whatever shows your tasks the moment a task file changes on disk,
+ * so an AI tool's work over MCP shows as it happens rather than at the next
+ * refresh. Mounted once, by App.
+ */
+export function useTasksPush() {
+  const client = useQueryClient()
+  useEffect(
+    () =>
+      window.pacenoteDesktop?.tasks.onChanged(() => {
+        for (const key of ['tasks', 'task', 'task-trend', 'tasks-live'])
+          void client.invalidateQueries({ queryKey: [key] })
+      }),
+    [client]
+  )
 }
 
 /** Records a decision on a task (or takes it back) and refreshes the list */

@@ -1,6 +1,13 @@
 import { newTokens } from '@history/usage'
+import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
-import { ChevronRight, History, RefreshCw, Settings } from 'lucide-react'
+import {
+  ChevronRight,
+  History,
+  RefreshCw,
+  Settings,
+  SquareTerminal,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +26,7 @@ import {
   formatShortDay,
   formatTokens,
 } from '@/lib/format'
-import { useCollect, useDecide, useTasks } from '@/lib/tasks'
+import { useCollect, useDecide, useTasks, useTasksLive } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow, taskHash } from './task-row'
@@ -68,6 +75,8 @@ export function TasksPage({
 }) {
   const bridge = window.pacenoteDesktop?.tasks
   const tasks = useTasks()
+  // What AI tools are doing with your tasks now, over MCP
+  const live = useTasksLive().data
   const decide = useDecide()
   const [tab, setTab] = useState<Tab>('open')
   const [declined, setDeclined] = useState(declinedOffers)
@@ -189,7 +198,11 @@ export function TasksPage({
       }
       action={<CollectButton running={Boolean(data.collect.running)} />}
     >
-      <CollectStatus collect={data.collect} />
+      <StatusLine
+        collect={data.collect}
+        live={live}
+        titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
+      />
       {offer && (
         <Banner tone="note">
           <span className="flex-1">
@@ -249,6 +262,7 @@ export function TasksPage({
               motion={motion}
               cli={data.settings.cli}
               working={data.working?.[task.id]}
+              live={live?.working[task.id]}
               open={task.id === openId}
               gone={tabOf(task) !== tab}
               logEntry={task.id === openId ? logEntry : undefined}
@@ -399,6 +413,93 @@ function CollectButton({ running }: { running: boolean }) {
       <RefreshCw />
       Collect now
     </Button>
+  )
+}
+
+/** An AI tool's name, from its MCP client name ("claude-code") */
+function toolOf(client: string | undefined): string {
+  if (!client) return 'An AI tool'
+  if (/claude/i.test(client)) return 'Claude Code'
+  if (/codex/i.test(client)) return 'Codex'
+  return client
+}
+
+/** What an AI tool is doing with your tasks, or just did, in a sentence */
+function liveLine(
+  live: TasksLive | null | undefined,
+  titleOf: (id: string) => string | undefined
+): { key: string; text: string; active: boolean } | undefined {
+  if (!live) return undefined
+  if (live.collecting) {
+    const { by, since, added } = live.collecting
+    return {
+      key: `collect:${since}`,
+      active: true,
+      text: `${toolOf(by)} is collecting your tasks${added ? `: ${added} found so far` : ''}.`,
+    }
+  }
+  const event = live.latest
+  if (!event) return undefined
+  const title = event.task ? titleOf(event.task) : undefined
+  const it = title ? `\u201c${title}\u201d` : 'a task'
+  const tool = toolOf(event.by)
+  const text =
+    event.kind === 'look'
+      ? `${tool} is working on ${it}.`
+      : event.kind === 'update'
+        ? `${tool} updated ${it}.`
+        : event.kind === 'close'
+          ? `${tool} closed ${it}.`
+          : event.kind === 'wrap-up'
+            ? `${tool} wrote how ${it} ended.`
+            : event.kind === 'add' && event.finished !== false
+              ? event.added
+                ? `${tool} added ${event.added} ${event.added === 1 ? 'task' : 'tasks'}.`
+                : `${tool} found nothing new to add.`
+              : undefined
+  if (!text) return undefined
+  return {
+    key: `${event.kind}:${event.task ?? ''}:${event.at}`,
+    active: event.kind === 'look',
+    text,
+  }
+}
+
+/**
+ * The line under the title: a collection the app runs, or what an AI tool is
+ * doing with your tasks over MCP as it does it, or how the app's last
+ * collection ended. Each line gives way to the next (swap).
+ */
+function StatusLine({
+  collect,
+  live,
+  titleOf,
+}: {
+  collect: TasksCollect
+  live: TasksLive | null | undefined
+  titleOf: (id: string) => string | undefined
+}) {
+  const line = collect.running ? undefined : liveLine(live, titleOf)
+  return (
+    <Swap id={collect.running ? 'collect' : (line?.key ?? 'last')}>
+      {line ? (
+        <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+          {/* In the spinner's place: the tool at work, or done */}
+          <span className="flex size-6 shrink-0 items-center justify-center">
+            {line.active ? (
+              <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
+            ) : (
+              <SquareTerminal aria-hidden="true" className="size-3.5" />
+            )}
+          </span>
+          <span className={cn('min-w-0', line.active && 'text-shimmer')}>
+            {line.text}
+          </span>
+        </p>
+      ) : (
+        <CollectStatus collect={collect} />
+      )}
+    </Swap>
   )
 }
 

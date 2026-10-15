@@ -2,14 +2,16 @@
  * Motion: how things move in Pacenote, in one place.
  *
  * Motion answers what a person just did: opened a row, moved to a screen,
- * finished a task. Nothing else moves on its own, except Pace at work (its
- * spinner, the status dot). Things come in decelerating (enter), leave
+ * finished a task. Nothing else moves on its own, except Pace or an AI tool
+ * at work (Pace's spinner, the status dot, an AI tool's dot on the task it
+ * works on over MCP) and what an AI tool changes as you look (it lights up
+ * and fades, without moving). Things come in decelerating (enter), leave
  * accelerating (exit) and move or resize within the window on standard;
  * leaving takes about 2/3 of coming in.
  *
  * Screens do not style motion themselves. They use the primitives in
  * components/ui, which carry these patterns (Collapsible, Dialog, the menu,
- * the tooltip, Tabs, Swap, useListMotion, usePresence), or a pattern class
+ * the tooltip, Tabs, Swap, useListMotion, usePresence, useFlash), or a pattern class
  * below (motion-layout); tests/web-motion.test.ts fails on durations, easings
  * and animations written anywhere else. The drafts these values were picked
  * from are in the Pacenote Motion canvas; the Debug section shows each one in
@@ -29,6 +31,8 @@
   --motion-lag: calc(60ms * var(--motion-scale));
   /* A dialog leaves in 2/3 of the time it came in */
   --motion-exit: calc(var(--motion-moderate) * 2 / 3);
+  /* A change someone else made stays lit this long as it fades */
+  --motion-linger: calc(1600ms * var(--motion-scale));
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
@@ -132,6 +136,27 @@
   }
 
   /*
+   * fade: a mark that comes and goes beside text that stays (an AI tool at
+   * work on a task). It fades in and out where it is, without moving.
+   */
+  .motion-fade[data-state='open'] {
+    animation: motion-fade-in var(--motion-base) var(--ease-enter);
+  }
+  .motion-fade[data-state='closed'] {
+    animation: motion-fade-out var(--motion-quick) var(--ease-exit) forwards;
+  }
+
+  /*
+   * flash: a value an AI tool changed while it was in view (a due date, a
+   * title) lights up in the brand's tint, holds a moment and fades
+   * (useFlash). The tint lies over the element's own background, which stays.
+   */
+  .motion-flash[data-flash] {
+    background-image: linear-gradient(var(--motion-tint), var(--motion-tint));
+    animation: motion-flash var(--motion-linger) var(--ease-exit);
+  }
+
+  /*
    * sheet: a panel over the window's right side (a session's log). It slides
    * in 32px and fades; closing, it goes at once.
    */
@@ -216,7 +241,8 @@
     .motion-sheet[data-state='open'],
     .motion-dialog-overlay[data-state='open'],
     .motion-dialog[data-state='open'],
-    .motion-pop:not([data-state='closed']) {
+    .motion-pop:not([data-state='closed']),
+    .motion-fade[data-state='open'] {
       animation: motion-fade-in calc(120ms * var(--motion-scale)) ease;
     }
     .motion-reveal[data-state='closed'],
@@ -224,8 +250,13 @@
     [data-motion-item][data-motion='exit'],
     .motion-dialog-overlay[data-state='closed'],
     .motion-dialog[data-state='closed'],
-    .motion-pop[data-state='closed'] {
+    .motion-pop[data-state='closed'],
+    .motion-fade[data-state='closed'] {
       animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
+    }
+    /* A color, not a movement: it still lights up and fades */
+    .motion-flash[data-flash] {
+      animation: motion-flash var(--motion-linger) ease;
     }
     [data-motion-item][data-motion='enter'] > *,
     [data-motion-item][data-motion='exit'] > * {
@@ -240,6 +271,23 @@
     .motion-layout-label[data-hidden] {
       transition: opacity calc(120ms * var(--motion-scale)) ease;
     }
+  }
+}
+
+/* The flash's tint, as a color the browser can ease between */
+@property --motion-tint {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@keyframes motion-flash {
+  from,
+  25% {
+    --motion-tint: color-mix(in oklab, var(--color-primary) 22%, transparent);
+  }
+  to {
+    --motion-tint: transparent;
   }
 }
 

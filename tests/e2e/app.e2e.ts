@@ -973,11 +973,36 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(body.earlier.inRepo).toMatchObject([
       { id: earlier.id, outcome: 'Done in Claude Code · 2 comments' },
     ])
+    // Todo shows the session at work on the task as it happens: a mark on
+    // its row, and a line under the title.
+    const status = (text: string) =>
+      page.getByText(text, { exact: true }).waitFor({ timeout: 5_000 })
+    await row.getByText('Working in Claude Code').waitFor({ timeout: 5_000 })
+    await status(
+      'Claude Code is working on \u201cReview the payment retry PR\u201d.'
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-live.png'),
+    })
     // A collection knows the repositories you work in, by name only.
     const collecting = await client.callTool({ name: 'collect_context' })
     const collectText = (collecting.content as { text: string }[])[0]!.text
     expect(JSON.parse(collectText).repos).toEqual(['Ashon/payments'])
     expect(collectText).not.toContain(checkout)
+    await status('Claude Code is collecting your tasks.')
+    // What the collection changes lights up where it shows.
+    await page.evaluate(`{
+      const lit = (globalThis.lit = [])
+      new MutationObserver((changes) => {
+        for (const change of changes)
+          if (change.target.hasAttribute('data-flash'))
+            lit.push(change.target.textContent)
+      }).observe(document.body, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-flash'],
+      })
+    }`)
     // A later collection finds the thread moved the due date: the open row
     // says so, and the row in the list says it was updated.
     await client.callTool({
@@ -992,9 +1017,17 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .getByText('mina moved it to Wednesday')
       .waitFor({ timeout: 15_000 })
     await row.getByText('Wednesday', { exact: true }).waitFor()
+    await eventually('the new due date lit up', async () =>
+      ((await page.evaluate('globalThis.lit')) as string[]).includes(
+        'Wednesday'
+      )
+    )
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-updated.png'),
     })
+    // The collection ends with what it found: nothing new.
+    await client.callTool({ name: 'add_tasks', arguments: { tasks: [] } })
+    await status('Claude Code found nothing new to add.')
     // Closed, the row says it was updated; open, the Changed line does.
     await title.click()
     await row.getByText(/^Updated /).waitFor()
@@ -1012,7 +1045,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
 
     // Closed in its session, the task stays where it was, struck through,
-    // with how it ended and the reply that is still to be sent.
+    // with how it ended and the reply that is still to be sent; the session
+    // is no longer at work on it.
+    await status('Claude Code closed \u201cReview the payment retry PR\u201d.')
+    await row
+      .getByText('Working in Claude Code')
+      .waitFor({ state: 'detached', timeout: 5_000 })
     await row
       .getByText('mina is still waiting in the thread')
       .waitFor({ timeout: 15_000 })

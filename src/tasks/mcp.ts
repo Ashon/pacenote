@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import { recordActivity } from './activity.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
 import { yourRepos } from './folders.js'
 import type { TasksSettings } from './settings.js'
@@ -13,7 +14,7 @@ import {
   sourceOf,
 } from './sources.js'
 import { allTaskViews, readTasks, tasksView } from './store.js'
-import type { RelatedRun, TaskView } from './types.js'
+import type { RelatedRun, TaskActivity, TaskView } from './types.js'
 import { readWork } from './work.js'
 import { addTasks, closeTask, updateTask, wrapUpTask } from './write.js'
 
@@ -38,6 +39,11 @@ export interface TaskToolsOptions {
    * (collect_context). Without it, only the ones with a folder remembered.
    */
   home?: string
+  /**
+   * Launched by the app for a collection or a draft of its own, which show
+   * their own progress: the activity it records says so
+   */
+  app?: boolean
 }
 
 const OFF =
@@ -90,6 +96,14 @@ export function registerTaskTools(
   options: TaskToolsOptions
 ): void {
   const client = () => server.server.getClientVersion()?.name
+  // What the tool is doing, for the app to show as it happens (activity.ts)
+  const track = (event: Omit<TaskActivity, 'at' | 'by' | 'app'>) =>
+    recordActivity(options.dataDir, {
+      at: new Date().toISOString(),
+      by: client(),
+      ...(options.app ? { app: true } : {}),
+      ...event,
+    })
 
   server.registerPrompt(
     'collect_tasks',
@@ -118,6 +132,7 @@ export function registerTaskTools(
     },
     () =>
       respond(options, async () => {
+        track({ kind: 'collect' })
         const settings = options.settings()
         const file = readTasks(options.dataDir)
         const since =
@@ -230,6 +245,11 @@ export function registerTaskTools(
           addedBy: client(),
           finished: finished ?? true,
         })
+        track({
+          kind: 'add',
+          added: result.added.length,
+          finished: finished ?? true,
+        })
         return {
           added: result.added.map((task) => ({
             id: task.id,
@@ -299,6 +319,12 @@ export function registerTaskTools(
               why: `Left as it is: ${result.refused}`,
             },
           }
+        if (result.changed.length)
+          track({
+            kind: 'update',
+            task: result.task.id,
+            fields: result.changed.map((change) => change.field),
+          })
         return result.changed.length
           ? {
               updated: {
@@ -351,6 +377,7 @@ export function registerTaskTools(
           wrapUp: wrap_up,
         })
         if (!closed) throw new Error(`No task ${task}`)
+        track({ kind: 'close', task: closed.id })
         return {
           closed: {
             id: closed.id,
@@ -387,6 +414,7 @@ export function registerTaskTools(
         )
         if (!result) throw new Error(`No task ${task}`)
         const { id, title, wrapUp } = result.task
+        if (!('refused' in result)) track({ kind: 'wrap-up', task: id })
         return 'refused' in result
           ? {
               unchanged: { id, title, why: `Left as it is: ${result.refused}` },
@@ -416,6 +444,7 @@ export function registerTaskTools(
         const id = found ? SOURCES[found.app].taskId(found) : task
         const view = all.find((t) => t.id === id)
         if (!view) throw new Error(`No task ${task}`)
+        track({ kind: 'look', task: view.id })
         const work = readWork(options.dataDir).entries
         const [conversation, thread] = splitThread(view)
         const runs = options.runs?.(conversation, thread)

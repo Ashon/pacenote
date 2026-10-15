@@ -36,6 +36,7 @@ import type {
   WorkEntry,
   WorkTool,
 } from '@src/tasks/types'
+import type { TasksLive } from '@src/tasks/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
@@ -136,6 +137,10 @@ declare global {
         >
         /** What you handled over the last 14 days; null with Todo off */
         trend(): Promise<TaskTrend | null>
+        /** What AI tools are doing with your tasks now; null with Todo off */
+        live(): Promise<TasksLive | null>
+        /** Calls back when a task file changes on disk; returns the stop */
+        onChanged(callback: () => void): () => void
         decide(
           id: string,
           decision: Omit<TaskDecision, 'at'> | null

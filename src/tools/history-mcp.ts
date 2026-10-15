@@ -20,6 +20,9 @@ import { readTasksSettings } from '../tasks/settings.js'
  * - Sharing (HISTORY_SHARE) is read from the settings file on every call, so
  *   the switch in Settings applies without restarting the client. A value set
  *   in the environment at launch wins.
+ * - The app launches it for its own collections and drafts with
+ *   PACENOTE_MCP_FROM_APP=1, so the Todo screen shows their progress its own
+ *   way rather than as another AI tool's.
  * stdout carries the protocol; warnings go to stderr.
  */
 const launched = process.env.HISTORY_SHARE
@@ -36,6 +39,7 @@ const server = createHistoryServer({
     dataDir: data,
     home: homedir(),
     settings: () => readTasksSettings(process.env, settingsFile),
+    app: process.env.PACENOTE_MCP_FROM_APP === '1',
   },
 })
 await server.connect(new StdioServerTransport())

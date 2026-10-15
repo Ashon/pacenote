@@ -64,6 +64,7 @@ import {
 } from '../../../src/tasks/collections.js'
 import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
+import { liveTasks, readActivity } from '../../../src/tasks/activity.js'
 import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
   TaskDecision,
@@ -106,6 +107,7 @@ import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
+import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
@@ -252,6 +254,8 @@ if (themeSource === 'light' || themeSource === 'dark')
   nativeTheme.themeSource = themeSource
 
 let isQuitting = false
+/** Stops telling the window about task files changing on disk */
+let stopTasksWatch: (() => void) | undefined
 let mainWindow: BrowserWindow | undefined
 let tray: Tray | undefined
 let toolPathCache: string | undefined
@@ -359,7 +363,7 @@ const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
 const taskCollector = new TaskCollector({
   launch: () => {
     const { command, args, env } = mcpLaunch()
-    return { command, args, env }
+    return { command, args, env: { ...env, PACENOTE_MCP_FROM_APP: '1' } }
   },
   toolPath,
   cwd: dataDir,
@@ -820,6 +824,16 @@ function registerBotIpc(): void {
     const view = tasksView(dataDir, current.exclude)
     return taskTrend(view.tasks, readWork(dataDir).entries)
   })
+  // What AI tools are doing with your tasks now, over MCP
+  ipcMain.handle('pacenote:tasks:live', (event) => {
+    if (!fromMainWindow(event) || !tasksSettings().on) return null
+    return liveTasks(readActivity(dataDir))
+  })
+  // An AI tool works on your tasks in a process of its own: the screens hear
+  // of each change at once rather than at their next refresh.
+  stopTasksWatch = watchTasks(dataDir, () =>
+    mainWindow?.webContents.send('pacenote:tasks:changed')
+  )
   ipcMain.handle('pacenote:tasks:collect', (event) => {
     if (!fromMainWindow(event)) return undefined
     if (!tasksSettings().on)
@@ -1136,7 +1150,11 @@ function registerBotIpc(): void {
       const { command, args, env: launchEnv } = mcpLaunch()
       const draft = await draftReply({
         bin: env().CLAUDE_BIN?.trim() || 'claude',
-        launch: { command, args, env: launchEnv },
+        launch: {
+          command,
+          args,
+          env: { ...launchEnv, PACENOTE_MCP_FROM_APP: '1' },
+        },
         toolPath: toolPath(),
         cwd: dataDir,
         task: detail.task,
@@ -1632,6 +1650,7 @@ let botStopping: Promise<void> | undefined
 app.on('before-quit', (event) => {
   isQuitting = true
   bundleWatch?.stop()
+  stopTasksWatch?.()
   taskCollector.cancel()
   void stopClaim()
   supervisor?.dispose()

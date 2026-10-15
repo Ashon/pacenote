@@ -47,7 +47,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { motionItem } from '@/components/ui/motion'
+import { motionItem, useFlash, usePresence } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
@@ -162,6 +162,7 @@ export function TaskRow({
   motion,
   cli,
   working,
+  live,
   open,
   gone,
   logEntry,
@@ -175,6 +176,8 @@ export function TaskRow({
   cli: WorkTool
   /** Its latest session: the tool and when it was last active */
   working?: { tool: WorkTool; at: string }
+  /** An AI tool working on it now over MCP (tasks-activity.jsonl) */
+  live?: { by?: string; at: string }
   open: boolean
   /** Settled while it was open: it stays in place until it is closed */
   gone?: boolean
@@ -198,6 +201,15 @@ export function TaskRow({
   const [reply, setReply] = useState<string>()
   const [error, setError] = useState<string>()
   const row = useRef<HTMLLIElement>(null)
+  // What an AI tool changes while the row is in view lights up a moment.
+  const flash = useFlash({ title: task.title, due: task.due, repo: task.repo })
+  // An AI tool at work on it: a mark that fades in and, once it is done,
+  // out, still naming the tool as it goes
+  const atWork = usePresence<HTMLSpanElement>(
+    Boolean(live) && task.status === 'open'
+  )
+  const liveTool = useRef('an AI tool')
+  if (live) liveTool.current = closedBy(live.by) ?? 'an AI tool'
 
   // Opened from a link, the row comes into view.
   useEffect(() => {
@@ -312,7 +324,9 @@ export function TaskRow({
                   )}
                 />
                 <span
+                  {...flash('title')}
                   className={cn(
+                    'motion-flash rounded-sm',
                     gone && 'text-muted-foreground line-through decoration-1'
                   )}
                 >
@@ -325,7 +339,10 @@ export function TaskRow({
                 .filter(Boolean)
                 .join(' · ')}
               {task.due && !settled && (
-                <span className="rounded-full bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted">
+                <span
+                  {...flash('due')}
+                  className="motion-flash rounded-full bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted"
+                >
                   {task.due}
                 </span>
               )}
@@ -334,8 +351,25 @@ export function TaskRow({
                   {settledLabel}
                 </span>
               )}
-              {task.repo && <span className="font-mono">{task.repo}</span>}
-              {working && task.status === 'open' && (
+              {task.repo && (
+                <span
+                  {...flash('repo')}
+                  className="motion-flash rounded-sm font-mono"
+                >
+                  {task.repo}
+                </span>
+              )}
+              {atWork.mounted && (
+                <span
+                  ref={atWork.ref}
+                  data-state={atWork.state}
+                  className="motion-fade inline-flex items-center gap-1.5 font-medium text-status-running"
+                >
+                  <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
+                  Working in {liveTool.current}
+                </span>
+              )}
+              {working && task.status === 'open' && !atWork.mounted && (
                 <span
                   title={`Last active in its ${TOOL[working.tool]} session`}
                   className="inline-flex items-center gap-1"
@@ -606,6 +640,7 @@ function TaskOpen({
   const summary = task.summary ?? task.reason
   const settled = !['open', 'maybe'].includes(task.status)
   const change = settled ? undefined : lastChange(task)
+  const flash = useFlash({ summary })
 
   const sessions = (detail?.work ?? []).filter(
     (entry): entry is Session => entry.kind === 'session'
@@ -635,7 +670,10 @@ function TaskOpen({
     <div className="flex flex-col gap-2 pt-2.5 pl-6">
       <div className="flex flex-col gap-0.5 rounded-xl bg-well px-3.5 py-3">
         {summary && (
-          <p className="mb-1.5 max-w-[44rem] text-body leading-relaxed select-text">
+          <p
+            {...flash('summary')}
+            className="motion-flash mb-1.5 max-w-[44rem] rounded-sm text-body leading-relaxed select-text"
+          >
             {summary}
           </p>
         )}

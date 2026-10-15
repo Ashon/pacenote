@@ -107,6 +107,17 @@ An open task's row says when its latest session was last active ("Claude Code 5m
 They answer only while "Gather my tasks from Slack" is on, read on every call, and are separate from sharing the run
 history.
 
+Todo shows what an AI tool does with them as it does it. Each call that does something adds a line to
+`PACENOTE_DATA_DIR/tasks-activity.jsonl` (the tool, what it did, the task's id and the names of the fields it changed,
+never what Slack said), and the app watches the data folder, so the screens change the moment a task file does:
+
+- The line under Todo's title says what the tool is doing ("Claude Code is collecting your tasks: 3 found so far") or
+  just did ("Claude Code closed …"), for two minutes after its last call.
+- A task a session is looking at or changing says "Working in Claude Code" on its row, until the session closes it or
+  goes quiet for two minutes.
+- What it changes in view (a due date, a title, the repository, the summary) lights up a moment and fades.
+- Collect now and drafted replies show their own progress, so their calls stay out of the line.
+
 ## Not yet
 
 Collecting on a schedule (from Pacenote, running the tool with Slack read tools only), a daily summary in your DM with Pace,

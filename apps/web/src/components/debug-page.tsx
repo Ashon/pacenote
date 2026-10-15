@@ -35,7 +35,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { motionItem, Swap, useListMotion } from '@/components/ui/motion'
+import {
+  motionItem,
+  Swap,
+  useFlash,
+  useListMotion,
+  usePresence,
+} from '@/components/ui/motion'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -561,6 +567,8 @@ function MotionBench() {
   const [added, setAdded] = useState(3)
   const [tasks, setTasks] = useState([1, 2, 3])
   const list = useListMotion(tasks, String)
+  const [working, setWorking] = useState(false)
+  const [due, setDue] = useState('Thursday')
 
   return (
     <section className="space-y-5">
@@ -712,6 +720,31 @@ function MotionBench() {
           )}
         </Bench>
 
+        <Bench
+          title="fade and flash"
+          note="An AI tool at work on a task, and what it changes"
+        >
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => setWorking(!working)}
+            >
+              {working ? 'Done working' : 'Start working'}
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() =>
+                setDue(due === 'Thursday' ? 'Wednesday' : 'Thursday')
+              }
+            >
+              Move the due date
+            </Button>
+          </div>
+          <AtWorkRow working={working} due={due} />
+        </Bench>
+
         <Bench title="pop" note="A menu and a tooltip out of their anchors">
           <div className="flex items-center gap-2">
             <Tooltip content="Opens in ~/git/payments">
@@ -734,6 +767,36 @@ function MotionBench() {
         </Bench>
       </div>
     </section>
+  )
+}
+
+/** A task row as an AI tool works on it: its mark, and a due date it moves */
+function AtWorkRow({ working, due }: { working: boolean; due: string }) {
+  const mark = usePresence<HTMLSpanElement>(working)
+  const flash = useFlash({ due })
+  return (
+    <div className="mt-3 border-t border-border pt-2.5">
+      <p className="text-sm font-semibold">Review the payments retry PR</p>
+      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        mina · #payments
+        <span
+          {...flash('due')}
+          className="motion-flash rounded-full bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted"
+        >
+          {due}
+        </span>
+        {mark.mounted && (
+          <span
+            ref={mark.ref}
+            data-state={mark.state}
+            className="motion-fade inline-flex items-center gap-1.5 font-medium text-status-running"
+          >
+            <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
+            Working in Claude Code
+          </span>
+        )}
+      </p>
+    </div>
   )
 }
 

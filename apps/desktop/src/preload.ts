@@ -76,6 +76,14 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   tasks: {
     list: () => ipcRenderer.invoke('pacenote:tasks:list'),
     trend: () => ipcRenderer.invoke('pacenote:tasks:trend'),
+    live: () => ipcRenderer.invoke('pacenote:tasks:live'),
+    // A task file changed on disk: an AI tool over MCP, a collection, you
+    onChanged: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('pacenote:tasks:changed', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:tasks:changed', listener)
+    },
     decide: (id: string, decision: unknown) =>
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     leaveOut: (label: string) =>

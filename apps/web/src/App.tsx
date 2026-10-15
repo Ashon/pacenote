@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
+import { useTasksPush } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { BotPage } from './components/bot-page'
 import {
@@ -111,6 +112,8 @@ export default function App() {
   const windowWidth = useWindowWidth()
   const isMacDesktop = window.pacenoteDesktop?.platform === 'darwin'
   const fullScreen = useFullScreen()
+  // An AI tool's work on your tasks shows everywhere as it happens.
+  useTasksPush()
   const [collapsed, setCollapsed] = useStoredFlag(
     'pacenote.sidebar.collapsed',
     false
