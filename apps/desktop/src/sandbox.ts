@@ -22,7 +22,7 @@ import {
   type SandboxJobKind,
   type SandboxStatus,
 } from '../../../src/sandbox/types.js'
-import { readEnvFile, readEnvValues } from '../../../src/settings/env-file.js'
+import { readSettingsValues } from '../../../src/settings/settings-file.js'
 import { allowlistPath } from '../../../src/settings/paths.js'
 
 const OUTPUT_LINES = 400
@@ -49,7 +49,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
       /** Sandbox apply job runner (app-paths.ts) */
       jobRunner: string
       /** Settings file (outside the repository, src/settings/paths.ts) */
-      envFile: string
+      settingsFile: string
       dataDir: string
       env: NodeJS.ProcessEnv
       toolPath: () => string
@@ -69,7 +69,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
   status(): Promise<SandboxStatus> {
     return collectSandboxStatus({
       sandboxDir: this.options.sandboxDir,
-      envFile: this.options.envFile,
+      settingsFile: this.options.settingsFile,
       dataDir: this.options.dataDir,
       env: this.options.env,
       run: commandRunner(this.commandEnv, this.options.dataDir),
@@ -82,7 +82,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
       return [{ message: 'The domain list format is invalid.' }]
     }
     const values = {
-      ...readEnvValues(readEnvFile(this.options.envFile)),
+      ...readSettingsValues(this.options.settingsFile),
       ...this.options.env,
     }
     const issues = checkAllowlist(

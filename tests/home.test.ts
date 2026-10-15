@@ -19,7 +19,10 @@ import {
   STATUS_FILE,
 } from '../src/runtime/status.js'
 import { loadBrokerEnv } from '../src/sandbox/env.js'
-import { writeEnvFile } from '../src/settings/env-file.js'
+import {
+  settingsText,
+  writeSettingsFile,
+} from '../src/settings/settings-file.js'
 import {
   botLockDirs,
   defaultHome,
@@ -45,9 +48,9 @@ describe('where Pacenote keeps settings and data', () => {
   })
 
   it('passes compose the resolved home', () => {
-    const envFile = path.join(root, 'job.env')
-    writeFileSync(envFile, 'OPS_SSH_USER=from-file\n')
-    expect(jobEnv({ HOME: '/home/me' }, envFile)).toMatchObject({
+    const settingsFile = path.join(root, 'job.json')
+    writeFileSync(settingsFile, settingsText({ OPS_SSH_USER: 'from-file' }))
+    expect(jobEnv({ HOME: '/home/me' }, settingsFile)).toMatchObject({
       OPS_SSH_USER: 'from-file',
       PACENOTE_HOME: '/home/me/.pacenote',
     })
@@ -177,19 +180,19 @@ describe('private folders', () => {
     securePrivateDir(open)
     expect(statSync(open).mode & 0o777).toBe(0o700)
 
-    const env = path.join(open, '.env')
-    writeFileSync(env, 'SLACK_BOT_TOKEN=xoxb-1\n', { mode: 0o644 })
-    chmodSync(env, 0o644)
-    securePrivateFile(env)
-    expect(statSync(env).mode & 0o777).toBe(0o600)
+    const file = path.join(open, 'settings.json')
+    writeFileSync(file, '{}\n', { mode: 0o644 })
+    chmodSync(file, 0o644)
+    securePrivateFile(file)
+    expect(statSync(file).mode & 0o777).toBe(0o600)
     securePrivateFile(path.join(open, 'missing'))
   })
 
   it('writes the settings file for this account alone, whatever it was', () => {
-    const env = path.join(root, 'private', 'settings.env')
-    writeFileSync(env, 'A=1\n', { mode: 0o644 })
-    chmodSync(env, 0o644)
-    writeEnvFile(env, 'A=2\n')
-    expect(statSync(env).mode & 0o777).toBe(0o600)
+    const file = path.join(root, 'private', 'mine.json')
+    writeFileSync(file, '{}\n', { mode: 0o644 })
+    chmodSync(file, 0o644)
+    writeSettingsFile(file, '{ "tasks": { "enabled": true } }\n')
+    expect(statSync(file).mode & 0o777).toBe(0o600)
   })
 })

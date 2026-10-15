@@ -22,13 +22,14 @@ import {
   VM_RENDERER_IMAGE,
 } from './sandbox/vm-images.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
+import { settingName } from './settings/settings-file.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
 
 /**
  * REASONER_SANDBOX as Pace reads it: docker, the sandbox Pacenote had before
- * the built-in one, means the built-in one now. (The desktop app rewrites it in
- * .env when it starts.)
+ * the built-in one, means the built-in one now. (Moving an earlier version's
+ * .env into settings.json rewrites it.)
  */
 export function sandboxSetting(value: unknown): unknown {
   return value === 'docker' ? 'vm' : value
@@ -287,7 +288,7 @@ export interface Config {
   logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
-/** Treats entries left empty in .env, like "KEY=", as unset. */
+/** Treats entries left empty, like "KEY=", as unset. */
 const providedValues = (env: NodeJS.ProcessEnv) =>
   Object.fromEntries(
     Object.entries(env).filter(
@@ -314,8 +315,8 @@ const OUTSIDE_FINGERPRINT = new Set([
 
 /**
  * Bot config fingerprint. The bot writes it to the status file at startup, and
- * the desktop app compares it with the value computed from the current .env to
- * decide whether a restart is needed. (The values themselves are not stored)
+ * the desktop app compares it with the value computed from the current settings
+ * to decide whether a restart is needed. (The values themselves are not stored)
  */
 export function configFingerprint(env: NodeJS.ProcessEnv): string {
   const provided = providedValues(env)
@@ -346,23 +347,33 @@ export interface ConfigIssue {
   missing?: boolean
 }
 
-/**
- * A required setting that is still empty. Carries a valid stand-in so the
- * remaining rules can still be checked.
- */
-export class MissingSettingError extends Error {
+/** A setting that keeps Pace from starting, and the problem in words */
+export class SettingError extends Error {
   constructor(
     readonly key: string,
-    message: string,
-    readonly standIn: string
+    message: string
   ) {
     super(message)
   }
 }
 
 /**
+ * A required setting that is still empty. Carries a valid stand-in so the
+ * remaining rules can still be checked.
+ */
+export class MissingSettingError extends SettingError {
+  constructor(
+    key: string,
+    message: string,
+    readonly standIn: string
+  ) {
+    super(key, message)
+  }
+}
+
+/**
  * Validation for the settings screen. Uses the same rules as loadConfig and
- * returns problems per env var.
+ * returns problems per setting.
  */
 export function checkConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
   const parsed = EnvSchema.safeParse(providedValues(env))
@@ -389,12 +400,8 @@ export function checkConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
         probe[err.key] = err.standIn
         continue
       }
-      const message = (err as Error).message
-      // Treats the first env var name in the message as the main one.
-      const keys = new Set(Object.keys(EnvSchema.shape))
-      const key = message
-        .match(/[A-Z][A-Z0-9_]+/g)
-        ?.find((word) => keys.has(word))
+      const { message } = err as Error
+      const key = err instanceof SettingError ? err.key : undefined
       return [...issues, { key, message }]
     }
   }
@@ -404,9 +411,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = EnvSchema.safeParse(providedValues(env))
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((issue) => `- ${issue.path.join('.')}: ${issue.message}`)
+      .map(
+        (issue) => `- ${settingName(String(issue.path[0]))}: ${issue.message}`
+      )
       .join('\n')
-    throw new Error(`Some environment variables are invalid.\n${issues}`)
+    throw new Error(`Some settings are invalid.\n${issues}`)
   }
   const e = parsed.data
 
@@ -414,8 +423,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ? expandHome(e.MENTION_WORKSPACE)
     : undefined
   if (workspace && !isDirectory(workspace)) {
-    throw new Error(
-      `MENTION_WORKSPACE must be an absolute path to an existing directory: ${workspace}`
+    throw new SettingError(
+      'MENTION_WORKSPACE',
+      `The reference directory must be an absolute path to an existing folder: ${workspace}`
     )
   }
 
@@ -424,19 +434,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // in a public channel drives it as you. Answering anyone else, or a whole
   // workspace, is not a setting.
   if (env.MENTION_ANYONE?.trim().toLowerCase() === 'on')
-    throw new Error(
-      'MENTION_ANYONE is gone: Pace answers only you. Remove it, and keep your own Slack member ID in MENTION_ALLOWED_USERS.'
+    throw new SettingError(
+      'MENTION_ALLOWED_USERS',
+      'MENTION_ANYONE is gone: Pace answers only you. Remove it from the settings file.'
     )
   const owners = [...new Set(e.MENTION_ALLOWED_USERS)]
   if (slack.kind === 'app' && owners.length === 0)
     throw new MissingSettingError(
       'MENTION_ALLOWED_USERS',
-      'Say who you are: put your own Slack member ID in MENTION_ALLOWED_USERS (in Slack, your profile, then ⋮, Copy member ID). Pace answers only you.',
+      'Say who you are: add your own Slack member ID (in Slack, your profile, then ⋮, Copy member ID). Pace answers only you.',
       'U0STANDIN'
     )
   if (slack.kind === 'app' && owners.length > 1)
-    throw new Error(
-      'MENTION_ALLOWED_USERS takes one Slack member ID, your own: Pace answers only you. Teammates each run their own Pace through the team hub.'
+    throw new SettingError(
+      'MENTION_ALLOWED_USERS',
+      'Add one Slack member ID, your own: Pace answers only you. Teammates each run their own Pace through the team hub.'
     )
 
   const dataDir = e.PACENOTE_DATA_DIR
@@ -493,13 +505,13 @@ function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
     if (!e.HUB_URL)
       throw new MissingSettingError(
         'HUB_URL',
-        'HUB_URL is required to connect through the team hub.',
+        'Connecting through the team hub needs the hub URL.',
         'https://hub.invalid'
       )
     if (!e.HUB_TOKEN)
       throw new MissingSettingError(
         'HUB_TOKEN',
-        'HUB_TOKEN is missing: this desktop is not paired with the hub yet. Connect in Settings > Messengers > Slack.',
+        'This desktop is not paired with the hub yet. Connect in Settings > Messengers > Slack.',
         '0000000000000000000000000000000000000000000000000000000000000000'
       )
     return {
@@ -511,13 +523,13 @@ function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
   if (!e.SLACK_BOT_TOKEN)
     throw new MissingSettingError(
       'SLACK_BOT_TOKEN',
-      'SLACK_BOT_TOKEN is required for your own Slack app (SLACK_CONNECTION=app).',
+      'Your own Slack app needs its bot token.',
       'xoxb-stand-in'
     )
   if (!e.SLACK_APP_TOKEN)
     throw new MissingSettingError(
       'SLACK_APP_TOKEN',
-      'SLACK_APP_TOKEN is required for your own Slack app (SLACK_CONNECTION=app).',
+      'Your own Slack app needs its app token.',
       'xapp-stand-in'
     )
   return {
@@ -571,8 +583,9 @@ function buildReasonerConfig(
     // ops-broker uses SSH keys, a cluster read token, and the work directory.
     // It stays off without the sandbox; Pace answers only you either way.
     if (e.REASONER_SANDBOX === 'none') {
-      throw new Error(
-        'OPS_TOOLS=on requires the built-in sandbox: REASONER_SANDBOX=vm.'
+      throw new SettingError(
+        'OPS_TOOLS',
+        'Ops tools need the built-in sandbox: set the run environment to the built-in sandbox.'
       )
     }
     // The broker is relayed into each VM at this address (vm-broker.ts).
@@ -603,7 +616,7 @@ function buildReasonerConfig(
   if (e.REASONER === 'claude' && Object.keys(claudeEnv).length === 0) {
     throw new MissingSettingError(
       'SANDBOX_CLAUDE_OAUTH_TOKEN',
-      'Using claude in the built-in sandbox requires SANDBOX_CLAUDE_OAUTH_TOKEN (claude setup-token) or SANDBOX_ANTHROPIC_API_KEY.',
+      'claude in the built-in sandbox needs a claude token (claude setup-token) or an Anthropic API key.',
       'sk-ant-oat01-stand-in'
     )
   }
@@ -611,8 +624,9 @@ function buildReasonerConfig(
   const codexAuthFile = expandHome(e.SANDBOX_CODEX_AUTH_FILE)
   if (e.REASONER === 'codex') {
     if (!path.isAbsolute(codexAuthFile) || !existsSync(codexAuthFile)) {
-      throw new Error(
-        `Using codex in the built-in sandbox requires a codex login file: ${codexAuthFile}`
+      throw new SettingError(
+        'SANDBOX_CODEX_AUTH_FILE',
+        `codex in the built-in sandbox needs its login file: ${codexAuthFile}`
       )
     }
     if (!e.REASONER_MODEL) {

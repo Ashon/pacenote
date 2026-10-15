@@ -55,7 +55,7 @@ describe('loadConfig sandbox', () => {
 
   it('does not start the claude sandbox without its own credentials', () => {
     expect(() => loadConfig({ ...env, REASONER_SANDBOX: 'vm' })).toThrow(
-      /SANDBOX_CLAUDE_OAUTH_TOKEN/
+      /needs a claude token/
     )
     const config = loadConfig({
       ...env,

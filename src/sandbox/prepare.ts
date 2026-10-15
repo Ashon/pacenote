@@ -37,7 +37,7 @@ export async function prepareBrokerFiles(
     return
   }
   if (!env.OPS_SSH_ALLOWED_CIDR)
-    throw new Error('Set OPS_SSH_ALLOWED_CIDR to use an inventory.')
+    throw new Error('Set the allowed SSH range to use an inventory.')
 
   const hosts = await renderInventory(env, env.OPS_SSH_ALLOWED_CIDR, processEnv)
   writeFileSync(

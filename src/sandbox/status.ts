@@ -5,7 +5,8 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { configFingerprint, sandboxSetting } from '../config.js'
 import { readBotStatus } from '../runtime/status.js'
-import { readEnvFile, readEnvValues } from '../settings/env-file.js'
+import { SETTING_FIELDS } from '../settings/fields.js'
+import { readSettingsValues } from '../settings/settings-file.js'
 import {
   allowlistPath,
   brokerRuntimeDir,
@@ -21,15 +22,19 @@ import { defaultVmBin, vmStatus } from './vm.js'
 import { VM_BROKER_IMAGE, VM_IMAGE, VM_RENDERER_IMAGE } from './vm-images.js'
 import type { PendingApply, SandboxCheck, SandboxStatus } from './types.js'
 
-/** Settings Pace has not picked up: .env changed after it started */
+/** Settings Pace has not picked up: they changed after it started */
 export function computePending(bot?: {
   configHash?: string
   expectedHash: string
 }): PendingApply[] {
   return bot?.configHash && bot.configHash !== bot.expectedHash
-    ? [{ reason: 'The .env settings changed after Pace started.' }]
+    ? [{ reason: 'Settings changed after Pace started.' }]
     : []
 }
+
+/** A setting's name on the Settings screen */
+const labelOf = (key: string) =>
+  SETTING_FIELDS.find((field) => field.key === key)?.label ?? key
 
 type Run = (
   command: string,
@@ -62,8 +67,8 @@ const expandHome = (value: string, home: string) =>
 
 /**
  * The broker's commit author, resolved as it is when the broker starts:
- * OPS_GIT_AUTHOR_* in .env, otherwise the global git config. This repository's
- * local git config is not consulted.
+ * OPS_GIT_AUTHOR_* in the settings, otherwise the global git config. This
+ * repository's local git config is not consulted.
  */
 async function sandboxAuthor(
   values: NodeJS.ProcessEnv,
@@ -75,10 +80,14 @@ async function sandboxAuthor(
     values.OPS_GIT_AUTHOR_NAME?.trim() || (await fromGlobal('user.name'))
   const email =
     values.OPS_GIT_AUTHOR_EMAIL?.trim() || (await fromGlobal('user.email'))
-  const fromEnv = Boolean(
+  const fromSettings = Boolean(
     values.OPS_GIT_AUTHOR_NAME?.trim() || values.OPS_GIT_AUTHOR_EMAIL?.trim()
   )
-  return { name, email, source: fromEnv ? '.env' : 'global git config' }
+  return {
+    name,
+    email,
+    source: fromSettings ? 'Settings' : 'global git config',
+  }
 }
 
 /**
@@ -89,8 +98,8 @@ async function sandboxAuthor(
 export async function collectSandboxStatus(options: {
   /** The sandbox folder (the repository's, or the one inside the app) */
   sandboxDir: string
-  /** Config file (outside the repository, src/settings/paths.ts) */
-  envFile: string
+  /** Settings file (outside the repository, src/settings/paths.ts) */
+  settingsFile: string
   dataDir: string
   /**
    * The app's environment variables, applied with the same precedence as the
@@ -110,7 +119,7 @@ export async function collectSandboxStatus(options: {
   const { sandboxDir, run } = options
   const home = options.home ?? homedir()
   const values: NodeJS.ProcessEnv = {
-    ...readEnvValues(readEnvFile(options.envFile)),
+    ...readSettingsValues(options.settingsFile),
     ...options.env,
   }
   const reasoner = values.REASONER === 'codex' ? 'codex' : 'claude'
@@ -168,7 +177,7 @@ export async function collectSandboxStatus(options: {
       login: true,
       ok: set && state !== 'rejected',
       detail: !set
-        ? 'SANDBOX_CLAUDE_OAUTH_TOKEN required'
+        ? 'Not set'
         : state === 'accepted'
           ? 'Set, and Claude accepts it'
           : state === 'rejected'
@@ -201,7 +210,7 @@ export async function collectSandboxStatus(options: {
           ? `${hostCount} host${hostCount === 1 ? '' : 's'} (${fromInventory ? 'rebuilt from the inventory when Pace starts' : 'hosts.json managed by hand'})`
           : fromInventory
             ? 'None (built when Pace starts)'
-            : 'None (set OPS_SSH_INVENTORY or write hosts.json by hand)',
+            : `None (set ${labelOf('OPS_SSH_INVENTORY')} in Settings, or write hosts.json by hand)`,
     })
   }
   if (opsOn) {
@@ -228,7 +237,7 @@ export async function collectSandboxStatus(options: {
         detail:
           missing.length === 0
             ? `${values.OPS_JIRA_URL} (${values.OPS_JIRA_PROJECTS}, ${values.OPS_JIRA_EMAIL})`
-            : `${missing.join(', ')} required`,
+            : `${missing.map(labelOf).join(', ')} required`,
       })
     }
     const gh = await run('gh', [
@@ -254,7 +263,7 @@ export async function collectSandboxStatus(options: {
       detail:
         author.name && author.email
           ? `${author.name} <${author.email}> (${author.source})`
-          : 'OPS_GIT_AUTHOR_NAME and OPS_GIT_AUTHOR_EMAIL, or git config --global, required',
+          : 'The commit author name and email in Settings, or git config --global, required',
     })
   }
 

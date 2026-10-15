@@ -7,26 +7,35 @@ import { SettingsStore } from '../apps/desktop/src/settings.js'
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-desktop-settings-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-const ENV = `# Personal settings
-LLM_API_URL=https://llm.example.com
-LLM_API_KEY=keep-me
-
-SLACK_BOT_TOKEN=xoxb-1111-2222-abcd
-SLACK_APP_TOKEN=xapp-1-A0APP-3333-wxyz
-REASONER=claude
+const SETTINGS = `{
+  "slack": {
+    "botToken": "xoxb-1111-2222-abcd",
+    "appToken": "xapp-1-A0APP-3333-wxyz"
+  },
+  "answers": { "reasoner": "claude" },
+  "env": {
+    "LLM_API_URL": "https://llm.example.com",
+    "LLM_API_KEY": "keep-me"
+  }
+}
 `
 
-function store(env: NodeJS.ProcessEnv = {}) {
-  const envFile = path.join(root, `${Math.random().toString(36).slice(2)}.env`)
-  writeFileSync(envFile, ENV, { mode: 0o600 })
+function store(env: NodeJS.ProcessEnv = {}, text = SETTINGS) {
+  const settingsFile = path.join(
+    root,
+    `${Math.random().toString(36).slice(2)}.json`
+  )
+  writeFileSync(settingsFile, text, { mode: 0o600 })
   return {
-    envFile,
-    store: new SettingsStore({ envFile, dataDir: '/tmp/pacenote', env }),
+    settingsFile,
+    store: new SettingsStore({ settingsFile, dataDir: '/tmp/pacenote', env }),
   }
 }
 
+const read = (file: string) => JSON.parse(readFileSync(file, 'utf8'))
+
 describe('settings store', () => {
-  it('masks secrets and reports unhandled entries and environment overrides', () => {
+  it('masks secrets and reports environment overrides', () => {
     const { store: s } = store({ LOG_LEVEL: 'debug' })
     const view = s.view()
     expect(view.secrets.SLACK_BOT_TOKEN).toEqual({
@@ -37,8 +46,20 @@ describe('settings store', () => {
     expect(JSON.stringify(view)).not.toContain('xoxb-1111')
     expect(view.values.REASONER).toBe('claude')
     expect(view.values.LOG_LEVEL).toBe('')
-    expect(view.otherKeys).toEqual(['LLM_API_URL', 'LLM_API_KEY'])
     expect(view.overridden).toEqual(['LOG_LEVEL'])
+    expect(view.problem).toBeUndefined()
+  })
+
+  it('says why a file it cannot read is empty, and saves nothing over it', () => {
+    const broken = '{ "slack": { "botToken": "xoxb-1" }\n'
+    const { settingsFile, store: s } = store({}, broken)
+    const view = s.view()
+    expect(view.problem).toMatch(/not valid JSON/)
+    expect(view.secrets.SLACK_BOT_TOKEN).toEqual({ set: false })
+    expect(s.save({ TIMEZONE: 'UTC' })).toEqual([
+      { message: expect.stringMatching(/not valid JSON/) },
+    ])
+    expect(readFileSync(settingsFile, 'utf8')).toBe(broken)
   })
 
   it('validates with the bot rules and rejects unknown entries and required empty values', () => {
@@ -68,7 +89,7 @@ describe('settings store', () => {
   })
 
   it('saves only changed values and keeps the rest; writes nothing when validation fails', () => {
-    const { envFile, store: s } = store()
+    const { settingsFile, store: s } = store()
     expect(
       s.save({
         SLACK_BOT_TOKEN: 'xoxb-9999-new',
@@ -76,34 +97,27 @@ describe('settings store', () => {
         TIMEZONE: 'UTC',
       })
     ).toEqual([])
-    expect(
-      readFileSync(envFile, 'utf8').replace(
-        /^# .*\n(?=TIMEZONE=)/m,
-        '# <added>\n'
-      )
-    ).toBe(`# Personal settings
-LLM_API_URL=https://llm.example.com
-LLM_API_KEY=keep-me
-
-SLACK_BOT_TOKEN=xoxb-9999-new
-SLACK_APP_TOKEN=xapp-1-A0APP-3333-wxyz
-REASONER=
-
-# <added>
-TIMEZONE=UTC
-`)
-    const before = readFileSync(envFile, 'utf8')
+    expect(read(settingsFile)).toEqual({
+      slack: {
+        botToken: 'xoxb-9999-new',
+        appToken: 'xapp-1-A0APP-3333-wxyz',
+      },
+      answers: { timeZone: 'UTC' },
+      env: {
+        LLM_API_URL: 'https://llm.example.com',
+        LLM_API_KEY: 'keep-me',
+      },
+    })
+    const before = readFileSync(settingsFile, 'utf8')
     expect(s.save({ MENTION_CONCURRENCY: '-1' })).not.toEqual([])
-    expect(readFileSync(envFile, 'utf8')).toBe(before)
+    expect(readFileSync(settingsFile, 'utf8')).toBe(before)
   })
 
   it('saves you as the one Pace answers, and nothing that would answer more', () => {
-    const { store: s, envFile } = store()
+    const { store: s, settingsFile } = store()
     expect(s.save({ MENTION_ALLOWED_USERS: 'u0me' })).toEqual([])
-    expect(readFileSync(envFile, 'utf8')).toMatch(
-      /^MENTION_ALLOWED_USERS=u0me$/m
-    )
-    const before = readFileSync(envFile, 'utf8')
+    expect(read(settingsFile).slack.memberId).toBe('u0me')
+    const before = readFileSync(settingsFile, 'utf8')
     expect(s.save({ MENTION_ALLOWED_USERS: 'U0ME, U0BOB' })).toEqual([
       expect.objectContaining({ key: 'MENTION_ALLOWED_USERS' }),
     ])
@@ -114,10 +128,10 @@ TIMEZONE=UTC
         message: 'This entry cannot be changed from the Settings screen.',
       },
     ])
-    expect(readFileSync(envFile, 'utf8')).toBe(before)
+    expect(readFileSync(settingsFile, 'utf8')).toBe(before)
   })
 
-  it('validates with app environment variables taking precedence over .env', () => {
+  it('validates with app environment variables taking precedence over the file', () => {
     const { store: s } = store({
       REASONER_SANDBOX: 'vm',
       MENTION_ALLOWED_USERS: 'U1',

@@ -28,7 +28,7 @@ export function securePrivateDir(dir: string): void {
   tighten(dir, 0o700)
 }
 
-/** The same for a file that holds secrets (.env), when it exists */
+/** The same for a file that holds secrets (settings.json), when it exists */
 export function securePrivateFile(file: string): void {
   if (existsSync(file)) tighten(file, 0o600)
 }

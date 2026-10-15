@@ -10,8 +10,8 @@ import type { SettingsStore } from './settings.js'
 
 /**
  * Pairs this desktop with the team hub (docs/team-hub.md). The token is made
- * here and stays in the main process until it is saved to .env (HUB_TOKEN); the
- * UI only sees the code and who sent it.
+ * here and stays in the main process until it is saved to the settings file;
+ * the UI only sees the code and who sent it.
  */
 export class HubPairing {
   private pending?: {
@@ -57,7 +57,7 @@ export class HubPairing {
 
   /**
    * Confirms the member who sent the code, then saves the hub connection to
-   * .env.
+   * the settings file.
    */
   async confirm(): Promise<PairConfirmResponse & { issues: SettingsIssue[] }> {
     const pending = this.pending

@@ -98,7 +98,7 @@ declare global {
           changes: SettingsChanges,
           restart?: boolean
         ): Promise<{ issues: SettingsIssue[]; restarted: boolean }>
-        revealEnv(): Promise<void>
+        revealFile(): Promise<void>
         openDataDir(): Promise<void>
         /**
          * How AI tools launch Pacenote's MCP server. ready: the bundled server

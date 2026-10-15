@@ -36,7 +36,8 @@ Using the packaged app:
 
 - `Pacenote.app` contains the UI, the bot and sandbox job bundles (`pnpm bundle`) and the `sandbox/` files, so it runs without the repository, Node or pnpm.
   It needs a reasoner CLI login (claude or codex), and gh and git for the ops tools; the built-in sandbox comes with it.
-- Config (`~/.pacenote/.env`), history and the allowed domains list live outside the app (`PACENOTE_HOME`, default `~/.pacenote`), so they are kept when the app is reinstalled.
+- Settings (`~/.pacenote/settings.json`), history and the allowed domains list live outside the app (`PACENOTE_HOME`,
+  default `~/.pacenote`), so they are kept when the app is reinstalled.
 - Sandbox jobs (the built-in sandbox's setup, the broker's kubeconfig) run the job bundle inside the app with the app's Node.
   From the repository, the same jobs run with `pnpm sandbox:vm` and `pnpm k8s:kubeconfig`.
 - The packaged app uses its bundles as they are, so it has no "Rebuild and restart". After changing code, reinstall with `pnpm package:mac && pnpm install:mac`.
@@ -82,7 +83,8 @@ Bot management:
 - Opening the app starts the bot automatically. (Turn it off with "Start the bot when the app opens" under Settings > General. It is stored in `PACENOTE_DATA_DIR/desktop.json`)
 - The bot runs as an Electron utilityProcess. Development runs use the repository's `dist/index.js` and run `pnpm build` first when `src` is newer.
   The packaged app uses its bundled bot (`bot/index.mjs`) as is.
-  Environment variables are read from the config file (`~/.pacenote/.env`) like `node --env-file`, and existing environment variables take precedence.
+  Settings are read from the settings file (`~/.pacenote/settings.json`, see [Settings file](settings.md)), and
+  variables already set in the environment take precedence.
   PATH comes from the login shell. (So codex, gh and pnpm are found even when the app is launched from Finder)
 - The Pace screen has "Start", "Stop", "Restart" and "Rebuild and restart" (development runs only). The number of requests in progress is shown next to the menu bar icon.
   Pace's mark beside its name looks around while Pace starts or stops, and turns while it is connected: once in 16 seconds,
@@ -135,7 +137,9 @@ Bot management:
 
 Settings:
 
-- The gear icon at the bottom of the left rail ("Settings") edits the config file (`~/.pacenote/.env`). The app and terminal runs use the same file, so settings do not diverge.
+- The gear icon at the bottom of the left rail ("Settings") edits the settings file (`~/.pacenote/settings.json`, see
+  [Settings file](settings.md)). The app and terminal runs use the same file, so settings do not diverge. The screen
+  names settings by what they do; variable names stay in the file and the docs.
 - Settings has its own section list (`#/settings/<section>`): General for the app first, then the bot's sections.
 
   | Section | What it holds |
@@ -151,7 +155,7 @@ Settings:
   that still needs its setup, "Off" for an unused sandbox or ops tools, and per section the number of unsaved changes or a red dot for
   values to fix. Changes in several sections are saved together from the bar at the bottom, which also names the section with a problem.
 - Fields show only when they apply: sandbox limits and the reasoner login only for the built-in sandbox, and only the selected
-  reasoner's (claude token or codex login file). Hidden values stay in `.env`. Each ops integration card says whether its fields turn it
+  reasoner's (claude token or codex login file). Hidden values stay in the file. Each ops integration card says whether its fields turn it
   on ("On", "Incomplete", "Off"). Rarely changed values are collapsed under "Advanced".
   Fields, groups and sections are defined only in `src/settings/fields.ts`, and a test checks that their defaults match the bot config (`src/config.ts`).
 - Secret values such as tokens are never sent to the UI. Only the prefix and the last 4 characters are shown; enter a new value to change one.
@@ -161,14 +165,16 @@ Settings:
 - Before saving, values are validated with the same rules as the bot. Problems are shown next to the field and nothing is saved.
   A value that is only missing (a Slack token, the hub pairing, the sandbox's claude token) does not block saving the rest, so a setup
   can be saved a piece at a time; the bot shows "Setup needed" until it is complete.
-- Saving keeps comments, order, and entries the settings screen does not handle (such as personal API keys). Fields reset to their default are emptied as `KEY=`.
-  New entries are appended at the end, and the file mode (600) is kept.
+- Saving changes only what changed and keeps entries the settings screen does not handle (such as personal API keys
+  under `env`). Fields reset to their default leave the file, and it stays 600. A file that is not valid JSON is not
+  saved over; Settings > General says why.
 - Saved settings take effect after the bot restarts. "Save and restart Pace" does both at once.
-- A field also set in the app's environment variables takes precedence over `.env`, so the UI marks it.
-- Socket Mode keepalive values: `SOCKET_CLIENT_PING_TIMEOUT_MS` (default 5000), `SOCKET_SERVER_PING_TIMEOUT_MS` (default 30000),
-  `SOCKET_PING_PONG_LOG` (default off, visible with `LOG_LEVEL=debug`)
-- `SLACK_API_URL` (not on the screen): your own app's Slack Web API, default `https://slack.com/api/`; `https://slack-gov.com/api/`
-  for GovSlack. http is accepted only for this computer, which is how the end-to-end tests point the bot at a fake Slack.
+- A field also set in the app's environment variables takes precedence over the file, so the UI marks it.
+- Socket Mode keepalive values: `slack.clientPingTimeoutMs` (default 5000), `slack.serverPingTimeoutMs` (default 30000),
+  `logs.pingPong` (default off, visible with `logs.level` `debug`)
+- `env.SLACK_API_URL` (not on the screen): your own app's Slack Web API, default `https://slack.com/api/`;
+  `https://slack-gov.com/api/` for GovSlack. http is accepted only for this computer, which is how the end-to-end tests
+  point the bot at a fake Slack.
 - Settings are read and written only over the app's internal IPC, like bot control. The query API and the browser dev server cannot change settings.
 
 Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
@@ -178,7 +184,7 @@ Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
   under the choices, then, once chosen, what it has ([Reasoner sandbox](sandbox.md#built-in-sandbox)): the kernel, the init
   filesystem, the reasoner and diagram images and pacenote-vm. Settings that need Pace's restart show as pending at the
   top of the card, with "Restart Pace": when the config fingerprint (`configHash`) the bot wrote to its status file at
-  startup differs from the one computed from the current `.env`.
+  startup differs from the one computed from the current settings.
 - The reasoner login's check (the claude token, the codex login file) shows in the login card. The allowed domains apply
   from the next request.
 - The broker's checks (host list, kubeconfig, gh login, PR author) and "Rebuild kubeconfig" (`k8s:kubeconfig`) are in the
@@ -198,7 +204,7 @@ Status and logs:
 - Pace answers only you. With its own Slack app, the bot needs to know who you are: until "Who can ask" holds your Slack
   member ID (one only), the Overview shows "Set up Pace" with a way to Settings or back to setup, and the bot does not
   start. Setup fills it in from "@Pace it's me". `MENTION_ANYONE`, from when Pace could answer a whole workspace, is
-  removed from the settings file when the app starts.
+  dropped when an earlier version's `.env` moves into `settings.json`.
 - On this Mac, the status also says when the reasoner CLI is missing, signed out or (codex) too old, with what to do; it is
   checked at startup, every 5 minutes, and after an answer that went through.
 - Logs go to the console and to `PACENOTE_DATA_DIR/logs/bot.log`. (Past 5MB it rolls over to `bot.log.1`) The app's own
@@ -229,7 +235,7 @@ Run history:
   ("Resumed after a bot restart (attempt 2)"), and records that will not be resumed are marked "Interrupted" at startup.
 - Date directories older than `HISTORY_RETENTION_DAYS` (default 30 days) are deleted. Change the location with `PACENOTE_DATA_DIR`.
 - Records contain thread context and attachment contents, so they stay local: `~/.pacenote` and the data folder are kept to
-  your account (700, `.env` 600), set at every start of the app and the bot.
+  your account (700, `settings.json` 600), set at every start of the app and the bot.
 - Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
   which are most of the input and cost far less.
 - UI: run list (kind and status filters, search), "Overview" (last 14 days, success rate, average duration, top tools, new tokens per day for
@@ -241,8 +247,8 @@ Other:
 
 - The query API is served only inside the app at `pacenote://app/api/*`, with no open port. Bot control uses preload IPC only.
   The dev server (`apps/web` Vite) listens only on 127.0.0.1 and attaches the same query API read-only.
-- The data location is taken from the `PACENOTE_DATA_DIR` environment variable, then `PACENOTE_DATA_DIR` in the config file, then the
-  default home (`~/.pacenote`).
+- The data location is taken from the `PACENOTE_DATA_DIR` environment variable, then `dataDir` in the settings file, then
+  the default home (`~/.pacenote`).
 - App icon: `assets/pacenote-icon.svg` is the source. After editing it, `pnpm --filter @pacenote/desktop icon` (macOS swift) redraws
   the same shape on the macOS icon grid (an 824 body in 1024, shadow, highlight) as `assets/pacenote-icon.png`.
   Development runs use the PNG as the Dock icon as is, so this does the system's processing by hand.

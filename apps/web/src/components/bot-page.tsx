@@ -1,4 +1,4 @@
-import { setupSettingsRoute } from '@src/settings/fields'
+import { SETTING_FIELDS, setupSettingsRoute } from '@src/settings/fields'
 import type { BotStatus, LogLine, SupervisorState } from '@runtime/types'
 import {
   ArrowDownToLine,
@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils'
 import { describeBot, TONE_CLASS, type BotTone } from './bot-state'
 import { CodeBlock } from './code-block'
 import { PaceSpinner } from './pace-spinner'
+
+/** A setting as the Settings screen names it; one it does not show, by name */
+const settingLabel = (key: string) =>
+  SETTING_FIELDS.find((field) => field.key === key)?.label ?? key
 
 const SOCKET_LABEL: Record<BotStatus['socket']['state'], string> = {
   connecting: 'connecting',
@@ -184,7 +188,9 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
             {issues.map((issue) => (
               <li key={`${issue.key}:${issue.message}`}>
                 {issue.key && (
-                  <span className="font-mono font-medium">{issue.key}</span>
+                  <span className="font-medium">
+                    {settingLabel(issue.key)}:
+                  </span>
                 )}{' '}
                 {issue.message}
               </li>

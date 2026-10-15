@@ -26,6 +26,11 @@ import { withHub } from './support/hub.js'
 import { eventually, REPO } from './support/processes.js'
 import * as vm from './support/vm.js'
 import { vmUnsupported } from '../../src/sandbox/vm.js'
+import { readEnvValues } from '../../src/settings/env-file.js'
+import {
+  readSettingsValues,
+  settingsText,
+} from '../../src/settings/settings-file.js'
 import { World } from './support/world.js'
 
 /**
@@ -89,16 +94,19 @@ function appEnv(
 }
 
 /**
- * Opens the app on the world. settings: lines the settings file has besides
- * what any member would have set before (all but the Slack tokens, which the
- * setup tests enter); env: the app's environment on top; firstRun: setup is
- * not done yet, so the app opens on it (otherwise it is marked done, as for
- * someone who set Pacenote up before).
+ * Opens the app on the world. settings: lines (KEY=value) the settings file
+ * has besides what any member would have set before (all but the Slack
+ * tokens, which the setup tests enter); legacy: they are in the .env an
+ * earlier version kept, for the app to move into settings.json; env: the
+ * app's environment on top; firstRun: setup is not done yet, so the app opens
+ * on it (otherwise it is marked done, as for someone who set Pacenote up
+ * before).
  */
 async function launch(
   world: World,
   options: {
     settings?: string[]
+    legacy?: boolean
     env?: Record<string, string>
     firstRun?: boolean
   } = {}
@@ -113,24 +121,27 @@ async function launch(
   const given = new Set(
     (options.settings ?? []).map((line) => line.split('=')[0])
   )
-  writeFileSync(
-    path.join(world.home, '.env'),
-    [
-      ...[
-        'REASONER=claude',
-        'REASONER_SANDBOX=none',
-        'RENDER_DIAGRAMS=off',
-        'TIMEZONE=UTC',
-        `SLACK_API_URL=${world.slack.apiUrl}`,
-        `CLAUDE_BIN=${world.claudeBin}`,
-        `FAKE_CLAUDE_DIR=${world.claudeDir}`,
-        // Not a codex this Mac may have: setup finds none.
-        `CODEX_BIN=${path.join(world.root, 'no-codex')}`,
-      ].filter((line) => !given.has(line.split('=')[0])),
-      ...(options.settings ?? []),
-      '',
-    ].join('\n')
-  )
+  const lines = [
+    ...[
+      'REASONER=claude',
+      'REASONER_SANDBOX=none',
+      'RENDER_DIAGRAMS=off',
+      'TIMEZONE=UTC',
+      `SLACK_API_URL=${world.slack.apiUrl}`,
+      `CLAUDE_BIN=${world.claudeBin}`,
+      `FAKE_CLAUDE_DIR=${world.claudeDir}`,
+      // Not a codex this Mac may have: setup finds none.
+      `CODEX_BIN=${path.join(world.root, 'no-codex')}`,
+    ].filter((line) => !given.has(line.split('=')[0])),
+    ...(options.settings ?? []),
+    '',
+  ].join('\n')
+  if (options.legacy) writeFileSync(path.join(world.home, '.env'), lines)
+  else
+    writeFileSync(
+      path.join(world.home, 'settings.json'),
+      settingsText(readEnvValues(lines))
+    )
   app = await _electron.launch({
     executablePath: ELECTRON,
     args: [path.join(REPO, 'apps/desktop')],
@@ -204,16 +215,22 @@ async function enterSecret(
   else await row.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
+/** The settings the app saved, by name */
+const saved = (world: World) =>
+  readSettingsValues(path.join(world.home, 'settings.json'))
+
 describe.runIf(process.env.E2E_APP)('desktop app', () => {
   it('sets up Slack from a first run, starts the bot, and shows the answered mention', async () => {
     world = await World.create([
       { match: 'web-01', answer: '**Healthy**. Up 3 days.' },
     ])
     const { slack, ops, alice, bob } = world
-    // Left from when Pace could answer a whole workspace
+    // Left in an earlier version's .env from when Pace could answer a whole
+    // workspace
     const page = await launch(world, {
       firstRun: true,
       settings: ['MENTION_ANYONE=on'],
+      legacy: true,
     })
 
     // A first run opens on setup. Left for later, Overview holds the way back
@@ -266,11 +283,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByText('Socket Mode', { exact: true }).waitFor()
 
     // Pace answers only you: one member ID, and no switch for anyone else.
-    // The setting that answered a whole workspace left the file as the app
-    // started.
-    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).not.toMatch(
-      /MENTION_ANYONE/
-    )
+    // The .env moved into settings.json as the app started, without the
+    // setting that answered a whole workspace.
+    expect(existsSync(path.join(world.home, '.env'))).toBe(false)
+    expect(existsSync(path.join(world.home, '.env.bak'))).toBe(true)
+    expect(saved(world)).toMatchObject({ TIMEZONE: 'UTC' })
+    expect(saved(world)).not.toHaveProperty('MENTION_ANYONE')
     expect(
       await page.getByText('Anyone in the workspace may ask').count()
     ).toBe(0)
@@ -278,12 +296,10 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await owner.fill(`${alice.id}, ${bob.id}`)
     await page.getByRole('button', { name: 'Save and start Pace' }).click()
     await page
-      .getByText(/takes one Slack member ID, your own/)
+      .getByText(/one Slack member ID, your own/)
       .first()
       .waitFor()
-    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).not.toMatch(
-      /U0BOB/
-    )
+    expect(saved(world).MENTION_ALLOWED_USERS ?? '').not.toMatch(/U0BOB/)
     await owner.fill(alice.id)
     await page.getByRole('button', { name: 'Save and start Pace' }).click()
     await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
@@ -376,9 +392,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
     await page.getByText('@alice', { exact: true }).waitFor()
     expect(await page.getByRole('switch', { name: 'Diagrams' }).count()).toBe(0)
-    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).toContain(
-      `MENTION_ALLOWED_USERS=${alice.id}`
-    )
+    expect(saved(world).MENTION_ALLOWED_USERS).toBe(alice.id)
     await page.getByRole('button', { name: 'Start Pace', exact: true }).click()
 
     // 5. The first answer ends setup.
@@ -548,9 +562,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
     await page.getByText('@alice', { exact: true }).waitFor()
     expect(await page.getByText('@bob', { exact: true }).count()).toBe(0)
-    expect(readFileSync(path.join(world.home, '.env'), 'utf8')).toMatch(
-      new RegExp(`^MENTION_ALLOWED_USERS=${alice.id}$`, 'm')
-    )
+    expect(saved(world).MENTION_ALLOWED_USERS).toBe(alice.id)
     await page.getByRole('button', { name: 'Start Pace', exact: true }).click()
 
     // A first answer that fails says why, and the next one finishes setup.

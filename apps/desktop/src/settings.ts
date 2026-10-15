@@ -1,12 +1,11 @@
 import { checkConfig } from '../../../src/config.js'
 import { checkBrokerEnv } from '../../../src/sandbox/env.js'
 import {
-  envKeys,
-  readEnvFile,
-  readEnvValues,
-  updateEnvText,
-  writeEnvFile,
-} from '../../../src/settings/env-file.js'
+  readSettingsText,
+  readSettingsValues,
+  updateSettingsText,
+  writeSettingsFile,
+} from '../../../src/settings/settings-file.js'
 import {
   maskSecret,
   SETTING_FIELDS,
@@ -23,37 +22,35 @@ import {
 const FIELDS = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
 
 /**
- * Reads and writes .env for the Settings screen. The settings file outside the
- * repository (src/settings/paths.ts, default ~/.pacenote/.env) is the single
- * source of settings for the bot (both app and terminal).
+ * Reads and writes the settings file for the Settings screen. The file outside
+ * the repository (src/settings/paths.ts, default ~/.pacenote/settings.json) is
+ * the single source of settings for the bot (both app and terminal).
  * - Secrets are never sent to the UI. (only whether they are set and the last 4
  *   characters)
  * - Validates with the same rules as the bot and broker (checkConfig,
  *   checkBrokerEnv) before saving. App environment variables also take
- *   precedence over .env the same way.
- * - Entries, comments, and order the Settings screen does not handle are left
- *   as is.
+ *   precedence over the file the same way.
+ * - Entries the Settings screen does not handle are left as is.
  */
 export class SettingsStore {
   constructor(
     private readonly options: {
-      envFile: string
+      settingsFile: string
       dataDir: string
       env: NodeJS.ProcessEnv
     }
   ) {}
 
   view(): SettingsView {
-    const text = readEnvFile(this.options.envFile)
-    const values = readEnvValues(text)
+    const { values, problem } = this.read()
     const view: SettingsView = {
-      envFile: this.options.envFile,
-      exists: text !== '',
+      file: this.options.settingsFile,
+      exists: readSettingsText(this.options.settingsFile) !== '',
+      ...(problem ? { problem } : {}),
       dataDir: this.options.dataDir,
       values: {},
       secrets: {},
       overridden: [],
-      otherKeys: envKeys(text).filter((key) => !FIELDS.has(key)),
     }
     for (const field of SETTING_FIELDS) {
       const value = values[field.key] ?? ''
@@ -95,8 +92,11 @@ export class SettingsStore {
     const issues = this.check(parsed.changes)
     if (issues.length > 0) return issues
     try {
-      const text = readEnvFile(this.options.envFile)
-      writeEnvFile(this.options.envFile, updateEnvText(text, parsed.changes))
+      const file = this.options.settingsFile
+      writeSettingsFile(
+        file,
+        updateSettingsText(readSettingsText(file), parsed.changes)
+      )
       return []
     } catch (err) {
       return [{ message: (err as Error).message }]
@@ -125,8 +125,20 @@ export class SettingsStore {
     return { ...this.candidate({}), ...this.options.env }
   }
 
+  /**
+   * The file's values. One that cannot be read counts as empty, with why:
+   * saving then fails rather than write over it.
+   */
+  private read(): { values: Record<string, string>; problem?: string } {
+    try {
+      return { values: readSettingsValues(this.options.settingsFile) }
+    } catch (err) {
+      return { values: {}, problem: (err as Error).message }
+    }
+  }
+
   private candidate(changes: SettingsChanges): Record<string, string> {
-    const values = readEnvValues(readEnvFile(this.options.envFile))
+    const { values } = this.read()
     for (const [key, value] of Object.entries(changes)) {
       if (value === null) delete values[key]
       else values[key] = value

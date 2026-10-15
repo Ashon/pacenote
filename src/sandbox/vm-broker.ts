@@ -32,9 +32,9 @@ export interface VmBrokerOptions {
   /** Mirrors and worktrees for draft PRs, kept between runs */
   workDir: string
   /**
-   * Where its settings come from: .env's OPS_* and the environment. Its files
-   * (hosts.json, kubeconfig, placeholders for what is not set) are in
-   * brokerRuntimeDir(env), ~/.pacenote/ops-broker.
+   * Where its settings come from: the settings' OPS_* and the environment.
+   * Its files (hosts.json, kubeconfig, placeholders for what is not set) are
+   * in brokerRuntimeDir(env), ~/.pacenote/ops-broker.
    */
   env: NodeJS.ProcessEnv
   log?: Logger
@@ -263,9 +263,8 @@ export class VmBroker {
   }
 
   /**
-   * The broker's settings from .env, and the credentials it gets from this
-   * Mac: the gh login's token and the git
-   * author
+   * The broker's settings, and the credentials it gets from this Mac: the gh
+   * login's token and the git author
    */
   private values(
     expected: ReturnType<typeof brokerExpected>

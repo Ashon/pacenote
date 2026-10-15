@@ -1,4 +1,4 @@
-import { readEnvFile, readEnvValues } from '../settings/env-file.js'
+import { readSettingsValues } from '../settings/settings-file.js'
 
 export interface TasksSettings {
   /** AI tools may add tasks through Pacenote's MCP server (TASKS) */
@@ -17,9 +17,9 @@ export interface TasksSettings {
  */
 export function readTasksSettings(
   env: NodeJS.ProcessEnv,
-  envFile: string
+  settingsFile: string
 ): TasksSettings {
-  const file = readEnvValues(readEnvFile(envFile))
+  const file = readSettingsValues(settingsFile)
   const value = (key: string) => file[key]?.trim() || env[key]?.trim()
   return {
     on: value('TASKS') === 'on',

@@ -112,13 +112,14 @@ in the status bar's check issues) and in Settings > Sandbox's status ("Sandbox c
 each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
 is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
 
-From a terminal, `claude setup-token` prints the same token; put it in `SANDBOX_CLAUDE_OAUTH_TOKEN` in `~/.pacenote/.env`.
+From a terminal, `claude setup-token` prints the same token; put it in `sandbox.claudeToken` in
+`~/.pacenote/settings.json`.
 
 ## Before the built-in sandbox
 
-Pacenote used to offer a Docker sandbox. It is gone: `REASONER_SANDBOX=docker` is read as the built-in sandbox, and the
-desktop app rewrites it in `.env` when it starts. Nothing uses its containers, network and images any more, but the
-proxy and broker containers restart with Docker until removed:
+Pacenote used to offer a Docker sandbox. It is gone: `REASONER_SANDBOX=docker` is read as the built-in sandbox, and
+moving an earlier version's `.env` into `settings.json` rewrites it. Nothing uses its containers, network and images any
+more, but the proxy and broker containers restart with Docker until removed:
 
 ```sh
 docker rm -f pacenote-sandbox-egress-proxy-1 pacenote-sandbox-ops-broker-1

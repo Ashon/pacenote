@@ -3,9 +3,10 @@ import path from 'node:path'
 import { defaultHome } from './home.js'
 
 /**
- * Pacenote settings location outside the repository. Holds the config file
- * (.env) and ops-broker runtime files (host list, kubeconfig). It is kept out
- * of the repository so values from target environments do not end up in it.
+ * Pacenote settings location outside the repository. Holds the settings file
+ * (settings.json) and ops-broker runtime files (host list, kubeconfig). It is
+ * kept out of the repository so values from target environments do not end up
+ * in it.
  * Change the location with the PACENOTE_HOME environment variable. The default
  * is ~/.pacenote. (The sandbox jobs always get the resolved location)
  */
@@ -20,12 +21,15 @@ export function pacenoteHome(
     : path.resolve(value)
 }
 
-/** Config file shared by the bot, desktop app, and sandbox jobs */
-export function envFilePath(
+/**
+ * Settings file shared by the bot, desktop app, and sandbox jobs
+ * (settings-file.ts)
+ */
+export function settingsFilePath(
   env: NodeJS.ProcessEnv = process.env,
   home = homedir()
 ): string {
-  return path.join(pacenoteHome(env, home), '.env')
+  return path.join(pacenoteHome(env, home), 'settings.json')
 }
 
 /**

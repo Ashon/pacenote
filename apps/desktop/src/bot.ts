@@ -8,11 +8,11 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
-import { parseEnv } from 'node:util'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import { RECHECK_SANDBOX } from '../../../src/runtime/sandbox-health.js'
 import { readRunningBot } from '../../../src/runtime/status.js'
 import { botLockDirs } from '../../../src/settings/home.js'
+import { readSettingsValues } from '../../../src/settings/settings-file.js'
 import {
   nextRetry,
   setupProblem,
@@ -69,7 +69,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   private retryTimer?: NodeJS.Timeout
   private poller?: NodeJS.Timeout
   private state: SupervisorState
-  private readonly settingsFile: string
+  private readonly prefsFile: string
 
   constructor(
     private readonly options: {
@@ -83,7 +83,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       /** Bot working directory */
       cwd: string
       /** Settings file (outside the repository, src/settings/paths.ts) */
-      envFile: string
+      settingsFile: string
       dataDir: string
       /**
        * Login shell PATH (an app launched from Finder lacks the codex, gh and
@@ -94,7 +94,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     }
   ) {
     super()
-    this.settingsFile = path.join(options.dataDir, 'desktop.json')
+    this.prefsFile = path.join(options.dataDir, 'desktop.json')
     this.state = {
       phase: 'idle',
       output: [],
@@ -118,7 +118,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
 
   setAutoStart(value: boolean): void {
     writeFileSync(
-      this.settingsFile,
+      this.prefsFile,
       `${JSON.stringify({ autoStartBot: value }, null, 2)}\n`
     )
     this.set({ autoStart: value })
@@ -130,7 +130,12 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     this.refreshExternal()
     if (this.state.phase === 'external') return
     this.stopRequested = false
-    const problem = setupProblem(this.botEnv())
+    let problem: ReturnType<typeof setupProblem>
+    try {
+      problem = setupProblem(this.botEnv())
+    } catch (err) {
+      problem = { kind: 'config', message: (err as Error).message, issues: [] }
+    }
     if (problem) {
       this.set({
         phase: 'setup',
@@ -246,14 +251,13 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   }
 
   /**
-   * The bot's environment: the settings file under the app's own environment,
-   * as with node --env-file.
+   * The bot's environment: the settings file under the app's own environment.
+   * Throws when the file cannot be read.
    */
   private botEnv(): Record<string, string> {
-    const env: Record<string, string> = {}
-    const { envFile } = this.options
-    if (existsSync(envFile))
-      Object.assign(env, parseEnv(readFileSync(envFile, 'utf8')))
+    const env: Record<string, string> = {
+      ...readSettingsValues(this.options.settingsFile),
+    }
     for (const [key, value] of Object.entries(process.env)) {
       if (value !== undefined && !key.startsWith('ELECTRON_')) env[key] = value
     }
@@ -394,7 +398,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   private readSettings(): Settings {
     try {
       const parsed = JSON.parse(
-        readFileSync(this.settingsFile, 'utf8')
+        readFileSync(this.prefsFile, 'utf8')
       ) as Partial<Settings>
       return { autoStartBot: parsed.autoStartBot ?? true }
     } catch {

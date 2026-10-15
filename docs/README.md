@@ -13,6 +13,7 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
   read what Pace did
 - [Your tasks from Slack](tasks.md): what people asked of you, collected by your AI tool over MCP, on the Todo screen
 - [Installation](installation.md): Homebrew in detail, running from source, restarts and the run lock
+- [Settings file](settings.md): `~/.pacenote/settings.json`, every setting's place, and environment variables over it
 - [Desktop app](desktop-app.md): the app's screens, bot management, settings, sandbox controls, packaging
 - [Development](development.md): checks, end-to-end tests and coverage, adding a messenger
 - [Releases](releases): release notes

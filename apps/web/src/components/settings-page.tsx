@@ -83,7 +83,8 @@ import {
 const bridge = () => window.pacenoteDesktop?.settings
 
 /**
- * Settings sections: the bot's own (.env), then the desktop app's preferences.
+ * Settings sections: the bot's own (the settings file), then the desktop app's
+ * preferences.
  */
 type Section = SettingSection | 'general'
 
@@ -161,10 +162,10 @@ interface Hint {
 }
 
 /**
- * Settings screen that edits the settings file (~/.pacenote/.env). Available
- * only in the desktop app. draft holds the values changed in the UI. An empty
- * string means revert to default. Changes are kept across sections and saved
- * together from the bar at the bottom.
+ * Settings screen that edits the settings file (~/.pacenote/settings.json).
+ * Available only in the desktop app. draft holds the values changed in the UI.
+ * An empty string means revert to default. Changes are kept across sections
+ * and saved together from the bar at the bottom.
  */
 export function SettingsPage() {
   const settings = bridge()
@@ -236,8 +237,8 @@ export function SettingsPage() {
   if (!view) return null
 
   /**
-   * The value in effect once the draft is saved: the draft, else .env, else the
-   * default. Secrets read "set" or "".
+   * The value in effect once the draft is saved: the draft, else the file,
+   * else the default. Secrets read "set" or "".
    */
   const valueOf = (key: string): string => {
     const field = FIELD.get(key)
@@ -705,10 +706,7 @@ export function SettingsPage() {
             help="Stored with the run history, not in the settings file."
           />
           <div className="divide-y divide-border">
-            <Row
-              label="Theme"
-              help="System follows the macOS appearance. PACENOTE_DESKTOP_THEME in the environment overrides it."
-            >
+            <Row label="Theme" help="System follows the macOS appearance.">
               <ThemePicker />
             </Row>
             {loginItem.state && (
@@ -771,16 +769,17 @@ export function SettingsPage() {
                   ? 'Everything under Pace is saved here.'
                   : "Does not exist yet. Saving any of Pace's settings creates it."
               }
+              issue={view.problem}
             >
               <PathControl
-                path={view.envFile}
+                path={view.file}
                 label="Show in Finder"
-                onOpen={() => void settings.revealEnv()}
+                onOpen={() => void settings.revealFile()}
               />
             </Row>
             <Row
               label="Run history folder"
-              help="PACENOTE_DATA_DIR. To change it, edit the settings file and relaunch the app."
+              help="To move it, change it in the settings file and relaunch the app."
             >
               <PathControl
                 path={view.dataDir}
@@ -788,18 +787,6 @@ export function SettingsPage() {
                 onOpen={() => void settings.openDataDir()}
               />
             </Row>
-            {view.otherKeys.length > 0 && (
-              <Row
-                label="Other entries in the settings file"
-                help="Settings this screen does not handle. Saving keeps them as they are."
-              >
-                <span className="max-w-72 text-right font-mono text-xs text-muted-foreground">
-                  <span className="select-text">
-                    {view.otherKeys.join(', ')}
-                  </span>
-                </span>
-              </Row>
-            )}
           </div>
         </section>
       </>
@@ -1198,7 +1185,7 @@ function credentialsHelp(reasoner: string): string {
 /**
  * Gets the sandbox's claude token from the Claude subscription: the app runs
  * claude setup-token, the user approves in the browser, and the token is saved
- * to .env in the main process (it never reaches this screen).
+ * to the settings file in the main process (it never reaches this screen).
  */
 function ClaudeTokenSetup({
   hasToken,
@@ -1634,29 +1621,19 @@ function FieldRow({
     </span>
   )
   const warning = overridden
-    ? 'This variable is set in the app environment and takes precedence over the settings file.'
+    ? 'Pacenote was started with its own value for this, which wins over the one saved here.'
     : undefined
-  // Options that explain themselves are laid out as cards. The card's title
-  // names the choice, and the variable stays visible below for editing the
-  // settings file by hand.
+  // Options that explain themselves are laid out as cards; the card's title
+  // names the choice.
   if (field.type === 'select' && field.options?.some((option) => option.help)) {
     return (
-      <div className="px-4 py-3">
+      <div data-setting={field.key} className="px-4 py-3">
         <Choice
           field={field}
           value={value}
           onChange={onChange}
           footers={extras?.footers}
         />
-        <div className="mt-2 flex items-center gap-1.5 font-mono text-2xs text-muted-foreground/80">
-          <span className="select-text">{field.key}</span>
-          {changed && (
-            <span
-              className="size-1.5 rounded-full bg-primary"
-              aria-label="Changed"
-            />
-          )}
-        </div>
         <RowNotes warning={warning} issue={issue} />
         {extras?.below}
       </div>
@@ -1665,7 +1642,7 @@ function FieldRow({
   return (
     <Row
       label={label}
-      sub={field.key}
+      setting={field.key}
       help={field.help}
       issue={issue}
       warning={warning}
@@ -1879,14 +1856,15 @@ function Control({
 
 function Row({
   label,
-  sub,
+  setting,
   help,
   issue,
   warning,
   children,
 }: {
   label: React.ReactNode
-  sub?: string
+  /** The setting the row edits, for finding it (never shown) */
+  setting?: string
   help?: string
   issue?: string
   warning?: string
@@ -1894,16 +1872,11 @@ function Row({
 }) {
   return (
     <div
-      data-setting={sub}
+      data-setting={setting}
       className="flex items-start gap-4 px-4 py-3 @max-[36rem]/content:flex-col @max-[36rem]/content:gap-2"
     >
       <div className="min-w-0 flex-1 @max-[36rem]/content:w-full">
         <div className="text-sm font-medium">{label}</div>
-        {sub && (
-          <div className="font-mono text-2xs text-muted-foreground/80 select-text">
-            {sub}
-          </div>
-        )}
         {help && <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>}
         <RowNotes warning={warning} issue={issue} />
       </div>

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { settingsText } from '../src/settings/settings-file.js'
 
 /** The bot processes the supervisor forked, as stand-ins */
 const forked: FakeChild[] = []
@@ -43,15 +44,19 @@ const supervisors: InstanceType<typeof BotSupervisor>[] = []
 
 /** A supervisor whose settings would start the bot */
 function supervisor() {
-  const envFile = path.join(root, '.env')
+  const settingsFile = path.join(root, 'settings.json')
   writeFileSync(
-    envFile,
-    'SLACK_BOT_TOKEN=xoxb-1-abc\nSLACK_APP_TOKEN=xapp-1-abc\nMENTION_ALLOWED_USERS=U1\n'
+    settingsFile,
+    settingsText({
+      SLACK_BOT_TOKEN: 'xoxb-1-abc',
+      SLACK_APP_TOKEN: 'xapp-1-abc',
+      MENTION_ALLOWED_USERS: 'U1',
+    })
   )
   const made = new BotSupervisor({
     entry: path.join(root, 'bot.mjs'),
     cwd: root,
-    envFile,
+    settingsFile,
     dataDir: root,
     toolPath: () => '/usr/bin:/bin',
     log: () => undefined,

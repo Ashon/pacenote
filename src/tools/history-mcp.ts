@@ -3,10 +3,10 @@ import path from 'node:path'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createHistoryServer } from '../history/mcp.js'
 import { HistoryReader } from '../history/reader.js'
-import { readEnvFile, readEnvValues } from '../settings/env-file.js'
 import { defaultHome } from '../settings/home.js'
-import { loadEnv } from '../settings/load-env.js'
-import { envFilePath } from '../settings/paths.js'
+import { loadSettings } from '../settings/load-settings.js'
+import { settingsFilePath } from '../settings/paths.js'
+import { readSettingsValues } from '../settings/settings-file.js'
 import { readTasksSettings } from '../tasks/settings.js'
 
 /**
@@ -17,25 +17,25 @@ import { readTasksSettings } from '../tasks/settings.js'
  * pnpm mcp.
  * - The history is the one the desktop app shows: PACENOTE_DATA_DIR, or the
  *   home (~/.pacenote).
- * - Sharing (HISTORY_SHARE) is read from the config file on every call, so the
- *   switch in Settings applies without restarting the client. A value set in
- *   the environment at launch wins.
+ * - Sharing (HISTORY_SHARE) is read from the settings file on every call, so
+ *   the switch in Settings applies without restarting the client. A value set
+ *   in the environment at launch wins.
  * stdout carries the protocol; warnings go to stderr.
  */
 const launched = process.env.HISTORY_SHARE
-const envFile = envFilePath()
-loadEnv()
+const settingsFile = settingsFilePath()
+loadSettings()
 
 const data = dataDir(process.env.PACENOTE_DATA_DIR)
 const server = createHistoryServer({
   reader: new HistoryReader(data),
   enabled: () =>
-    (launched ?? readEnvValues(readEnvFile(envFile)).HISTORY_SHARE) === 'on',
+    (launched ?? readSettingsValues(settingsFile).HISTORY_SHARE) === 'on',
   version: process.env.PACENOTE_VERSION ?? 'dev',
   tasks: {
     dataDir: data,
     home: homedir(),
-    settings: () => readTasksSettings(process.env, envFile),
+    settings: () => readTasksSettings(process.env, settingsFile),
   },
 })
 await server.connect(new StdioServerTransport())

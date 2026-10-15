@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -32,12 +32,6 @@ import {
 } from '../../../src/runtime/status.js'
 import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
 import {
-  migrateEnvText,
-  readEnvFile,
-  readEnvValues,
-  writeEnvFile,
-} from '../../../src/settings/env-file.js'
-import {
   secretValues,
   setupSettingsRoute,
 } from '../../../src/settings/fields.js'
@@ -46,7 +40,11 @@ import {
   securePrivateDir,
   securePrivateFile,
 } from '../../../src/settings/home.js'
-import { envFilePath } from '../../../src/settings/paths.js'
+import { settingsFilePath } from '../../../src/settings/paths.js'
+import {
+  moveEnvSettings,
+  readSettingsValues,
+} from '../../../src/settings/settings-file.js'
 import { BotSupervisor, type SupervisorState } from './bot.js'
 import {
   currentTroubles,
@@ -145,16 +143,28 @@ const webDistDir = paths.webDist
  * The settings file lives outside the repository. (PACENOTE_HOME, default
  * ~/.pacenote)
  */
-const envFile = envFilePath()
+const settingsFile = settingsFilePath()
 const webDevUrl = app.isPackaged ? undefined : process.env.PACENOTE_WEB_DEV_URL
 /** Saves the window as a PNG and quits. (for checking builds) */
 const captureFile = process.env.PACENOTE_DESKTOP_CAPTURE
-const dataDir = resolveDataDir()
 // Settings, run history and logs stay with this account: other accounts on
 // this Mac cannot list or read them.
-securePrivateDir(path.dirname(envFile))
+securePrivateDir(path.dirname(settingsFile))
+/**
+ * An earlier version's .env becomes settings.json, once, before anything reads
+ * it; logged once the log is open. Settings that changed meaning are rewritten
+ * as Pace reads them now.
+ */
+const moved = (() => {
+  try {
+    return { notes: moveEnvSettings(settingsFile) }
+  } catch (err) {
+    return { notes: [], error: (err as Error).message }
+  }
+})()
+const dataDir = resolveDataDir()
 securePrivateDir(dataDir)
-securePrivateFile(envFile)
+securePrivateFile(settingsFile)
 /**
  * The app's own log, kept beside Pace's in the data folder so the installed
  * app's messages are not lost with its console. Open logs folder shows both.
@@ -164,17 +174,9 @@ const log = createLogger('info', 'desktop', [
   fileSink(path.join(dataDir, DESKTOP_LOG_FILE)),
 ])
 log.info(`Starting ${app.getVersion()} (pid ${process.pid})`)
-// Settings that changed meaning are rewritten as Pace reads them now: the
-// Docker sandbox is the built-in one, and answering anyone but you is gone.
-try {
-  const migrated = migrateEnvText(readEnvFile(envFile))
-  if (migrated.changed) {
-    writeEnvFile(envFile, migrated.text)
-    for (const note of migrated.notes) log.info(`Settings: ${note}`)
-  }
-} catch (err) {
-  log.warn(`Could not update the settings file: ${(err as Error).message}`)
-}
+for (const note of moved.notes) log.info(`Settings: ${note}`)
+if (moved.error)
+  log.warn(`Could not move the settings to settings.json: ${moved.error}`)
 /**
  * Another version put in this app's place while it runs (BundleWatch): Pace
  * stops as on any quit, and the app opens again as the new version. The
@@ -286,11 +288,11 @@ function toolPath(): string {
 }
 
 /**
- * Settings screen that edits the settings file (.env). Works even when the bot
- * is not managed.
+ * Settings screen that edits the settings file. Works even when the bot is not
+ * managed.
  */
 const settings = new SettingsStore({
-  envFile,
+  settingsFile,
   dataDir,
   env: process.env,
 })
@@ -327,7 +329,7 @@ function claimStep<T>(run: () => Promise<T>): Promise<T> {
 }
 /**
  * Settings > Sandbox "Get token from Claude": runs claude setup-token and saves
- * its token to .env
+ * its token to the settings file
  */
 const claudeToken = new ClaudeTokenSetup({
   toolPath: () => toolPath(),
@@ -368,7 +370,7 @@ const taskCollector = new TaskCollector({
 const sandbox = new SandboxService({
   sandboxDir: paths.sandboxDir,
   jobRunner: paths.jobRunner,
-  envFile,
+  settingsFile,
   dataDir,
   env: process.env,
   toolPath,
@@ -380,7 +382,7 @@ const supervisor = manageBot
       repoRoot: paths.repoRoot,
       // The packaged app runs the bot from the writable data folder.
       cwd: paths.repoRoot ?? dataDir,
-      envFile,
+      settingsFile,
       dataDir,
       toolPath,
       log: (message) => log.info(message),
@@ -395,22 +397,16 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 /**
- * Resolved from the environment variable, then PACENOTE_DATA_DIR in the
- * settings file, then the default home (~/.pacenote).
+ * Resolved from the environment variable, then the data folder in the settings
+ * file, then the default home (~/.pacenote).
  */
 function resolveDataDir(): string {
-  const key = 'PACENOTE_DATA_DIR'
-  let value = process.env[key]
+  let value = process.env.PACENOTE_DATA_DIR
   if (!value) {
     try {
-      value = readFileSync(envFile, 'utf8')
-        .split('\n')
-        .find((l) => l.startsWith(`${key}=`))
-        ?.slice(key.length + 1)
-        .trim()
-        .replace(/^["']|["']$/g, '')
+      value = readSettingsValues(settingsFile).PACENOTE_DATA_DIR?.trim()
     } catch {
-      // Without .env, the default is used.
+      // A file that cannot be read leaves the default.
     }
   }
   if (!value) return defaultHome()
@@ -695,7 +691,13 @@ function diagnostics(): string {
     },
     supervisor: supervisor?.current,
     bot: readBotStatus(dataDir),
-    settings: readEnvValues(readEnvFile(envFile)),
+    settings: (() => {
+      try {
+        return readSettingsValues(settingsFile)
+      } catch {
+        return {}
+      }
+    })(),
     secrets: secretValues(settings.effectiveEnv()),
     logs: [
       {
@@ -1362,8 +1364,8 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:settings:open-data-dir', (event) => {
     if (fromMainWindow(event)) void shell.openPath(dataDir)
   })
-  ipcMain.handle('pacenote:settings:reveal-env', (event) => {
-    if (fromMainWindow(event)) shell.showItemInFolder(envFile)
+  ipcMain.handle('pacenote:settings:reveal-file', (event) => {
+    if (fromMainWindow(event)) shell.showItemInFolder(settingsFile)
   })
   // The settings screen turns the launch into commands to add it by hand.
   ipcMain.handle('pacenote:settings:history-mcp', (event) =>

@@ -69,7 +69,9 @@ reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:312
   It has the `repo` and `workflow` scopes, so in production a fine-grained PAT limited to the target repositories is recommended instead.
 - Workspaces are cleaned up after 24 hours.
 
-Setup: no value of the target environment lives in the code; all of them go into `OPS_*` in the config file (`~/.pacenote/.env`). Each feature is optional, and the broker starts without the tools of any feature left empty.
+Setup: no value of the target environment lives in the code; all of them go into `ops` in the settings file
+(`~/.pacenote/settings.json`, from Settings > Ops tools; [Settings file](settings.md) maps each `OPS_*` name below to
+its place). Each feature is optional, and the broker starts without the tools of any feature left empty.
 Files the broker generates, such as the host list and kubeconfig, are also created outside the repository, in `~/.pacenote/ops-broker/`.
 
 | Feature | Settings | If empty |

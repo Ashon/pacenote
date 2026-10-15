@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:settings:check-slack', changes),
     save: (changes: unknown, restart = false) =>
       ipcRenderer.invoke('pacenote:settings:save', changes, restart),
-    revealEnv: () => ipcRenderer.invoke('pacenote:settings:reveal-env'),
+    revealFile: () => ipcRenderer.invoke('pacenote:settings:reveal-file'),
     openDataDir: () => ipcRenderer.invoke('pacenote:settings:open-data-dir'),
     historyMcp: () => ipcRenderer.invoke('pacenote:settings:history-mcp'),
   },
@@ -152,8 +152,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     run: (kind: string) => ipcRenderer.invoke('pacenote:sandbox:run', kind),
     saveAllowlist: (domains: string[]) =>
       ipcRenderer.invoke('pacenote:sandbox:save-allowlist', domains),
-    // Runs claude setup-token; the token goes to .env in the main process and
-    // never comes back here.
+    // Runs claude setup-token; the token goes to the settings file in the main
+    // process and never comes back here.
     claudeToken: () => ipcRenderer.invoke('pacenote:sandbox:claude-token'),
     cancelClaudeToken: () =>
       ipcRenderer.invoke('pacenote:sandbox:claude-token-cancel'),

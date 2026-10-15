@@ -17,7 +17,7 @@ Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSo
 - Pairing: in Pacenote, Settings > Messengers > Slack > Team hub, enter the hub URL and choose Connect. Pacenote shows a code; send
   `@Pace connect <code>` in a channel Pacenote is in, then confirm in Pacenote that the Slack account shown is yours.
   The confirmation is what counts, so a code someone else saw and sent first is turned down on the desktop.
-  The desktop keeps a random token in `.env` (`HUB_TOKEN`); the hub stores only its SHA-256.
+  The desktop keeps a random token in its settings file (`slack.hub.token`); the hub stores only its SHA-256.
 - One desktop per member: pairing again replaces the previous desktop. Settings > Messengers > Slack > Disconnect unpairs it.
 - The hub sees mentions and thread content in transit (as Slack's own servers do) and stores only paired desktops.
   Grants are kept in memory, so restarting the hub ends edits to answers in progress.

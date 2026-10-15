@@ -1,18 +1,32 @@
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { checkConfig, EnvSchema } from '../src/config.js'
 import { BrokerEnvSchema } from '../src/sandbox/env.js'
 import {
-  envKeys,
-  formatEnvValue,
-  migrateEnvText,
+  migrateEnvValues,
   readEnvFile,
   readEnvValues,
-  updateEnvText,
-  writeEnvFile,
 } from '../src/settings/env-file.js'
+import {
+  moveEnvSettings,
+  parseSettings,
+  readSettingsValues,
+  SETTING_PLACES,
+  settingName,
+  settingsText,
+  settingsValues,
+  updateSettingsText,
+  writeSettingsFile,
+} from '../src/settings/settings-file.js'
 import { MESSENGER_IDS } from '../src/messengers/ids.js'
 import {
   maskSecret,
@@ -28,103 +42,164 @@ import {
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-settings-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-const ENV = `# Personal LLM settings
-LLM_API_URL=https://llm.example.com
-LLM_API_KEY=secret-value
+describe('settings file', () => {
+  it('keeps each setting at its place, as true/false, numbers and lists', () => {
+    const text = settingsText({
+      SLACK_BOT_TOKEN: 'xoxb-1',
+      MENTION_ALLOWED_USERS: 'U1',
+      TASKS: 'on',
+      TASKS_PLAN_FIRST: 'off',
+      TASKS_EXCLUDE_CHANNELS: '#random, C9',
+      REASONER_TIMEOUT_SEC: '600',
+      LLM_API_URL: 'https://llm.example.com',
+    })
+    expect(JSON.parse(text)).toEqual({
+      slack: { botToken: 'xoxb-1', memberId: 'U1' },
+      answers: { timeoutSec: 600 },
+      tasks: {
+        enabled: true,
+        leaveOutChannels: ['#random', 'C9'],
+        planFirst: false,
+      },
+      env: { LLM_API_URL: 'https://llm.example.com' },
+    })
+    expect(settingsValues(JSON.parse(text))).toEqual({
+      SLACK_BOT_TOKEN: 'xoxb-1',
+      MENTION_ALLOWED_USERS: 'U1',
+      TASKS: 'on',
+      TASKS_PLAN_FIRST: 'off',
+      TASKS_EXCLUDE_CHANNELS: '#random, C9',
+      REASONER_TIMEOUT_SEC: '600',
+      LLM_API_URL: 'https://llm.example.com',
+    })
+  })
 
-# ---- Slack ----
-SLACK_BOT_TOKEN=xoxb-old
-SLACK_APP_TOKEN=xapp-1-A1-old
-REASONER=codex
-REASONER=claude
-LOG_LEVEL=info
+  it('changes only what changed, and keeps what the app does not know', () => {
+    const text = `{
+  "slack": { "botToken": "xoxb-old", "note": "mine" },
+  "answers": { "reasoner": "codex" },
+  "logs": { "level": "debug" },
+  "env": { "LLM_API_KEY": "secret-value", "SLACK_APP_TOKEN": "xapp-old" }
+}
 `
-
-describe('.env editing', () => {
-  it('changes only values and keeps comments, order, and unhandled entries', () => {
-    const next = updateEnvText(ENV, {
-      SLACK_BOT_TOKEN: 'xoxb-new',
-      REASONER: 'codex',
-      LOG_LEVEL: null,
-      MENTION_ALLOWED_USERS: 'U1, U2',
+    const next = JSON.parse(
+      updateSettingsText(text, {
+        SLACK_BOT_TOKEN: 'xoxb-new',
+        SLACK_APP_TOKEN: 'xapp-new',
+        LOG_LEVEL: null,
+        REASONER: '',
+        CLAUDE_BIN: '/opt/claude',
+      })
+    )
+    expect(next).toEqual({
+      slack: { botToken: 'xoxb-new', note: 'mine', appToken: 'xapp-new' },
+      env: { LLM_API_KEY: 'secret-value', CLAUDE_BIN: '/opt/claude' },
     })
-    expect(next).toBe(`# Personal LLM settings
-LLM_API_URL=https://llm.example.com
-LLM_API_KEY=secret-value
+  })
 
-# ---- Slack ----
-SLACK_BOT_TOKEN=xoxb-new
-SLACK_APP_TOKEN=xapp-1-A1-old
-REASONER=codex
-LOG_LEVEL=
-
-# Added from the Pacenote app settings screen
-MENTION_ALLOWED_USERS='U1, U2'
-`)
-    expect(readEnvValues(next)).toMatchObject({
-      LLM_API_KEY: 'secret-value',
-      REASONER: 'codex',
-      LOG_LEVEL: '',
-      MENTION_ALLOWED_USERS: 'U1, U2',
+  it('reads values written by hand, and a name under env, the way Pace reads them', () => {
+    expect(
+      settingsValues({
+        slack: { memberId: ['U1'], clientPingTimeoutMs: '7000' },
+        ops: { enabled: false, github: { owners: 'acme, tools' } },
+        history: { retentionDays: null },
+        env: { TASKS: true, SANDBOX_CPUS: 4 },
+        tasks: { enabled: false },
+      })
+    ).toEqual({
+      MENTION_ALLOWED_USERS: 'U1',
+      SOCKET_CLIENT_PING_TIMEOUT_MS: '7000',
+      OPS_TOOLS: 'off',
+      OPS_GIT_ALLOWED_OWNERS: 'acme, tools',
+      TASKS: 'off',
+      SANDBOX_CPUS: '4',
     })
-    expect(envKeys(next)).toContain('LLM_API_URL')
-    expect(updateEnvText('', { A: '1' })).toBe(
-      '# Added from the Pacenote app settings screen\nA=1\n'
+  })
+
+  it('says what is wrong with a file that is not an object', () => {
+    expect(parseSettings('')).toEqual({})
+    expect(() => parseSettings('{ "slack": ')).toThrow(/not valid JSON/)
+    expect(() => parseSettings('[]')).toThrow(/one object/)
+    expect(() => updateSettingsText('nope', { TASKS: 'on' })).toThrow(
+      /not valid JSON/
     )
   })
 
-  it('quotes special characters and reads back the same value as node', () => {
-    for (const value of [
-      'a "b" c',
-      'x#y',
-      'back\\slash',
-      '~/.codex/auth.json',
-      'Asia/Seoul',
-    ]) {
-      expect(readEnvValues(`K=${formatEnvValue(value)}\n`).K).toBe(value)
-    }
-    expect(formatEnvValue('xoxb-1-abc')).toBe('xoxb-1-abc')
-    expect(formatEnvValue('~/.codex/auth.json')).toBe('~/.codex/auth.json')
-    expect(() => formatEnvValue('a\nb')).toThrow(/line break/)
+  it('gives every setting a place of its own, none inside another', () => {
+    const paths = [...SETTING_PLACES.values()].map((place) =>
+      place.path.join('.')
+    )
+    expect(new Set(paths).size).toBe(paths.length)
+    for (const a of paths)
+      for (const b of paths) expect(b.startsWith(`${a}.`)).toBe(false)
+    expect(paths.some((path) => path.startsWith('env.'))).toBe(false)
+    expect(settingName('SLACK_BOT_TOKEN')).toBe('slack.botToken')
+    expect(settingName('CLAUDE_BIN')).toBe('CLAUDE_BIN')
   })
 
-  it('keeps the existing mode and writes new files as 600', () => {
-    const file = path.join(root, '.env')
-    writeEnvFile(file, 'A=1\n')
+  it('writes the file for this account alone, whole or not at all', () => {
+    const file = path.join(root, 'settings.json')
+    writeSettingsFile(file, '{}\n')
     expect(statSync(file).mode & 0o777).toBe(0o600)
-    writeFileSync(file, 'A=1\n', { mode: 0o640 })
-    writeEnvFile(file, 'A=2\n')
-    expect(readEnvFile(file)).toBe('A=2\n')
-    expect(readEnvFile(path.join(root, 'missing'))).toBe('')
+    writeFileSync(file, '{}\n', { mode: 0o640 })
+    writeSettingsFile(file, '{ "tasks": { "enabled": true } }\n')
+    expect(readSettingsValues(file)).toEqual({ TASKS: 'on' })
+    expect(existsSync(`${file}.tmp`)).toBe(false)
   })
 
-  it('rewrites the Docker sandbox, which is gone, as the built-in one', () => {
-    const text = '# mine\nREASONER_SANDBOX=docker\nSANDBOX_IMAGE=x\n'
-    expect(migrateEnvText(text)).toEqual({
-      text: '# mine\nREASONER_SANDBOX=vm\nSANDBOX_IMAGE=x\n',
-      changed: true,
-      notes: ['REASONER_SANDBOX=docker is now vm (the built-in sandbox)'],
+  it("moves an earlier version's .env into settings.json once, keeping the old file", () => {
+    const home = mkdtempSync(path.join(root, 'home-'))
+    const file = path.join(home, 'settings.json')
+    const legacy = path.join(home, '.env')
+    writeFileSync(
+      legacy,
+      `# mine
+SLACK_BOT_TOKEN=xoxb-1
+MENTION_ALLOWED_USERS=U1
+MENTION_ANYONE=off
+REASONER_SANDBOX=docker
+LOG_LEVEL=
+TASKS=on
+FAKE_CLAUDE_DIR='/tmp/a b'
+`,
+      { mode: 0o644 }
+    )
+    // Read where it is until it moves
+    expect(readSettingsValues(file)).toMatchObject({ TASKS: 'on' })
+    expect(moveEnvSettings(file)).toEqual([
+      'REASONER_SANDBOX=docker is now vm (the built-in sandbox)',
+      'MENTION_ANYONE is removed: Pace answers only you',
+      'moved from .env to settings.json (the old file is .env.bak)',
+    ])
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({
+      slack: { botToken: 'xoxb-1', memberId: 'U1' },
+      sandbox: { runIn: 'vm' },
+      tasks: { enabled: true },
+      env: { FAKE_CLAUDE_DIR: '/tmp/a b' },
     })
-    for (const unchanged of ['REASONER_SANDBOX=vm\n', 'A=1\n', ''])
-      expect(migrateEnvText(unchanged)).toEqual({
-        text: unchanged,
-        changed: false,
-        notes: [],
-      })
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    expect(existsSync(legacy)).toBe(false)
+    expect(readFileSync(`${legacy}.bak`, 'utf8')).toMatch(/^# mine/)
+    expect(statSync(`${legacy}.bak`).mode & 0o777).toBe(0o600)
+    // Once: a .env written again later is left alone, and the file wins.
+    writeFileSync(legacy, 'TASKS=off\n')
+    expect(moveEnvSettings(file)).toEqual([])
+    expect(readSettingsValues(file).TASKS).toBe('on')
+    expect(moveEnvSettings(path.join(root, 'none', 'settings.json'))).toEqual(
+      []
+    )
   })
 
-  it('drops answering the whole workspace, on or off: Pace answers only you', () => {
-    for (const value of ['on', 'off']) {
-      const text = `MENTION_ALLOWED_USERS=U1\nMENTION_ANYONE=${value}\nTASKS=on\n`
-      const migrated = migrateEnvText(text)
-      expect(migrated).toMatchObject({ changed: true })
-      expect(migrated.notes).toEqual([
-        'MENTION_ANYONE is removed: Pace answers only you',
-      ])
-      expect(migrated.text).not.toMatch(/MENTION_ANYONE/)
-      expect(migrated.text).toMatch(/^MENTION_ALLOWED_USERS=U1$/m)
-      expect(migrated.text).toMatch(/^TASKS=on$/m)
-    }
+  it('reads values from a .env with the same rules as node', () => {
+    expect(readEnvValues('A=\'x "y"\'\nB=1 # note\n')).toEqual({
+      A: 'x "y"',
+      B: '1',
+    })
+    expect(readEnvFile(path.join(root, 'missing'))).toBe('')
+    expect(migrateEnvValues({ REASONER_SANDBOX: 'vm', A: '1' })).toEqual({
+      values: { REASONER_SANDBOX: 'vm', A: '1' },
+      notes: [],
+    })
   })
 })
 
@@ -172,7 +247,7 @@ describe('setting fields', () => {
     expect(maskSecret('xapp-1-A1-zzzz9999')).toBe('xapp-...9999')
   })
 
-  it('returns validation issues per environment variable', () => {
+  it('returns validation issues per setting, in words without its name', () => {
     const base = {
       SLACK_BOT_TOKEN: 'xoxb-1',
       SLACK_APP_TOKEN: 'xapp-1',
@@ -194,9 +269,60 @@ describe('setting fields', () => {
     ).toEqual([
       {
         key: 'OPS_TOOLS',
-        message: expect.stringContaining('REASONER_SANDBOX=vm'),
+        message: expect.stringContaining('built-in sandbox'),
       },
     ])
+  })
+})
+
+describe('setting issues', () => {
+  it('name settings as the screen does, never by their variable', () => {
+    const issues = [
+      {},
+      { SLACK_CONNECTION: 'hub' },
+      { SLACK_CONNECTION: 'hub', HUB_URL: 'https://hub.example.com' },
+      { SLACK_BOT_TOKEN: 'xoxb-1', SLACK_APP_TOKEN: 'xapp-1' },
+      {
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U1,U2',
+      },
+      {
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U1',
+        MENTION_WORKSPACE: '/no/such/folder',
+      },
+      {
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U1',
+        REASONER_SANDBOX: 'vm',
+        REASONER: 'codex',
+        SANDBOX_CODEX_AUTH_FILE: '/no/such/auth.json',
+      },
+      {
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U1',
+        REASONER_SANDBOX: 'vm',
+      },
+    ].flatMap((env) => checkConfig(env))
+    expect(issues.map((issue) => issue.key)).toEqual([
+      'SLACK_BOT_TOKEN',
+      'SLACK_APP_TOKEN',
+      'MENTION_ALLOWED_USERS',
+      'HUB_URL',
+      'HUB_TOKEN',
+      'HUB_TOKEN',
+      'MENTION_ALLOWED_USERS',
+      'MENTION_ALLOWED_USERS',
+      'MENTION_WORKSPACE',
+      'SANDBOX_CODEX_AUTH_FILE',
+      'SANDBOX_CLAUDE_OAUTH_TOKEN',
+    ])
+    for (const { message } of issues)
+      expect(message).not.toMatch(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/)
   })
 })
 

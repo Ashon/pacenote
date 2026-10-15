@@ -29,9 +29,9 @@ brew install --cask pacenote
   until it is done, they stay as text.
 - At startup Pace checks that the CLI is installed, signed in and, for codex, new enough; what is missing shows in the
   status bar with what to do.
-- Config, run history and the allowed domains list live in `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive
-  upgrades and uninstall. The folder is kept to your account (700, and `.env` 600), and the app's own log is
-  `logs/desktop.log`, beside Pace's `logs/bot.log`.
+- Settings (`settings.json`, see [Settings file](settings.md)), run history and the allowed domains list live in
+  `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive upgrades and uninstall. The folder is kept to your
+  account (700, and `settings.json` 600), and the app's own log is `logs/desktop.log`, beside Pace's `logs/bot.log`.
 - `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 15 seconds to finish its requests, and
   the rest resume on the next start) and reopens it. If a copy of the old version is still running when the new one
   moves in (a late quit request can open it again), it sees the new version on disk within seconds, stops Pace and
@@ -47,15 +47,18 @@ brew install --cask pacenote
      and `reactions:write` (without it Pace posts "Working on it..." instead of reacting to the mention with 👀)
    - Event Subscriptions > bot events: `app_mention`
    - Turn on Socket Mode
-2. Basic Information -> App-Level Tokens: create a token with `connections:write` -> `SLACK_APP_TOKEN`
+2. Basic Information -> App-Level Tokens: create a token with `connections:write` -> `slack.appToken`
 3. Invite the bot to the public channels where it should answer. (`/invite @botname`) Put your own Slack member ID (your
-   profile > ⋮ > Copy member ID) in `MENTION_ALLOWED_USERS`: Pace answers only you, and with your own app the bot does
-   not start until it knows who you are.
-4. Write the config file and check it. Config lives outside the repository in `~/.pacenote/.env`. (`PACENOTE_HOME` changes the location)
-   The bot (app, terminal) and the sandbox jobs read this file, so values of the target environment never land in the repository.
+   profile > ⋮ > Copy member ID) in `slack.memberId`: Pace answers only you, and with your own app the bot does not
+   start until it knows who you are.
+4. Write the settings file and check it. It lives outside the repository in `~/.pacenote/settings.json`
+   (`PACENOTE_HOME` changes the location; [Settings file](settings.md) lists every setting). The bot (app, terminal)
+   and the sandbox jobs read this file, so values of the target environment never land in the repository. The desktop
+   app's Settings screen writes the same file, so you can also leave this to the app.
 
    ```sh
-   mkdir -p ~/.pacenote && cp .env.example ~/.pacenote/.env   # fill in SLACK_*, MENTION_ALLOWED_USERS, REASONER, REASONER_SANDBOX
+   mkdir -p ~/.pacenote && cp settings.example.json ~/.pacenote/settings.json   # fill in slack, answers, sandbox
+   chmod 600 ~/.pacenote/settings.json
    pnpm install
    pnpm slack:check        # check tokens, scopes, app match, Socket Mode
    ```

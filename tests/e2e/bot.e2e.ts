@@ -334,7 +334,7 @@ describe('bot on its own Slack app', () => {
     for (const [extra, said] of [
       [
         { MENTION_ALLOWED_USERS: `${world.alice.id},${world.bob.id}` },
-        /takes one Slack member ID, your own/,
+        /one Slack member ID, your own/,
       ],
       [{ MENTION_ANYONE: 'on' }, /MENTION_ANYONE is gone/],
     ] as const) {

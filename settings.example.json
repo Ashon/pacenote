@@ -1,0 +1,14 @@
+{
+  "slack": {
+    "botToken": "xoxb-",
+    "appToken": "xapp-",
+    "memberId": ""
+  },
+  "answers": {
+    "reasoner": "claude"
+  },
+  "sandbox": {
+    "runIn": "vm",
+    "claudeToken": ""
+  }
+}

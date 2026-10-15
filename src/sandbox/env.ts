@@ -16,8 +16,8 @@ const name = '[A-Za-z0-9][A-Za-z0-9._@-]*'
 
 /**
  * Values that ops-broker and its prep jobs (the broker's start, sandbox-job
- * kubeconfig) read from .env. For empty features the broker starts without
- * those tools.
+ * kubeconfig) read from the settings. For empty features the broker starts
+ * without those tools.
  */
 export const BrokerEnvSchema = z.object({
   /**
@@ -136,7 +136,7 @@ export function checkBrokerEnv(env: NodeJS.ProcessEnv): ConfigIssue[] {
 }
 
 /**
- * Validates and reads .env. Used by the prep jobs (sandbox-job broker,
+ * Validates and reads the settings. Used by the prep jobs (sandbox-job broker,
  * kubeconfig).
  */
 export function loadBrokerEnv(env: NodeJS.ProcessEnv): BrokerEnv {

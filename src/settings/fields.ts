@@ -2,17 +2,19 @@ import type { MessengerId } from '../messengers/ids.js'
 import { systemTimeZone } from '../messengers/text.js'
 
 /**
- * Config file (.env, ~/.pacenote/.env outside the repository) entries handled
- * by the settings screen. Shared by the desktop app (save, validation) and the
+ * Settings handled by the settings screen, each kept at its place in the
+ * settings file (settings.json, ~/.pacenote outside the repository; see
+ * settings-file.ts). Shared by the desktop app (save, validation) and the
  * screen (input form). Defaults must match the bot config (src/config.ts
  * EnvSchema) or the broker config (src/sandbox/env.ts).
- * (tests/settings.test.ts) .env entries not listed here are hidden from the
- * screen and kept as is on save.
+ * (tests/settings.test.ts) Entries not listed here are hidden from the screen
+ * and kept as is on save.
  */
 /**
  * Settings screen sections, in navigation order. Each holds a few groups
  * (cards) of fields. The desktop app's own preferences (theme, autostart) are
- * not .env entries and have a "general" section of their own on the screen.
+ * not in the settings file and have a "general" section of their own on the
+ * screen.
  */
 export type SettingSection =
   'messengers' | 'answers' | 'sandbox' | 'ops' | 'tasks' | 'logs'
@@ -74,7 +76,15 @@ export type SettingGroup =
   | 'logs'
 
 export interface SettingField {
+  /**
+   * The name Pace reads it by, as an environment variable that also overrides
+   * the file. Never shown on the screen.
+   */
   key: string
+  /** Where it is kept in settings.json, dotted: "slack.botToken" */
+  path: string
+  /** Kept as a list in the file; a comma-separated value on the screen */
+  list?: boolean
   group: SettingGroup
   label: string
   help?: string
@@ -98,7 +108,8 @@ export interface SettingField {
   applies?: 'app'
   /**
    * Shown only while another field has this value, or one of these values
-   * (e.g. sandbox limits only for the sandboxes). Hidden values stay in .env.
+   * (e.g. sandbox limits only for the sandboxes). Hidden values stay in the
+   * file.
    */
   shownWhen?: { key: string; equals: string | readonly string[] }
   /**
@@ -267,6 +278,7 @@ export function settingSectionOf(
 export const SETTING_FIELDS: SettingField[] = [
   {
     key: 'SLACK_CONNECTION',
+    path: 'slack.connection',
     group: 'slack',
     label: 'Connection',
     type: 'select',
@@ -286,6 +298,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'HUB_URL',
+    path: 'slack.hub.url',
     group: 'slack',
     label: 'Hub URL',
     help: "The address your team's hub admin gave you.",
@@ -295,6 +308,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'HUB_TOKEN',
+    path: 'slack.hub.token',
     group: 'slack',
     label: 'Hub token',
     help: 'Stored by pairing with the hub. The hub keeps only its hash.',
@@ -303,6 +317,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SLACK_APP_TOKEN',
+    path: 'slack.appToken',
     group: 'slack',
     label: 'App token',
     help: 'Basic Information > App-Level Tokens (connections:write). Used for the Socket Mode connection.',
@@ -312,6 +327,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SLACK_BOT_TOKEN',
+    path: 'slack.botToken',
     group: 'slack',
     label: 'Bot token',
     help: 'OAuth & Permissions > Bot User OAuth Token',
@@ -321,6 +337,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SOCKET_CLIENT_PING_TIMEOUT_MS',
+    path: 'slack.clientPingTimeoutMs',
     group: 'slack',
     label: 'Client ping timeout (ms)',
     help: 'Reconnects if a ping sent by Pace gets no reply within this time. (1000 to 60000)',
@@ -331,6 +348,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SOCKET_SERVER_PING_TIMEOUT_MS',
+    path: 'slack.serverPingTimeoutMs',
     group: 'slack',
     label: 'Server ping timeout (ms)',
     help: 'Reconnects if no ping arrives from Slack within this time. (5000 to 300000)',
@@ -341,6 +359,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'MENTION_ALLOWED_USERS',
+    path: 'slack.memberId',
     group: 'access',
     label: 'Your Slack member ID',
     help: 'Pace answers only you: it runs on this Mac with your login. In Slack, open your profile, click ⋮ and Copy member ID; setup fills it in when you say "@Pace it\'s me". Teammates each run their own Pace through your team\'s hub.',
@@ -350,6 +369,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'REASONER',
+    path: 'answers.reasoner',
     group: 'reasoner',
     label: 'Reasoner CLI',
     type: 'select',
@@ -361,6 +381,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'REASONER_MODEL',
+    path: 'answers.model',
     group: 'reasoner',
     label: 'Model',
     help: 'Leave empty to use claude-opus-5-5 for claude and the model in ~/.codex/config.toml for codex.',
@@ -368,6 +389,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'REASONER_TIMEOUT_SEC',
+    path: 'answers.timeoutSec',
     group: 'reasoner',
     label: 'Timeout (seconds)',
     type: 'number',
@@ -375,6 +397,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'MENTION_CONCURRENCY',
+    path: 'answers.concurrency',
     group: 'requests',
     label: 'Concurrent requests',
     type: 'number',
@@ -382,6 +405,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TIMEZONE',
+    path: 'answers.timeZone',
     group: 'requests',
     label: 'Time zone',
     help: "Used to show times in thread context. Left empty, it is this Mac's time zone.",
@@ -390,6 +414,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'MENTION_WORKSPACE',
+    path: 'answers.referenceDir',
     group: 'requests',
     label: 'Reference directory',
     help: 'Absolute path consulted read-only when answering. Used only in run environments that can read files.',
@@ -398,6 +423,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'RENDER_DIAGRAMS',
+    path: 'answers.diagrams',
     group: 'diagrams',
     label: 'Render diagrams',
     help: 'Renders mermaid, dot, vega-lite, and svg blocks in answers as PNG and uploads them, in a VM of the built-in sandbox (set it up in Settings > Sandbox, even with Pace on this Mac). Until it is set up, they stay as text.',
@@ -406,6 +432,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'GENERATED_IMAGE_MAX_PX',
+    path: 'answers.imageMaxPx',
     group: 'diagrams',
     label: 'Generated image max size (px)',
     help: 'Shrinks the long side to this size before uploading. 0 keeps the original size.',
@@ -414,6 +441,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'REASONER_SANDBOX',
+    path: 'sandbox.runIn',
     group: 'environment',
     label: 'Run environment',
     type: 'select',
@@ -433,6 +461,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SANDBOX_MEMORY',
+    path: 'sandbox.memory',
     group: 'environment',
     label: 'Memory limit',
     help: 'For each request, such as 2g or 1536m',
@@ -442,6 +471,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SANDBOX_CPUS',
+    path: 'sandbox.cpus',
     group: 'environment',
     label: 'CPU limit',
     type: 'text',
@@ -450,6 +480,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SANDBOX_CLAUDE_OAUTH_TOKEN',
+    path: 'sandbox.claudeToken',
     group: 'credentials',
     label: 'claude token',
     help: 'Required to use claude in the sandbox. (claude setup-token)',
@@ -458,6 +489,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SANDBOX_ANTHROPIC_API_KEY',
+    path: 'sandbox.anthropicApiKey',
     group: 'credentials',
     label: 'Anthropic API key',
     help: 'For using an API key instead of the claude token',
@@ -467,6 +499,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SANDBOX_CODEX_AUTH_FILE',
+    path: 'sandbox.codexLoginFile',
     group: 'credentials',
     label: 'codex login file',
     help: 'Copied into the VM when using codex in the sandbox.',
@@ -476,6 +509,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_TOOLS',
+    path: 'ops.enabled',
     group: 'ops',
     label: 'Enable ops tools',
     help: 'Offers the integrations below to the reasoner. Each one stays off until its fields are filled in.',
@@ -484,6 +518,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_FS_ROOT',
+    path: 'ops.workDir',
     group: 'files',
     label: 'Work directory',
     help: 'Work directory to mount read-only (absolute path). Leave empty to turn off the file and PR tools.',
@@ -492,6 +527,8 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_GIT_ALLOWED_OWNERS',
+    path: 'ops.github.owners',
+    list: true,
     group: 'github',
     label: 'Allowed GitHub orgs',
     help: 'Limits PR creation and GitHub queries to repositories of these orgs (or users). Comma-separated. Leave empty to turn off the GitHub tools.',
@@ -500,6 +537,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_GIT_AUTHOR_NAME',
+    path: 'ops.github.authorName',
     group: 'github',
     label: 'PR commit author name',
     help: "Author of commits the sandbox makes. Leave empty to use the global git config (git config --global user.name). Separate from this repository's git config.",
@@ -507,6 +545,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_GIT_AUTHOR_EMAIL',
+    path: 'ops.github.authorEmail',
     group: 'github',
     label: 'PR commit author email',
     help: 'Leave empty to use the global git config (git config --global user.email).',
@@ -514,6 +553,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_JIRA_URL',
+    path: 'ops.jira.url',
     group: 'jira',
     label: 'Jira URL',
     help: 'Jira Cloud site URL. The Jira tools turn on only when the URL, email, token, and projects are all set.',
@@ -522,6 +562,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_JIRA_EMAIL',
+    path: 'ops.jira.email',
     group: 'jira',
     label: 'Jira account email',
     help: 'Atlassian account that owns the API token. Issues and comments are posted as this account.',
@@ -529,6 +570,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_JIRA_TOKEN',
+    path: 'ops.jira.token',
     group: 'jira',
     label: 'Jira API token',
     help: "Create it under Security > API tokens at id.atlassian.com. Passed only to the broker's VM.",
@@ -536,6 +578,8 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_JIRA_PROJECTS',
+    path: 'ops.jira.projects',
+    list: true,
     group: 'jira',
     label: 'Allowed Jira projects',
     help: 'Limits queries, creation, and comments to these projects. Comma-separated project keys',
@@ -544,6 +588,8 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_K8S_CONTEXTS',
+    path: 'ops.kubernetes.contexts',
+    list: true,
     group: 'k8s',
     label: 'k8s contexts',
     help: 'Local kubeconfig contexts to build the read-only kubeconfig from. Comma-separated. Rebuild the kubeconfig after changing them.',
@@ -551,6 +597,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_K8S_SA',
+    path: 'ops.kubernetes.serviceAccount',
     group: 'k8s',
     label: 'k8s read-only account',
     help: 'Read-only ServiceAccount in each cluster (sandbox/k8s/pacenote-ro.yaml)',
@@ -560,6 +607,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_K8S_SA_NAMESPACE',
+    path: 'ops.kubernetes.namespace',
     group: 'k8s',
     label: 'k8s read-only account namespace',
     type: 'text',
@@ -568,6 +616,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_USER',
+    path: 'ops.ssh.user',
     group: 'ssh',
     label: 'SSH user',
     help: 'Account used for host checks. Host checks turn on only when the user, allowed range, and key are all set.',
@@ -575,6 +624,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_ALLOWED_CIDR',
+    path: 'ops.ssh.allowedRange',
     group: 'ssh',
     label: 'Allowed SSH range',
     help: 'Only hosts in this range are checked over SSH.',
@@ -583,6 +633,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_KEY',
+    path: 'ops.ssh.key',
     group: 'ssh',
     label: 'SSH key path',
     help: "Absolute path. The key is shared only into the broker's VM.",
@@ -591,6 +642,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_KNOWN_HOSTS',
+    path: 'ops.ssh.knownHosts',
     group: 'ssh',
     label: 'SSH known_hosts path',
     help: 'Absolute path. Leave empty to remember host keys from the first connection only inside the broker.',
@@ -599,6 +651,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_INVENTORY_DIR',
+    path: 'ops.ssh.inventoryDir',
     group: 'ssh',
     label: 'Inventory directory',
     help: 'Location of the ansible project used to build the host list. Relative paths are relative to this repository. Leave empty to write ~/.pacenote/ops-broker/hosts.json directly.',
@@ -607,6 +660,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'OPS_SSH_INVENTORY',
+    path: 'ops.ssh.inventory',
     group: 'ssh',
     label: 'Inventory file',
     help: 'Relative path inside the inventory directory',
@@ -616,6 +670,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'HISTORY',
+    path: 'history.enabled',
     group: 'history',
     label: 'Record runs',
     type: 'toggle',
@@ -623,6 +678,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'HISTORY_RETENTION_DAYS',
+    path: 'history.retentionDays',
     group: 'history',
     label: 'History retention (days)',
     help: 'Set to 0 to never delete.',
@@ -631,6 +687,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'HISTORY_SHARE',
+    path: 'history.shareWithAiTools',
     group: 'history',
     label: 'Share with AI tools',
     help: "Lets AI tools on this Mac, such as Claude Code or Codex, read the run history through Pacenote's MCP server, read-only. Applies right away.",
@@ -640,6 +697,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS',
+    path: 'tasks.enabled',
     group: 'tasks',
     label: 'Gather my tasks from Slack',
     help: "Off by default. Turns on Collect now on the Todo screen, and the task tools of Pacenote's MCP server for the AI tools you add it to below, whether or not the run history is shared.",
@@ -649,6 +707,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_DMS',
+    path: 'tasks.dms',
     group: 'tasks',
     label: 'Count DMs and group DMs',
     help: 'Off: AI tools are told to leave DMs out, and tasks from them are not added.',
@@ -659,6 +718,8 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_EXCLUDE_CHANNELS',
+    path: 'tasks.leaveOutChannels',
+    list: true,
     group: 'tasks',
     label: 'Leave out channels',
     help: 'Comma-separated channel names or IDs.',
@@ -669,6 +730,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_CLI',
+    path: 'tasks.openIn',
     group: 'work',
     label: 'Open code tasks in',
     help: 'The button on a code task opens a session here, with the task.',
@@ -683,6 +745,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_TERMINAL',
+    path: 'tasks.terminal',
     group: 'work',
     label: 'Terminal',
     help: 'Where the session opens. Automatic picks the terminal you have open, else the one you used last.',
@@ -699,6 +762,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_PLAN_FIRST',
+    path: 'tasks.planFirst',
     group: 'work',
     label: 'Start with a plan',
     help: 'The session sums up the task and its plan, then waits for you before it changes anything.',
@@ -709,6 +773,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'TASKS_LINK_SESSIONS',
+    path: 'tasks.linkSessions',
     group: 'work',
     label: 'Show sessions you start yourself',
     help: "Adds the Claude Code and Codex sessions you start yourself to a task's work log: ones that used Pacenote's task tools for it, had its Slack link in what you typed, or worked on its branch. Ones that only look related are suggested for you to link. Their logs are read on this Mac, and nothing from them leaves it.",
@@ -719,6 +784,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'LOG_LEVEL',
+    path: 'logs.level',
     group: 'logs',
     label: 'Log level',
     help: 'At debug, detailed Socket Mode client logs are also written.',
@@ -731,6 +797,7 @@ export const SETTING_FIELDS: SettingField[] = [
   },
   {
     key: 'SOCKET_PING_PONG_LOG',
+    path: 'logs.pingPong',
     group: 'logs',
     label: 'Ping/pong log',
     help: 'Logs keepalive signals. Visible when the log level is debug.',
@@ -740,24 +807,25 @@ export const SETTING_FIELDS: SettingField[] = [
   },
 ]
 
-/** null clears the value in .env so the default applies again. */
+/** null clears the value in the file so the default applies again. */
 export type SettingsChanges = Record<string, string | null>
 
 export interface SettingsView {
-  envFile: string
+  /** The settings file */
+  file: string
   exists: boolean
+  /** Why the file could not be read, when it could not */
+  problem?: string
   dataDir: string
-  /** Current values of non-secret fields (empty string if not in .env) */
+  /** Current values of non-secret fields (empty string if not in the file) */
   values: Record<string, string>
   /** For secrets, only whether they are set and the last 4 characters */
   secrets: Record<string, { set: boolean; hint?: string }>
   /**
    * Fields set in the app's environment variables, which take precedence over
-   * .env
+   * the file
    */
   overridden: string[]
-  /** .env entries the settings screen does not handle (kept as is on save) */
-  otherKeys: string[]
 }
 
 export interface SettingsIssue {

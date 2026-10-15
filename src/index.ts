@@ -23,9 +23,10 @@ import {
   securePrivateDir,
   securePrivateFile,
 } from './settings/home.js'
-import { envFilePath, pacenoteHome } from './settings/paths.js'
+import { pacenoteHome, settingsFilePath } from './settings/paths.js'
 import { secretValues } from './settings/fields.js'
-import { loadEnv } from './settings/load-env.js'
+import { loadSettings } from './settings/load-settings.js'
+import { moveEnvSettings } from './settings/settings-file.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -47,12 +48,14 @@ let startupLog: Logger | undefined
 let running = false
 
 async function main(): Promise<void> {
-  loadEnv()
+  // An earlier version's .env becomes settings.json, once.
+  const moved = moveEnvSettings(settingsFilePath())
+  loadSettings()
   const config = loadConfig()
   // Settings, run history and logs stay with this account.
   securePrivateDir(pacenoteHome())
   securePrivateDir(config.dataDir)
-  securePrivateFile(envFilePath())
+  securePrivateFile(settingsFilePath())
   // Logs to PACENOTE_DATA_DIR/logs/bot.log as well as the console. The desktop
   // app shows this file.
   const log = createLogger(config.logLevel, 'pacenote', [
@@ -60,6 +63,7 @@ async function main(): Promise<void> {
     fileSink(path.join(config.dataDir, LOG_FILE)),
   ])
   startupLog = log
+  for (const note of moved) log.info(`Settings: ${note}`)
   const status = await BotStatusFile.acquire(
     config.dataDir,
     process.env.PACENOTE_MANAGED_BY === 'desktop' ? 'desktop' : 'terminal',

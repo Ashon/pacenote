@@ -767,7 +767,7 @@ describe('config', () => {
 
   it('needs the sandbox login', () => {
     expect(() => loadConfig({ ...base, REASONER_SANDBOX: 'vm' })).toThrow(
-      /built-in sandbox requires SANDBOX_CLAUDE_OAUTH_TOKEN/
+      /claude in the built-in sandbox needs a claude token/
     )
   })
 
@@ -791,7 +791,7 @@ describe('config', () => {
     })
     // Not without a sandbox
     expect(() => loadConfig({ ...ops, REASONER_SANDBOX: 'none' })).toThrow(
-      /OPS_TOOLS=on requires the built-in sandbox/
+      /Ops tools need the built-in sandbox/
     )
   })
 })

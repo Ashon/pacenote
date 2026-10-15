@@ -137,7 +137,7 @@ export function findClaudeToken(
  * terminal, so it runs under macOS's script(1), which gives it a
  * pseudo-terminal (wide enough that the token is not wrapped). The browser
  * approval is the user's; the token goes from the command's output straight to
- * .env and is never sent to the UI.
+ * the settings file and is never sent to the UI.
  */
 export class ClaudeTokenSetup {
   private child?: ChildProcess

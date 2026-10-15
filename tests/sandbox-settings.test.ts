@@ -9,8 +9,8 @@ import {
 import { brokerExpected, checkBrokerEnv } from '../src/sandbox/env.js'
 import {
   brokerRuntimeDir,
-  envFilePath,
   pacenoteHome,
+  settingsFilePath,
 } from '../src/settings/paths.js'
 import { computePending } from '../src/sandbox/status.js'
 
@@ -118,15 +118,17 @@ describe('broker settings', () => {
     )
   })
 
-  it('keeps the config file and broker generated files outside the repository (PACENOTE_HOME, default ~/.pacenote)', () => {
+  it('keeps the settings file and broker generated files outside the repository (PACENOTE_HOME, default ~/.pacenote)', () => {
     expect(pacenoteHome({}, '/home/me')).toBe('/home/me/.pacenote')
-    expect(envFilePath({}, '/home/me')).toBe('/home/me/.pacenote/.env')
+    expect(settingsFilePath({}, '/home/me')).toBe(
+      '/home/me/.pacenote/settings.json'
+    )
     expect(brokerRuntimeDir({}, '/home/me')).toBe(
       '/home/me/.pacenote/ops-broker'
     )
-    expect(envFilePath({ PACENOTE_HOME: '~/work/pacenote' }, '/home/me')).toBe(
-      '/home/me/work/pacenote/.env'
-    )
+    expect(
+      settingsFilePath({ PACENOTE_HOME: '~/work/pacenote' }, '/home/me')
+    ).toBe('/home/me/work/pacenote/settings.json')
     expect(
       brokerRuntimeDir({ PACENOTE_HOME: '/srv/pacenote ' }, '/home/me')
     ).toBe('/srv/pacenote/ops-broker')
@@ -166,9 +168,9 @@ describe('broker settings', () => {
 })
 
 describe('status evaluation', () => {
-  it('asks for a restart when .env changed after Pace started', () => {
+  it('asks for a restart when the settings changed after Pace started', () => {
     expect(computePending({ configHash: 'aaa', expectedHash: 'bbb' })).toEqual([
-      { reason: expect.stringContaining('.env') },
+      { reason: 'Settings changed after Pace started.' },
     ])
     expect(
       computePending({ configHash: 'same', expectedHash: 'same' })

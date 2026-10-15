@@ -57,7 +57,7 @@ describe('loadConfig', () => {
         .owner
     ).toBe('U0BOSS')
     expect(() => loadConfig({ ...env, MENTION_ALLOWED_USERS: '@bob' })).toThrow(
-      /MENTION_ALLOWED_USERS/
+      /slack\.memberId: Must be a Slack user ID/
     )
   })
 
@@ -69,7 +69,7 @@ describe('loadConfig', () => {
     ])
     // More than one person is refused outright, not narrowed to one.
     const two = { ...env, MENTION_ALLOWED_USERS: 'U0ME,U0BOB' }
-    expect(() => loadConfig(two)).toThrow(/takes one Slack member ID, your own/)
+    expect(() => loadConfig(two)).toThrow(/one Slack member ID, your own/)
     // Not merely missing, so Settings will not save it.
     expect(checkConfig(two)).toEqual([
       {
@@ -121,11 +121,11 @@ describe('loadConfig', () => {
       loadConfig({ ...env, MENTION_WORKSPACE: dir }).mention.workspace
     ).toBe(dir)
     expect(() => loadConfig({ ...env, MENTION_WORKSPACE: './x' })).toThrow(
-      /MENTION_WORKSPACE/
+      /reference directory must be an absolute path/
     )
     expect(() =>
       loadConfig({ ...env, MENTION_WORKSPACE: `${dir}/missing` })
-    ).toThrow(/MENTION_WORKSPACE/)
+    ).toThrow(/reference directory must be an absolute path/)
   })
 
   it("passes codex's own model along when no model is set, since its config is not loaded", () => {
@@ -157,7 +157,7 @@ describe('loadConfig', () => {
       OPS_TOOLS: 'on',
     }
     expect(() => loadConfig({ ...base, MENTION_ALLOWED_USERS: 'U1' })).toThrow(
-      /requires the built-in sandbox: REASONER_SANDBOX=vm/
+      /Ops tools need the built-in sandbox/
     )
     expect(() =>
       loadConfig({ ...base, REASONER_SANDBOX: 'vm', MENTION_ANYONE: 'on' })
@@ -194,12 +194,14 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...env, TIMEZONE: 'America/New_York' }).timezone).toBe(
       'America/New_York'
     )
-    expect(() => loadConfig({ ...env, TIMEZONE: 'Seoul' })).toThrow(/TIMEZONE/)
+    expect(() => loadConfig({ ...env, TIMEZONE: 'Seoul' })).toThrow(
+      /answers\.timeZone: Must be a time zone name/
+    )
   })
 
   it('reports which value is wrong when a token format is invalid', () => {
     expect(() => loadConfig({ ...env, SLACK_BOT_TOKEN: 'xoxp-1' })).toThrow(
-      /SLACK_BOT_TOKEN/
+      /Some settings are invalid\.\n- slack\.botToken: /
     )
   })
 })

@@ -24,6 +24,7 @@ import {
 } from '../src/tasks/sources.js'
 import type { Task, TasksFile } from '../src/tasks/types.js'
 import { addTasks, closeTask } from '../src/tasks/write.js'
+import { settingsText } from '../src/settings/settings-file.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-tasks-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -503,11 +504,13 @@ describe('the task tools over MCP', () => {
   })
 
   it('reads its settings from the file, over the environment', () => {
-    const envFile = dir('tasks.env')
-    // As the settings screen writes it: quoted, since # starts a comment
-    writeFileSync(envFile, "TASKS=on\nTASKS_EXCLUDE_CHANNELS='#random, C9'\n")
+    const settingsFile = dir('settings.json')
+    writeFileSync(
+      settingsFile,
+      settingsText({ TASKS: 'on', TASKS_EXCLUDE_CHANNELS: '#random, C9' })
+    )
     expect(
-      readTasksSettings({ TASKS: 'off', TASKS_DMS: 'on' }, envFile)
+      readTasksSettings({ TASKS: 'off', TASKS_DMS: 'on' }, settingsFile)
     ).toEqual({
       on: true,
       dms: true,

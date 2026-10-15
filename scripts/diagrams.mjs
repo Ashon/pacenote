@@ -675,10 +675,15 @@ function architecture(c) {
         label: '~/.pacenote',
         help: 'Settings and what Pace keeps, outside the app',
         after: (y) => {
-          c.badges(360, y - 2, ['.env', 'runs/', 'logs/', 'tasks.json'], {
-            outline: true,
-            mono: true,
-          })
+          c.badges(
+            360,
+            y - 2,
+            ['settings.json', 'runs/', 'logs/', 'tasks.json'],
+            {
+              outline: true,
+              mono: true,
+            }
+          )
           return y + 18
         },
       },
@@ -793,8 +798,8 @@ function architecture(c) {
     {
       icon: 'user-check',
       label: 'People',
-      value: 'Allowed users',
-      hint: 'Required when ops tools are on',
+      value: 'Only you',
+      hint: 'Anyone else gets a note',
     },
     {
       icon: 'shield-check',
@@ -1138,7 +1143,7 @@ function mentionFlow(c) {
   const top = (lane) => lanes[lane].y + (lanes[lane].h - H) / 2
   const steps = [
     [0, 0, 'app_mention', ['Acked; a resend', 'is handled once']],
-    [0, 1, 'Allowed here?', ['Allowed users,', 'public channels']],
+    [0, 1, 'Asked by you?', ['Only you, in', 'public channels']],
     [1, 0, 'React 👀', ['On the mention;', '⏳ after 90 s']],
     [1, 1, 'Read the thread', ['Names, text,', 'images, PDFs']],
     [2, 2, 'Reason', ['claude or codex,', 'tools over MCP']],
@@ -1198,7 +1203,7 @@ function mentionFlow(c) {
       [
         'failed',
         'Refused',
-        'Not allowed or not public',
+        'Not you, or not public',
         'A note only the asker sees; nothing runs.',
       ],
       [
@@ -1354,7 +1359,7 @@ function teamHub(c) {
       ],
       [
         'Confirm',
-        'The app shows the Slack name it bound to; confirming stores the token in ~/.pacenote/.env.',
+        'The app shows the Slack name it bound to; confirming stores the token in ~/.pacenote/settings.json.',
       ],
     ],
     (left, [title, help], width) => {

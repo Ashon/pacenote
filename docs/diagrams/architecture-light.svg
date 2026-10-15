@@ -53,8 +53,8 @@
 <rect x="376" y="462" width="92" height="20" rx="6" fill="#e2f1ea"/>
 <g transform="translate(383 466) scale(0.5)" color="#0e3629" fill="none" stroke="#0e3629" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></g>
 <text x="399" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#0e3629" text-anchor="start">claude@vm</text>
-<rect x="474.5" y="462.5" width="113" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
-<text x="480.5" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">👀 on the mention</text>
+<rect x="474.5" y="462.5" width="113" height="19" rx="9.5" fill="#00786e" fill-opacity="0.12" stroke="#00786e" stroke-opacity="0.3"/>
+<text x="480.5" y="476" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#00786e" text-anchor="start">👀 on the mention</text>
 <text x="360" y="528" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Desktop app</text>
 <text x="360" y="545" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Overview, Todo, Runs, Settings; keeps Pace running</text>
 <path d="M360 554.5H756" stroke="#d8e5df" stroke-width="1"/>
@@ -63,14 +63,14 @@
 <path d="M360 600.5H756" stroke="#d8e5df" stroke-width="1"/>
 <text x="360" y="620" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="12" font-weight="600" fill="#10211c" text-anchor="start">~/.pacenote</text>
 <text x="360" y="637" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Settings and what Pace keeps, outside the app</text>
-<rect x="360.5" y="644.5" width="38" height="19" rx="6" fill="none" stroke="#d8e5df"/>
-<text x="366.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">.env</text>
-<rect x="405.5" y="644.5" width="45" height="19" rx="6" fill="none" stroke="#d8e5df"/>
-<text x="411.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">runs/</text>
-<rect x="457.5" y="644.5" width="45" height="19" rx="6" fill="none" stroke="#d8e5df"/>
-<text x="463.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">logs/</text>
-<rect x="509.5" y="644.5" width="78" height="19" rx="6" fill="none" stroke="#d8e5df"/>
-<text x="515.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">tasks.json</text>
+<rect x="360.5" y="644.5" width="98" height="19" rx="6" fill="none" stroke="#d8e5df"/>
+<text x="366.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">settings.json</text>
+<rect x="465.5" y="644.5" width="45" height="19" rx="6" fill="none" stroke="#d8e5df"/>
+<text x="471.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">runs/</text>
+<rect x="517.5" y="644.5" width="45" height="19" rx="6" fill="none" stroke="#d8e5df"/>
+<text x="523.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">logs/</text>
+<rect x="569.5" y="644.5" width="78" height="19" rx="6" fill="none" stroke="#d8e5df"/>
+<text x="575.5" y="658" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace" font-size="11" font-weight="500" fill="#10211c" text-anchor="start">tasks.json</text>
 <rect x="844" y="176" width="308" height="418" rx="20" fill="#f1f8f5"/>
 <g transform="translate(860 193) scale(0.6666666666666666)" color="#007c5c" fill="none" stroke="#007c5c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7.7c0-.6-.4-1.2-.8-1.5l-6.3-3.9a1.72 1.72 0 0 0-1.7 0l-10.3 6c-.5.2-.9.8-.9 1.4v6.6c0 .5.4 1.2.8 1.5l6.3 3.9a1.72 1.72 0 0 0 1.7 0l10.3-6c.5-.3.9-1 .9-1.5Z"/><path d="M10 21.9V14L2.1 9.1"/><path d="m10 14 11.9-6.9"/><path d="M14 19.8v-8.1"/><path d="M18 17.5V9.4"/></g>
 <text x="884" y="206" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#10211c" text-anchor="start">Built-in sandbox</text>

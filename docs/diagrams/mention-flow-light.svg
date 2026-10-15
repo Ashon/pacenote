@@ -84,29 +84,29 @@
 <path d="M798 354 L804.5 354 Q811 354 811 360.5 L811 476.5 Q811 482 816.5 482 L822 482" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
 <path d="M956 482 L962.5 482 Q969 482 969 475.5 L969 231.5 Q969 226 974.5 226 L980 226" fill="none" stroke="#007c5c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrow-main)"/>
 <path d="M48 556.5H1152" stroke="#d8e5df" stroke-width="1"/>
-<rect x="48.5" y="580.5" width="68" height="19" rx="9.5" fill="#d42f34" fill-opacity="0.12" stroke="#d42f34" stroke-opacity="0.3"/>
-<circle cx="58" cy="590" r="3" fill="#d42f34"/>
-<text x="65.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#d42f34" text-anchor="start">Refused</text>
+<rect x="48.5" y="580.5" width="68" height="19" rx="9.5" fill="#c2272d" fill-opacity="0.12" stroke="#c2272d" stroke-opacity="0.3"/>
+<circle cx="58" cy="590" r="3" fill="#c2272d"/>
+<text x="65.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#c2272d" text-anchor="start">Refused</text>
 <text x="48" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Not you, or not public</text>
 <text x="48" y="642" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">A note only the asker sees; nothing runs.</text>
 <path d="M324.5 580V664" stroke="#d8e5df" stroke-width="1"/>
-<rect x="340.5" y="580.5" width="57" height="19" rx="9.5" fill="#d42f34" fill-opacity="0.12" stroke="#d42f34" stroke-opacity="0.3"/>
-<circle cx="350" cy="590" r="3" fill="#d42f34"/>
-<text x="357.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#d42f34" text-anchor="start">Failed</text>
+<rect x="340.5" y="580.5" width="57" height="19" rx="9.5" fill="#c2272d" fill-opacity="0.12" stroke="#c2272d" stroke-opacity="0.3"/>
+<circle cx="350" cy="590" r="3" fill="#c2272d"/>
+<text x="357.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#c2272d" text-anchor="start">Failed</text>
 <text x="340" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">The reasoner fails</text>
 <text x="340" y="642" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">⚠️ on the mention, and what it means to the</text>
 <text x="340" y="658" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">asker alone; the run says what to fix.</text>
 <path d="M600.5 580V664" stroke="#d8e5df" stroke-width="1"/>
-<rect x="616.5" y="580.5" width="83" height="19" rx="9.5" fill="#be7100" fill-opacity="0.12" stroke="#be7100" stroke-opacity="0.3"/>
-<circle cx="626" cy="590" r="3" fill="#be7100"/>
-<text x="633.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#be7100" text-anchor="start">Interrupted</text>
+<rect x="616.5" y="580.5" width="83" height="19" rx="9.5" fill="#9c5900" fill-opacity="0.12" stroke="#9c5900" stroke-opacity="0.3"/>
+<circle cx="626" cy="590" r="3" fill="#9c5900"/>
+<text x="633.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#9c5900" text-anchor="start">Interrupted</text>
 <text x="616" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Pace restarts</text>
 <text x="616" y="642" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">inflight.json resumes it once; the 👀 stays</text>
 <text x="616" y="658" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">on the mention meanwhile.</text>
 <path d="M876.5 580V664" stroke="#d8e5df" stroke-width="1"/>
-<rect x="892.5" y="580.5" width="64" height="19" rx="9.5" fill="#029a92" fill-opacity="0.12" stroke="#029a92" stroke-opacity="0.3"/>
-<circle cx="902" cy="590" r="3" fill="#029a92"/>
-<text x="909.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#029a92" text-anchor="start">Queued</text>
+<rect x="892.5" y="580.5" width="64" height="19" rx="9.5" fill="#00786e" fill-opacity="0.12" stroke="#00786e" stroke-opacity="0.3"/>
+<circle cx="902" cy="590" r="3" fill="#00786e"/>
+<text x="909.5" y="594" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11" font-weight="500" fill="#00786e" text-anchor="start">Queued</text>
 <text x="892" y="622" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#10211c" text-anchor="start">Too many at once</text>
 <text x="892" y="642" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">Two run and ten wait; beyond that, only the</text>
 <text x="892" y="658" font-family="-apple-system, BlinkMacSystemFont, Pretendard, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#4f665e" text-anchor="start">asker hears it is busy.</text>

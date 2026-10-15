@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url'
-import { loadEnv } from '../settings/load-env.js'
+import { loadSettings } from '../settings/load-settings.js'
 import { checkSlackTokens } from '../messengers/slack/check.js'
 
 export {
@@ -9,11 +9,11 @@ export {
 } from '../messengers/slack/check.js'
 
 /**
- * Checks with the .env tokens that the Slack app settings fit this bot. Sends
- * no messages.
+ * Checks with the tokens in the settings file that the Slack app settings fit
+ * this bot. Sends no messages.
  */
 async function main(): Promise<void> {
-  loadEnv()
+  loadSettings()
   const items = await checkSlackTokens({
     botToken: process.env.SLACK_BOT_TOKEN,
     appToken: process.env.SLACK_APP_TOKEN,

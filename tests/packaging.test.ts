@@ -6,6 +6,7 @@ import { resolveAppPaths } from '../apps/desktop/src/app-paths.js'
 import { ensureAllowlistFile } from '../src/sandbox/allowlist.js'
 import { allowlistPath } from '../src/settings/paths.js'
 import { jobEnv, planJob } from '../src/tools/sandbox-job.js'
+import { settingsText } from '../src/settings/settings-file.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-packaging-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -42,10 +43,16 @@ describe('sandbox jobs', () => {
     expect(planJob('vm')).toEqual([{ kind: 'allowlist' }, { kind: 'vm' }])
   })
 
-  it('layers the environment over the config file and expands PACENOTE_HOME', () => {
-    const envFile = path.join(root, '.env')
-    writeFileSync(envFile, 'OPS_SSH_USER=from-file\nOPS_FS_ROOT=/from/file\n')
-    const env = jobEnv({ OPS_SSH_USER: 'from-env', HOME: '/home/me' }, envFile)
+  it('layers the environment over the settings file and expands PACENOTE_HOME', () => {
+    const settingsFile = path.join(root, 'settings.json')
+    writeFileSync(
+      settingsFile,
+      settingsText({ OPS_SSH_USER: 'from-file', OPS_FS_ROOT: '/from/file' })
+    )
+    const env = jobEnv(
+      { OPS_SSH_USER: 'from-env', HOME: '/home/me' },
+      settingsFile
+    )
     expect(env).toMatchObject({
       OPS_SSH_USER: 'from-env',
       OPS_FS_ROOT: '/from/file',

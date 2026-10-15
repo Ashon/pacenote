@@ -6,13 +6,13 @@ import { loadBrokerEnv } from '../sandbox/env.js'
 import { writeKubeconfig } from '../sandbox/kubeconfig.js'
 import { defaultVmBin } from '../sandbox/vm.js'
 import { setupVm } from '../sandbox/vm-setup.js'
-import { readEnvFile, readEnvValues } from '../settings/env-file.js'
 import {
   allowlistPath,
-  envFilePath,
   pacenoteHome,
+  settingsFilePath,
   vmRootPath,
 } from '../settings/paths.js'
+import { readSettingsValues } from '../settings/settings-file.js'
 
 /**
  * Sandbox jobs. The desktop app and the terminal (pnpm sandbox:vm,
@@ -20,8 +20,8 @@ import {
  * Usage: sandbox-job <vm|kubeconfig> [--dry-run]
  * - The sandbox directory is PACENOTE_SANDBOX_DIR (the sandbox inside the
  *   bundle for the app), otherwise sandbox in the current directory
- * - Settings are read from the config file (PACENOTE_HOME/.env), and existing
- *   environment variables take precedence. (Same as node --env-file)
+ * - Settings are read from the settings file (PACENOTE_HOME/settings.json),
+ *   and existing environment variables take precedence.
  */
 export const JOB_KINDS = ['vm', 'kubeconfig'] as const
 export type JobKind = (typeof JOB_KINDS)[number]
@@ -40,15 +40,15 @@ export function planJob(kind: JobKind): JobStep[] {
 }
 
 /**
- * Overlays the current environment variables on the config file values.
+ * Overlays the current environment variables on the settings file values.
  * PACENOTE_HOME is always passed resolved, so the job uses the same location as
  * the app.
  */
 export function jobEnv(
   base: NodeJS.ProcessEnv,
-  envFile: string
+  settingsFile: string
 ): NodeJS.ProcessEnv {
-  const fromFile = readEnvValues(readEnvFile(envFile))
+  const fromFile = readSettingsValues(settingsFile)
   const merged: NodeJS.ProcessEnv = { ...fromFile }
   for (const [key, value] of Object.entries(base)) {
     if (value !== undefined) merged[key] = value
@@ -65,8 +65,7 @@ async function main(): Promise<void> {
   const sandboxDir = path.resolve(
     process.env.PACENOTE_SANDBOX_DIR?.trim() || 'sandbox'
   )
-  const envFile = envFilePath()
-  const env = jobEnv(process.env, envFile)
+  const env = jobEnv(process.env, settingsFilePath())
   const log = (line: string) => console.log(line)
   const steps = planJob(kind as JobKind)
 
