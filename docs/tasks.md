@@ -67,6 +67,30 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
 - Under Done, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked too
   loosely.
 
+## Continuing a task
+
+**Continue in Claude Code** (or Codex) opens a session in a terminal, in the task's repository on this Mac, with the
+task and what came before it as the first prompt. Pacenote names the session, so the task's work log has it from the
+start, and opening it again later (the terminal icon, `claude --resume`, the Claude app) keeps it there.
+
+With "Show sessions you start yourself" on (Settings > Todo), the work log also has the sessions you started on your
+own, from Claude Code's and Codex's logs on this Mac (the last 14 days; Claude Code's in the Claude app and IDE
+extensions too), checked every 30 seconds or so while the Todo screen is open:
+
+- **Linked:** a session that used Pacenote's task tools for the task, one whose prompt has the task's Slack link, or one
+  that worked on the task's branch in its repository: a branch other than the default one that a session already in its
+  log worked on. So a session continued after `/clear`, in a new terminal or in a worktree stays with the task. A branch
+  two tasks share links neither.
+- **Suggested:** a session in the task's repository, active since the task was posted, whose prompts share words with
+  it (a PR number, an issue key, a file or code name, words of its title) shows as "Looks related", for you to **Link**
+  or say **Not it**, which is not asked again. A task without a repository needs a stronger match, such as its pull
+  request's link.
+- Only the session's id, folder and branch are kept; what was said stays in the tool's log, read when you open it.
+  Pacenote's own sessions (a collection, a reply draft) and temporary folders are left out, and nothing from the logs
+  leaves this Mac.
+
+An open task's row says when its latest session was last active ("Claude Code 5m ago").
+
 ## The MCP tools
 
 | Tool | What it does |

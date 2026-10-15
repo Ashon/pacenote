@@ -188,6 +188,14 @@ export interface TasksCollect {
 export type WorkTool = 'claude' | 'codex'
 
 /**
+ * How a session you started yourself was known as a task's work: it used
+ * Pacenote's task tools for the task (tools), your prompt had the task's
+ * Slack message (link), it worked on the branch the task's work is on
+ * (branch), or you said so when Pacenote asked (you)
+ */
+export type FoundBy = 'tools' | 'link' | 'branch' | 'you'
+
+/**
  * A task's work log, kept by the desktop app (tasks-work.json): the sessions it
  * opened or found for the task and the replies it drafted. Sessions keep their
  * id and folder only; their content stays in the tool's own log.
@@ -207,6 +215,10 @@ export type WorkEntry =
       resumedAt?: string[]
       /** Found in the tool's log (a session you started yourself) */
       found?: boolean
+      /** How it was found; older entries say only found: tools */
+      foundBy?: FoundBy
+      /** The git branch it worked on, when it was found by it */
+      branch?: string
     }
   | {
       kind: 'draft'
@@ -219,9 +231,25 @@ export type WorkEntry =
       copiedAt?: string
     }
 
+/**
+ * A session you started yourself that looks like a task's work, by the
+ * words they share, kept apart from the work log until you say it is
+ */
+export type SessionSuggestion = Omit<
+  Extract<WorkEntry, { kind: 'session' }>,
+  'resumedAt' | 'found' | 'foundBy'
+> & {
+  /** What it has of the task's, a few at most: "#482", "retry" */
+  shares: string[]
+}
+
 export interface WorkFile {
   version: 1
   entries: WorkEntry[]
+  /** Sessions that look like a task's work, waiting for you to say */
+  suggested?: SessionSuggestion[]
+  /** Sessions you said were not a task's work, not asked about again */
+  notIt?: { task: string; session: string; at: string }[]
 }
 
 /** A run of Pace's in the task's thread, as its detail lists it */
@@ -285,7 +313,10 @@ export interface SessionItem {
 export interface TaskDetail {
   task: TaskView
   context: TaskContext
-  /** Its work log, newest first; a session with when it was last active */
+  /**
+   * Its work log, newest first; a session with when it was last active and
+   * the branch it was on last
+   */
   work: (
     | (Extract<WorkEntry, { kind: 'session' }> & {
         lastActiveAt?: string
@@ -294,6 +325,8 @@ export interface TaskDetail {
       })
     | Extract<WorkEntry, { kind: 'draft' }>
   )[]
+  /** Sessions that look like its work, for you to say whether they are */
+  suggested?: (SessionSuggestion & { lastActiveAt?: string })[]
   /** How it ended, once settled: "Done in Claude Code · 3 comments" */
   outcome?: string
   /** The task's repository's folder on this Mac, when known */

@@ -248,6 +248,7 @@ export function TasksPage({
               task={task}
               motion={motion}
               cli={data.settings.cli}
+              working={data.working?.[task.id]}
               open={task.id === openId}
               gone={tabOf(task) !== tab}
               logEntry={task.id === openId ? logEntry : undefined}

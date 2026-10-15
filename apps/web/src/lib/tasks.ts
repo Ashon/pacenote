@@ -93,5 +93,9 @@ export function useTaskWork(id: string) {
     resume: (entryId: string) => after(bridge?.resume(entryId)),
     draft: () => after(bridge?.draft(id)),
     copyReply: (text: string) => after(bridge?.copyReply(id, text)),
+    answer: async (entryId: string, yes: boolean) => {
+      await bridge?.answerSuggestion(entryId, yes)
+      await refresh()
+    },
   }
 }

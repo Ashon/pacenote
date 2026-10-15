@@ -128,6 +128,8 @@ declare global {
               collect: TasksCollect
               /** The last 7 days' collections, newest first */
               collections: CollectionRecord[]
+              /** Each open task's latest session: its tool and last activity */
+              working: Record<string, { tool: WorkTool; at: string }>
             })
           | null
         >
@@ -141,6 +143,8 @@ declare global {
         stopCollect(): Promise<void>
         /** A task with what came before it and its work log */
         detail(id: string): Promise<TaskDetail | null>
+        /** A session that looked like a task's work: it is, or it is not */
+        answerSuggestion(entryId: string, yes: boolean): Promise<void>
         /** Where a task may open on this Mac, likeliest first */
         folders(id: string): Promise<FolderCheck[]>
         /** Asks for a folder, and checks it against the repository */

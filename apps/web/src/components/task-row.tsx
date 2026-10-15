@@ -161,6 +161,7 @@ export function TaskRow({
   task,
   motion,
   cli,
+  working,
   open,
   gone,
   logEntry,
@@ -172,6 +173,8 @@ export function TaskRow({
   motion?: Parameters<typeof motionItem>[0]
   /** Where code tasks continue */
   cli: WorkTool
+  /** Its latest session: the tool and when it was last active */
+  working?: { tool: WorkTool; at: string }
   open: boolean
   /** Settled while it was open: it stays in place until it is closed */
   gone?: boolean
@@ -332,6 +335,15 @@ export function TaskRow({
                 </span>
               )}
               {task.repo && <span className="font-mono">{task.repo}</span>}
+              {working && task.status === 'open' && (
+                <span
+                  title={`Last active in its ${TOOL[working.tool]} session`}
+                  className="inline-flex items-center gap-1"
+                >
+                  <SquareTerminal aria-hidden="true" className="size-3" />
+                  {TOOL[working.tool]} {formatRelative(working.at)}
+                </span>
+              )}
               {recent && !open && (
                 <span
                   title={recent.why}
@@ -487,6 +499,7 @@ export function TaskRow({
             onDraft={() => void draft()}
             onCopy={(text) => void act.copyReply(text).then(setError)}
             onResume={(entryId) => void act.resume(entryId).then(setError)}
+            onAnswer={(entryId, yes) => void act.answer(entryId, yes)}
           />
         </CollapsibleContent>
       </Collapsible>
@@ -575,6 +588,7 @@ function TaskOpen({
   onDraft,
   onCopy,
   onResume,
+  onAnswer,
 }: {
   task: TaskView
   drafting: boolean
@@ -583,6 +597,8 @@ function TaskOpen({
   onDraft: () => void
   onCopy: (text: string) => void
   onResume: (entryId: string) => void
+  /** A suggested session: the task's work, or not */
+  onAnswer: (entryId: string, yes: boolean) => void
 }) {
   const detail = useTaskDetail(task.id).data
   const [all, setAll] = useState(false)
@@ -594,6 +610,7 @@ function TaskOpen({
   const sessions = (detail?.work ?? []).filter(
     (entry): entry is Session => entry.kind === 'session'
   )
+  const suggested = settled ? [] : (detail?.suggested ?? [])
   const latestDraft = detail?.work.find((entry) => entry.kind === 'draft')
   const earlier = detail ? earlierOf(detail) : { rest: [] }
   const rest: Earlier[] = [
@@ -678,6 +695,14 @@ function TaskOpen({
                 onResume={onResume}
               />
             )}
+            {suggested.map((suggestion) => (
+              <SuggestedLine
+                key={suggestion.id}
+                suggestion={suggestion}
+                taskId={task.id}
+                onAnswer={onAnswer}
+              />
+            ))}
             {all &&
               rest.map((line) => (
                 <EarlierLine
@@ -687,7 +712,7 @@ function TaskOpen({
                   onResume={onResume}
                 />
               ))}
-            {!earlier.last && !sessions[0] && (
+            {!earlier.last && !sessions[0] && !suggested.length && (
               <p className="flex min-h-[30px] items-center text-xs text-muted-foreground">
                 Nothing earlier in this thread
                 {task.repo ? `, in ${task.repo}` : ''}
@@ -897,10 +922,89 @@ function EarlierLine({
     <Line label={line.label} actions={action}>
       {name(`${TOOL[own.tool]} session`, log, 'Read the session')}
       {quiet(
-        own.lastActiveAt
-          ? `last active ${formatRelative(own.lastActiveAt)}`
-          : `started ${formatRelative(own.startedAt)}`
+        [
+          own.branch,
+          own.lastActiveAt
+            ? `last active ${formatRelative(own.lastActiveAt)}`
+            : `started ${formatRelative(own.startedAt)}`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        foundHint(own)
       )}
+    </Line>
+  )
+}
+
+/** How a session you started yourself was known as the task's work */
+function foundHint(session: Session): string | undefined {
+  if (!session.found) return undefined
+  switch (session.foundBy) {
+    case 'link':
+      return "Found: what you typed has this task's Slack message"
+    case 'branch':
+      return `Found: it worked on ${session.branch ?? 'the branch'}, where this task's work is`
+    case 'you':
+      return 'You said it is this task’s work'
+    default:
+      return "Found: it used Pacenote's task tools for this task"
+  }
+}
+
+type Suggestion = NonNullable<TaskDetail['suggested']>[number]
+
+/**
+ * A session that only looks like the task's work, by what they share: you
+ * say whether it is, and its log opens like any other
+ */
+function SuggestedLine({
+  suggestion,
+  taskId,
+  onAnswer,
+}: {
+  suggestion: Suggestion
+  taskId: string
+  onAnswer: (entryId: string, yes: boolean) => void
+}) {
+  return (
+    <Line
+      label="Looks related"
+      actions={
+        <>
+          <Button
+            size="xs"
+            variant="outline"
+            aria-label="Link this session to the task"
+            onClick={() => onAnswer(suggestion.id, true)}
+          >
+            Link
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            aria-label="Not this task's session"
+            onClick={() => onAnswer(suggestion.id, false)}
+          >
+            Not it
+          </Button>
+        </>
+      }
+    >
+      <a
+        href={taskHash(taskId, `/log/${encodeURIComponent(suggestion.id)}`)}
+        title="Read the session"
+        className="font-semibold underline-offset-2 hover:underline"
+      >
+        {TOOL[suggestion.tool]} session
+      </a>
+      <span title={suggestion.cwd} className="text-xs text-muted-foreground">
+        {[
+          `mentions ${suggestion.shares.join(', ')}`,
+          suggestion.lastActiveAt
+            ? `last active ${formatRelative(suggestion.lastActiveAt)}`
+            : `started ${formatRelative(suggestion.startedAt)}`,
+        ].join(' · ')}
+      </span>
     </Line>
   )
 }
@@ -1111,9 +1215,10 @@ function sessionOf(
   entryId: string
 ): { entry: Session; title: string } | undefined {
   if (!detail) return undefined
-  const own = detail.work.find(
-    (item): item is Session => item.kind === 'session' && item.id === entryId
-  )
+  const own =
+    detail.work.find(
+      (item): item is Session => item.kind === 'session' && item.id === entryId
+    ) ?? detail.suggested?.find((item) => item.id === entryId)
   if (own) return { entry: own, title: detail.task.title }
   const { thread, repo, person } = detail.context
   const earlier = [

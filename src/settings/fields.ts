@@ -711,7 +711,7 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'TASKS_LINK_SESSIONS',
     group: 'work',
     label: 'Show sessions you start yourself',
-    help: "Finds the Claude Code and Codex sessions on this Mac that used Pacenote's task tools, and adds them to the task's work log. A session's log is read only when you open it.",
+    help: "Adds the Claude Code and Codex sessions you start yourself to a task's work log: ones that used Pacenote's task tools for it, had its Slack link in what you typed, or worked on its branch. Ones that only look related are suggested for you to link. Their logs are read on this Mac, and nothing from them leaves it.",
     type: 'toggle',
     default: 'off',
     applies: 'app',

@@ -20,7 +20,6 @@ import {
 import {
   chooseTerminal,
   commandScript,
-  discoverSessions,
   findCodexSession,
   handoffPrompt,
   lastActive,
@@ -524,46 +523,6 @@ describe("the tools' own session logs", () => {
     expect(readSessionLog(rollout, 'codex')).toEqual([
       { role: 'tool', name: 'shell', text: 'git diff' },
       { role: 'assistant', text: 'Done.' },
-    ])
-  })
-
-  it('finds sessions you started yourself that worked on a task', () => {
-    const home = dir('own-home')
-    const project = path.join(home, '.claude', 'projects', '-w-payments')
-    mkdirSync(project, { recursive: true })
-    const line = (session: string, input: unknown) =>
-      JSON.stringify({
-        type: 'assistant',
-        sessionId: session,
-        cwd: '/w/payments',
-        timestamp: '2026-10-13T09:00:00Z',
-        message: {
-          content: [
-            { type: 'tool_use', name: 'mcp__pacenote__task_context', input },
-          ],
-        },
-      })
-    writeFileSync(path.join(project, 's1.jsonl'), line('s1', { task: LINK }))
-    writeFileSync(
-      path.join(project, 's2.jsonl'),
-      line('s2', { task: 'C9:1.0' })
-    )
-    writeFileSync(path.join(project, 's3.jsonl'), line('s3', { task: task.id }))
-    const found = discoverSessions(
-      home,
-      [{ id: task.id, link: LINK }],
-      new Set(['s3'])
-    )
-    expect(found).toMatchObject([
-      {
-        kind: 'session',
-        task: task.id,
-        tool: 'claude',
-        session: 's1',
-        cwd: '/w/payments',
-        startedAt: '2026-10-13T09:00:00Z',
-        found: true,
-      },
     ])
   })
 })

@@ -66,7 +66,11 @@ import {
 } from '../../../src/tasks/collections.js'
 import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
-import type { TaskDecision, WorkEntry } from '../../../src/tasks/types.js'
+import type {
+  TaskDecision,
+  WorkEntry,
+  WorkTool,
+} from '../../../src/tasks/types.js'
 import {
   checkFolder,
   readRepos,
@@ -74,16 +78,20 @@ import {
   repoFolder,
   saveRepo,
   suggestFolders,
+  yourFolder,
 } from '../../../src/tasks/folders.js'
 import {
   addWork,
+  answerSuggestion,
+  changeWork,
   readWork,
   updateWork,
   workFor,
 } from '../../../src/tasks/work.js'
 import { draftReply } from './drafter.js'
+import { SessionIndex } from './session-index.js'
+import { isTaskBranch, linkSessions, RepoLookup } from './session-links.js'
 import {
-  discoverSessions,
   findCodexSession,
   lastActive,
   readSessionLog,
@@ -791,11 +799,14 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:tasks:list', (event) => {
     if (!fromMainWindow(event)) return null
     const current = tasksSettings()
+    const view = tasksView(dataDir, current.exclude)
+    linkSessionsSoon()
     return {
       settings: current,
       collect: taskCollector.state,
       collections: recentCollections(dataDir, collectionRuns(7)),
-      ...tasksView(dataDir, current.exclude),
+      ...view,
+      working: working(view.tasks.filter((task) => task.status === 'open')),
     }
   })
   ipcMain.handle('pacenote:tasks:collect', (event) => {
@@ -838,23 +849,115 @@ function registerBotIpc(): void {
     terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
   })
-  let lookedForSessions = 0
-  /** Sessions you started yourself, looked for at most once a minute */
-  const findOwnSessions = () => {
-    if (env().TASKS_LINK_SESSIONS !== 'on') return
-    if (Date.now() - lookedForSessions < 60_000) return
-    lookedForSessions = Date.now()
-    const known = new Set(
-      readWork(dataDir).entries.flatMap((entry) =>
-        entry.kind === 'session' && entry.session ? [entry.session] : []
+  // Sessions you started yourself, from Claude Code's and Codex's logs on
+  // this Mac (Settings > Todo > Show sessions you start yourself): linked to
+  // the task they worked on, or suggested for you to say, at most every 30
+  // seconds and never two passes at once (session-links.ts).
+  // End-to-end tests look more often (PACENOTE_TASKS_LINK_MS).
+  const LINK_EVERY_MS = Number(process.env.PACENOTE_TASKS_LINK_MS) || 30_000
+  const sessionIndex = new SessionIndex({ home: homedir() })
+  const repoLookup = new RepoLookup()
+  const linkingOn = () =>
+    env().TASKS === 'on' && env().TASKS_LINK_SESSIONS === 'on'
+  let linking: Promise<void> | undefined
+  let linkedAt = 0
+  let linkAgain = false
+  const linkSessionsSoon = (force = false): void => {
+    if (!linkingOn()) return
+    if (linking) {
+      linkAgain ||= force
+      return
+    }
+    if (!force && Date.now() - linkedAt < LINK_EVERY_MS) return
+    linking = (async () => {
+      await sessionIndex.refresh()
+      const sessions = sessionIndex
+        .sessions()
+        .filter((s) => yourFolder(homedir(), s.cwd, [dataDir]))
+      const repos = await repoLookup.all(sessions.map((s) => s.cwd))
+      const tasks = allTaskViews(dataDir)
+      const open = new Set(
+        tasks.filter((t) => t.status === 'open').map((t) => t.id)
       )
-    )
-    const tasks = allTaskViews(dataDir).map((task) => ({
-      id: task.id,
-      link: task.source.permalink,
-    }))
-    for (const entry of discoverSessions(homedir(), tasks, known))
-      addWork(dataDir, entry)
+      const result = linkSessions({
+        tasks,
+        work: readWork(dataDir),
+        sessions,
+        repos,
+      })
+      changeWork(dataDir, (file) => {
+        const known = new Set(
+          file.entries.flatMap((e) =>
+            e.kind === 'session' && e.session ? [e.session] : []
+          )
+        )
+        const found = result.found.filter((e) => !known.has(e.session!))
+        for (const e of found) known.add(e.session!)
+        const ids = new Map(result.opened.map((o) => [o.entry, o.session]))
+        return {
+          ...file,
+          entries: [
+            ...file.entries.map((e) =>
+              e.kind === 'session' && !e.session && ids.has(e.id)
+                ? { ...e, session: ids.get(e.id) }
+                : e
+            ),
+            ...found,
+          ],
+          // Still asked: for an open task, and not linked since
+          suggested: [...(file.suggested ?? []), ...result.suggested].filter(
+            (s) => open.has(s.task) && !known.has(s.session!)
+          ),
+        }
+      })
+      if (result.found.length || result.suggested.length)
+        log.info(
+          `Sessions: ${result.found.length} linked to tasks, ${result.suggested.length} suggested`
+        )
+    })()
+      .catch((error: Error) =>
+        log.warn(`Could not read the sessions' logs: ${error.message}`)
+      )
+      .finally(() => {
+        linking = undefined
+        linkedAt = Date.now()
+        if (linkAgain) {
+          linkAgain = false
+          linkSessionsSoon(true)
+        }
+      })
+  }
+  /** A session's last activity and the branch it was on last, from its log */
+  const sessionNow = (
+    entry: Pick<Session, 'session' | 'tool' | 'startedAt'>
+  ): { lastActiveAt?: string; branch?: string } => {
+    const summary = entry.session
+      ? sessionIndex.session(entry.session)
+      : undefined
+    if (summary)
+      return {
+        lastActiveAt: summary.lastAt,
+        branch:
+          summary.branch && isTaskBranch(summary.branch)
+            ? summary.branch
+            : undefined,
+      }
+    return {
+      lastActiveAt: lastActive(homedir(), entry as Session),
+    }
+  }
+  /** Each open task's latest session, for its row: the tool and when */
+  const working = (tasks: { id: string }[]) => {
+    const work = readWork(dataDir).entries
+    const rows: Record<string, { tool: WorkTool; at: string }> = {}
+    for (const task of tasks) {
+      const latest = workFor(work, task.id).find(
+        (e): e is Session => e.kind === 'session' && !!e.session
+      )
+      const at = latest && sessionNow(latest).lastActiveAt
+      if (latest && at) rows[task.id] = { tool: latest.tool, at }
+    }
+    return rows
   }
   const taskDetail = (id: string) => {
     const all = allTaskViews(dataDir)
@@ -870,8 +973,9 @@ function registerBotIpc(): void {
         const session = findCodexSession(homedir(), entry)
         if (session) updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
       }
-    findOwnSessions()
-    const work = readWork(dataDir).entries
+    linkSessionsSoon()
+    const file = readWork(dataDir)
+    const work = file.entries
     const thread = threadOf(task)
     const at = thread.indexOf(':')
     const context = taskContext(
@@ -888,22 +992,42 @@ function registerBotIpc(): void {
         entry.kind === 'session'
           ? {
               ...entry,
-              lastActiveAt: lastActive(homedir(), entry),
+              ...sessionNow(entry),
               resume: resumeCommand(entry),
             }
           : entry
       ),
+      suggested: (file.suggested ?? [])
+        .filter((s) => s.task === id)
+        .map((s) => ({
+          ...s,
+          lastActiveAt: sessionNow(s).lastActiveAt,
+        })),
       folder: task.repo ? repoFolder(dataDir, task.repo) : undefined,
       cli:
         env().TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
     }
   }
+  /** A session in a task's work log, or one suggested for it */
   const sessionEntry = (entryId: unknown): Session | undefined => {
-    const entry = readWork(dataDir).entries.find((e) => e.id === entryId)
+    const file = readWork(dataDir)
+    const entry =
+      file.entries.find((e) => e.id === entryId) ??
+      file.suggested?.find((s) => s.id === entryId)
     return entry?.kind === 'session' ? entry : undefined
   }
   ipcMain.handle('pacenote:tasks:detail', (event, id: unknown) =>
     fromMainWindow(event) && typeof id === 'string' ? taskDetail(id) : null
+  )
+  // A suggested session: yours for the task, or not
+  ipcMain.handle(
+    'pacenote:tasks:answer-suggestion',
+    (event, entryId: unknown, yes: unknown) => {
+      if (!fromMainWindow(event) || typeof entryId !== 'string') return
+      answerSuggestion(dataDir, entryId, yes === true)
+      // A session that is the task's lends it its branch: look again.
+      linkSessionsSoon(true)
+    }
   )
   // Where a task may open: its repository's folder and checkouts, or the
   // folders you worked in lately, likeliest first

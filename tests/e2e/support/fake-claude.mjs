@@ -13,7 +13,9 @@
 // An interactive session the desktop app opens to continue a task
 // (claude --session-id ID -n NAME PROMPT, or claude --resume ID) is recorded
 // the same way, with its folder, and leaves a transcript where Claude Code
-// keeps its own: $HOME/.claude/projects/<folder>/<ID>.jsonl.
+// keeps its own: $HOME/.claude/projects/<folder>/<ID>.jsonl, each line with
+// the folder's git branch.
+import { execFileSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
@@ -52,7 +54,17 @@ if (sessionAt >= 0 || resumeAt >= 0) {
   )
   mkdirSync(project, { recursive: true })
   const at = new Date().toISOString()
-  const lines =
+  // The branch the folder is on, as Claude Code logs it on each line
+  let gitBranch
+  try {
+    gitBranch = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    // Not a repository
+  }
+  const lines = (
     sessionAt >= 0
       ? [
           {
@@ -92,6 +104,7 @@ if (sessionAt >= 0 || resumeAt >= 0) {
             message: { role: 'user', content: 'Continue where we left off.' },
           },
         ]
+  ).map((line) => (gitBranch ? { ...line, gitBranch } : line))
   appendFileSync(
     path.join(project, `${id}.jsonl`),
     lines.map((line) => `${JSON.stringify(line)}\n`).join('')

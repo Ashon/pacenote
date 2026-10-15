@@ -1167,6 +1167,239 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(existsSync(path.join(home, 'tasks-repos.json'))).toBe(true)
   }, 180_000)
 
+  it('links the sessions you start yourself to the task they worked on, and asks about the ones that only look related', async () => {
+    world = await World.create()
+    const { home, root } = world
+    const now = Date.now()
+    const HOUR = 3_600_000
+    const link = (at: number) =>
+      `https://acme.slack.com/archives/C0OPS/p${String(Math.floor(at / 1000))}000100`
+    const on = { on: true, dms: false, exclude: [] }
+
+    // A checkout of the repository, on the branch the review goes on
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/fix/retry'], {
+      cwd: checkout,
+    })
+    const folder = realpathSync(checkout)
+    const [review, webhooks, backup] = addTasks(
+      home,
+      [
+        {
+          title: 'Review the payment retry PR',
+          asked_by: 'mina',
+          where: '#ops',
+          link: link(now - 3 * HOUR),
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'mina wants a review of PR #482 before Thursday.',
+        },
+        {
+          title: 'Raise the webhook retry limit',
+          asked_by: 'hyun',
+          where: '#ops',
+          link: link(now - 2 * HOUR),
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'hyun asked for `max_attempts` to be 5.',
+        },
+        {
+          title: 'Look at the failed nightly backup',
+          asked_by: 'dara',
+          where: '#ops',
+          link: link(now - HOUR),
+          confidence: 'sure',
+          action: 'other',
+          summary: 'dara asked why the nightly backup failed.',
+        },
+      ],
+      { settings: on, now: new Date(now - HOUR) }
+    ).added as NonNullable<ReturnType<typeof addTasks>['added'][0]>[]
+
+    /** A session you started yourself, as Claude Code logs it */
+    const session = (
+      id: string,
+      cwd: string,
+      prompts: string[],
+      gitBranch?: string
+    ) => {
+      const project = path.join(
+        root,
+        '.claude',
+        'projects',
+        cwd.replace(/[/.]/g, '-')
+      )
+      mkdirSync(project, { recursive: true })
+      writeFileSync(
+        path.join(project, `${id}.jsonl`),
+        prompts
+          .map(
+            (content) =>
+              `${JSON.stringify({
+                type: 'user',
+                sessionId: id,
+                cwd,
+                ...(gitBranch ? { gitBranch } : {}),
+                timestamp: new Date().toISOString(),
+                message: { role: 'user', content },
+              })}\n`
+          )
+          .join('')
+      )
+    }
+
+    const opener = path.join(root, 'open-terminal')
+    writeFileSync(
+      opener,
+      `#!/bin/sh\nFAKE_CLAUDE_DIR="${world.claudeDir}" /bin/zsh "$1" >> "${root}/session.out" 2>&1\n`
+    )
+    chmodSync(opener, 0o755)
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on', 'TASKS_PLAN_FIRST=off'],
+      env: {
+        PACENOTE_HANDOFF_OPENER: opener,
+        FAKE_CLAUDE_DIR: world.claudeDir,
+        PACENOTE_TASKS_LINK_MS: '1000',
+      },
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const rowOf = (id: string) => page.locator(`[data-task-row="${id}"]`)
+    const lineIn = (row: Locator, label: string) =>
+      row.locator('div.grid', { has: page.getByText(label, { exact: true }) })
+
+    // The review continues in Claude Code from Pacenote, on fix/retry.
+    const reviewRow = rowOf(review!.id)
+    await reviewRow
+      .getByRole('button', { name: 'Continue in Claude Code' })
+      .click()
+    await page.getByText('Where is Ashon/payments on this Mac?').waitFor()
+    const openHere = page.getByRole('button', { name: 'Open Claude Code here' })
+    await faded(openHere, 'the folder ready to open')
+    await openHere.click()
+    await eventually('the Claude Code session', () =>
+      world!.claudeCalls().find((call) => call.args.includes('--session-id'))
+    )
+
+    // After /clear the review goes on in a session of its own, on the same
+    // branch: it stays with the task, the newest of its work.
+    session('cleared', folder, ['Carry on with the review'], 'fix/retry')
+    // Pacenote's own sessions (a collection in its data folder) are not
+    // anyone's work, whatever they name.
+    session('collection', home, [`Collect: ${review!.source.permalink}`])
+    const yourWork = lineIn(reviewRow, 'Your work')
+    await yourWork
+      .getByText(/^fix\/retry · last active /)
+      .waitFor({ timeout: 15_000 })
+    await yourWork
+      .locator(
+        '[title="Found: it worked on fix/retry, where this task\'s work is"]'
+      )
+      .waitFor()
+    await reviewRow.getByRole('button', { name: '1 more earlier' }).click()
+    expect(await reviewRow.getByText('Claude Code session').count()).toBe(2)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-linked-branch.png'),
+    })
+
+    // A session with the backup task's Slack link in what you typed
+    session('pasted', path.join(root, 'notes'), [
+      `Why did this fail? ${backup!.source.permalink}`,
+    ])
+    mkdirSync(path.join(root, 'notes'), { recursive: true })
+    const backupRow = rowOf(backup!.id)
+    await backupRow
+      .getByRole('button', { name: 'Look at the failed nightly backup' })
+      .click()
+    await lineIn(backupRow, 'Your work')
+      .locator('[title="Found: what you typed has this task\'s Slack message"]')
+      .waitFor({ timeout: 15_000 })
+
+    // Two sessions on main that only share words with the webhook task:
+    // asked about, not linked. Not it is not asked again; Link adds it.
+    session(
+      'limit',
+      folder,
+      ['set max_attempts for the webhook retry to 5'],
+      'main'
+    )
+    session(
+      'config',
+      folder,
+      ['where is max_attempts read? webhook retry config'],
+      'main'
+    )
+    const webhookRow = rowOf(webhooks!.id)
+    await webhookRow
+      .getByRole('button', { name: 'Raise the webhook retry limit' })
+      .click()
+    const related = lineIn(webhookRow, 'Looks related')
+    await expect.poll(() => related.count(), { timeout: 15_000 }).toBe(2)
+    await related
+      .first()
+      .getByText(/^mentions max_attempts, webhook, retry · last active /)
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-looks-related.png'),
+    })
+    // Its log opens like any other session's.
+    await related
+      .first()
+      .getByRole('link', { name: 'Claude Code session' })
+      .click()
+    const log = page.getByRole('dialog', { name: 'Session log' })
+    await log
+      .getByText(/max_attempts/)
+      .first()
+      .waitFor()
+    await page.keyboard.press('Escape')
+    await log.waitFor({ state: 'detached' })
+
+    await related
+      .nth(1)
+      .getByRole('button', { name: "Not this task's session" })
+      .click()
+    await expect.poll(() => related.count()).toBe(1)
+    await related
+      .getByRole('button', { name: 'Link this session to the task' })
+      .click()
+    await related.waitFor({ state: 'detached' })
+    await lineIn(webhookRow, 'Your work')
+      .locator('[title="You said it is this task’s work"]')
+      .waitFor()
+    // Turned down, it is not asked about again.
+    await new Promise((resolve) => setTimeout(resolve, 2_500))
+    expect(await related.count()).toBe(0)
+    const kept = JSON.parse(
+      readFileSync(path.join(home, 'tasks-work.json'), 'utf8')
+    ) as { entries: { session?: string; foundBy?: string }[]; notIt: unknown[] }
+    expect(kept.notIt).toHaveLength(1)
+    expect(kept.entries.map((e) => e.session)).not.toContain('collection')
+    // Only the session's id, folder and branch: nothing it said
+    expect(JSON.stringify(kept)).not.toContain('max_attempts')
+
+    // Closed, an open task's row says when its session was last active.
+    await webhookRow
+      .getByRole('button', { name: 'Raise the webhook retry limit' })
+      .focus()
+    await page.keyboard.press('Escape')
+    await expect
+      .poll(async () => page.evaluate('window.location.hash'))
+      .toBe('#/tasks')
+    await reviewRow.getByText(/^Claude Code (just now|\d+m ago)$/).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-row-working.png'),
+    })
+  }, 180_000)
+
   it.skipIf(vm.skip !== undefined)(
     'sets Pace up in the built-in sandbox, its default here, and answers from a VM',
     async () => {

@@ -268,12 +268,35 @@ export function recentFolders(
     }))
 }
 
-/** A folder with its links followed, as the tools log it (/private/var) */
+/**
+ * A folder a session ran in is your work's: not one an app runs its tools in
+ * (leaveOut, Pacenote's data folder), nor a temporary one outside your home
+ */
+export function yourFolder(
+  home: string,
+  folder: string,
+  leaveOut: string[] = []
+): boolean {
+  const at = real(folder)
+  return (
+    !leaveOut.some((dir) => inside(real(dir), at)) &&
+    (inside(real(home), at) || !temporary(at))
+  )
+}
+
+/**
+ * A folder with its links followed, as the tools log it (/private/var); one
+ * that is gone (a worktree removed since), by the nearest folder still there
+ */
 function real(folder: string): string {
-  try {
-    return realpathSync(folder)
-  } catch {
-    return path.resolve(folder)
+  const rest: string[] = []
+  for (let at = path.resolve(folder); ; at = path.dirname(at)) {
+    try {
+      return path.join(realpathSync(at), ...rest)
+    } catch {
+      if (path.dirname(at) === at) return path.resolve(folder)
+      rest.unshift(path.basename(at))
+    }
   }
 }
 
