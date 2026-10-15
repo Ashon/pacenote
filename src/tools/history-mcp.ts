@@ -7,6 +7,7 @@ import { defaultHome } from '../settings/home.js'
 import { loadSettings } from '../settings/load-settings.js'
 import { settingsFilePath } from '../settings/paths.js'
 import { readSettingsValues } from '../settings/settings-file.js'
+import { folderRepo } from '../tasks/folders.js'
 import { readTasksSettings } from '../tasks/settings.js'
 
 /**
@@ -30,6 +31,9 @@ const settingsFile = settingsFilePath()
 loadSettings()
 
 const data = dataDir(process.env.PACENOTE_DATA_DIR)
+// The AI tool runs the server in the folder it works in: its repository's
+// open tasks go into the instructions.
+const repo = await folderRepo(process.cwd())
 const server = createHistoryServer({
   reader: new HistoryReader(data),
   enabled: () =>
@@ -40,6 +44,7 @@ const server = createHistoryServer({
     home: homedir(),
     settings: () => readTasksSettings(process.env, settingsFile),
     app: process.env.PACENOTE_MCP_FROM_APP === '1',
+    repo,
   },
 })
 await server.connect(new StdioServerTransport())

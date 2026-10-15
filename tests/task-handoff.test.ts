@@ -36,6 +36,7 @@ import {
 import {
   checkFolder,
   findRepoFolders,
+  folderRepo,
   readRepos,
   remoteRepo,
   repoFolder,
@@ -138,6 +139,18 @@ describe('repository folders', () => {
       'Ashon/payments'
     )
     expect(remoteRepo('not a remote')).toBeUndefined()
+  })
+
+  it("names the repository of a folder's checkout, from a folder inside it too", async () => {
+    const at = checkout(
+      path.join(root, 'named', 'payments'),
+      'git@github.com:Ashon/payments.git'
+    )
+    expect(await folderRepo(at)).toBe('Ashon/payments')
+    expect(await folderRepo(dir('named', 'payments', 'src'))).toBe(
+      'Ashon/payments'
+    )
+    expect(await folderRepo(dir('named', 'plain'))).toBeUndefined()
   })
 
   it('checks a folder against the repository, with its changes', async () => {

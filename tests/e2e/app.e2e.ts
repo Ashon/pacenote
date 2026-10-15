@@ -952,9 +952,11 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
     // The session closes the task through Pacenote's MCP server, as Claude
     // Code would, with a reply for the user to send.
+    // Claude Code runs it in the folder it works in, the task's checkout.
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [path.join(REPO, 'build/tools/history-mcp.mjs')],
+      cwd: checkout,
       env: {
         ...(process.env as Record<string, string>),
         HOME: root,
@@ -964,6 +966,16 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
     const client = new Client({ name: 'claude-code', version: '1' })
     await client.connect(transport)
+    // The session starts knowing the repository's open task and when to use
+    // Pacenote's tools for it.
+    const instructions = client.getInstructions() ?? ''
+    expect(instructions).toContain(
+      'This folder is Ashon/payments. Its open tasks:'
+    )
+    expect(instructions).toContain(
+      `- Review the payment retry PR (id ${current.id}, asked by mina, due Thursday)`
+    )
+    expect(instructions).not.toContain('Answer hyun')
     const context = await client.callTool({
       name: 'task_context',
       arguments: { task: current.source.permalink! },

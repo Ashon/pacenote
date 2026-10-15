@@ -94,6 +94,18 @@ extensions too), checked every 30 seconds or so while the Todo screen is open:
 
 An open task's row says when its latest session was last active ("Claude Code 5m ago").
 
+A session you start yourself knows the tasks of its folder without being told. Claude Code and Codex run Pacenote's MCP
+server in the folder they work in, so it reads that checkout's repository as it starts and puts its open tasks (up to
+five, each with its id, who asked, the due hint and a line of its summary) in the instructions the tool keeps for the
+session, with when to use them: call `task_context` before working on one, and `close_task` with what was done once it
+is. Asked to review a pull request one of them names, the session starts from the task. In other folders the
+instructions only say how many tasks are open. Two prompts make it one command:
+
+- `/mcp__pacenote__task` (Claude Code; the `task` prompt elsewhere) brings a task into the session, by its id, its
+  Slack link or a few words, and proposes a first step.
+- `/mcp__pacenote__done` wraps the session up into its task: it closes it with what was done, a wrap-up and a reply for
+  you to send, or, when the work is not done, leaves it open and says what is left.
+
 ## The MCP tools
 
 | Tool | What it does |
@@ -103,6 +115,8 @@ An open task's row says when its latest session was last active ("Claude Code 5m
 | `close_task` | Closes an open task: you replied, it got a check mark, or it was settled some other way |
 | `my_tasks` | Your open tasks, with who asked, where, a due hint, why, and a link; Maybes are left out |
 | `collect_tasks` (prompt) | The steps of a collection, as a slash command in Claude Code |
+| `task` (prompt) | Brings one of your tasks into the session you are in |
+| `done` (prompt) | Closes the task the session worked on, with what was done |
 
 They answer only while "Gather my tasks from Slack" is on, read on every call, and are separate from sharing the run
 history.

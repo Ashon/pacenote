@@ -65,6 +65,12 @@ export function remoteRepo(remote: string): string | undefined {
   return match ? `${match[1]}/${match[2]}` : undefined
 }
 
+/** The repository of a folder's checkout, by its origin, as owner/name */
+export async function folderRepo(folder: string): Promise<string | undefined> {
+  const remote = await git(folder, ['remote', 'get-url', 'origin'])
+  return remote ? remoteRepo(remote) : undefined
+}
+
 /** Whether a folder is the repository's checkout: its origin and its changes */
 export async function checkFolder(
   folder: string,

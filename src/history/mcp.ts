@@ -2,7 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
-import { registerTaskTools, type TaskToolsOptions } from '../tasks/mcp.js'
+import {
+  registerTaskTools,
+  taskInstructions,
+  type TaskToolsOptions,
+} from '../tasks/mcp.js'
 import type { HistoryReader } from './reader.js'
 import {
   isCollection,
@@ -51,18 +55,16 @@ export function createHistoryServer({
   const server = new McpServer(
     { name: 'pacenote', version },
     {
-      instructions:
+      instructions: [
         'Pacenote records each Slack mention its assistant Pace answered: ' +
-        'the request, the tool calls it made and its answer. Use ' +
-        'recent_runs or search_runs to find a run, then get_run for its ' +
-        'steps. ' +
-        (tasks
-          ? 'collect_context, add_tasks, update_task, close_task and ' +
-            'wrap_up_task keep the user\u2019s tasks from Slack, my_tasks ' +
-            'lists them, and ' +
-            'task_context gives one with what came before it, to work on it. '
-          : '') +
-        NOTE,
+          'the request, the tool calls it made and its answer. Use ' +
+          'recent_runs or search_runs to find a run, then get_run for its ' +
+          'steps. ' +
+          NOTE,
+        tasks ? taskInstructions(tasks) : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
     }
   )
 
