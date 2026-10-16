@@ -58,6 +58,7 @@ your own Slack.
 | `search_runs` | Runs whose request, channel, requester, answer or error contains `query`. `status`, `since` (ISO 8601), `limit` |
 | `get_run` | One run in full: the request and its Slack link, each tool call and command with its result (cut to 1500 characters), the answer or error (and its cause, such as `auth` or `limit`), outputs, token use. `include_prompt` adds the prompt Pace sent to the reasoner |
 | `collect_context`, `add_tasks`, `close_task`, `add_followup`, `my_tasks` | Your tasks from Slack, collected by the tool with its own Slack connector, and the ones a session keeps: see [Your tasks from Slack](tasks.md). These answer only while Settings > Todo > Gather my tasks from Slack is on, separately from sharing the run history, and `add_tasks`, `close_task` and `add_followup` write |
+| `my_work` | Where you contribute, from your tasks and sessions: your areas, how you contribute to each, what is open there and what you did lately; see [Where you contribute](you.md). It answers with the task tools and only reads |
 
 The run tools are read-only. The history is the one the desktop app shows (`PACENOTE_DATA_DIR`, by default `~/.pacenote`).
 

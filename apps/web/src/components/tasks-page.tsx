@@ -28,8 +28,10 @@ import {
 } from '@/lib/format'
 import { useCollect, useDecide, useTasks, useTasksLive } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { useYou } from '@/lib/you'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow, taskHash } from './task-row'
+import { YourWork } from './your-work'
 
 type Tab = 'open' | 'maybe' | 'done'
 
@@ -77,6 +79,8 @@ export function TasksPage({
   const tasks = useTasks()
   // What AI tools are doing with your tasks now, over MCP
   const live = useTasksLive().data
+  // Where you contribute: shown once above the tasks after a collection
+  const you = useYou().data
   const decide = useDecide()
   const [tab, setTab] = useState<Tab>('open')
   const [declined, setDeclined] = useState(declinedOffers)
@@ -203,6 +207,7 @@ export function TasksPage({
         live={live}
         titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
       />
+      <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
         <Banner tone="note">
           <span className="flex-1">
@@ -264,6 +269,7 @@ export function TasksPage({
               working={data.working?.[task.id]}
               live={live?.working[task.id]}
               proposal={data.proposals?.[task.id]}
+              area={data.areas?.[task.id]}
               askGroup={
                 task.status === 'maybe' &&
                 task.group &&

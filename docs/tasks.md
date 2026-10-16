@@ -148,6 +148,7 @@ It uses your Claude Code login, and is off until you turn it on.
 | `close_task` | Closes an open task: you replied, it got a check mark, or it was settled some other way |
 | `add_followup` | Keeps a task of your own from the session: work left after a task, or something to do later |
 | `my_tasks` | Your open tasks, with who asked, where, a due hint, why, and a link; Maybes are left out |
+| `my_work` | Where you contribute: your areas, how you contribute to each, what is open and what you did lately ([Where you contribute](you.md)) |
 | `collect_tasks` (prompt) | The steps of a collection, as a slash command in Claude Code |
 | `task` (prompt) | Brings one of your tasks into the session you are in |
 | `done` (prompt) | Closes the task the session worked on, with what was done |

@@ -1943,6 +1943,182 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
   }, 120_000)
 
+  it('shows where you contribute once after a collection, keeps your fixes, and opens an area from its task', async () => {
+    world = await World.create([])
+    const { home, root } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    // A checkout you work in with Claude Code, as its log says, right now
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    const project = path.join(root, '.claude', 'projects', '-git-payments')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(
+      path.join(project, 's-payments.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        sessionId: 's-payments',
+        cwd: checkout,
+        timestamp: new Date(now - 60_000).toISOString(),
+        message: { role: 'user', content: 'Look at the retry backoff' },
+      })}\n`
+    )
+    // A collection's tasks: three about payments, three in #infra
+    const on = { on: true, dms: false, exclude: [] }
+    let k = 0
+    const ask = (
+      title: string,
+      asked_by: string,
+      channel: 'payments' | 'infra'
+    ) => ({
+      title,
+      asked_by,
+      where: `#${channel}`,
+      link: `https://acme.slack.com/archives/C0${channel.toUpperCase()}/p${Math.floor((now - HOUR) / 1000) + ++k}000100`,
+      confidence: 'sure' as const,
+      ...(channel === 'payments' ? { repo: 'Ashon/payments' } : {}),
+    })
+    const [review, , , disk] = addTasks(
+      home,
+      [
+        ask('Review the payment retry PR', 'mina', 'payments'),
+        ask('Answer hyun about the refund limit', 'hyun', 'payments'),
+        ask('Check the payout job', 'mina', 'payments'),
+        ask('Look at the disk alert on db-2', 'jin', 'infra'),
+        ask('Rotate the old WAL files', 'jin', 'infra'),
+        ask('Check the backup on db-3', 'dara', 'infra'),
+      ],
+      { settings: on, now: new Date(now - HOUR), finished: true }
+    ).added
+    const page = await launch(world, { settings: ['TASKS=on'] })
+    await page.evaluate("window.location.hash = '#/tasks'")
+
+    // Once, above the tasks: the areas the work makes, and how you are in each
+    const card = page.getByRole('region', {
+      name: 'This is your work, as Pacenote sees it',
+    })
+    const area = (name: string) =>
+      card.locator('[data-your-area]').filter({ hasText: name })
+    await area('Payments').getByText('You build and answer').waitFor()
+    await area('Payments').getByText('Working on it now').waitFor()
+    await area('Payments')
+      .getByText('Ashon/payments · #payments', { exact: true })
+      .waitFor()
+    await area('Infra').getByText('You answer').waitFor()
+    expect(await card.locator('[data-your-area]').count()).toBe(2)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/you-first-look.png'),
+    })
+
+    // Fix something: rename Infra, then done; the card goes and stays gone.
+    await card.getByRole('button', { name: 'Fix something' }).click()
+    const rename = card.getByLabel('Name of Infra')
+    await rename.fill('Infra on-call')
+    await rename.press('Enter')
+    await card.getByRole('button', { name: 'Done' }).click()
+    await card.waitFor({ state: 'detached' })
+    const you = () =>
+      JSON.parse(readFileSync(path.join(home, 'you.json'), 'utf8')) as {
+        confirmedAt?: string
+        areas: { id: string; name: string; named?: boolean; left?: string }[]
+      }
+    await eventually(
+      'the rename and the look kept',
+      () =>
+        you().confirmedAt &&
+        you().areas.some((a) => a.name === 'Infra on-call' && a.named)
+    )
+    expect(
+      you()
+        .areas.map((a) => a.name)
+        .sort()
+    ).toEqual(['Infra on-call', 'Payments'])
+
+    // Each task says its area; its link opens the area on the You screen.
+    const diskRow = page.locator(`[data-task-row="${disk!.id}"]`)
+    await diskRow.getByRole('link', { name: 'Infra on-call' }).waitFor()
+    await page
+      .locator(`[data-task-row="${review!.id}"]`)
+      .getByRole('link', { name: 'Payments' })
+      .click()
+    const payments = page.locator('[data-area-row]').filter({
+      has: page.getByRole('button', { name: 'Payments', exact: true }),
+    })
+    await payments.getByText('Working in Claude Code').waitFor()
+    await payments.getByText('sessions here on 1 day of the last 30').waitFor()
+    await payments.getByText('mina and hyun asked you 3 times').waitFor()
+    await payments
+      .getByRole('link', { name: 'Review the payment retry PR' })
+      .waitFor()
+    expect(await page.evaluate('window.location.hash')).toBe(
+      `#/you/${you().areas.find((a) => a.name === 'Payments')!.id}`
+    )
+    await page.getByRole('button', { name: 'You', exact: true }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/you-areas.png'),
+    })
+
+    // Not mine anymore, then Undo: it leaves the list and comes back.
+    const infra = page.locator('[data-area-row]').filter({
+      has: page.getByRole('button', { name: 'Infra on-call', exact: true }),
+    })
+    await infra.getByRole('button', { name: 'More for Infra on-call' }).click()
+    await page.getByRole('menuitem', { name: 'Not mine anymore' }).click()
+    await page
+      .getByText('Infra on-call is not listed as yours anymore.')
+      .waitFor()
+    await infra.waitFor({ state: 'detached' })
+    expect(
+      you().areas.find((a) => a.name === 'Infra on-call')?.left
+    ).toBeTruthy()
+    await page.getByRole('button', { name: 'Undo' }).click()
+    await infra.waitFor()
+    expect(
+      you().areas.find((a) => a.name === 'Infra on-call')?.left
+    ).toBeUndefined()
+
+    // An AI tool reads the same areas through my_work.
+    const client = new Client({ name: 'claude-code', version: '1' })
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [path.join(REPO, 'build/tools/history-mcp.mjs')],
+        cwd: root,
+        env: {
+          ...(process.env as Record<string, string>),
+          HOME: root,
+          PACENOTE_HOME: home,
+          PACENOTE_DATA_DIR: home,
+        },
+      })
+    )
+    const work = JSON.parse(
+      (
+        (await client.callTool({ name: 'my_work', arguments: {} })).content as {
+          text: string
+        }[]
+      )[0]!.text
+    ) as { areas: { name: string; parts: string[]; roles: string[] }[] }
+    await client.close()
+    expect(work.areas.map((a) => a.name).sort()).toEqual([
+      'Infra on-call',
+      'Payments',
+    ])
+    expect(work.areas.find((a) => a.name === 'Payments')).toMatchObject({
+      parts: ['Ashon/payments', '#payments'],
+      roles: [
+        'builds (sessions here on 1 day of the last 30)',
+        'answers for it (mina and hyun asked you 3 times)',
+      ],
+    })
+  }, 120_000)
+
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {
     world = await World.create()
     const { slack } = world

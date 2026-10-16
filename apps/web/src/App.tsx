@@ -25,6 +25,7 @@ import { SettingsPage } from './components/settings-page'
 import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
+import { YouPage } from './components/you-page'
 import { SetupWizard } from './components/setup/wizard'
 
 /**
@@ -53,6 +54,11 @@ type Route =
       /** A session's log, over the list */
       entry?: string
     }
+  | {
+      page: 'you'
+      /** The area open in its row */
+      id?: string
+    }
   | { page: 'bot' }
   | { page: 'settings' }
   | { page: 'debug' }
@@ -61,7 +67,8 @@ type Route =
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
- * the list), #/bot: Pace's status and logs,
+ * the list), #/you: where you contribute, #/you/<id>: one area open in its
+ * row, #/bot: Pace's status and logs,
  * #/settings: Settings, #/setup: setting Pace up (the first run's wizard),
  * #/debug: Debug (development builds), otherwise: Overview
  */
@@ -78,6 +85,9 @@ function readRoute(): Route {
       entry: task[2] ? decodeURIComponent(task[2]) : undefined,
     }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
+  const area = /^#\/you\/([^/?#]+)/.exec(hash)?.[1]
+  if (area) return { page: 'you', id: decodeURIComponent(area) }
+  if (hash.startsWith('#/you')) return { page: 'you' }
   if (hash.startsWith('#/bot')) return { page: 'bot' }
   if (hash.startsWith('#/settings')) return { page: 'settings' }
   if (hash.startsWith('#/setup')) return { page: 'setup' }
@@ -197,6 +207,8 @@ export default function App() {
                     // The same list whether a task is open or not, so its
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
+                  ) : route.page === 'you' ? (
+                    <YouPage openId={route.id} />
                   ) : route.page === 'settings' ? (
                     <SettingsPage />
                   ) : route.page === 'debug' ? (

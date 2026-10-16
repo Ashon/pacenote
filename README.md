@@ -65,10 +65,16 @@ yourself in a repository is told its open tasks from the start, and Todo shows t
 </picture>
 </p>
 
+### See where you contribute
+
+**You** gathers your tasks and your Claude Code and Codex sessions into the areas you work in, such as a service's
+repositories with the channel that asks about them, and shows how you contribute to each, what is open there and what
+you did lately. Pacenote finds them on its own and shows them to you once; you only fix what it got wrong.
+
 ### Share the history with your AI tools
 
-Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did and what is on your
-list. You add it to each tool with one click, and only if you want to.
+Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did, what is on your list
+and where you contribute. You add it to each tool with one click, and only if you want to.
 
 ## What Pace never does
 

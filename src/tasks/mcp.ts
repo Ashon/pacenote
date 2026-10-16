@@ -2,6 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import { countYou } from '../you/store.js'
+import type { AreaRole } from '../you/types.js'
 import { recordActivity } from './activity.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
 import { yourRepos } from './folders.js'
@@ -134,6 +136,7 @@ export function taskInstructions(options: TaskToolsOptions): string {
     'When the work the user asks for is one of these tasks, or carries one on, call task_context with its id before you start: it has what was asked, by whom, and what came before.',
     'When that work is done, call close_task with why "resolved", a note on what you did in a line and, if the person who asked waits for an answer, a reply for the user to send. Never post to Slack yourself.',
     'When work is left after it, or the user asks you to keep something to do later, add it with add_followup (after: the task it carries on from). Not for work you are about to do now.',
+    'my_work tells where the user contributes: their areas, how they contribute to each, what is open there and what they did lately. Read it when that helps you plan their work.',
   ]
   if (here.length > 0) {
     lines.push(`This folder is ${options.repo}. Its open tasks:`)
@@ -736,6 +739,65 @@ export function registerTaskTools(
   )
 
   server.registerTool(
+    'my_work',
+    {
+      description:
+        'Where the user contributes, from their tasks and their Claude Code ' +
+        'and Codex sessions on this Mac: their areas (the repositories, Slack ' +
+        'channels and user groups each is made of), how they contribute to ' +
+        'each and what shows it, what is open in each, what they did there ' +
+        'in the last 30 days, and who asks them most. Areas with nothing for ' +
+        'four weeks are listed as resting.',
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    () =>
+      respond(options, async () => {
+        const you = await countYou({
+          dataDir: options.dataDir,
+          home: options.home,
+        })
+        const { slack, github } = you.accounts
+        return {
+          you: {
+            ...(slack
+              ? {
+                  slack: slack.team
+                    ? `${slack.name} in ${slack.team}`
+                    : slack.name,
+                }
+              : {}),
+            ...(github ? { github } : {}),
+          },
+          areas: you.areas
+            .filter((area) => area.state === 'active')
+            .map((area) => ({
+              name: area.name,
+              parts: area.parts.map((part) => part.label),
+              roles: area.roles.map(
+                (role) => `${ROLE_WORDS[role.role]} (${role.evidence})`
+              ),
+              ...(area.working
+                ? { workingNow: `in ${TOOL_LABEL[area.working.tool]}` }
+                : {}),
+              open: area.now,
+              lately: area.lately.map(({ title, at, outcome }) => ({
+                title,
+                at,
+                outcome,
+              })),
+              asksMost: area.people,
+            })),
+          resting: you.areas
+            .filter((area) => area.state === 'resting')
+            .map((area) => ({
+              name: area.name,
+              lastWorked: area.lastActiveAt,
+            })),
+        }
+      })
+  )
+
+  server.registerTool(
     'my_tasks',
     {
       description:
@@ -777,6 +839,14 @@ export function registerTaskTools(
         }
       })
   )
+}
+
+/** How the user contributes to an area, in my_work's words */
+const ROLE_WORDS: Record<AreaRole, string> = {
+  build: 'builds',
+  review: 'reviews',
+  answer: 'answers for it',
+  'on-call': 'on call',
 }
 
 /** A task's conversation and thread, as Pace's runs record them */

@@ -11,6 +11,7 @@ import type {
   TaskView,
   WorkTool,
 } from '@src/tasks/types'
+import type { TaskArea } from '@src/you/types'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
@@ -61,6 +62,7 @@ import {
   useTaskWork,
 } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { areaHash } from '@/lib/you'
 import { PaceSpinner } from './pace-spinner'
 
 /**
@@ -168,6 +170,7 @@ export function TaskRow({
   live,
   follows,
   proposal,
+  area,
   askGroup,
   open,
   gone,
@@ -188,6 +191,8 @@ export function TaskRow({
   follows?: string
   /** Its quiet session says it looks done (done-watch.ts) */
   proposal?: Proposal
+  /** The area of your work it is in (You), linked to it */
+  area?: TaskArea
   /**
    * The user group a Maybe was asked of, when you have not said whether it
    * means you
@@ -382,6 +387,15 @@ export function TaskRow({
                 <span className="rounded-full bg-muted px-2 py-px font-medium">
                   {settledLabel}
                 </span>
+              )}
+              {area && (
+                <a
+                  href={areaHash(area.id)}
+                  title={`In ${area.name}, an area of your work`}
+                  className="rounded-full bg-muted px-2 py-px font-medium hover:text-foreground"
+                >
+                  {area.name}
+                </a>
               )}
               {task.repo && (
                 <span

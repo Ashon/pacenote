@@ -58,6 +58,7 @@ export function useTasksPush() {
           'task-trend',
           'tasks-live',
           'tasks-you',
+          'you',
         ])
           void client.invalidateQueries({ queryKey: [key] })
       }),

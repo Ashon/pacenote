@@ -119,6 +119,19 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     sessionLog: (entryId: string) =>
       ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
   },
+  // You: where you contribute, and your fixes to your areas
+  you: {
+    get: () => ipcRenderer.invoke('pacenote:you:get'),
+    confirm: () => ipcRenderer.invoke('pacenote:you:confirm'),
+    rename: (id: string, name: string) =>
+      ipcRenderer.invoke('pacenote:you:rename', id, name),
+    takeOut: (id: string, part: string) =>
+      ipcRenderer.invoke('pacenote:you:take-out', id, part),
+    merge: (id: string, into: string) =>
+      ipcRenderer.invoke('pacenote:you:merge', id, into),
+    leave: (id: string, left: boolean) =>
+      ipcRenderer.invoke('pacenote:you:leave', id, left),
+  },
   // Pacenote's MCP server in Claude Code and Codex: added with their own CLIs
   mcp: {
     status: () => ipcRenderer.invoke('pacenote:mcp:status'),

@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Settings,
+  UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -13,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
 
 export type Section =
-  'overview' | 'runs' | 'tasks' | 'bot' | 'settings' | 'debug'
+  'overview' | 'runs' | 'tasks' | 'you' | 'bot' | 'settings' | 'debug'
 
 type Item = { section: Section; label: string; icon: LucideIcon }
 
@@ -22,6 +23,8 @@ const ITEMS: Item[] = [
   { section: 'overview', label: 'Overview', icon: LayoutDashboard },
   // What you have to do, above the jobs Pacenote ran
   { section: 'tasks', label: 'Todo', icon: ListChecks },
+  // Where you contribute, from those tasks and your sessions
+  { section: 'you', label: 'You', icon: UserRound },
   { section: 'runs', label: 'Runs', icon: History },
   { section: 'bot', label: 'Pace', icon: Bot },
 ]

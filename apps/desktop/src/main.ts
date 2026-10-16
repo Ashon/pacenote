@@ -103,6 +103,20 @@ import {
 } from '../../../src/tasks/work.js'
 import { addFollowUp, closeTask } from '../../../src/tasks/write.js'
 import {
+  leaveArea,
+  mergeAreas,
+  renameArea,
+  takeOut,
+  taskArea,
+} from '../../../src/you/areas.js'
+import {
+  changeYou,
+  checkAccounts,
+  countYou,
+  readYou,
+} from '../../../src/you/store.js'
+import type { YouFile, YouView } from '../../../src/you/types.js'
+import {
   dueForJudging,
   judge,
   judgePrompt,
@@ -831,6 +845,7 @@ function registerBotIpc(): void {
     judgeSoon()
     const open = view.tasks.filter((task) => task.status === 'open')
     const yours = yourGroups(current)
+    const areas = readYou(dataDir).areas
     return {
       settings: current,
       collect: taskCollector.state,
@@ -846,6 +861,13 @@ function registerBotIpc(): void {
         yours,
         notYours: notYourGroups(readTasks(dataDir), yours),
       },
+      // The area each task is in, for its row (src/you)
+      areas: Object.fromEntries(
+        view.tasks.flatMap((task) => {
+          const area = taskArea(areas, task)
+          return area ? [[task.id, area]] : []
+        })
+      ),
     }
   })
   // Who you are in Slack, as Collect now last looked you up
@@ -876,6 +898,72 @@ function registerBotIpc(): void {
       return { kept: kept.length }
     }
   )
+  // You: where you contribute, from your tasks and your sessions on this Mac
+  // (src/you). Counted at most every minute, in the background once there is
+  // a count to show; a fix applies at once and is counted again with it.
+  const YOU_EVERY_MS = 60_000
+  let you: { view: YouView; at: number } | undefined
+  let counting: Promise<YouView> | undefined
+  const countYouNow = (): Promise<YouView> => {
+    counting ??= (async () => {
+      await checkAccounts(dataDir, toolPath()).catch(() => undefined)
+      const view = await countYou({ dataDir, home: homedir(), keep: true })
+      you = { view, at: Date.now() }
+      return view
+    })().finally(() => {
+      counting = undefined
+    })
+    return counting
+  }
+  ipcMain.handle('pacenote:you:get', (event) => {
+    if (!fromMainWindow(event)) return null
+    if (!you) return countYouNow()
+    if (Date.now() - you.at > YOU_EVERY_MS) void countYouNow()
+    return you.view
+  })
+  const fixYou = async (change: (file: YouFile) => YouFile) => {
+    changeYou(dataDir, change)
+    // A count under way may have read the areas before the fix.
+    await counting?.catch(() => undefined)
+    return countYouNow()
+  }
+  const text = (value: unknown) =>
+    typeof value === 'string' && value.length < 200 ? value : undefined
+  ipcMain.handle('pacenote:you:confirm', (event) =>
+    fromMainWindow(event)
+      ? fixYou((file) => ({ ...file, confirmedAt: new Date().toISOString() }))
+      : null
+  )
+  ipcMain.handle('pacenote:you:rename', (event, id: unknown, name: unknown) => {
+    const area = text(id)
+    const to = text(name)
+    return fromMainWindow(event) && area && to
+      ? fixYou((file) => renameArea(file, area, to))
+      : null
+  })
+  ipcMain.handle(
+    'pacenote:you:take-out',
+    (event, id: unknown, part: unknown) => {
+      const area = text(id)
+      const key = text(part)
+      return fromMainWindow(event) && area && key
+        ? fixYou((file) => takeOut(file, area, key))
+        : null
+    }
+  )
+  ipcMain.handle('pacenote:you:merge', (event, id: unknown, into: unknown) => {
+    const area = text(id)
+    const target = text(into)
+    return fromMainWindow(event) && area && target
+      ? fixYou((file) => mergeAreas(file, area, target))
+      : null
+  })
+  ipcMain.handle('pacenote:you:leave', (event, id: unknown, left: unknown) => {
+    const area = text(id)
+    return fromMainWindow(event) && area
+      ? fixYou((file) => leaveArea(file, area, left === true))
+      : null
+  })
   // The Overview's tasks: what you handled over the last 14 days
   ipcMain.handle('pacenote:tasks:trend', (event) => {
     if (!fromMainWindow(event)) return null

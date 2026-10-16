@@ -39,6 +39,7 @@ import type {
   WorkTool,
 } from '@src/tasks/types'
 import type { TasksLive } from '@src/tasks/types'
+import type { TaskArea, YouView } from '@src/you/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
@@ -138,6 +139,8 @@ declare global {
               proposals: Record<string, Proposal>
               /** User groups that mean you (Settings), and ones you said not */
               groups: { yours: string[]; notYours: string[] }
+              /** The area each task is in, for those in one (src/you) */
+              areas: Record<string, TaskArea>
             })
           | null
         >
@@ -206,6 +209,22 @@ declare global {
         sessionLog(
           entryId: string
         ): Promise<{ items?: SessionItem[]; error?: string } | undefined>
+      }
+      /**
+       * You (src/you): where you contribute, from your tasks and sessions.
+       * Each fix returns you counted again with it.
+       */
+      you: {
+        get(): Promise<YouView | null>
+        /** The areas look right, or you finished fixing them */
+        confirm(): Promise<YouView | null>
+        rename(id: string, name: string): Promise<YouView | null>
+        /** Takes a part (by its key, "repo:ashon/payments") out of an area */
+        takeOut(id: string, part: string): Promise<YouView | null>
+        /** Puts an area into another, which keeps its name */
+        merge(id: string, into: string): Promise<YouView | null>
+        /** Not yours anymore, or yours again */
+        leave(id: string, left: boolean): Promise<YouView | null>
       }
       /**
        * Pacenote's MCP server in Claude Code and Codex. connect adds this
