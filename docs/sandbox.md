@@ -34,7 +34,9 @@ bot (host) --pacenote-vm run--> a Linux VM of its own, with no network device
                                 |- /out           codex's generated images (the one writable mount)
                                 |- /run/secrets   codex's auth.json (read-only)
                                 |- HOME, /tmp     tmpfs, empty on every run
-                                '- 127.0.0.1:3128 --socket--> egress proxy in Pace --> allowed domains only
+                                |- 127.0.0.1:3128 --socket--> egress proxy in Pace --> allowed domains only
+                                '- 127.0.0.1:8080 --socket--> the run's door in Pace --> /pace/mcp: Pace's own tools
+                                                                                   '-> the rest: the ops broker
 ```
 
 Settings > Sandbox > Run environment > "Built-in sandbox" (`REASONER_SANDBOX=vm`) runs each request in a VM of its own,
@@ -52,6 +54,7 @@ Each CLI's adapter (`src/reasoners`) asks only for the mounts it needs; the path
 | Network | No network device at all. The CLIs' `HTTPS_PROXY` is 127.0.0.1:3128, which the image forwards over a socket that pacenote-vm relays to Pace's own egress proxy (`src/sandbox/egress.ts`). It lets through only the domains in `~/.pacenote/sandbox/allowed-domains.txt` (exact names; CONNECT on 443, and plain HTTP; first created from `sandbox/allowed-domains.txt`), and reads it again when it changes, so an edit applies to the next request. It looks each name up itself and connects to that address, never to this Mac's own (loopback), the link-local range (where cloud metadata answers), "any" or multicast, even for an allowed name; private ranges stay reachable by name |
 | Privileges | uid 1000, the memory and CPUs set in Settings > Sandbox |
 | Auth | claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` by variable name only (not in process arguments); codex gets its `auth.json` read-only, copied to tmpfs |
+| Pace's own tools | Each run gets a door of its own, a socket relayed in at 127.0.0.1:8080. Under `/pace/mcp` it serves Pacenote's tools for the person Pace answers ([Asking Pace in Slack](tasks.md#asking-pace-in-slack)), which read and write Pacenote's files here on this Mac; the VM never sees them. The rest goes to the ops broker, when ops tools are on |
 | On failure | Settings > Sandbox and the status bar say what is missing and how to set it up. Reasoner calls fail; it does not fall back to running on the host |
 
 Per backend:

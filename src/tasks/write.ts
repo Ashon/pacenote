@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { TasksSettings } from './settings.js'
 import {
   findMessage,
@@ -195,6 +195,104 @@ export function addTasks(
         ),
       })
     return { added, skipped }
+  })
+}
+
+/** A task Pace keeps for you from a thread it answered in */
+export interface ThreadTask {
+  title: string
+  why?: string
+  /** Someone in the thread asked it of you; otherwise it is yours to do */
+  asked_by?: string
+  due?: string
+  action?: TaskAction
+  repo?: string
+  summary?: string
+}
+
+/**
+ * Adds tasks you asked Pace for in a Slack thread, as many as you asked for:
+ * each comes from your request there (its link opens it), so it is keyed by
+ * that message and its title rather than by the message alone. The same title
+ * still open in the thread is not added again. You asked for them, so they
+ * are sure, and the settings that leave channels out do not apply.
+ */
+export function addThreadTasks(
+  dataDir: string,
+  items: readonly ThreadTask[],
+  at: {
+    conversation: string
+    label: string
+    /** Your request (a Slack ts) and its link */
+    message: string
+    thread: string
+    permalink?: string
+  },
+  options: { addedBy?: string; now?: Date } = {}
+): { added: Task[]; alreadyThere: Task[]; skipped: string[] } {
+  return withTasksLock(dataDir, () => {
+    const now = options.now ?? new Date()
+    const file = readTasks(dataDir)
+    const added: Task[] = []
+    const alreadyThere: Task[] = []
+    const skipped: string[] = []
+    for (const item of items) {
+      const title = item.title.trim().slice(0, 120)
+      if (!title) {
+        skipped.push('no title')
+        continue
+      }
+      const key = createHash('sha256')
+        .update(title.toLowerCase())
+        .digest('hex')
+        .slice(0, 10)
+      const id = `${at.conversation}:${at.message}#${key}`
+      const same = [...file.tasks, ...added].find(
+        (t) =>
+          t.id === id ||
+          (!t.closed &&
+            t.source.conversation === at.conversation &&
+            (t.source.thread ?? t.source.message) === at.thread &&
+            t.title.toLowerCase() === title.toLowerCase())
+      )
+      if (same) {
+        alreadyThere.push(same)
+        continue
+      }
+      const askedBy = item.asked_by?.trim()
+      const repo = item.repo?.trim()
+      added.push({
+        id,
+        source: {
+          app: 'slack',
+          conversation: at.conversation,
+          label: at.label,
+          message: at.message,
+          thread: at.thread,
+          permalink: at.permalink,
+        },
+        title,
+        askedBy: askedBy || 'you',
+        kind: askedBy ? 'asked' : 'promised',
+        due: item.due?.trim() || undefined,
+        confidence: 'sure',
+        reason: item.why?.trim().slice(0, 300) || 'You asked Pace to keep it',
+        action: item.action,
+        repo: repo && REPO.test(repo) ? repo : undefined,
+        summary: item.summary?.trim().slice(0, 600) || undefined,
+        postedAt: new Date(
+          SOURCES.slack.postedAt?.({
+            conversation: at.conversation,
+            message: at.message,
+          }) ?? now.getTime()
+        ).toISOString(),
+        foundAt: now.toISOString(),
+        addedBy: options.addedBy,
+      })
+    }
+    if (added.length > 0)
+      writeTasks(dataDir, { ...file, tasks: [...file.tasks, ...added] })
+    return { added, alreadyThere, skipped }
   })
 }
 

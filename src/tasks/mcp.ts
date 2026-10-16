@@ -783,55 +783,7 @@ export function registerTaskTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ period, date }) =>
-      respond(options, async () => {
-        const [y, m, d] = (date ?? '').split('-').map(Number)
-        const day = date ? new Date(y!, m! - 1, d) : new Date()
-        const counted = await countRecap({
-          dataDir: options.dataDir,
-          home: options.home,
-          period,
-          key: periodKey(period, day),
-        })
-        if (!counted) throw new Error(`No ${period} for ${date}`)
-        const { view, commits } = counted
-        const inPeriod = (at: string) =>
-          Date.parse(at) >= Date.parse(view.start) &&
-          Date.parse(at) < Date.parse(view.end)
-        const title = (item: { title: string; note?: string }) =>
-          item.note ? `${item.title} (${item.note})` : item.title
-        return {
-          period,
-          key: view.key,
-          from: view.start,
-          to: view.end,
-          soFar: view.current,
-          totals: view.totals,
-          areas: view.areas.map((area) => ({
-            name: area.name,
-            done: area.items.filter((item) => item.task).map(title),
-            commits: commits
-              .filter((c) => area.repos.includes(c.repo) && inPeriod(c.at))
-              .slice(0, 80)
-              .map((c) => c.subject),
-            commitCount: area.commits,
-            sessionDays: area.days,
-            newAsks: area.asks,
-            askedPace: area.runs,
-            stillOpen: area.carried.map(title),
-          })),
-          ...(view.day
-            ? {
-                ...(view.day.yesterday
-                  ? { yesterday: view.day.yesterday.map(title) }
-                  : {}),
-                doing: view.day.doing.map(title),
-                next: view.day.next.map(title),
-              }
-            : {}),
-          ...(view.month ? { month: view.month } : {}),
-          ...(view.written ? { written: view.written.text } : {}),
-        }
-      })
+      respond(options, () => recapSummary(options, period, date))
   )
 
   server.registerTool(
@@ -846,51 +798,7 @@ export function registerTaskTools(
         'four weeks are listed as resting.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    () =>
-      respond(options, async () => {
-        const you = await countYou({
-          dataDir: options.dataDir,
-          home: options.home,
-        })
-        const { slack, github } = you.accounts
-        return {
-          you: {
-            ...(slack
-              ? {
-                  slack: slack.team
-                    ? `${slack.name} in ${slack.team}`
-                    : slack.name,
-                }
-              : {}),
-            ...(github ? { github } : {}),
-          },
-          areas: you.areas
-            .filter((area) => area.state === 'active')
-            .map((area) => ({
-              name: area.name,
-              parts: area.parts.map((part) => part.label),
-              roles: area.roles.map(
-                (role) => `${ROLE_WORDS[role.role]} (${role.evidence})`
-              ),
-              ...(area.working
-                ? { workingNow: `in ${TOOL_LABEL[area.working.tool]}` }
-                : {}),
-              open: area.now,
-              lately: area.lately.map(({ title, at, outcome }) => ({
-                title,
-                at,
-                outcome,
-              })),
-              asksMost: area.people,
-            })),
-          resting: you.areas
-            .filter((area) => area.state === 'resting')
-            .map((area) => ({
-              name: area.name,
-              lastWorked: area.lastActiveAt,
-            })),
-        }
-      })
+    () => respond(options, () => workSummary(options))
   )
 
   server.registerTool(
@@ -913,28 +821,131 @@ export function registerTaskTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ limit }) =>
-      respond(options, () => {
-        const view = tasksView(options.dataDir, options.settings().exclude)
-        return {
-          collectedAt: view.collectedAt,
-          tasks: view.tasks
-            .filter((task) => task.status === 'open')
-            .slice(0, limit ?? 20)
-            .map((task) => ({
-              id: task.id,
-              title: task.title,
-              kind: task.kind,
-              askedBy: task.askedBy,
-              source: sourceOf(task).label,
-              where: task.source.label,
-              postedAt: task.postedAt,
-              due: task.due,
-              reason: task.reason,
-              link: task.source.permalink,
-            })),
-        }
-      })
+      respond(options, () => ({
+        collectedAt: tasksView(options.dataDir, options.settings().exclude)
+          .collectedAt,
+        tasks: openTasks(options, limit ?? 20),
+      }))
   )
+}
+
+/**
+ * The user's open tasks, newest first, as my_tasks gives them (and Pace's own
+ * tools); keep says which ones to give
+ */
+export function openTasks(
+  options: Pick<TaskToolsOptions, 'dataDir' | 'settings'>,
+  limit: number,
+  keep: (task: TaskView) => boolean = () => true
+) {
+  return tasksView(options.dataDir, options.settings().exclude)
+    .tasks.filter((task) => task.status === 'open' && keep(task))
+    .slice(0, limit)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      kind: task.kind,
+      askedBy: task.askedBy,
+      source: sourceOf(task).label,
+      where: task.source.label,
+      postedAt: task.postedAt,
+      due: task.due,
+      reason: task.reason,
+      link: task.source.permalink,
+    }))
+}
+
+/** Where the user contributes, as my_work gives it (and Pace's own tools) */
+export async function workSummary(
+  options: Pick<TaskToolsOptions, 'dataDir' | 'home'>
+) {
+  const you = await countYou({ dataDir: options.dataDir, home: options.home })
+  const { slack, github } = you.accounts
+  return {
+    you: {
+      ...(slack
+        ? { slack: slack.team ? `${slack.name} in ${slack.team}` : slack.name }
+        : {}),
+      ...(github ? { github } : {}),
+    },
+    areas: you.areas
+      .filter((area) => area.state === 'active')
+      .map((area) => ({
+        name: area.name,
+        parts: area.parts.map((part) => part.label),
+        roles: area.roles.map(
+          (role) => `${ROLE_WORDS[role.role]} (${role.evidence})`
+        ),
+        ...(area.working
+          ? { workingNow: `in ${TOOL_LABEL[area.working.tool]}` }
+          : {}),
+        open: area.now,
+        lately: area.lately.map(({ title, at, outcome }) => ({
+          title,
+          at,
+          outcome,
+        })),
+        asksMost: area.people,
+      })),
+    resting: you.areas
+      .filter((area) => area.state === 'resting')
+      .map((area) => ({ name: area.name, lastWorked: area.lastActiveAt })),
+  }
+}
+
+/** A recap of a day, a week or a month, as my_recap gives it */
+export async function recapSummary(
+  options: Pick<TaskToolsOptions, 'dataDir' | 'home'>,
+  period: 'day' | 'week' | 'month',
+  date: string | undefined
+) {
+  const [y, m, d] = (date ?? '').split('-').map(Number)
+  const day = date ? new Date(y!, m! - 1, d) : new Date()
+  const counted = await countRecap({
+    dataDir: options.dataDir,
+    home: options.home,
+    period,
+    key: periodKey(period, day),
+  })
+  if (!counted) throw new Error(`No ${period} for ${date}`)
+  const { view, commits } = counted
+  const inPeriod = (at: string) =>
+    Date.parse(at) >= Date.parse(view.start) &&
+    Date.parse(at) < Date.parse(view.end)
+  const title = (item: { title: string; note?: string }) =>
+    item.note ? `${item.title} (${item.note})` : item.title
+  return {
+    period,
+    key: view.key,
+    from: view.start,
+    to: view.end,
+    soFar: view.current,
+    totals: view.totals,
+    areas: view.areas.map((area) => ({
+      name: area.name,
+      done: area.items.filter((item) => item.task).map(title),
+      commits: commits
+        .filter((c) => area.repos.includes(c.repo) && inPeriod(c.at))
+        .slice(0, 80)
+        .map((c) => c.subject),
+      commitCount: area.commits,
+      sessionDays: area.days,
+      newAsks: area.asks,
+      askedPace: area.runs,
+      stillOpen: area.carried.map(title),
+    })),
+    ...(view.day
+      ? {
+          ...(view.day.yesterday
+            ? { yesterday: view.day.yesterday.map(title) }
+            : {}),
+          doing: view.day.doing.map(title),
+          next: view.day.next.map(title),
+        }
+      : {}),
+    ...(view.month ? { month: view.month } : {}),
+    ...(view.written ? { written: view.written.text } : {}),
+  }
 }
 
 /** Writing the user's recap in the session they are in (the recap prompt) */

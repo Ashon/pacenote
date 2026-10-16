@@ -99,7 +99,10 @@ export function brokerDestinations(input: {
  * The headers the broker reads as who is asking (TRUST_REQUESTER): set by
  * the door in front of it (openBrokerDoor), never by the reasoner
  */
-export const REQUESTER_HEADERS: Record<keyof Requester, string> = {
+export const REQUESTER_HEADERS: Record<
+  Exclude<keyof Requester, 'message' | 'permalink'>,
+  string
+> = {
   user: 'x-pacenote-user',
   conversation: 'x-pacenote-conversation',
   label: 'x-pacenote-label',
@@ -108,19 +111,45 @@ export const REQUESTER_HEADERS: Record<keyof Requester, string> = {
 }
 
 /**
- * A door to the broker for one run: a socket of its own that passes each
- * request on to the broker, with who is asking in REQUESTER_HEADERS, and drops
- * any such header the reasoner sent itself. Each reasoner VM gets its run's
- * door, never the broker's own socket, so what the broker logs about who asked
- * comes from Pace.
+ * Pace's own tools (src/pace/tools.ts), served here for one run: they act for
+ * the run's requester, which comes from the door, never from the reasoner
+ */
+export type OwnTools = (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  requester: Requester | undefined
+) => Promise<void>
+
+/** Where a door serves Pace's own tools; anything else goes to the broker */
+export const OWN_TOOLS_PATH = '/pace/'
+
+/**
+ * A door for one run: a socket of its own that passes each request on to the
+ * broker, with who is asking in REQUESTER_HEADERS, and drops any such header
+ * the reasoner sent itself. Each reasoner VM gets its run's door, never the
+ * broker's own socket, so what the broker logs about who asked comes from
+ * Pace. Requests under OWN_TOOLS_PATH go to Pace's own tools instead, here on
+ * this Mac. Without a broker, only those answer.
  */
 export async function openBrokerDoor(
-  broker: string,
+  broker: string | undefined,
   socket: string,
-  requester?: Requester
+  requester?: Requester,
+  ownTools?: OwnTools
 ): Promise<{ socket: string; close(): Promise<void> }> {
   const connections = new Set<net.Socket>()
   const server = http.createServer((req, res) => {
+    if (ownTools && req.url?.startsWith(OWN_TOOLS_PATH)) {
+      ownTools(req, res, requester).catch(() => {
+        if (!res.headersSent) res.writeHead(500, { 'Content-Length': '0' })
+        res.end()
+      })
+      return
+    }
+    if (!broker) {
+      res.writeHead(404, { 'Content-Length': '0' }).end()
+      return
+    }
     const headers = { ...req.headers }
     for (const name of Object.keys(headers))
       if (name.startsWith('x-pacenote-')) delete headers[name]
@@ -170,7 +199,6 @@ export class VmBroker {
   private restarts = 0
   /** What the broker's VM said last, to say why it did not start */
   private lastLine?: string
-  private doors = 0
   /** Why the broker is not answering, if it is not */
   problem?: string
 
@@ -236,15 +264,6 @@ export class VmBroker {
       ])
     }
     await this.egress?.close()
-  }
-
-  /** A door to the broker for one run (openBrokerDoor) */
-  door(requester?: Requester) {
-    return openBrokerDoor(
-      this.socket,
-      path.join(tmpdir(), `pacenote-door-${process.pid}-${++this.doors}.sock`),
-      requester
-    )
   }
 
   /** Whether the broker answers now, over its socket */

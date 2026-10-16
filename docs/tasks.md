@@ -169,7 +169,31 @@ never what Slack said), and the app watches the data folder, so the screens chan
 - What it changes in view (a due date, a title, the repository, the summary) lights up a moment and fades.
 - Collect now and drafted replies show their own progress, so their calls stay out of the line.
 
+## Asking Pace in Slack
+
+In the built-in sandbox, Pace has Pacenote's tools of its own, so a mention can use your Todo: "keep the reviews here as
+tasks", "what is on my list?", "the retry review is done", "what did I do this week?".
+
+| Tool | What it does |
+| --- | --- |
+| `add_tasks` | Keeps what you asked for as tasks, each linking to your request in the thread; the same title still open there is kept once |
+| `my_tasks` | Your open tasks, without the ones from DMs |
+| `close_task` | Closes a task you say is done, with what was done in a line |
+| `my_work` | Where you contribute ([Where you contribute](you.md)) |
+| `my_recap` | What you did in a day, a week or a month ([Recap](recap.md)) |
+| `earlier_answers` | Pace's earlier answers in the same channel, when the run history is kept |
+
+- **Only for you.** They act for the person Pace answers, as Pacenote's door into the run says, never as the reasoner
+  says; anyone else gets nothing from them.
+- **Said in a channel.** Everyone there reads the answer, so tasks from DMs are left out, and earlier answers come only
+  from that channel, where they were already posted.
+- **In your Todo.** Tasks Pace keeps are sure, from **Pace**, in the channel you asked in, and Todo says so as it
+  happens. A request to keep tasks goes to your Todo unless you name Jira or another tracker.
+- They answer only while "Gather my tasks from Slack" is on, as the tools for AI tools do. The VM never sees Pacenote's
+  files: the tools run in Pace on this Mac, reached at `127.0.0.1:8080/pace/mcp` in the VM
+  ([Built-in sandbox](sandbox.md#built-in-sandbox)). When answers run on this Mac, Pace has none of them yet.
+
 ## Not yet
 
-Collecting on a schedule (from Pacenote, running the tool with Slack read tools only), a daily summary in your DM with Pace,
-and adding a task by mentioning Pace are the next phases of [the proposal](proposals/personal-tasks.md).
+Collecting on a schedule (from Pacenote, running the tool with Slack read tools only) and a daily summary in your DM
+with Pace are the next phases of [the proposal](proposals/personal-tasks.md).

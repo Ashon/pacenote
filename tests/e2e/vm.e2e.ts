@@ -15,6 +15,8 @@ import path from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ProcessExitError } from '../../src/sandbox/process.js'
 import { createLogger } from '../../src/logger.js'
+import { serveOwnTools } from '../../src/pace/tools.js'
+import { readTasks } from '../../src/tasks/store.js'
 import { VmSandbox } from '../../src/sandbox/vm.js'
 import { BIN, prepare, ROOT, skip } from './support/vm.js'
 import { REPO } from './support/processes.js'
@@ -256,6 +258,101 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
     },
     120_000
   )
+
+  it("gives Pace its own tools in the VM, acting for the run's requester", async () => {
+    const dataDir = path.join(work, 'own-tools')
+    mkdirSync(dataDir, { recursive: true })
+    const withTools = new VmSandbox({
+      bin: BIN,
+      root: ROOT,
+      image: 'reasoner',
+      memoryMiB: 512,
+      cpus: 1,
+      allowlistFile,
+    })
+    withTools.attachOwnTools(
+      serveOwnTools({
+        dataDir,
+        settings: () => ({
+          on: true,
+          dms: false,
+          exclude: [],
+          names: [],
+          groups: [],
+        }),
+        owner: () => 'U0ALICE',
+        version: 'e2e',
+      })
+    )
+    // A tool call from inside the VM, as the CLIs make it: at 127.0.0.1:8080,
+    // under /pace/
+    const script = `
+      const [name, args] = process.argv.slice(1)
+      const res = await fetch('http://127.0.0.1:8080/pace/mcp', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name, arguments: JSON.parse(args) },
+        }),
+      })
+      const text = await res.text()
+      const data = text.split('\\n').filter((l) => l.startsWith('data:'))
+      const reply = JSON.parse(data.map((l) => l.slice(5)).join(''))
+      process.stdout.write(reply.result.content[0].text)
+    `
+    const call = async (user: string, tool: string, args: object) =>
+      (
+        await withTools.run({
+          command: 'node',
+          args: [
+            '--input-type=module',
+            '-e',
+            script,
+            tool,
+            JSON.stringify(args),
+          ],
+          input: '',
+          timeoutMs: 60_000,
+          requester: {
+            user,
+            conversation: 'C0OPS',
+            label: '#ops',
+            thread: '1791443475.275049',
+            message: '1791443480.000200',
+            permalink:
+              'https://acme.slack.com/archives/C0OPS/p1791443480000200?thread_ts=1791443475.275049',
+            run: 'run-own',
+          },
+        })
+      ).stdout
+    try {
+      const added = JSON.parse(
+        await call('U0ALICE', 'add_tasks', {
+          tasks: [{ title: 'Review the retry PR' }],
+        })
+      ) as { added: { title: string }[] }
+      expect(added.added.map((task) => task.title)).toEqual([
+        'Review the retry PR',
+      ])
+      expect(readTasks(dataDir).tasks).toMatchObject([
+        {
+          title: 'Review the retry PR',
+          addedBy: 'Pace',
+          source: { conversation: 'C0OPS', message: '1791443480.000200' },
+        },
+      ])
+      // Someone else in the channel gets nothing from them.
+      expect(await call('U0BOB', 'my_tasks', {})).toMatch(/only for the person/)
+    } finally {
+      await withTools.close()
+    }
+  }, 120_000)
 
   it('answers a mention from a VM of its own', async () => {
     world = await World.create()

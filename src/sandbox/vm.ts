@@ -14,7 +14,12 @@ import {
   type SandboxRun,
 } from './runtime.js'
 import { jobHint, type VmImageStatus, type VmStatus } from './types.js'
-import { VmBroker, type VmBrokerOptions } from './vm-broker.js'
+import {
+  openBrokerDoor,
+  VmBroker,
+  type OwnTools,
+  type VmBrokerOptions,
+} from './vm-broker.js'
 import { IMAGE_RECIPES, imageCurrent } from './vm-images.js'
 
 /**
@@ -181,6 +186,9 @@ export class VmSandbox implements Sandbox {
   /** The ops broker's VM, once started */
   private broker?: VmBroker
   private brokerStarting?: Promise<void>
+  /** Pace's own tools, once attached (attachOwnTools) */
+  private ownTools?: OwnTools
+  private doors = 0
 
   constructor(
     private readonly options: VmSandboxOptions,
@@ -194,12 +202,32 @@ export class VmSandbox implements Sandbox {
     )
   }
 
+  /**
+   * Serves Pace's own tools to each run, through its door (127.0.0.1:8080/pace/
+   * in the VM), with or without the ops broker
+   */
+  attachOwnTools(tools: OwnTools): void {
+    this.ownTools = tools
+  }
+
   async run(run: SandboxRun): Promise<RunResult> {
     const egress = await this.openEgress()
-    // The broker through a door of the run's own, which says who is asking
+    // The broker and Pace's own tools through a door of the run's own, which
+    // says who is asking. Images relay it in as broker.sock, whatever is
+    // behind it.
+    const broker =
+      this.broker && !this.broker.problem ? this.broker.socket : undefined
     const door =
-      this.broker && !this.broker.problem
-        ? await this.broker.door(run.requester)
+      broker || this.ownTools
+        ? await openBrokerDoor(
+            broker,
+            path.join(
+              tmpdir(),
+              `pacenote-door-${process.pid}-${++this.doors}.sock`
+            ),
+            run.requester,
+            this.ownTools
+          )
         : undefined
     try {
       const result = await runProcess(

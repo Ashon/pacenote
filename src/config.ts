@@ -25,6 +25,8 @@ import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 import { settingName } from './settings/settings-file.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
+/** Pace's own tools in a reasoner VM, through the run's door (vm-broker.ts) */
+const OWN_TOOLS_URL = 'http://127.0.0.1:8080/pace/mcp'
 
 /**
  * REASONER_SANDBOX as Pace reads it: docker, the sandbox Pacenote had before
@@ -652,6 +654,9 @@ function buildReasonerConfig(
   const { broker, ...vm } = host.vm
   return {
     ...base,
+    // Pace's own tools come through each run's door, at the broker's address
+    // (src/pace/tools.ts).
+    mcpServers: [...base.mcpServers, { name: 'pacenote', url: OWN_TOOLS_URL }],
     auth,
     vm: {
       ...vm,

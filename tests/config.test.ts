@@ -167,11 +167,18 @@ describe('loadConfig', () => {
       REASONER_SANDBOX: 'vm',
       MENTION_ALLOWED_USERS: 'U1',
     })
-    // The broker is relayed into each VM at this address.
+    // The broker is relayed into each VM at this address, and Pace's own
+    // tools come through the same door.
     expect(config.reasoner.mcpServers).toEqual([
       { name: 'ops', url: 'http://127.0.0.1:8080/mcp' },
+      { name: 'pacenote', url: 'http://127.0.0.1:8080/pace/mcp' },
     ])
     expect(config.reasoner.vm?.broker).toBeDefined()
+    // Without ops tools, the VM still gets Pace's own; on this Mac, neither.
+    expect(
+      loadConfig({ ...base, OPS_TOOLS: 'off', REASONER_SANDBOX: 'vm' }).reasoner
+        .mcpServers
+    ).toEqual([{ name: 'pacenote', url: 'http://127.0.0.1:8080/pace/mcp' }])
     expect(loadConfig(env).reasoner.mcpServers).toEqual([])
   })
 

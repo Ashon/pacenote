@@ -5,6 +5,8 @@ export interface PromptAbilities {
   canReadWorkspace?: boolean
   /** The ops MCP server is attached */
   opsTools?: boolean
+  /** Pace's own tools are attached: the Todo, work and recaps (pacenote) */
+  ownTools?: boolean
   /** Diagram blocks are rendered and posted */
   diagrams?: boolean
   /** The reasoner can generate images (codex) */
@@ -16,6 +18,7 @@ export function systemPrompt(
   {
     canReadWorkspace,
     opsTools,
+    ownTools,
     diagrams,
     imageGeneration,
   }: PromptAbilities = {}
@@ -62,6 +65,16 @@ export function systemPrompt(
     lines.push(
       '- The current working directory may contain documents or code needed for the answer. Before answering, find and read the relevant files, and base the answer only on what you verified.',
       '- Only read files; do not modify them. Do not look outside the working directory.'
+    )
+  }
+  if (ownTools) {
+    lines.push(
+      "- You can use Pacenote's own tools (pacenote). Pacenote is the app you run in, and it keeps the work of the person you answer.",
+      '  - Their Todo: my_tasks, add_tasks (from this thread), close_task',
+      '  - Where they contribute and what they did: my_work, my_recap',
+      '  - Your earlier answers in this channel: earlier_answers',
+      '- When they ask you to keep, register or remember something to do (a task, a to-do, a work item), add it to their Todo with add_tasks, and say what you added. Use Jira or another tracker only when they name it.',
+      '- From these tools, put in the answer only what fits this channel.'
     )
   }
   if (opsTools) {

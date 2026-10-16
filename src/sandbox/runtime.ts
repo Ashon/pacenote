@@ -45,7 +45,8 @@ export interface Mount {
 
 /**
  * Who a run answers. The built-in sandbox puts it on each of the run's calls to
- * the ops broker, which logs them with it (vm-broker.ts).
+ * the ops broker, which logs them with it (vm-broker.ts), and Pace's own tools
+ * act for it (src/pace/tools.ts).
  */
 export interface Requester {
   /** The asker, by the messenger's user id */
@@ -56,6 +57,9 @@ export interface Requester {
   thread: string
   /** The run in the history */
   run?: string
+  /** The mention (a Slack ts) and its link: where tasks Pace adds come from */
+  message?: string
+  permalink?: string
 }
 
 /** One process to run */

@@ -72,8 +72,9 @@ export function StatusBarView({
   const status = data?.alive ? data.status : undefined
   const active = status?.requests.active ?? 0
   const problems = status?.problems ?? []
+  // Pace's own tools come with the built-in sandbox; the bar names add-ons.
   const tools = [
-    ...(status?.mcp ?? []),
+    ...(status?.mcp ?? []).filter((name) => name !== 'pacenote'),
     ...(status?.diagrams ? ['diagrams'] : []),
   ]
   const setup = supervisor?.phase === 'setup'

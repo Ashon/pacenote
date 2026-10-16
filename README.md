@@ -35,7 +35,8 @@ work.
 
 Mention `@Pace` in a thread. Pace reads the thread and its files (text, images, PDFs), works the question out with the
 `claude` or `codex` CLI you are signed in to, and answers in the thread. The app keeps every run with each step Pace
-took, so you can see how it got there. In the built-in sandbox, diagrams and charts in an answer come back as images.
+took, so you can see how it got there. In the built-in sandbox, diagrams and charts in an answer come back as images,
+and Pace can use your Todo: ask it to keep what a thread needs from you, list or close your tasks, or recap your week.
 
 <p align="center">
 <picture>

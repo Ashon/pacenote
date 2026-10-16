@@ -85,6 +85,44 @@ export class HistoryReader {
     return result
   }
 
+  /**
+   * Pace's answers in a conversation, newest first, with the text to look for
+   * in the request or the answer: what was already said there, for Pace to
+   * pick up from (src/pace/tools.ts)
+   */
+  inConversation(
+    conversation: string,
+    options: { q?: string; limit?: number; except?: string } = {}
+  ): {
+    id: string
+    at: string
+    thread: string
+    request: string
+    answer?: string
+    permalink?: string
+  }[] {
+    const q = options.q?.trim().toLowerCase()
+    const limit = Math.min(Math.max(options.limit ?? 5, 1), 20)
+    const result = []
+    for (const record of this.records()) {
+      if (isCollection(record) || record.id === options.except) continue
+      if (record.origin.conversation !== conversation) continue
+      if (record.status !== 'succeeded' || !record.answer) continue
+      if (q && !`${record.request}\n${record.answer}`.toLowerCase().includes(q))
+        continue
+      result.push({
+        id: record.id,
+        at: record.startedAt,
+        thread: record.origin.thread,
+        request: record.request,
+        answer: record.answer,
+        permalink: record.origin.permalink,
+      })
+      if (result.length >= limit) break
+    }
+    return result
+  }
+
   get(id: string): HistoryRecord | undefined {
     const dir = this.runDir(id)
     return dir ? this.load(path.join(dir, RUN_FILE)) : undefined

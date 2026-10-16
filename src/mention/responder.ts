@@ -433,6 +433,7 @@ export class MentionResponder {
       const system = systemPrompt(messenger.profile, {
         canReadWorkspace: readOnlyDir !== undefined,
         opsTools: reasoner.mcpServerNames.includes('ops'),
+        ownTools: reasoner.mcpServerNames.includes('pacenote'),
         diagrams: this.deps.renderer !== undefined,
         imageGeneration: reasoner.backend === 'codex',
       })
@@ -455,6 +456,8 @@ export class MentionResponder {
           label,
           thread: mention.thread,
           run: run?.id,
+          message: mention.message,
+          permalink: messenger.permalink(mention, mention.message),
         },
       })
       reasoning = false

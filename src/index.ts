@@ -1,5 +1,7 @@
+import { homedir } from 'node:os'
 import path from 'node:path'
 import { configFingerprint, loadConfig } from './config.js'
+import { HistoryReader } from './history/reader.js'
 import { HistoryStore } from './history/recorder.js'
 import { consoleSink, createLogger, fileSink, type Logger } from './logger.js'
 import { InflightStore } from './mention/inflight.js'
@@ -10,6 +12,7 @@ import {
   claudeCredential,
 } from './sandbox/claude-credential.js'
 import { connectSlack } from './messengers/slack/connect.js'
+import { serveOwnTools } from './pace/tools.js'
 import { createReasoner } from './reasoners/cli.js'
 import { hostCliProblems } from './reasoners/host-check.js'
 import { HostSandbox } from './sandbox/host.js'
@@ -27,6 +30,7 @@ import { pacenoteHome, settingsFilePath } from './settings/paths.js'
 import { secretValues } from './settings/fields.js'
 import { loadSettings } from './settings/load-settings.js'
 import { moveEnvSettings } from './settings/settings-file.js'
+import { readTasksSettings } from './tasks/settings.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -128,6 +132,19 @@ async function main(): Promise<void> {
     ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
     : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
+  // Pace's own tools, for the reasoner in the VM: the Todo, work and recaps of
+  // the person it answers, and its earlier answers in the channel
+  if (sandbox instanceof VmSandbox)
+    sandbox.attachOwnTools(
+      serveOwnTools({
+        dataDir: config.dataDir,
+        home: homedir(),
+        settings: () => readTasksSettings(process.env, settingsFilePath()),
+        owner: () => messenger.owner,
+        history: config.history ? new HistoryReader(config.dataDir) : undefined,
+        version: process.env.PACENOTE_VERSION ?? 'dev',
+      })
+    )
   const reasoner = createReasoner(config.reasoner, sandbox)
 
   let renderer: DiagramRenderer | undefined

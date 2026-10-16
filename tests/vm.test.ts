@@ -782,6 +782,7 @@ describe('config', () => {
     const config = loadConfig({ ...ops, REASONER_SANDBOX: 'vm' })
     expect(config.reasoner.mcpServers).toEqual([
       { name: 'ops', url: 'http://127.0.0.1:8080/mcp' },
+      { name: 'pacenote', url: 'http://127.0.0.1:8080/pace/mcp' },
     ])
     expect(config.reasoner.vm?.broker).toMatchObject({
       image: 'broker',
