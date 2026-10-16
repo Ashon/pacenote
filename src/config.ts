@@ -196,6 +196,9 @@ export const EnvSchema = z.object({
   TASKS_DMS: z.enum(['on', 'off']).default('off'),
   /** Channels tasks leave out, by name (#random) or ID */
   TASKS_EXCLUDE_CHANNELS: z.string().optional(),
+  /** Other names people call you, and the user groups that mean you */
+  TASKS_NAMES: z.string().optional(),
+  TASKS_GROUPS: z.string().optional(),
   /**
    * Continuing a task (the desktop app): where code tasks open, in which
    * terminal, whether the session starts with a plan, whether sessions
@@ -309,6 +312,8 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS',
   'TASKS_DMS',
   'TASKS_EXCLUDE_CHANNELS',
+  'TASKS_NAMES',
+  'TASKS_GROUPS',
   'TASKS_CLI',
   'TASKS_TERMINAL',
   'TASKS_PLAN_FIRST',

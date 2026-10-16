@@ -1794,6 +1794,155 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     ).toMatchObject({ why: 'resolved', by: 'claude-code' })
   }, 120_000)
 
+  it('asks whether a user group means you, and tells the next collection who you are', async () => {
+    world = await World.create([])
+    const { home, root } = world
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_NAMES=Ash', 'MENTION_ALLOWED_USERS=U0PACE'],
+    })
+    // A collection, as Claude Code runs one through Pacenote's MCP server
+    const client = new Client({ name: 'claude-code', version: '1' })
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [path.join(REPO, 'build/tools/history-mcp.mjs')],
+        cwd: root,
+        env: {
+          ...(process.env as Record<string, string>),
+          HOME: root,
+          PACENOTE_HOME: home,
+          PACENOTE_DATA_DIR: home,
+        },
+      })
+    )
+    const call = async (name: string, args?: Record<string, unknown>) =>
+      JSON.parse(
+        (
+          (await client.callTool({ name, arguments: args })).content as {
+            text: string
+          }[]
+        )[0]!.text
+      )
+    const ts = (minutesAgo: number, n: number) =>
+      `${Math.floor((Date.now() - minutesAgo * 60_000) / 1000)}00010${n}`
+    const link = (channel: string, minutesAgo: number, n: number) =>
+      `https://acme.slack.com/archives/${channel}/p${ts(minutesAgo, n)}`
+
+    // The first collection is told the names you added, and to look you up.
+    expect((await call('collect_context')).you).toEqual({
+      names: ['Ash'],
+      groups: [],
+      notGroups: [],
+      lookUp: true,
+    })
+    const first = await call('add_tasks', {
+      you: { id: 'U0ME', name: 'ashon', real_name: 'Ashon Lee', team: 'Acme' },
+      tasks: [
+        {
+          title: 'Look at the disk alert on db-2',
+          asked_by: 'hyun',
+          where: '#infra',
+          link: link('C0INFRA', 30, 1),
+          confidence: 'maybe',
+          reason: 'Asked of @infra-oncall',
+          group: '@infra-oncall',
+        },
+        {
+          title: 'Pick a color for the banner',
+          asked_by: 'mina',
+          where: '#design',
+          link: link('C0DESIGN', 20, 2),
+          confidence: 'maybe',
+          reason: 'Asked of @design',
+          group: '@design',
+        },
+      ],
+    })
+    const [disk, banner] = first.added as { id: string }[]
+
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page.getByRole('tab', { name: 'Maybe 2' }).click()
+    const diskRow = page.locator(`[data-task-row="${disk!.id}"]`)
+    const bannerRow = page.locator(`[data-task-row="${banner!.id}"]`)
+    const ask = (group: string) =>
+      page.getByRole('group', { name: `Whether ${group} means you` })
+    await ask('@infra-oncall')
+      .getByText('Does @infra-oncall mean you?')
+      .waitFor()
+    await diskRow
+      .getByText('hyun asked @infra-oncall', { exact: false })
+      .waitFor()
+    await ask('@design').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-group-ask.png'),
+    })
+    // It means you: the group goes into Settings, its Maybe into the list.
+    await ask('@infra-oncall')
+      .getByRole('button', { name: 'It\u2019s me' })
+      .click()
+    await page.getByRole('tab', { name: 'Open 1' }).waitFor()
+    expect(saved(world).TASKS_GROUPS).toBe('@infra-oncall')
+    // It does not: not asked again, and the Maybe stays one.
+    await ask('@design').getByRole('button', { name: 'Not me' }).click()
+    await ask('@design').waitFor({ state: 'detached' })
+    await bannerRow.getByRole('button', { name: 'Keep as a task' }).waitFor()
+    await page.getByRole('tab', { name: 'Open 1' }).click()
+    await diskRow.getByRole('button', { name: 'Done' }).waitFor()
+
+    // The next collection knows who you are, and which groups mean you.
+    expect((await call('collect_context')).you).toEqual({
+      id: 'U0ME',
+      names: ['ashon', 'Ashon Lee', 'Ash'],
+      groups: ['@infra-oncall'],
+      notGroups: ['@design'],
+    })
+    const next = await call('add_tasks', {
+      tasks: [
+        {
+          title: 'Restart the stuck backup job',
+          where: '#infra',
+          link: link('C0INFRA', 10, 3),
+          confidence: 'maybe',
+          group: '@infra-oncall',
+        },
+        {
+          title: 'Review the new icon set',
+          where: '#design',
+          link: link('C0DESIGN', 5, 4),
+          confidence: 'maybe',
+          group: '@design',
+        },
+      ],
+    })
+    expect(next.added).toMatchObject([
+      { title: 'Restart the stuck backup job', confidence: 'sure' },
+    ])
+    expect(next.skipped).toMatchObject([
+      { why: '@design does not mean the user' },
+    ])
+    await client.close()
+
+    // Settings > Todo says who Collect now reads Slack as, and that it is
+    // not the account Pace answers.
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    const you = page.getByText('In Slack you are', { exact: false })
+    await you.waitFor()
+    expect(await you.textContent()).toBe(
+      'In Slack you are ashon (Ashon Lee) in Acme, as Collect now last looked you up.'
+    )
+    await page
+      .getByText(
+        'Collect now reads Slack as ashon, not as the account Pace answers.'
+      )
+      .waitFor()
+    expect(
+      await page.locator('[data-setting="TASKS_GROUPS"] input').inputValue()
+    ).toBe('@infra-oncall')
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-you-settings.png'),
+    })
+  }, 120_000)
+
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {
     world = await World.create()
     const { slack } = world

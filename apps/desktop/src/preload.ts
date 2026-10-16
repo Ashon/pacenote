@@ -98,6 +98,9 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:answer-proposal', id, answer),
     keepLeft: (id: string, text: string) =>
       ipcRenderer.invoke('pacenote:tasks:keep-left', id, text),
+    you: () => ipcRenderer.invoke('pacenote:tasks:you'),
+    answerGroup: (group: string, yours: boolean) =>
+      ipcRenderer.invoke('pacenote:tasks:answer-group', group, yours),
     answerSuggestion: (entryId: string, yes: boolean) =>
       ipcRenderer.invoke('pacenote:tasks:answer-suggestion', entryId, yes),
     folders: (id: string) => ipcRenderer.invoke('pacenote:tasks:folders', id),

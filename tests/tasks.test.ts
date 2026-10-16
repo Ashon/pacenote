@@ -34,6 +34,12 @@ import { taskTrend } from '../src/tasks/trend.js'
 import type { Task, TasksFile, WorkEntry } from '../src/tasks/types.js'
 import { dayDirFor } from '../src/history/layout.js'
 import { addFollowUp, addTasks, closeTask } from '../src/tasks/write.js'
+import {
+  answerGroup,
+  groupHandle,
+  LOOK_AGAIN_MS,
+  youForCollection,
+} from '../src/tasks/you.js'
 import { settingsText } from '../src/settings/settings-file.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-tasks-'))
@@ -829,14 +835,174 @@ describe('the task tools over MCP', () => {
     const settingsFile = dir('settings.json')
     writeFileSync(
       settingsFile,
-      settingsText({ TASKS: 'on', TASKS_EXCLUDE_CHANNELS: '#random, C9' })
+      settingsText({
+        TASKS: 'on',
+        TASKS_EXCLUDE_CHANNELS: '#random, C9',
+        TASKS_GROUPS: '@infra-oncall',
+      })
     )
     expect(
-      readTasksSettings({ TASKS: 'off', TASKS_DMS: 'on' }, settingsFile)
+      readTasksSettings(
+        { TASKS: 'off', TASKS_DMS: 'on', TASKS_NAMES: 'Ash, 애숀' },
+        settingsFile
+      )
     ).toEqual({
       on: true,
       dms: true,
       exclude: ['#random', 'C9'],
+      names: ['Ash', '애숀'],
+      groups: ['@infra-oncall'],
     })
+  })
+
+  it('tells a collection who the user is, and keeps who it looked up', async () => {
+    const data = dir('mcp-you')
+    const { call, client } = await connect(
+      { ...on, names: ['Ash'], groups: ['infra-oncall'] },
+      data
+    )
+    const prompt = await client.getPrompt({ name: 'collect_tasks' })
+    expect((prompt.messages[0]!.content as { text: string }).text).toContain(
+      'If its you says lookUp, read the user\u2019s own Slack profile'
+    )
+    const first = JSON.parse((await call('collect_context')).text)
+    expect(first.you).toEqual({
+      names: ['Ash'],
+      groups: ['@infra-oncall'],
+      notGroups: [],
+      lookUp: true,
+    })
+    expect(first.rules).toContain(
+      'a user group collect_context names neither way'
+    )
+    const added = JSON.parse(
+      (
+        await call('add_tasks', {
+          you: {
+            id: 'U0ME',
+            name: 'ashon',
+            real_name: 'Ashon Lee',
+            team: 'Acme',
+          },
+          tasks: [
+            {
+              title: 'Look at the disk alert',
+              where: '#infra',
+              link: link('C3', '1760140800.000300'),
+              confidence: 'maybe',
+              group: '<!subteam^S0INFRA|@infra-oncall>',
+            },
+            {
+              title: 'Pick a color for the banner',
+              where: '#design',
+              link: link('C4', '1760140800.000400'),
+              confidence: 'maybe',
+              group: '@design',
+            },
+          ],
+        })
+      ).text
+    )
+    // An ask of a group that means the user is theirs.
+    expect(added.added).toMatchObject([
+      { title: 'Look at the disk alert', confidence: 'sure' },
+      { title: 'Pick a color for the banner', confidence: 'maybe' },
+    ])
+    const next = JSON.parse((await call('collect_context')).text)
+    expect(next.you).toEqual({
+      id: 'U0ME',
+      names: ['ashon', 'Ashon Lee', 'Ash'],
+      groups: ['@infra-oncall'],
+      notGroups: [],
+    })
+    await client.close()
+  })
+})
+
+describe('who you are in Slack', () => {
+  it('reads a user group by its handle', () => {
+    expect(groupHandle('infra-oncall')).toBe('@infra-oncall')
+    expect(groupHandle(' @Infra-Oncall ')).toBe('@infra-oncall')
+    expect(groupHandle('<!subteam^S0123|@infra-oncall>')).toBe('@infra-oncall')
+    expect(groupHandle('@디자인팀')).toBe('@디자인팀')
+    expect(groupHandle('<!subteam^S0123>')).toBeUndefined()
+    expect(groupHandle('two words')).toBeUndefined()
+    expect(groupHandle('@')).toBeUndefined()
+  })
+
+  it('looks you up again once the last look is old, and lets Settings overrule a "not me"', () => {
+    const seenAt = new Date(NOW - DAY).toISOString()
+    const file: TasksFile = {
+      version: 1,
+      tasks: [],
+      you: { id: 'U0ME', name: 'ashon', realName: 'ashon', seenAt },
+      notYourGroups: [
+        { group: '@design', at: seenAt },
+        { group: '@infra-oncall', at: seenAt },
+      ],
+    }
+    const settings = {
+      ...on,
+      names: ['ASHON', 'Ash'],
+      groups: ['infra-oncall'],
+    }
+    expect(youForCollection(file, settings, NOW)).toEqual({
+      id: 'U0ME',
+      names: ['ashon', 'Ash'],
+      groups: ['@infra-oncall'],
+      notGroups: ['@design'],
+    })
+    expect(youForCollection(file, settings, NOW + LOOK_AGAIN_MS).lookUp).toBe(
+      true
+    )
+  })
+
+  it('leaves out an ask of a group you said is not you, and keeps that through other writes', () => {
+    const data = dir('you-groups')
+    const now = new Date(NOW)
+    expect(answerGroup(data, 'not a group', false)).toBeUndefined()
+    expect(answerGroup(data, 'Design', false, now)).toBe('@design')
+    addTasks(data, [], {
+      settings: on,
+      finished: true,
+      you: { id: 'not an id' },
+      now,
+    })
+    expect(readTasks(data).you).toBeUndefined()
+    const result = addTasks(
+      data,
+      [
+        {
+          title: 'Pick a color for the banner',
+          where: '#design',
+          link: link('C4', '1760140800.000400'),
+          group: '@design',
+        },
+        {
+          title: 'Look at the disk alert',
+          where: '#infra',
+          link: link('C3', '1760140800.000300'),
+          group: '@infra-oncall',
+        },
+      ],
+      { settings: on, you: { id: 'U0ME', name: '@ashon' }, now }
+    )
+    expect(result.skipped).toEqual([
+      {
+        link: link('C4', '1760140800.000400'),
+        why: '@design does not mean the user',
+      },
+    ])
+    expect(result.added).toMatchObject([
+      { confidence: 'maybe', group: '@infra-oncall' },
+    ])
+    closeTask(data, result.added[0]!.id, 'replied', now)
+    expect(readTasks(data)).toMatchObject({
+      you: { id: 'U0ME', name: 'ashon', seenAt: now.toISOString() },
+      notYourGroups: [{ group: '@design' }],
+    })
+    // Said to mean you after all, it comes off the list.
+    answerGroup(data, '@design', true, now)
+    expect(readTasks(data).notYourGroups).toEqual([])
   })
 })

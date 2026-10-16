@@ -67,6 +67,11 @@ export interface Task {
   /** The task it carries on from: work a session left after that one */
   follows?: string
   /**
+   * The user group it was asked of, as @handle, when that group is all that
+   * made it maybe yours: Todo asks whether the group means you
+   */
+  group?: string
+  /**
    * The thread in two or three sentences, written when it was collected: who
    * wants what, and why. Pacenote keeps no messages, so this is the reminder.
    */
@@ -115,11 +120,29 @@ export interface TaskUpdate {
   changed: { field: TaskField; from?: string; to?: string }[]
 }
 
+/** Who you are in Slack, as a collection's Slack connector sees you */
+export interface SlackYou {
+  /** Your member id: "U0123ABCD" */
+  id: string
+  /** Display name: "ashon" */
+  name?: string
+  /** Full name, when Slack has one */
+  realName?: string
+  /** The workspace's name */
+  team?: string
+  /** When a collection looked you up */
+  seenAt: string
+}
+
 export interface TasksFile {
   version: 1
   /** When an AI tool last finished collecting (ISO) */
   collectedAt?: string
   tasks: Task[]
+  /** Who you are in Slack, looked up by a collection (you.ts) */
+  you?: SlackYou
+  /** User groups you said do not mean you, as @handle; not asked again */
+  notYourGroups?: { group: string; at: string }[]
 }
 
 /** Why a task was dismissed, when you say */

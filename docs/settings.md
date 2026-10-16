@@ -115,6 +115,8 @@ Each table is one group of the file. Select values are in the last column; the S
 | `tasks.enabled` | `TASKS` | `false` | Gather my tasks from Slack |
 | `tasks.dms` | `TASKS_DMS` | `false` | Count DMs and group DMs |
 | `tasks.leaveOutChannels` | `TASKS_EXCLUDE_CHANNELS` | | Leave out channels (list) |
+| `tasks.yourNames` | `TASKS_NAMES` | | Other names people call you (list) |
+| `tasks.yourGroups` | `TASKS_GROUPS` | | Groups that mean you (list) |
 | `tasks.openIn` | `TASKS_CLI` | `claude` | Open code tasks in: `claude` or `codex` |
 | `tasks.terminal` | `TASKS_TERMINAL` | `auto` | Terminal: `auto`, `terminal`, `iterm` or `ghostty` |
 | `tasks.planFirst` | `TASKS_PLAN_FIRST` | `true` | Start with a plan |

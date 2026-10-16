@@ -47,8 +47,9 @@ took, so you can see how it got there. In the built-in sandbox, diagrams and cha
 ### Keep track of what is asked of you
 
 **Collect now** has Claude Code read Slack through your claude.ai Slack connector, read only, and lists what people
-asked of you and what you said you would do. Anything it is not sure about waits under Maybe instead of cluttering the
-list, and a message never becomes a task twice. Collecting is off until you turn it on.
+asked of you and what you said you would do: by your @mention, the other names people call you, or a user group that
+means you. Anything it is not sure about waits under Maybe instead of cluttering the list, a Maybe from a group asks once
+whether that group means you, and a message never becomes a task twice. Collecting is off until you turn it on.
 
 ### Pick up where you left off, in either tool
 

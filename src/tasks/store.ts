@@ -22,10 +22,13 @@ import type {
 } from './types.js'
 
 /**
- * The two files behind your tasks, each with one kind of writer, so adding a
- * task and a click never overwrite each other:
- * - tasks.json: Pacenote's MCP server, when an AI tool adds or closes tasks
- * - tasks-decisions.json: the desktop app (done, dismissed, kept)
+ * The two files behind your tasks:
+ * - tasks.json: the tasks as AI tools add, change and close them through
+ *   Pacenote's MCP server, with who you are in Slack; the desktop app writes
+ *   it too (a task closed when it looks done, a group you say is not you),
+ *   each change under its lock (withTasksLock)
+ * - tasks-decisions.json: your clicks in the desktop app (done, dismissed,
+ *   kept), written by it alone
  */
 export const TASKS_FILE = 'tasks.json'
 export const DECISIONS_FILE = 'tasks-decisions.json'
@@ -76,6 +79,10 @@ export function readTasks(dataDir: string): TasksFile {
     version: 1,
     collectedAt: file.collectedAt,
     tasks: Array.isArray(file.tasks) ? file.tasks : [],
+    ...(file.you?.id ? { you: file.you } : {}),
+    ...(Array.isArray(file.notYourGroups)
+      ? { notYourGroups: file.notYourGroups }
+      : {}),
   }
 }
 

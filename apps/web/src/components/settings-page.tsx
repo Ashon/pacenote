@@ -69,6 +69,7 @@ import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
 import { RepoFolders } from './repo-folders'
+import { SlackYou } from './slack-you'
 import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
 import {
@@ -680,7 +681,19 @@ export function SettingsPage() {
       <>
         {card('tasks', {
           after: valueOf('TASKS') === 'on' && (
-            <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this." />
+            <>
+              <SlackYou
+                owners={
+                  hubMode
+                    ? []
+                    : valueOf('MENTION_ALLOWED_USERS')
+                        .split(',')
+                        .map((id) => id.trim())
+                        .filter(Boolean)
+                }
+              />
+              <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this." />
+            </>
           ),
         })}
         {card('work', {

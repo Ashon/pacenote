@@ -23,6 +23,13 @@ import type {
   TaskKind,
   TaskUpdate,
 } from './types.js'
+import {
+  groupHandle,
+  notYourGroups,
+  youFrom,
+  yourGroups,
+  type NewYou,
+} from './you.js'
 
 /**
  * Adding, updating and closing tasks, as the MCP server does for an AI tool.
@@ -54,6 +61,11 @@ export interface NewTask {
   repo?: string
   /** The thread in two or three sentences */
   summary?: string
+  /**
+   * The user group it was asked of (@handle), when that group is all that
+   * makes it maybe the user's
+   */
+  group?: string
 }
 
 /** owner/name, as GitHub names a repository */
@@ -84,6 +96,8 @@ export function addTasks(
     addedBy?: string
     /** Marks the collection finished (collectedAt) */
     finished?: boolean
+    /** Your own Slack profile, as the collection looked it up */
+    you?: NewYou
     now?: Date
   }
 ): { added: Task[]; skipped: Skipped[] } {
@@ -91,6 +105,9 @@ export function addTasks(
     const now = options.now ?? new Date()
     const file = readTasks(dataDir)
     const known = new Set(file.tasks.map((task) => task.id))
+    // A group that means you makes its ask yours; one you said does not, not.
+    const groups = yourGroups(options.settings)
+    const notGroups = notYourGroups(file, groups)
     const added: Task[] = []
     const skipped: Skipped[] = []
     for (const item of items) {
@@ -104,6 +121,7 @@ export function addTasks(
       }
       const id = SOURCES[source.app].taskId(source)
       const title = item.title.trim()
+      const group = item.group ? groupHandle(item.group) : undefined
       // Channels left out and DMs are Slack's settings.
       const slack = source.app === 'slack'
       const excluded = slack
@@ -119,7 +137,9 @@ export function addTasks(
                 !options.settings.dms &&
                 isDm(source.conversation, item.where)
               ? 'DMs are off'
-              : undefined
+              : group && notGroups.includes(group)
+                ? `${group} does not mean the user`
+                : undefined
       if (why) {
         skipped.push({ link: item.link, why })
         continue
@@ -142,7 +162,10 @@ export function addTasks(
           kind === 'promised' ? 'you' : item.asked_by?.trim() || undefined,
         kind,
         due: item.due?.trim() || undefined,
-        confidence: item.confidence ?? 'maybe',
+        confidence:
+          group && groups.includes(group)
+            ? 'sure'
+            : (item.confidence ?? 'maybe'),
         reason: (item.reason ?? '').trim().slice(0, 300),
         action: item.action,
         repo:
@@ -157,11 +180,14 @@ export function addTasks(
         ).toISOString(),
         foundAt: now.toISOString(),
         addedBy: options.addedBy,
+        ...(group && !groups.includes(group) ? { group } : {}),
       })
     }
-    if (added.length > 0 || options.finished)
+    const you = options.you && youFrom(options.you, now)
+    if (added.length > 0 || options.finished || you)
       writeTasks(dataDir, {
-        version: 1,
+        ...file,
+        ...(you ? { you } : {}),
         collectedAt: options.finished ? now.toISOString() : file.collectedAt,
         // Kept as the history earlier tasks are read from, then dropped
         tasks: [...file.tasks, ...added].filter(

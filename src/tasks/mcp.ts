@@ -16,6 +16,7 @@ import {
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskActivity, TaskView } from './types.js'
 import { readWork } from './work.js'
+import { youForCollection } from './you.js'
 import {
   addFollowUp,
   addTasks,
@@ -78,9 +79,9 @@ const WRAP_UP =
 /** Precision first (docs/proposals/personal-tasks.md) */
 export const TASK_RULES = [
   'Precision matters more than recall: a wrong task costs the user more than a missed one.',
-  '- A task (confidence "sure"): someone asks the user by name, or in a direct message, to do or answer something (kind "asked"), or the user says they will do something (kind "promised").',
-  '- A Maybe (confidence "maybe"): an @here or @channel, "someone should look at this", a request that may or may not be for the user, or anything you are not sure about.',
-  '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done.',
+  '- A task (confidence "sure"): someone asks the user by name (their @mention, or one of the names collect_context gives for them), in a direct message, or through a user group collect_context says means them, to do or answer something (kind "asked"), or the user says they will do something (kind "promised").',
+  '- A Maybe (confidence "maybe"): an @here or @channel, a user group collect_context names neither way (give its @handle as group, when the group is all that makes it the user\u2019s), "someone should look at this", a request that may or may not be for the user, or anything you are not sure about.',
+  '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done, or an ask of a group the user said does not mean them, unless it names the user too.',
   'title: what to do, a short imperative under 80 characters, in the language of the messages. reason: one line on why it is a task. due: a due hint in words, only if the messages give one.',
   'action: what doing it takes. "code" when it needs a change to code or a look in a repository (a review, a fix, a question only the code answers), "reply" when an answer in the thread is all it needs, "other" for anything else.',
   'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself) or plainly mean one of the user\u2019s repositories collect_context lists (by its name, as "the payments service" means acme/payments).',
@@ -91,12 +92,12 @@ export function collectPrompt(): string {
   return [
     "Collect the user's tasks from Slack into Pacenote.",
     '',
-    '1. Call collect_context: the rules, what to leave out, since when to read, and the open tasks.',
-    '2. With your Slack tools, read only: never send, edit, react or schedule anything. Find, since then: messages that mention the user; threads they took part in whose last word is not theirs; in DMs (only if DMs count), what the other person said after the user last wrote; and the user’s own messages saying they will do something. Leave out the channels collect_context lists.',
+    '1. Call collect_context: the rules, what to leave out, since when to read, the open tasks, and who the user is. If its you says lookUp, read the user\u2019s own Slack profile (no user given) for add_tasks.',
+    '2. With your Slack tools, read only: never send, edit, react or schedule anything. Find, since then: messages that mention the user (their @mention, and a search for each of the names and groups collect_context gives for them); threads they took part in whose last word is not theirs; in DMs (only if DMs count), what the other person said after the user last wrote; and the user’s own messages saying they will do something. Leave out the channels collect_context lists.',
     '3. Decide for each: a task, a Maybe, or nothing, by the rules.',
     '4. For each open task collect_context lists, look at its thread: if the user replied after it, close_task with "replied"; if its message has a check mark reaction, "checked"; if it was settled in Slack some other way (done, taken by someone else, called off), "resolved". If it is still open but the thread changed it (a new due date, a sharper or different ask, the repository named, the user now asked by name, or no longer clearly the user\u2019s), update_task with only what changed and why, on clear signs only; keep its title unless the ask itself changed. If it has no action or summary, or no repo while its thread plainly means one, fill them in with update_task. When you close one, give close_task a wrap_up too.',
     '5. For each task collect_context lists to wrap up (done or closed lately, with no wrap-up yet), read its thread and call wrap_up_task. Anything left that is asked of the user is a task to add like any other.',
-    '6. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished.',
+    '6. Call add_tasks once with everything you found, each with the permalink of its message, even when the list is empty, so Pacenote knows the collection finished; with you (the profile\u2019s id, display name, real name and workspace) when collect_context said lookUp.',
     '',
     NOTE,
   ].join('\n')
@@ -267,8 +268,9 @@ export function registerTaskTools(
         "What collecting the user's tasks from Slack needs: the rules for " +
         'what is a task, the channels to leave out, whether DMs count, since ' +
         'when to read, the open tasks to check for closing, the tasks done ' +
-        'or closed lately to wrap up, and the repositories the user works ' +
-        'in. Call it first.',
+        'or closed lately to wrap up, the repositories the user works in, ' +
+        'and who the user is in Slack: the names people call them and the ' +
+        'user groups that mean them, or do not. Call it first.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     () =>
@@ -326,6 +328,7 @@ export function registerTaskTools(
             })),
           // For a task's repo: names only, never where they are
           repos: await yourRepos(options.dataDir, options.home),
+          you: youForCollection(file, settings),
         }
       })
   )
@@ -375,6 +378,12 @@ export function registerTaskTools(
                 .string()
                 .optional()
                 .describe('The thread in two or three sentences'),
+              group: z
+                .string()
+                .optional()
+                .describe(
+                  'The user group it was asked of, as @handle, when the group is all that makes it maybe the user\u2019s'
+                ),
             })
           )
           .max(100),
@@ -382,15 +391,27 @@ export function registerTaskTools(
           .boolean()
           .optional()
           .describe('The collection is done (default true)'),
+        you: z
+          .object({
+            id: z.string().describe('Their member id: U0123ABCD'),
+            name: z.string().optional().describe('Display name'),
+            real_name: z.string().optional().describe('Full name'),
+            team: z.string().optional().describe("The workspace's name"),
+          })
+          .optional()
+          .describe(
+            "The user's own Slack profile, when collect_context said lookUp"
+          ),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    ({ tasks, finished }) =>
+    ({ tasks, finished, you }) =>
       respond(options, () => {
         const result = addTasks(options.dataDir, tasks, {
           settings: options.settings(),
           addedBy: client(),
           finished: finished ?? true,
+          you,
         })
         track({
           kind: 'add',

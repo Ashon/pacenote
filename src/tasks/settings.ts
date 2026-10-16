@@ -7,6 +7,10 @@ export interface TasksSettings {
   dms: boolean
   /** Channels left out, by name (#random) or ID (TASKS_EXCLUDE_CHANNELS) */
   exclude: string[]
+  /** Other names people call you, besides your Slack names (TASKS_NAMES) */
+  names?: string[]
+  /** User groups whose mention asks you, as written (TASKS_GROUPS) */
+  groups?: string[]
 }
 
 /**
@@ -24,9 +28,15 @@ export function readTasksSettings(
   return {
     on: value('TASKS') === 'on',
     dms: value('TASKS_DMS') === 'on',
-    exclude: (value('TASKS_EXCLUDE_CHANNELS') ?? '')
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean),
+    exclude: listOf(value('TASKS_EXCLUDE_CHANNELS')),
+    names: listOf(value('TASKS_NAMES')),
+    groups: listOf(value('TASKS_GROUPS')),
   }
 }
+
+/** A list setting's entries: comma-separated in the environment */
+export const listOf = (value: string | undefined): string[] =>
+  (value ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)

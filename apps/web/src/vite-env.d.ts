@@ -28,6 +28,7 @@ import type {
   CollectOutcome,
   FolderCheck,
   SessionItem,
+  SlackYou,
   TaskDecision,
   Proposal,
   TaskDetail,
@@ -135,6 +136,8 @@ declare global {
               working: Record<string, { tool: WorkTool; at: string }>
               /** Open tasks whose quiet session says they look done */
               proposals: Record<string, Proposal>
+              /** User groups that mean you (Settings), and ones you said not */
+              groups: { yours: string[]; notYours: string[] }
             })
           | null
         >
@@ -164,6 +167,16 @@ declare global {
           id: string,
           text: string
         ): Promise<{ id?: string; error?: string } | undefined>
+        /** Who you are in Slack, as Collect now last looked you up */
+        you(): Promise<SlackYou | null>
+        /**
+         * Whether a user group means you: yes adds it to Settings and keeps
+         * its Maybes as tasks; no is not asked again
+         */
+        answerGroup(
+          group: string,
+          yours: boolean
+        ): Promise<{ kept?: number; error?: string } | undefined>
         /** A session that looked like a task's work: it is, or it is not */
         answerSuggestion(entryId: string, yes: boolean): Promise<void>
         /** Where a task may open on this Mac, likeliest first */

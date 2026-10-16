@@ -44,22 +44,37 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
 
 ## How a collection goes
 
-- Claude Code (or your tool) calls `collect_context`: the rules, the channels to leave out, whether DMs count, since when to read (the last
-  collection, or the last 7 days the first time), and the open tasks to check.
-- With its Slack tools, read only, it looks for messages that mention you, threads you took part in whose last word is not
-  yours, what someone said in a DM after your last message (when DMs count), and your own messages saying you will do
-  something.
+- Claude Code (or your tool) calls `collect_context`: the rules, the channels to leave out, whether DMs count, since when
+  to read (the last collection, or the last 7 days the first time), the open tasks to check, and who you are.
+- With its Slack tools, read only, it looks for messages that mention you (your @mention, and the names and groups that
+  [mean you](#who-you-are-in-slack)), threads you took part in whose last word is not yours, what someone said in a DM
+  after your last message (when DMs count), and your own messages saying you will do something.
 - It closes open tasks you answered in the thread, or whose message got a check mark (`close_task`), and adds what it found
   (`add_tasks`), each with the permalink of its message. A message is never a task twice, and messages from channels left
   out, or DMs while they do not count, are skipped whatever the tool sends.
 - The messages go to the tool's model, as anything the tool reads does. Pacenote keeps the tasks in
   `PACENOTE_DATA_DIR/tasks.json` and your decisions in `tasks-decisions.json`.
 
+## Who you are in Slack
+
+A collection is told who you are, so it can tell what is asked of you from what only looks like it:
+
+- **Your names.** The first collection looks up your own Slack profile with its Slack connector, and does again every 30
+  days; Settings > Todo says who it read Slack as ("In Slack you are ashon (Ashon Lee) in Acme"), and when that is not the
+  account Pace answers. Add the other names people call you, such as a nickname or your name in another language, under
+  "Other names people call you": a request that calls you by one is yours, @mention or not.
+- **Your groups.** "Groups that mean you" lists the Slack user groups whose mention asks you, such as an on-call group.
+  An ask of one of them is a task. An ask of a group neither list has is a Maybe, and its row asks once: "Does
+  @infra-oncall mean you?" **It's me** adds the group to Settings and keeps its Maybes as tasks; **Not me** leaves later
+  asks of that group out, unless they name you. Adding the group to Settings later takes that back.
+- The collection searches for your names and groups as well as your @mention. Pacenote keeps your id, names and
+  workspace in `tasks.json`, and no Slack token.
+
 ## The list
 
-- **Precision first.** A task is something someone asked you by name (or in a DM), or something you said you would do. An
-  `@here`, "someone should look at this", or anything the tool is not sure about is a **Maybe**: it stays under its own tab,
-  out of the list and `my_tasks`, until you keep it.
+- **Precision first.** A task is something someone asked you by name (or in a DM, or through a group that means you), or
+  something you said you would do. An `@here`, a group not known to mean you, "someone should look at this", or anything
+  the tool is not sure about is a **Maybe**: it stays under its own tab, out of the list and `my_tasks`, until you keep it.
 - **Done** and **Dismiss** are one click. Dismiss can say why: not for me, already done, not worth it. After three "not for
   me" from the same channel, the screen offers to leave that channel out.
 - Closed tasks show under Done with why, and Reopen brings one back.

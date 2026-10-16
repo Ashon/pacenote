@@ -63,7 +63,18 @@ import {
   recentCollections,
 } from '../../../src/tasks/collections.js'
 import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
-import { allTaskViews, decide, tasksView } from '../../../src/tasks/store.js'
+import {
+  allTaskViews,
+  decide,
+  readTasks,
+  tasksView,
+} from '../../../src/tasks/store.js'
+import { listOf } from '../../../src/tasks/settings.js'
+import {
+  answerGroup,
+  notYourGroups,
+  yourGroups,
+} from '../../../src/tasks/you.js'
 import { liveTasks, readActivity } from '../../../src/tasks/activity.js'
 import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
@@ -805,10 +816,9 @@ function registerBotIpc(): void {
     return {
       on: env.TASKS === 'on',
       dms: env.TASKS_DMS === 'on',
-      exclude: (env.TASKS_EXCLUDE_CHANNELS ?? '')
-        .split(',')
-        .map((part) => part.trim())
-        .filter(Boolean),
+      exclude: listOf(env.TASKS_EXCLUDE_CHANNELS),
+      names: listOf(env.TASKS_NAMES),
+      groups: listOf(env.TASKS_GROUPS),
       /** Where code tasks continue */
       cli: env.TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
     }
@@ -820,6 +830,7 @@ function registerBotIpc(): void {
     linkSessionsSoon()
     judgeSoon()
     const open = view.tasks.filter((task) => task.status === 'open')
+    const yours = yourGroups(current)
     return {
       settings: current,
       collect: taskCollector.state,
@@ -830,8 +841,41 @@ function registerBotIpc(): void {
         readWork(dataDir),
         new Set(open.map((task) => task.id))
       ),
+      // A Maybe from a group neither list has asks whether it means you.
+      groups: {
+        yours,
+        notYours: notYourGroups(readTasks(dataDir), yours),
+      },
     }
   })
+  // Who you are in Slack, as Collect now last looked you up
+  ipcMain.handle('pacenote:tasks:you', (event) =>
+    fromMainWindow(event) ? (readTasks(dataDir).you ?? null) : null
+  )
+  // Whether a user group means you: one that does goes into Settings, and its
+  // Maybes into the list; one that does not is not asked about again.
+  ipcMain.handle(
+    'pacenote:tasks:answer-group',
+    (event, value: unknown, yours: unknown) => {
+      if (!fromMainWindow(event) || typeof value !== 'string') return {}
+      const group = answerGroup(dataDir, value, yours === true)
+      if (!group) return { error: `${value} is not a user group.` }
+      if (yours !== true) return {}
+      const current = tasksSettings()
+      if (!yourGroups(current).includes(group)) {
+        const problems = settings.save({
+          TASKS_GROUPS: [...(current.groups ?? []), group].join(', '),
+        })
+        if (problems.length > 0)
+          return { error: problems.map((p) => p.message).join(' ') }
+      }
+      const kept = tasksView(dataDir, current.exclude).tasks.filter(
+        (task) => task.status === 'maybe' && task.group === group
+      )
+      for (const task of kept) decide(dataDir, task.id, { status: 'kept' })
+      return { kept: kept.length }
+    }
+  )
   // The Overview's tasks: what you handled over the last 14 days
   ipcMain.handle('pacenote:tasks:trend', (event) => {
     if (!fromMainWindow(event)) return null

@@ -52,7 +52,13 @@ export function useTasksPush() {
   useEffect(
     () =>
       window.pacenoteDesktop?.tasks.onChanged(() => {
-        for (const key of ['tasks', 'task', 'task-trend', 'tasks-live'])
+        for (const key of [
+          'tasks',
+          'task',
+          'task-trend',
+          'tasks-live',
+          'tasks-you',
+        ])
           void client.invalidateQueries({ queryKey: [key] })
       }),
     [client]
@@ -82,6 +88,29 @@ export function useProposal(id: string) {
       return result?.error
     },
   }
+}
+
+/**
+ * Whether a user group a Maybe was asked of means you; returns the error to
+ * show, if any. Yes changes Settings, so the settings screen reloads too.
+ */
+export function useGroupAnswer() {
+  const client = useQueryClient()
+  return async (group: string, yours: boolean) => {
+    const result = await window.pacenoteDesktop?.tasks.answerGroup(group, yours)
+    await client.invalidateQueries({ queryKey: ['tasks'] })
+    return result?.error
+  }
+}
+
+/** Who you are in Slack, as Collect now last looked you up */
+export function useSlackYou() {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: ['tasks-you'],
+    queryFn: async () => (await bridge?.you()) ?? null,
+    enabled: Boolean(bridge),
+  })
 }
 
 /** Records a decision on a task (or takes it back) and refreshes the list */

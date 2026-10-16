@@ -264,6 +264,14 @@ export function TasksPage({
               working={data.working?.[task.id]}
               live={live?.working[task.id]}
               proposal={data.proposals?.[task.id]}
+              askGroup={
+                task.status === 'maybe' &&
+                task.group &&
+                !data.groups?.yours.includes(task.group) &&
+                !data.groups?.notYours.includes(task.group)
+                  ? task.group
+                  : undefined
+              }
               follows={
                 task.follows
                   ? data.tasks.find((each) => each.id === task.follows)?.title

@@ -54,6 +54,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import {
   taskDetailQuery,
+  useGroupAnswer,
   useProposal,
   useRepoFolders,
   useTaskDetail,
@@ -167,6 +168,7 @@ export function TaskRow({
   live,
   follows,
   proposal,
+  askGroup,
   open,
   gone,
   logEntry,
@@ -186,6 +188,11 @@ export function TaskRow({
   follows?: string
   /** Its quiet session says it looks done (done-watch.ts) */
   proposal?: Proposal
+  /**
+   * The user group a Maybe was asked of, when you have not said whether it
+   * means you
+   */
+  askGroup?: string
   open: boolean
   /** Settled while it was open: it stays in place until it is closed */
   gone?: boolean
@@ -204,6 +211,11 @@ export function TaskRow({
   // Its repository's folder: Continue opens there without asking.
   const folder = repoFolderOf(useRepoFolders().data, task.repo)
   const [dismissing, setDismissing] = useState(false)
+  // Whether its group means you: asked on the row, then gone once answered
+  const answerGroup = useGroupAnswer()
+  const asking = usePresence(Boolean(askGroup) && !dismissing)
+  const askedGroup = useRef(askGroup)
+  if (askGroup) askedGroup.current = askGroup
   // The folder dialog, kept for the tool it was for while it closes
   const [folderAsk, setFolderAsk] = useState<{
     tool: WorkTool
@@ -256,8 +268,10 @@ export function TaskRow({
     : task.kind === 'promised'
       ? 'You said you would'
       : task.askedBy
-        ? `${task.askedBy} asked you`
-        : undefined
+        ? `${task.askedBy} asked ${task.group ?? 'you'}`
+        : task.group
+          ? `Asked of ${task.group}`
+          : undefined
   const source = sourceOf(task)
   const by = closedBy(task.closed?.by)
   const settledLabel =
@@ -415,6 +429,36 @@ export function TaskRow({
                 </span>
               )}
             </p>
+            {asking.mounted && (
+              <div
+                ref={asking.ref}
+                data-state={asking.state}
+                className="motion-fade mt-2 flex flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label={`Whether ${askedGroup.current} means you`}
+              >
+                <span className="mr-1 text-xs text-muted-foreground">
+                  Does {askedGroup.current} mean you?
+                </span>
+                {[
+                  { label: 'It’s me', yours: true },
+                  { label: 'Not me', yours: false },
+                ].map(({ label, yours }) => (
+                  <Button
+                    key={label}
+                    size="xs"
+                    variant={yours ? 'outline' : 'ghost'}
+                    onClick={() =>
+                      void answerGroup(askedGroup.current!, yours).then(
+                        setError
+                      )
+                    }
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            )}
             {dismissing && (
               <div
                 className="mt-2 flex flex-wrap items-center gap-1.5"
