@@ -40,6 +40,7 @@ import type {
 } from '@src/tasks/types'
 import type { TasksLive } from '@src/tasks/types'
 import type { TaskArea, YouView } from '@src/you/types'
+import type { RecapPeriod, RecapView } from '@src/you/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
@@ -225,6 +226,16 @@ declare global {
         merge(id: string, into: string): Promise<YouView | null>
         /** Not yours anymore, or yours again */
         leave(id: string, left: boolean): Promise<YouView | null>
+      }
+      /** Recap (src/you/recap.ts): a day, a week or a month of your work */
+      recap: {
+        /** A period's recap; the current one without a key */
+        get(period: RecapPeriod, key?: string): Promise<RecapView | null>
+        /** Has Claude Code write it up, with no tools; the recap with it */
+        write(
+          period: RecapPeriod,
+          key: string
+        ): Promise<{ view?: RecapView; error?: string }>
       }
       /**
        * Pacenote's MCP server in Claude Code and Codex. connect adds this

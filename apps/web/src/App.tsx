@@ -26,6 +26,8 @@ import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
 import { YouPage } from './components/you-page'
+import { lastPeriod, RecapPage } from './components/recap-page'
+import type { RecapPeriod } from '@src/you/types'
 import { SetupWizard } from './components/setup/wizard'
 
 /**
@@ -59,6 +61,12 @@ type Route =
       /** The area open in its row */
       id?: string
     }
+  | {
+      page: 'recap'
+      period: RecapPeriod
+      /** The period's key; the current one when none */
+      key?: string
+    }
   | { page: 'bot' }
   | { page: 'settings' }
   | { page: 'debug' }
@@ -67,8 +75,9 @@ type Route =
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
- * the list), #/you: where you contribute, #/you/<id>: one area open in its
- * row, #/bot: Pace's status and logs,
+ * the list), #/recap/<day|week|month>[/<key>]: what you did in a period,
+ * #/you: where you contribute, #/you/<id>: one area open in its row, #/bot:
+ * Pace's status and logs,
  * #/settings: Settings, #/setup: setting Pace up (the first run's wizard),
  * #/debug: Debug (development builds), otherwise: Overview
  */
@@ -85,6 +94,13 @@ function readRoute(): Route {
       entry: task[2] ? decodeURIComponent(task[2]) : undefined,
     }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
+  const recap = /^#\/recap(?:\/(day|week|month)(?:\/([^/?#]+))?)?/.exec(hash)
+  if (recap)
+    return {
+      page: 'recap',
+      period: (recap[1] as RecapPeriod | undefined) ?? lastPeriod(),
+      key: recap[2] ? decodeURIComponent(recap[2]) : undefined,
+    }
   const area = /^#\/you\/([^/?#]+)/.exec(hash)?.[1]
   if (area) return { page: 'you', id: decodeURIComponent(area) }
   if (hash.startsWith('#/you')) return { page: 'you' }
@@ -207,6 +223,8 @@ export default function App() {
                     // The same list whether a task is open or not, so its
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
+                  ) : route.page === 'recap' ? (
+                    <RecapPage period={route.period} periodKey={route.key} />
                   ) : route.page === 'you' ? (
                     <YouPage openId={route.id} />
                   ) : route.page === 'settings' ? (

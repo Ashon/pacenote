@@ -391,11 +391,14 @@ function AreaRow({
                         </span>
                       </span>
                     ))}
-                    {area.latelyMore > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        and {area.latelyMore} more in 30 days
-                      </span>
-                    )}
+                    <a
+                      href="#/recap/week"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {area.latelyMore > 0
+                        ? `and ${area.latelyMore} more in 30 days, in Recap`
+                        : 'This week in Recap'}
+                    </a>
                   </span>
                 )}
               </Line>

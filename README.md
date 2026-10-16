@@ -71,6 +71,12 @@ yourself in a repository is told its open tasks from the start, and Todo shows t
 repositories with the channel that asks about them, and shows how you contribute to each, what is open there and what
 you did lately. Pacenote finds them on its own and shows them to you once; you only fix what it got wrong.
 
+### Recap your day, week and month
+
+**Recap** reads the same work at three distances: a day as a standup, a week by area with what carries over, a month by
+where it went. It counts your tasks and your own commits as they are, has Claude Code write it up in a few sentences
+only when you ask, and copies it as a standup or an update for you to post.
+
 ### Share the history with your AI tools
 
 Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did, what is on your list

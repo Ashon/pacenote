@@ -132,6 +132,13 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     leave: (id: string, left: boolean) =>
       ipcRenderer.invoke('pacenote:you:leave', id, left),
   },
+  // Recap: a day, a week or a month of your work, and writing it up
+  recap: {
+    get: (period: string, key?: string) =>
+      ipcRenderer.invoke('pacenote:recap:get', period, key),
+    write: (period: string, key: string) =>
+      ipcRenderer.invoke('pacenote:recap:write', period, key),
+  },
   // Pacenote's MCP server in Claude Code and Codex: added with their own CLIs
   mcp: {
     status: () => ipcRenderer.invoke('pacenote:mcp:status'),

@@ -2119,6 +2119,163 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     })
   }, 120_000)
 
+  it('recaps a week and a day from your tasks and commits, writes it up on a click, and copies it', async () => {
+    world = await World.create([
+      {
+        match: "Write a recap of the user's work",
+        answer:
+          'Most of the week went to Payments: you shipped retry backoff and kept the idempotency key on retries. The payment retry review is still open.',
+      },
+    ])
+    const { home, root } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    // Your checkout, with two commits of yours and one of someone else's
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', checkout, ...args], {
+        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' },
+      })
+    git('init', '-q', '-b', 'main')
+    git('remote', 'add', 'origin', 'https://github.com/Ashon/payments.git')
+    git('config', 'user.email', 'ashon@acme.dev')
+    git('config', 'user.name', 'ashon')
+    const save = (file: string, message: string, author?: string) => {
+      writeFileSync(path.join(checkout, file), file)
+      git('add', file)
+      git(
+        ...(author ? ['-c', `user.email=${author}`] : []),
+        'commit',
+        '-q',
+        '-m',
+        message
+      )
+    }
+    save('a', 'feat: retry backoff for payment retries')
+    save('b', 'fix: keep the idempotency key on a retry')
+    save('c', 'docs: from mina', 'mina@acme.dev')
+    const project = path.join(root, '.claude', 'projects', '-git-payments')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(
+      path.join(project, 's-payments.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        sessionId: 's-payments',
+        cwd: checkout,
+        timestamp: new Date(now - HOUR).toISOString(),
+        message: { role: 'user', content: 'Retry backoff' },
+      })}\n`
+    )
+    const on = { on: true, dms: false, exclude: [] }
+    const link = (k: number) =>
+      `https://acme.slack.com/archives/C0PAYMENTS/p${Math.floor((now - 2 * HOUR) / 1000) + k}000100`
+    const [shipped, review] = addTasks(
+      home,
+      [
+        {
+          title: 'Ship retry backoff',
+          asked_by: 'mina',
+          where: '#payments',
+          link: link(1),
+          confidence: 'sure',
+          repo: 'Ashon/payments',
+        },
+        {
+          title: 'Review the payment retry PR',
+          asked_by: 'mina',
+          where: '#payments',
+          link: link(2),
+          confidence: 'sure',
+          repo: 'Ashon/payments',
+          due: 'Friday',
+        },
+      ],
+      { settings: on, now: new Date(now - 2 * HOUR), finished: true }
+    ).added
+    closeTask(home, shipped!.id, 'resolved', new Date(now - 30 * 60_000), {
+      by: 'claude-code',
+      note: 'Merged #482',
+    })
+    // The app runs the fake Claude Code for Write it up itself.
+    const page = await launch(world, {
+      settings: ['TASKS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+    await page.getByRole('button', { name: 'Recap', exact: true }).waitFor()
+    await page.evaluate("window.location.hash = '#/recap/week'")
+
+    // A week, by area: what was done, your commits, and what carries over
+    await page.getByText('This week so far').waitFor()
+    const payments = page.locator('[data-recap-area]').filter({
+      has: page.getByRole('link', { name: 'Payments', exact: true }),
+    })
+    await payments.getByRole('link', { name: 'Ship retry backoff' }).waitFor()
+    await payments
+      .getByText('feat: retry backoff for payment retries', { exact: true })
+      .waitFor()
+    await payments
+      .getByText('and 1 more commit in Ashon/payments', { exact: true })
+      .waitFor()
+    await payments.getByText('Review the payment retry PR').waitFor()
+    // Someone else's commit is not yours.
+    expect(await page.getByText('docs: from mina').count()).toBe(0)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/recap-week.png'),
+    })
+
+    // Write it up: Claude Code with no tools, from the recap's lines only
+    await page.getByRole('button', { name: 'Write it up' }).click()
+    await page
+      .getByText('Most of the week went to Payments', { exact: false })
+      .waitFor()
+    await page.getByRole('button', { name: 'Write again' }).waitFor()
+    const calls = readFileSync(
+      path.join(world.claudeDir, 'calls.jsonl'),
+      'utf8'
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { args: string[]; prompt: string })
+    const call = calls.find((c) => c.prompt.includes('Write a recap'))!
+    expect(call.args).toEqual(expect.arrayContaining(['--tools', '']))
+    expect(call.prompt).toContain(
+      '- Commit: fix: keep the idempotency key on a retry'
+    )
+    expect(call.prompt).not.toContain('docs: from mina')
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/recap-written.png'),
+    })
+
+    // Copied as a weekly update, with what was written up first
+    await page.getByRole('button', { name: /Copy as weekly update/ }).click()
+    await page.getByRole('menuitem', { name: /As Markdown/ }).click()
+    const copied = await app!.evaluate(({ clipboard }) => clipboard.readText())
+    expect(copied).toContain('**This week so far**')
+    expect(copied).toContain('Most of the week went to Payments')
+    expect(copied).toContain('- Ship retry backoff')
+    expect(copied).toContain('- Carries over: Review the payment retry PR')
+
+    // The day, as a standup: done today, then what is next
+    await page.getByRole('tab', { name: 'Day' }).click()
+    await page.getByText('Today so far').waitFor()
+    expect(await page.evaluate('window.location.hash')).toBe('#/recap/day')
+    await page.getByRole('link', { name: 'Ship retry backoff' }).waitFor()
+    await page.getByText('2 commits in Ashon/payments').waitFor()
+    await page
+      .getByRole('link', { name: 'Review the payment retry PR' })
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/recap-day.png'),
+    })
+    // An area's name opens it on the You screen.
+    await page.getByRole('link', { name: 'Payments' }).first().click()
+    await eventually('the area on the You screen', async () =>
+      String(await page.evaluate('window.location.hash')).startsWith('#/you/')
+    )
+    expect(review).toBeDefined()
+  }, 120_000)
+
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {
     world = await World.create()
     const { slack } = world

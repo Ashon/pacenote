@@ -46,11 +46,11 @@ Using the packaged app:
 
 Layout:
 
-- The sidebar on the left lists the screens at the top ("Overview", "Todo", "You", "Runs", "Pace") and "Settings" at the
-  bottom. Todo, your tasks, comes before Runs, the jobs Pacenote ran, and shows how many are open
-  ([Your tasks from Slack](tasks.md)); You, where you contribute, follows it ([Where you contribute](you.md)). The toggle
-  at the left of the top bar (or Cmd+B) keeps only its icons, and the choice is remembered. Windows narrower than 900
-  pixels keep only the icons too.
+- The sidebar on the left lists the screens at the top ("Overview", "Todo", "Recap", "You", "Runs", "Pace") and
+  "Settings" at the bottom. Todo, your tasks, comes before Runs, the jobs Pacenote ran, and shows how many are open
+  ([Your tasks from Slack](tasks.md)); Recap, what you did ([Recap](recap.md)), and You, where you contribute
+  ([Where you contribute](you.md)), follow it. The toggle at the left of the top bar (or Cmd+B) keeps only its icons,
+  and the choice is remembered. Windows narrower than 900 pixels keep only the icons too.
 - The status bar along the bottom of the window holds indicators to glance at: Pace's connection status, reasoner backend,
   attached tools and startup check issues (when any) on the left; a task collection in progress (which opens Todo),
   requests in progress, the last request time, a folder button that opens the run history in Finder, and the version

@@ -1,6 +1,7 @@
 import {
   Bot,
   Bug,
+  CalendarCheck,
   History,
   LayoutDashboard,
   ListChecks,
@@ -14,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
 
 export type Section =
-  'overview' | 'runs' | 'tasks' | 'you' | 'bot' | 'settings' | 'debug'
+  'overview' | 'runs' | 'tasks' | 'recap' | 'you' | 'bot' | 'settings' | 'debug'
 
 type Item = { section: Section; label: string; icon: LucideIcon }
 
@@ -23,6 +24,8 @@ const ITEMS: Item[] = [
   { section: 'overview', label: 'Overview', icon: LayoutDashboard },
   // What you have to do, above the jobs Pacenote ran
   { section: 'tasks', label: 'Todo', icon: ListChecks },
+  // What you did, by day, week and month: what is behind, after what is ahead
+  { section: 'recap', label: 'Recap', icon: CalendarCheck },
   // Where you contribute, from those tasks and your sessions
   { section: 'you', label: 'You', icon: UserRound },
   { section: 'runs', label: 'Runs', icon: History },

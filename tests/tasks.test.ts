@@ -620,6 +620,7 @@ describe('the task tools over MCP', () => {
       'collect_tasks',
       'task',
       'done',
+      'recap',
     ])
     const prompt = await client.getPrompt({ name: 'collect_tasks' })
     const text = (prompt.messages[0]!.content as { text: string }).text

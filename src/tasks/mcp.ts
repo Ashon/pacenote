@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import { countRecap, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
 import type { AreaRole } from '../you/types.js'
 import { recordActivity } from './activity.js'
@@ -136,7 +137,7 @@ export function taskInstructions(options: TaskToolsOptions): string {
     'When the work the user asks for is one of these tasks, or carries one on, call task_context with its id before you start: it has what was asked, by whom, and what came before.',
     'When that work is done, call close_task with why "resolved", a note on what you did in a line and, if the person who asked waits for an answer, a reply for the user to send. Never post to Slack yourself.',
     'When work is left after it, or the user asks you to keep something to do later, add it with add_followup (after: the task it carries on from). Not for work you are about to do now.',
-    'my_work tells where the user contributes: their areas, how they contribute to each, what is open there and what they did lately. Read it when that helps you plan their work.',
+    'my_work tells where the user contributes: their areas, how they contribute to each, what is open there and what they did lately; my_recap, what they did in a day, a week or a month. Read them when that helps you plan their work or write it up.',
   ]
   if (here.length > 0) {
     lines.push(`This folder is ${options.repo}. Its open tasks:`)
@@ -260,6 +261,29 @@ export function registerTaskTools(
     () => ({
       messages: [
         { role: 'user', content: { type: 'text', text: donePrompt() } },
+      ],
+    })
+  )
+
+  server.registerPrompt(
+    'recap',
+    {
+      title: 'Write my recap',
+      description:
+        'Writes a standup, a weekly update or a monthly recap from what you did, as Pacenote keeps it.',
+      argsSchema: {
+        period: z
+          .string()
+          .optional()
+          .describe('day, week (the default) or month'),
+      },
+    },
+    ({ period }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: recapPromptFor(period) },
+        },
       ],
     })
   )
@@ -739,6 +763,78 @@ export function registerTaskTools(
   )
 
   server.registerTool(
+    'my_recap',
+    {
+      description:
+        "A recap of the user's work for a day, a week (Monday to Sunday) " +
+        'or a month, from their tasks, their own commits, their sessions ' +
+        'and Pacenote: in each area, the tasks done and how they ended, the ' +
+        "commits' subjects, the days with sessions, new asks and what is " +
+        'still open; for today, what they are doing and what is next; and ' +
+        'the sentences they had written for it, if any.',
+      inputSchema: {
+        period: z.enum(['day', 'week', 'month']),
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional()
+          .describe('A day in the period, YYYY-MM-DD; today by default'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ period, date }) =>
+      respond(options, async () => {
+        const [y, m, d] = (date ?? '').split('-').map(Number)
+        const day = date ? new Date(y!, m! - 1, d) : new Date()
+        const counted = await countRecap({
+          dataDir: options.dataDir,
+          home: options.home,
+          period,
+          key: periodKey(period, day),
+        })
+        if (!counted) throw new Error(`No ${period} for ${date}`)
+        const { view, commits } = counted
+        const inPeriod = (at: string) =>
+          Date.parse(at) >= Date.parse(view.start) &&
+          Date.parse(at) < Date.parse(view.end)
+        const title = (item: { title: string; note?: string }) =>
+          item.note ? `${item.title} (${item.note})` : item.title
+        return {
+          period,
+          key: view.key,
+          from: view.start,
+          to: view.end,
+          soFar: view.current,
+          totals: view.totals,
+          areas: view.areas.map((area) => ({
+            name: area.name,
+            done: area.items.filter((item) => item.task).map(title),
+            commits: commits
+              .filter((c) => area.repos.includes(c.repo) && inPeriod(c.at))
+              .slice(0, 80)
+              .map((c) => c.subject),
+            commitCount: area.commits,
+            sessionDays: area.days,
+            newAsks: area.asks,
+            askedPace: area.runs,
+            stillOpen: area.carried.map(title),
+          })),
+          ...(view.day
+            ? {
+                ...(view.day.yesterday
+                  ? { yesterday: view.day.yesterday.map(title) }
+                  : {}),
+                doing: view.day.doing.map(title),
+                next: view.day.next.map(title),
+              }
+            : {}),
+          ...(view.month ? { month: view.month } : {}),
+          ...(view.written ? { written: view.written.text } : {}),
+        }
+      })
+  )
+
+  server.registerTool(
     'my_work',
     {
       description:
@@ -839,6 +935,28 @@ export function registerTaskTools(
         }
       })
   )
+}
+
+/** Writing the user's recap in the session they are in (the recap prompt) */
+export function recapPromptFor(period: string | undefined): string {
+  const which = ['day', 'week', 'month'].includes(period?.trim() ?? '')
+    ? period!.trim()
+    : 'week'
+  const kind =
+    which === 'day'
+      ? 'a standup: what they did, what they are doing, what is next'
+      : which === 'month'
+        ? 'a monthly recap: where their month went, its highlights and what changed'
+        : 'a weekly update: what they did in each area, and what carries over'
+  return [
+    `Write the user's recap for this ${which}.`,
+    '',
+    `1. Call my_recap with period "${which}".`,
+    `2. Write ${kind}, in the language most of their task titles are in, area by area. Sum the commits up into what the work was about; do not list commit messages.`,
+    '3. Show it to the user to copy. Do not post it anywhere yourself.',
+    '',
+    NOTE,
+  ].join('\n')
 }
 
 /** How the user contributes to an area, in my_work's words */

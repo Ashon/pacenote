@@ -97,3 +97,98 @@ export interface TaskArea {
   id: string
   name: string
 }
+
+// Recaps (src/you/recap.ts)
+
+export type RecapPeriod = 'day' | 'week' | 'month'
+
+/** A run of Pace's you asked for: when, where, and the request's first line */
+export interface RunLine {
+  at: string
+  /** Where it was asked: "#payments" */
+  label: string
+  request: string
+}
+
+/** One line of a recap */
+export interface RecapItem {
+  title: string
+  at?: string
+  /** What else to say: how it ended, who asked, the repository */
+  note?: string
+  /** The task it is, to open it */
+  task?: string
+  area?: TaskArea
+}
+
+/** What a period has in one area, or in none (Elsewhere: no id) */
+export interface RecapArea {
+  id?: string
+  name: string
+  /** Its share of the period's work, 0 to 1 */
+  share: number
+  done: number
+  commits: number
+  /** Days with work in it: sessions, commits, tasks done */
+  days: number
+  /** New asks of you */
+  asks: number
+  runs: number
+  /** What was done (tasks, then release and feature commits), newest first */
+  items: RecapItem[]
+  /** Commits not among the items */
+  commitsMore: number
+  /** The repositories its commits are in */
+  repos: string[]
+  /** Open tasks it ended with */
+  carried: RecapItem[]
+}
+
+export interface RecapView {
+  period: RecapPeriod
+  key: string
+  start: string
+  end: string
+  /** The period goes on now ("so far") */
+  current: boolean
+  /** The period before, and the one after (none for the current one) */
+  prev: string
+  next?: string
+  totals: {
+    done: number
+    commits: number
+    days: number
+    asks: number
+    runs: number
+    carried: number
+  }
+  /** Most work first, Elsewhere last */
+  areas: RecapArea[]
+  /** A day, as a standup */
+  day?: {
+    /** Yesterday's done, on the morning of today */
+    yesterday?: RecapItem[]
+    done: RecapItem[]
+    /** Today only: open tasks worked on today */
+    doing: RecapItem[]
+    /** Today only: open tasks, due ones first */
+    next: RecapItem[]
+  }
+  /** A month: what changed, and who asked you most */
+  month?: {
+    /** Areas whose first work is in the month */
+    started: string[]
+    /** Areas whose last work is in the month */
+    quiet: string[]
+    people: string[]
+  }
+  /** The git emails your commits were found by */
+  emails: string[]
+  written?: Written
+}
+
+export interface Written {
+  text: string
+  at: string
+  by: string
+}

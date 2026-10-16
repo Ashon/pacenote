@@ -117,6 +117,18 @@ import {
 } from '../../../src/you/store.js'
 import type { YouFile, YouView } from '../../../src/you/types.js'
 import {
+  countRecap,
+  keepWritten,
+  periodKey,
+  periodRange,
+  periodWords,
+  RECAP_PERIODS,
+  recapPrompt,
+  type RecapPeriod,
+  type RecapView,
+} from '../../../src/you/recap.js'
+import { writeRecap } from './recap-writer.js'
+import {
   dueForJudging,
   judge,
   judgePrompt,
@@ -964,6 +976,81 @@ function registerBotIpc(): void {
       ? fixYou((file) => leaveArea(file, area, left === true))
       : null
   })
+  // Recap: what you did in a day, a week or a month (src/you/recap.ts),
+  // counted again at most every minute; Write it up asks Claude Code with no
+  // tools, only when you click it.
+  const RECAP_EVERY_MS = 60_000
+  const recaps = new Map<string, { view: RecapView; at: number }>()
+  const periodOf = (value: unknown): RecapPeriod | undefined =>
+    RECAP_PERIODS.find((period) => period === value)
+  const recapRuns = (since: Date) =>
+    reader
+      .list({ kind: 'mention', limit: 1000 })
+      .filter(
+        (run) => Date.parse(run.startedAt) >= since.getTime() - 86_400_000
+      )
+      .map((run) => ({
+        at: run.startedAt,
+        label: run.conversationLabel,
+        request: run.request,
+      }))
+  const countRecapNow = async (period: RecapPeriod, key: string) => {
+    // The areas the recap puts work in are the ones You shows.
+    if (!you) await countYouNow().catch(() => undefined)
+    const counted = await countRecap({
+      dataDir,
+      home: homedir(),
+      period,
+      key,
+      runs: recapRuns,
+    })
+    if (counted)
+      recaps.set(`${period}:${key}`, { view: counted.view, at: Date.now() })
+    return counted
+  }
+  ipcMain.handle(
+    'pacenote:recap:get',
+    async (event, period: unknown, key: unknown) => {
+      const which = periodOf(period)
+      if (!fromMainWindow(event) || !which) return null
+      const at =
+        typeof key === 'string' && periodRange(which, key)
+          ? key
+          : periodKey(which, new Date())
+      const kept = recaps.get(`${which}:${at}`)
+      if (kept && Date.now() - kept.at < RECAP_EVERY_MS) return kept.view
+      return (await countRecapNow(which, at))?.view ?? null
+    }
+  )
+  ipcMain.handle(
+    'pacenote:recap:write',
+    async (event, period: unknown, key: unknown) => {
+      const which = periodOf(period)
+      if (!fromMainWindow(event) || !which || typeof key !== 'string')
+        return { error: 'Not a recap.' }
+      const counted = await countRecapNow(which, key)
+      if (!counted) return { error: 'Not a recap.' }
+      const { view, commits } = counted
+      if (view.areas.length === 0)
+        return { error: 'There is nothing to write up yet.' }
+      const result = await writeRecap({
+        bin: env().CLAUDE_BIN?.trim() || 'claude',
+        toolPath: toolPath(),
+        cwd: dataDir,
+        prompt: recapPrompt(view, periodWords(view), commits),
+      })
+      if ('error' in result) {
+        log.warn(`Could not write up the recap of ${key}: ${result.error}`)
+        return { error: result.error }
+      }
+      keepWritten(dataDir, which, key, {
+        text: result.text,
+        at: new Date().toISOString(),
+        by: 'claude',
+      })
+      return { view: (await countRecapNow(which, key))?.view }
+    }
+  )
   // The Overview's tasks: what you handled over the last 14 days
   ipcMain.handle('pacenote:tasks:trend', (event) => {
     if (!fromMainWindow(event)) return null
