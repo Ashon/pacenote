@@ -28,11 +28,17 @@ import {
   formatShortDay,
   formatTokens,
 } from '@/lib/format'
-import { useCollect, useDecide, useTasks, useTasksLive } from '@/lib/tasks'
+import {
+  taskHash,
+  useCollect,
+  useDecide,
+  useTasks,
+  useTasksLive,
+} from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { PaceSpinner } from './pace-spinner'
-import { TaskRow, taskHash } from './task-row'
+import { TaskRow } from './task-row'
 import {
   lastYourWork,
   rememberYourWork,

@@ -48,8 +48,8 @@ import {
 } from '@/lib/recap'
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
+import { taskHash } from '@/lib/tasks'
 import { PaceSpinner } from './pace-spinner'
-import { taskHash } from './task-row'
 
 const PERIODS: { value: RecapPeriod; label: string }[] = [
   { value: 'day', label: 'Day' },

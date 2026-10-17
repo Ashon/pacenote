@@ -40,6 +40,9 @@ text comes in there word by word. What it wrote is kept in `PACENOTE_DATA_DIR/re
 comes back with the period; **Write again** replaces it. The tokens each write-up spent are kept there too (90 days),
 written again or not, and the Overview's tokens per day count them as Recaps.
 
+The Overview opens with today's recap in three lines at most: the first open task Next lists (and how many more are
+open), the first one you are on, and what got done today, or yesterday in the morning. Nothing is written for it.
+
 ## Copy
 
 **Copy** puts the recap on the clipboard as Markdown (with what was written up first), in Slack's formatting, or the

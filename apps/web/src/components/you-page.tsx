@@ -32,7 +32,7 @@ import {
   useFixYou,
   useYou,
 } from '@/lib/you'
-import { taskHash } from './task-row'
+import { taskHash } from '@/lib/tasks'
 
 const TOOL = { claude: 'Claude Code', codex: 'Codex' } as const
 

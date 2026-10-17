@@ -30,6 +30,7 @@ import {
 } from '@/lib/format'
 import { useTaskTrend } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { Briefing, BriefingSkeleton, lastBriefing } from './briefing'
 import { ResumeSetup, SetupFacts } from './setup/resume'
 
 /**
@@ -131,6 +132,7 @@ export function Overview() {
           <OverviewSkeleton
             taskBand={lastTaskBand()}
             setupCard={lastSetupCard()}
+            briefing={lastBriefing()}
           />
         }
       >
@@ -173,6 +175,7 @@ export function Overview() {
           <SetupFacts />
         ) : (
           <>
+            <Briefing open={trend.data?.open} />
             <section
               aria-label="Totals"
               className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4"
@@ -396,10 +399,13 @@ function BandSkeleton({
 function OverviewSkeleton({
   taskBand,
   setupCard,
+  briefing,
 }: {
   taskBand: boolean
   /** The setup card's height last time, with its 1.5rem margin */
   setupCard: number
+  /** The briefing's lines last time */
+  briefing: number
 }) {
   return (
     <>
@@ -409,6 +415,7 @@ function OverviewSkeleton({
           style={{ height: setupCard - 24 }}
         />
       )}
+      <BriefingSkeleton lines={briefing} />
       <section className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4">
         <MetricSkeleton
           icon={<Activity className="text-primary" />}

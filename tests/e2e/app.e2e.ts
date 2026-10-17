@@ -2619,6 +2619,11 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       '^.space-y-5 > :first-child',
     ])
     await shoot('#/', 'overview', ['section.mt-9', '^div.mt-10.border-t'])
+    // Its briefing, from today's recap: what is next, opening it in Todo
+    const next = page
+      .getByLabel('Briefing')
+      .getByRole('link', { name: 'Review the payment retry PR' })
+    expect(await next.getAttribute('href')).toMatch(/^#\/tasks\//)
     await shoot('#/bot', 'pace', ['.mt-6.grid'])
     await shoot('#/settings/general', 'settings', [
       'nav[aria-label="Settings sections"]',

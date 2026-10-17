@@ -55,6 +55,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import {
   taskDetailQuery,
+  taskHash,
   useGroupAnswer,
   useProposal,
   useRepoFolders,
@@ -80,10 +81,6 @@ import { PaceSpinner } from './pace-spinner'
 const TOOL: Record<WorkTool, string> = { claude: 'Claude Code', codex: 'Codex' }
 const other = (tool: WorkTool): WorkTool =>
   tool === 'claude' ? 'codex' : 'claude'
-
-/** #/tasks/<id>: the task open in its row; rest: /log/<entry> */
-export const taskHash = (id: string, rest = '') =>
-  `#/tasks/${encodeURIComponent(id)}${rest}`
 
 const DISMISS_REASONS: { reason: DismissReason; label: string }[] = [
   { reason: 'not-mine', label: 'Not for me' },

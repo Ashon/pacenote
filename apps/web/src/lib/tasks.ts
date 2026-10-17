@@ -2,6 +2,10 @@ import type { TaskDecision, WorkTool } from '@src/tasks/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
+/** #/tasks/<id>: the task open in its row; rest: /log/<entry> */
+export const taskHash = (id: string, rest = '') =>
+  `#/tasks/${encodeURIComponent(id)}${rest}`
+
 /** A task with what came before it and its work log, from the desktop app */
 export const taskDetailQuery = (id: string) => ({
   queryKey: ['task', id],
