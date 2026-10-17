@@ -15,7 +15,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pacenote: your own AI assistant in Slack, on your Mac</title>
-  <meta name="description" content="A free Mac app. Pace answers your Slack mentions with your own Claude Code or Codex login and lists what people asked of you. Open source, no telemetry.">
+  <meta name="description" content="A free Mac app. Pace answers you in Slack when you mention it, with your own Claude Code or Codex login, and lists what people asked of you. Open source, no telemetry.">
   <link rel="canonical" href="https://pacenote.dev/">
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
@@ -56,8 +56,8 @@
     <section class="hero">
       <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">What's new in v0.5.25</a>
       <h1>Ask in Slack.<br>Pick it up in your terminal.</h1>
-      <p class="lede">Pacenote is a free Mac app. Its assistant, Pace, answers your Slack mentions with your own Claude
-        Code or Codex login and hands each task, with its history, to the terminal session that does the work.</p>
+      <p class="lede">Pacenote is a free Mac app. Its assistant, Pace, answers you in Slack when you mention it, with your
+        own Claude Code or Codex login, and hands each task, with its history, to the terminal session that does the work.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
           <code id="install-command">brew install --cask ashon/tap/pacenote</code>
@@ -66,8 +66,8 @@
         </div>
         <a class="button secondary" href="how-it-works/">How it works</a>
       </div>
-      <p class="next">Free and open source. Needs an Apple silicon Mac and your Claude or ChatGPT plan. No
-        telemetry.</p>
+      <p class="next">Free and open source. Needs an Apple silicon Mac, your Claude or ChatGPT plan and a Slack
+        workspace where you can <a href="install/#before">create an app</a>. No telemetry.</p>
       <figure class="window">
         <div class="av av-window" role="img"
           aria-label="Pacenote's Todo screen: three tasks people asked of you in Slack. The open one, a PR review due Thursday, shows how a related review ended last week in Codex and what Pace answered in the same thread, with a button to continue it in Claude Code.">
@@ -116,11 +116,11 @@
           </div>
           <figure class="shot">
             <div class="av av-run" role="img"
-              aria-label="A run in Pacenote: sam asked in #ops what changed on web-01 this morning; Pace took two steps, a Grep of the deploy log and a Read of the config, and answered that the likely cause is the 09:02 deploy of payments-worker, offering to open a draft PR.">
-              <div class="av-run-head"><span class="av-badge ok"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Succeeded</span><span class="av-badge plain"><svg class="av-i" aria-hidden="true"><use href="icons.svg#at-sign"/></svg>Mention</span><span class="av-meta">#ops · @sam · 10/15 01:42:50</span><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg>View in Slack</span></div>
+              aria-label="A run in Pacenote: you asked in #ops what changed on web-01 this morning; Pace took two steps, a Grep of the deploy log and a Read of the config, and answered that the likely cause is the 09:02 deploy of payments-worker, offering to open a draft PR.">
+              <div class="av-run-head"><span class="av-badge ok"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Succeeded</span><span class="av-badge plain"><svg class="av-i" aria-hidden="true"><use href="icons.svg#at-sign"/></svg>Mention</span><span class="av-meta">#ops · @you · 10/15 01:42:50</span><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg>View in Slack</span></div>
               <div class="av-run-title">can you check what changed on web-01 this morning?</div>
               <div class="av-facts"><div><span><svg class="av-i s12" aria-hidden="true"><use href="icons.svg#timer"/></svg>Duration</span><b>2.9s</b></div><div><span><svg class="av-i s12" aria-hidden="true"><use href="icons.svg#wrench"/></svg>Tool calls</span><b>2 calls</b></div><div><span><svg class="av-i s12" aria-hidden="true"><use href="icons.svg#coins"/></svg>Tokens</span><b>120 new</b></div><div><span><svg class="av-i s12" aria-hidden="true"><use href="icons.svg#cpu"/></svg>Reasoner</span><b>claude@vm</b></div></div>
-              <div class="av-bubble"><span class="av-avatar">S</span><div class="av-bubble-body"><div class="av-bubble-head">@sam<span>#ops / 10/15 01:42:50</span></div><p>can you check what changed on web-01 this morning?</p><p class="av-meta">1 thread message</p></div></div>
+              <div class="av-bubble"><span class="av-avatar">Y</span><div class="av-bubble-body"><div class="av-bubble-head">@you<span>#ops / 10/15 01:42:50</span></div><p>can you check what changed on web-01 this morning?</p><p class="av-meta">1 thread message</p></div></div>
               <div class="av-steps"><div class="av-step"><svg class="av-i s14 ok" aria-hidden="true"><use href="icons.svg#circle-check"/></svg><span class="av-badge plain"><svg class="av-i" aria-hidden="true"><use href="icons.svg#wrench"/></svg>claude</span><b>Grep</b><span class="av-mono">pattern=web-01 path=deploys/2026-10-15.log</span><span class="time">902ms</span></div><div class="av-step"><svg class="av-i s14 ok" aria-hidden="true"><use href="icons.svg#circle-check"/></svg><span class="av-badge plain"><svg class="av-i" aria-hidden="true"><use href="icons.svg#wrench"/></svg>claude</span><b>Read</b><span class="av-mono">file_path=payments-worker/config.yaml</span><span class="time">402ms</span></div></div>
               <div class="av-bubble pace"><img src="media/pacenote-mark.svg" width="28" height="28" alt=""><div class="av-bubble-body"><div class="av-bubble-head">Pace<span>10/15 01:42:53</span></div><p><b>Likely cause: the 09:02 deploy of payments-worker.</b></p><ul><li>web-01 p99 went from 180 ms to 410 ms at 09:04, two minutes after the deploy.</li><li>The new build turns on retry for webhook calls, with no backoff (<code>retry.backoff: 0</code>).</li><li>Most of the extra time is spent in the <code>/webhooks/stripe</code> handler.</li></ul><p>Setting <code>retry.backoff</code> back to <code>250ms</code> should bring it down. Want me to open a draft PR?</p></div></div>
             </div>
