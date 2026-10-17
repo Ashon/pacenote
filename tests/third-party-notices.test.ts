@@ -34,8 +34,9 @@ describe('third-party notices', () => {
       for (const name of Object.keys(dependencies))
         expect(text, name).toMatch(heading(name))
     }
-    // The font and the styles the web app bundles from its build tools
+    // The fonts and the styles the web app bundles from its build tools
     expect(text).toMatch(heading('pretendard'))
+    expect(text).toMatch(heading('@fontsource-variable/host-grotesk'))
     expect(text).toContain('SIL OPEN FONT LICENSE Version 1.1')
     expect(text).toMatch(heading('tailwindcss'))
     // License texts, not only names
