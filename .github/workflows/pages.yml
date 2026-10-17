@@ -1,0 +1,63 @@
+name: pages
+
+# pacenote.dev: site/ published to GitHub Pages, with the custom domain set in the repository's Pages
+# settings (build_type workflow, so no CNAME file is needed).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/images/**'
+      - 'docs/diagrams/architecture-*.svg'
+      - 'assets/pacenote-mark.svg'
+      - '.github/workflows/pages.yml'
+  # The release link above the headline names the latest release. Releases are published with the maintainer's own gh, so
+  # the release event does reach this workflow.
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The pictures have one home each, beside the README that shows them too; the page gets copies.
+      - name: stage
+        run: |
+          set -euo pipefail
+          mkdir -p site/media
+          cp docs/images/*.webp site/media/
+          cp docs/diagrams/architecture-light.svg docs/diagrams/architecture-dark.svg site/media/
+          cp assets/pacenote-mark.svg site/media/
+      - name: stamp the latest release
+        env:
+          # Authenticated: an anonymous call from a runner shares its rate limit with every other runner on that IP
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)
+          test -n "$version" || { echo "could not read the latest release tag" >&2; exit 1; }
+          test "$(grep -c 'id="release-link"' site/index.html)" -eq 1 || { echo "expected one release-link" >&2; exit 1; }
+          sed -i -E "s|(<a class=\"release\" id=\"release-link\" href=\")[^\"]*(\">)[^<]*</a>|\1https://github.com/${{ github.repository }}/releases/tag/${version}\2What's new in ${version}</a>|" site/index.html
+          grep -o '<a class="release" id="release-link"[^<]*</a>' site/index.html | grep -F "$version"
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

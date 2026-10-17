@@ -1,0 +1,709 @@
+/*
+ * pacenote.dev: the app's own look, as a page. The tokens are the app's (apps/web/src/index.css):
+ * the canvas is the window chrome, one white content surface sits on it, and inside that surface
+ * parts are split by hairlines and grouped in recessed wells. Surfaces, not borders, set the levels.
+ * Type is the system font, as in the app, with Pretendard for Hangul only.
+ */
+
+@font-face {
+  font-family: 'Pretendard';
+  src: url('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/woff2/PretendardVariable.woff2')
+    format('woff2-variations');
+  font-weight: 45 920;
+  font-display: swap;
+  unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
+}
+
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
+  --gradient: linear-gradient(74deg, #01ab78 0%, #1fc289 46%, #48c89c 100%);
+  --canvas: oklch(0.975 0.01 165);
+  --card: oklch(1 0 0);
+  --card-accent: oklch(0.982 0.03 165);
+  --well: oklch(0.972 0.008 168);
+  --foreground: oklch(0.23 0.025 172);
+  --muted-foreground: oklch(0.49 0.03 172);
+  --primary: #007c5c;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.945 0.018 165);
+  --secondary-hover: oklch(0.925 0.024 165);
+  --secondary-foreground: oklch(0.3 0.05 168);
+  --border: oklch(0.91 0.016 168);
+  --ring: rgba(12, 182, 126, 0.5);
+  --track: #0cb67e;
+  --card-shadow:
+    0 1px 2px oklch(0.3 0.03 170 / 0.05),
+    0 10px 28px -14px oklch(0.3 0.03 170 / 0.14);
+  --window-shadow:
+    0 1px 2px oklch(0.3 0.03 170 / 0.06),
+    0 30px 70px -30px oklch(0.3 0.04 170 / 0.32);
+  --sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR',
+    system-ui, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  --page: 70rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --canvas: oklch(0.183 0.013 175);
+    --card: oklch(0.215 0.015 175);
+    --card-accent: oklch(0.25 0.035 168);
+    --well: oklch(0.19 0.013 175);
+    --foreground: oklch(0.93 0.012 165);
+    --muted-foreground: oklch(0.71 0.025 168);
+    --primary: #3ccb96;
+    --primary-foreground: #04281d;
+    --secondary: oklch(0.25 0.02 172);
+    --secondary-hover: oklch(0.28 0.025 172);
+    --secondary-foreground: oklch(0.9 0.015 165);
+    --border: oklch(0.9 0.05 165 / 11%);
+    --ring: rgba(60, 203, 150, 0.6);
+    --track: #2ec790;
+    --card-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
+    --window-shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 30px 70px -30px oklch(0 0 0 / 0.7);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--primary);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--well);
+  border-radius: 0.375rem;
+  padding: 0.1em 0.35em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--card);
+  border-radius: var(--radius);
+  z-index: 10;
+}
+.skip:focus {
+  top: 1rem;
+}
+
+/* Buttons: the app's primary and secondary */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.button.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.button.primary:hover {
+  filter: brightness(1.08);
+}
+.button.secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+.button.secondary:hover {
+  background: var(--secondary-hover);
+}
+
+/* The window chrome: brand at the left as in the sidebar, a few quiet links */
+.top {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: var(--foreground);
+  font-weight: 650;
+  font-size: 1.125rem;
+  text-decoration: none;
+}
+.top nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.top nav a:not(.button) {
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.top nav a:not(.button):hover {
+  color: var(--foreground);
+}
+
+/* Hero, on the canvas */
+.hero {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 7vw, 5.5rem) 1.5rem 0;
+}
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.75rem, 7.4vw, 5.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 750;
+  max-width: 14ch;
+}
+.release {
+  display: inline-flex;
+  margin-bottom: 1.5rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 550;
+  text-decoration: none;
+}
+.release:hover {
+  background: var(--secondary-hover);
+}
+.lede {
+  margin: 1.75rem 0 0;
+  font-size: clamp(1.125rem, 1.9vw, 1.3125rem);
+  line-height: 1.55;
+  max-width: 54ch;
+}
+.next {
+  margin: 0.875rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.get {
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.command {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.375rem 0.375rem 1rem;
+  background: var(--card);
+  border-radius: calc(var(--radius) * 1.4);
+  box-shadow: var(--card-shadow);
+  max-width: 100%;
+}
+.command code {
+  background: none;
+  padding: 0;
+  font-size: 0.9375rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.command .copy {
+  min-height: 2.125rem;
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+}
+.copied {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.facts {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+.facts li {
+  padding: 0.125rem 0.625rem;
+  background: var(--secondary);
+  border-radius: 999px;
+}
+
+/* The product, as a window on the canvas */
+.window {
+  margin: clamp(2.5rem, 6vw, 4rem) 0 0;
+  border-radius: calc(var(--radius) * 1.6);
+  overflow: hidden;
+  box-shadow: var(--window-shadow);
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+  position: relative;
+  z-index: 1;
+}
+.window img {
+  width: 100%;
+}
+
+/* The one content surface; sections inside it are split by hairlines */
+.surface {
+  width: min(100% - 3rem, var(--page) - 3rem);
+  margin: -3rem auto 0;
+  padding-top: 3rem;
+  background: var(--card);
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: var(--card-shadow);
+}
+.block {
+  padding: clamp(2.5rem, 5vw, 4rem) clamp(1.25rem, 4vw, 3.5rem);
+}
+.block + .block {
+  border-top: 1px solid var(--border);
+}
+.block h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.6vw, 1.875rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.block h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 650;
+}
+.block p {
+  margin: 0.75rem 0 0;
+}
+.intro {
+  max-width: 64ch;
+}
+.aside {
+  color: var(--muted-foreground);
+}
+
+/* The track: the app's trajectory stepper, a task's stages in order */
+.track {
+  --dot: 1.5rem;
+  --stages: 5;
+  list-style: none;
+  counter-reset: stage;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--stages), 1fr);
+  position: relative;
+}
+.track::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--dot) / 2);
+  right: calc(100% / var(--stages) - var(--dot) / 2);
+  top: calc(var(--dot) / 2 - 2px);
+  height: 4px;
+  border-radius: 999px;
+  background: var(--track);
+  transform-origin: left center;
+}
+.track li {
+  counter-increment: stage;
+  position: relative;
+  padding-top: calc(var(--dot) + 0.875rem);
+  padding-right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.track li::before {
+  content: counter(stage);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 4px var(--card);
+}
+.track b {
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+.track span {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Drawn once when first seen: the line runs from the ask to how it ended, each stage lands on it */
+@media (prefers-reduced-motion: no-preference) {
+  .js .track::before {
+    transform: scaleX(0);
+    transition: transform 1100ms cubic-bezier(0.22, 0.8, 0.28, 1);
+  }
+  .js .track li {
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 320ms ease-out,
+      transform 320ms ease-out;
+    transition-delay: calc(var(--i, 0) * 170ms);
+  }
+  .js .track.drawn::before {
+    transform: scaleX(1);
+  }
+  .js .track.drawn li {
+    opacity: 1;
+    transform: none;
+  }
+  .track li:nth-child(2) { --i: 1; }
+  .track li:nth-child(3) { --i: 2; }
+  .track li:nth-child(4) { --i: 3; }
+  .track li:nth-child(5) { --i: 4; }
+}
+
+/* A feature with its screen */
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  align-items: center;
+}
+.shot,
+.diagram {
+  margin: 0;
+  border-radius: calc(var(--radius) * 1.4);
+  overflow: hidden;
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+.shot {
+  box-shadow: var(--card-shadow);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+}
+.pair h2 {
+  font-size: clamp(1.375rem, 2.2vw, 1.5rem);
+}
+
+/* Smaller things, grouped in wells as the app groups them */
+.wells {
+  list-style: none;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+.wells li {
+  background: var(--well);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 1.25rem 1.375rem 1.375rem;
+}
+.wells p {
+  margin-top: 0.375rem;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+
+/* Numbered only where the content is a sequence */
+.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+.steps li {
+  counter-increment: step;
+  position: relative;
+  padding-top: 2.25rem;
+  font-size: 0.9375rem;
+}
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.steps.compact {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.steps.compact li {
+  padding: 0 0 0 2.25rem;
+}
+.steps.compact code {
+  overflow-wrap: anywhere;
+}
+@media (min-width: 44rem) {
+  .steps.compact code {
+    white-space: nowrap;
+  }
+}
+.diagram {
+  margin-top: 2.25rem;
+  background: var(--canvas);
+}
+
+/* Pace's promises, on the surface the app keeps for Pace's own voice */
+.promise {
+  background: var(--card-accent);
+  border-radius: calc(var(--radius) * 2);
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+.never {
+  list-style: none;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 2.5rem;
+}
+.never li {
+  padding: 0.875rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+.never b {
+  display: block;
+  color: var(--foreground);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.needs {
+  margin: 1.25rem 0 0;
+  padding-left: 1.125rem;
+  font-size: 0.9375rem;
+}
+.needs li + li {
+  margin-top: 0.5rem;
+}
+.note {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+/* Questions, as rows split by hairlines */
+.faq {
+  margin-top: 1.25rem;
+  max-width: 64ch;
+}
+.faq details {
+  border-top: 1px solid var(--border);
+}
+.faq details:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.faq summary {
+  padding: 1rem 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.5rem;
+  border-right: 2px solid var(--muted-foreground);
+  border-bottom: 2px solid var(--muted-foreground);
+  transform: rotate(45deg);
+}
+.faq details[open] summary::after {
+  transform: rotate(225deg);
+  margin-top: 0.75rem;
+}
+.faq details p {
+  margin: 0 0 1.125rem;
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+}
+
+/* The last word: the install command again */
+.closing .get {
+  margin-top: 1.25rem;
+}
+
+/* The status bar, as at the foot of the app's window */
+.status {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 2.5rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem 2rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+.status p {
+  margin: 0;
+}
+.state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--track);
+}
+.status nav {
+  display: flex;
+  gap: 1.25rem;
+}
+.status nav a {
+  color: var(--muted-foreground);
+}
+.legal {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 60rem) {
+  .top nav a[href='#how'] {
+    display: none;
+  }
+  .feature,
+  .pair {
+    grid-template-columns: 1fr;
+  }
+  .wells {
+    grid-template-columns: 1fr;
+  }
+  .steps {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 44rem) {
+  .top nav a:not(.button) {
+    display: none;
+  }
+  /* The track turns to run down the page */
+  .track {
+    grid-template-columns: 1fr;
+    gap: 1.125rem;
+  }
+  .track::before {
+    left: calc(var(--dot) / 2 - 2px);
+    right: auto;
+    top: calc(var(--dot) / 2);
+    bottom: calc(var(--dot) * 1.5);
+    width: 4px;
+    height: auto;
+    transform-origin: center top;
+  }
+  .track li {
+    padding: 0 0 0 calc(var(--dot) + 0.875rem);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .js .track::before {
+      transform: scaleY(0);
+    }
+    .js .track.drawn::before {
+      transform: scaleY(1);
+    }
+  }
+  .steps {
+    grid-template-columns: 1fr;
+  }
+  .never {
+    grid-template-columns: 1fr;
+  }
+  .status {
+    grid-template-columns: 1fr;
+  }
+  .status nav {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

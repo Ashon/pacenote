@@ -33,3 +33,6 @@ data/
 *.log
 test-results/
 coverage/
+
+# pacenote.dev pictures, copied in by the pages workflow
+site/media/
