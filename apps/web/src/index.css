@@ -74,6 +74,7 @@
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -144,6 +145,8 @@
   --chart-2: #46c99b;
   --chart-3: #a8e7d3;
   --chart-4: #007c5c;
+  /* Recap write-ups: teal beside the greens, darker than the well's tint */
+  --chart-5: oklch(0.6 0.09 205);
   /* Card shadow: a very faint lift */
   --card-shadow:
     0 1px 2px oklch(0.3 0.03 170 / 0.05),
@@ -188,6 +191,7 @@
   --chart-2: #48c89c;
   --chart-3: #a8e7d3;
   --chart-4: #a8e7d3;
+  --chart-5: oklch(0.72 0.1 200);
   --card-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
 }
 

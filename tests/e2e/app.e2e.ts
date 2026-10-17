@@ -2330,6 +2330,22 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       String(await page.evaluate('window.location.hash')).startsWith('#/you/')
     )
     expect(review).toBeDefined()
+
+    // What the write-up spent is in the Overview's tokens, as Recaps (the
+    // fake Claude Code reports 100 in and 20 out).
+    await page.evaluate("window.location.hash = '#/'")
+    const recapTokens = page.locator('li', { hasText: 'Recaps' })
+    await recapTokens.getByText('1 write-up · 120 each').waitFor()
+    await recapTokens.scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/overview-recap-tokens.png'),
+    })
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.locator('html.dark').waitFor({ state: 'attached' })
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/overview-recap-tokens-dark.png'),
+    })
+    await page.emulateMedia({ colorScheme: 'light' })
   }, 120_000)
 
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {

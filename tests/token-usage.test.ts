@@ -19,6 +19,9 @@ import {
   recentCollections,
 } from '../src/tasks/collections.js'
 import type { CollectionRecord } from '../src/tasks/types.js'
+import { keepWritten, readWritten } from '../src/you/recap.js'
+import { keepRecapSpend, readRecapSpend } from '../src/you/spent.js'
+import { usageFrom } from '../apps/desktop/src/recap-writer.js'
 
 const AT = '2026-10-11T05:00:00.000Z'
 
@@ -134,7 +137,7 @@ describe('token stats', () => {
       JSON.stringify({ version: 1, collections })
     )
 
-  it('counts tokens per day, mentions and collections apart', () => {
+  it('counts tokens per day, mentions, collections and recaps apart', () => {
     const store = new HistoryStore(root)
     const init = {
       origin: {
@@ -194,6 +197,23 @@ describe('token stats', () => {
       }),
       collection(new Date(2026, 8, 1, 10), { usage: usage({ input: 1 }) }),
     ])
+    // Each write-up of a recap, written again or not, inside the 14 days
+    keepRecapSpend(root, {
+      at: new Date(2026, 9, 10, 17).toISOString(),
+      usage: usage({ input: 300, cacheRead: 2000, output: 900 }),
+    })
+    keepRecapSpend(root, {
+      at: new Date(2026, 9, 10, 17, 5).toISOString(),
+      usage: usage({ input: 200, output: 700 }),
+    })
+    keepRecapSpend(
+      root,
+      {
+        at: new Date(2026, 8, 1, 10).toISOString(),
+        usage: usage({ input: 1 }),
+      },
+      new Date(2026, 8, 1, 10).getTime()
+    )
 
     const { tokens, total, byStatus } = new HistoryReader(root).stats(now)
     // The run figures are the answers'.
@@ -204,16 +224,19 @@ describe('token stats', () => {
       day: '2026-10-09',
       mentions: usage({}),
       collections: usage({ output: 100 }),
+      recaps: usage({}),
     })
     expect(tokens.daily.at(-2)).toEqual({
       day: '2026-10-10',
       mentions: usage({ input: 4000, cacheRead: 30_000, output: 600 }),
       collections: usage({}),
+      recaps: usage({ input: 500, cacheRead: 2000, output: 1600 }),
     })
     expect(tokens.daily.at(-1)).toEqual({
       day: '2026-10-11',
       mentions: usage({}),
       collections: usage({ input: 2000, cacheRead: 9000, cacheWrite: 500 }),
+      recaps: usage({}),
     })
     expect(tokens.mentions).toEqual({
       runs: 1,
@@ -229,6 +252,75 @@ describe('token stats', () => {
         output: 100,
       }),
     })
+    expect(tokens.recaps).toEqual({
+      count: 2,
+      usage: usage({ input: 500, cacheRead: 2000, output: 1600 }),
+    })
+  })
+
+  it('keeps what each write-up spent beside what it wrote, for 90 days', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-recaps-'))
+    try {
+      const at = (day: number) => new Date(2026, 9, day, 12)
+      keepRecapSpend(dir, {
+        at: at(1).toISOString(),
+        usage: usage({ input: 1 }),
+      })
+      keepWritten(dir, 'day', '2026-10-01', {
+        text: 'You fixed the retries.',
+        at: at(1).toISOString(),
+        by: 'claude',
+      })
+      // Writing it again keeps the first one's spend; one 90 days on drops it.
+      keepRecapSpend(dir, {
+        at: at(2).toISOString(),
+        usage: usage({ input: 2 }),
+      })
+      expect(readWritten(dir)['day:2026-10-01']?.text).toBe(
+        'You fixed the retries.'
+      )
+      expect(readRecapSpend(dir).map((entry) => entry.usage.input)).toEqual([
+        1, 2,
+      ])
+      keepRecapSpend(
+        dir,
+        { at: at(31).toISOString(), usage: usage({ input: 3 }) },
+        at(1).getTime() + 90 * 86_400_000
+      )
+      expect(readRecapSpend(dir).map((entry) => entry.usage.input)).toEqual([
+        2, 3,
+      ])
+      expect(readWritten(dir)['day:2026-10-01']).toBeDefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("reads a write-up's tokens from Claude Code's json output", () => {
+    // claude -p --output-format json (claude 2.1.29x)
+    expect(
+      usageFrom(
+        JSON.stringify({
+          type: 'result',
+          result: 'You fixed the retries.',
+          total_cost_usd: 0.012,
+          usage: {
+            input_tokens: 5,
+            cache_read_input_tokens: 14000,
+            cache_creation_input_tokens: 3000,
+            output_tokens: 180,
+          },
+        })
+      )
+    ).toEqual({
+      input: 5,
+      cacheRead: 14000,
+      cacheWrite: 3000,
+      output: 180,
+      costUsd: 0.012,
+    })
+    expect(usageFrom('not json')).toBeUndefined()
+    expect(usageFrom(JSON.stringify({ result: 'x' }))).toBeUndefined()
   })
 
   it('lists the last 7 days of collections newest first, runs and the old log', () => {

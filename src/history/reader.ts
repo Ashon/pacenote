@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { readCollections } from '../tasks/collections.js'
+import { readRecapSpend } from '../you/spent.js'
 import type { RelatedRun } from '../tasks/types.js'
 import {
   ARTIFACTS_DIR,
@@ -156,7 +157,7 @@ export class HistoryReader {
     const tokenDays = new Map(
       [...daily.keys()].map((day) => [
         day,
-        { mentions: NO_USAGE, collections: NO_USAGE },
+        { mentions: NO_USAGE, collections: NO_USAGE, recaps: NO_USAGE },
       ])
     )
     const mentions = { runs: 0, usage: NO_USAGE }
@@ -186,6 +187,15 @@ export class HistoryReader {
         entry.ok ? entry.added + entry.maybe : 0,
         entry.usage
       )
+    // Write it up, each write-up in the desktop app
+    const recaps = { count: 0, usage: NO_USAGE }
+    for (const spend of readRecapSpend(this.root)) {
+      const tokenDay = tokenDays.get(dayDirFor(new Date(spend.at)))
+      if (!tokenDay) continue
+      tokenDay.recaps = addUsage(tokenDay.recaps, spend.usage)
+      recaps.count += 1
+      recaps.usage = addUsage(recaps.usage, spend.usage)
+    }
     for (const record of this.records()) {
       // The run figures (status, days, duration, tools) are the answers';
       // collections count only toward tokens.
@@ -236,6 +246,7 @@ export class HistoryReader {
         daily: [...tokenDays].map(([day, value]) => ({ day, ...value })),
         mentions,
         collections,
+        recaps,
       },
     }
   }

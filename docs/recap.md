@@ -37,7 +37,8 @@ the language most of your task titles are in, area by area, the commits summed u
 only when you click, as `claude -p` with no tools, no MCP servers and none of your settings, on your Claude Code login,
 and is given only the recap's own lines. While it writes, the place the text will take shows Pace writing, and the
 text comes in there word by word. What it wrote is kept in `PACENOTE_DATA_DIR/recaps.json`, shown above the recap, and
-comes back with the period; **Write again** replaces it.
+comes back with the period; **Write again** replaces it. The tokens each write-up spent are kept there too (90 days),
+written again or not, and the Overview's tokens per day count them as Recaps.
 
 ## Copy
 

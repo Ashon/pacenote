@@ -1,5 +1,9 @@
 import { spawn } from 'node:child_process'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import {
+  claudeResultUsage,
+  type TokenUsage,
+} from '../../../src/history/usage.js'
 import { judgeCommand } from './done-watch.js'
 
 /**
@@ -29,13 +33,31 @@ export function writtenFrom(stdout: string): string | undefined {
   }
 }
 
+/** The tokens in Claude Code's json output, for the Overview */
+export function usageFrom(stdout: string): TokenUsage | undefined {
+  try {
+    const out = JSON.parse(stdout) as {
+      usage?: Record<string, number>
+      total_cost_usd?: number
+    }
+    return out.usage ? claudeResultUsage(out) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** What Claude Code wrote, or why it did not, and the tokens it spent */
+export type WriteResult = ({ text: string } | { error: string }) & {
+  usage?: TokenUsage
+}
+
 export function writeRecap(options: {
   bin: string
   toolPath: string
   cwd: string
   prompt: string
   timeoutMs?: number
-}): Promise<{ text: string } | { error: string }> {
+}): Promise<WriteResult> {
   const [command, args] = judgeCommand(options.bin)
   return new Promise((resolve) => {
     let stdout = ''
@@ -56,7 +78,11 @@ export function writeRecap(options: {
     child.on('close', () => {
       clearTimeout(timer)
       const text = writtenFrom(stdout)
-      resolve(text ? { text } : { error: 'Claude Code wrote nothing.' })
+      const usage = usageFrom(stdout)
+      resolve({
+        ...(text ? { text } : { error: 'Claude Code wrote nothing.' }),
+        ...(usage ? { usage } : {}),
+      })
     })
     child.stdin.end(options.prompt)
   })

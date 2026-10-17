@@ -127,6 +127,7 @@ import {
   type RecapPeriod,
   type RecapView,
 } from '../../../src/you/recap.js'
+import { keepRecapSpend } from '../../../src/you/spent.js'
 import { writeRecap } from './recap-writer.js'
 import {
   dueForJudging,
@@ -1052,6 +1053,12 @@ function registerBotIpc(): void {
         cwd: dataDir,
         prompt: recapPrompt(view, periodWords(view), commits),
       })
+      // Spent whether it wrote or not, for the Overview's tokens
+      if (result.usage)
+        keepRecapSpend(dataDir, {
+          at: new Date().toISOString(),
+          usage: result.usage,
+        })
       if ('error' in result) {
         log.warn(`Could not write up the recap of ${key}: ${result.error}`)
         return { error: result.error }

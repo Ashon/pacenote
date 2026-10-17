@@ -207,16 +207,24 @@ export interface RunStats {
 }
 
 /**
- * Tokens per day, apart by where they went: answering mentions (run history)
- * and collecting tasks (the collections the desktop app ran)
+ * Tokens per day, apart by where they went: answering mentions (run history),
+ * collecting tasks (the collections the desktop app ran) and writing recaps up
+ * (Write it up, recaps.json)
  */
 export interface TokenStats {
   /** Oldest -> newest, the same days as RunStats.daily */
-  daily: { day: string; mentions: TokenUsage; collections: TokenUsage }[]
+  daily: {
+    day: string
+    mentions: TokenUsage
+    collections: TokenUsage
+    recaps: TokenUsage
+  }[]
   /** Runs that recorded tokens */
   mentions: { runs: number; usage: TokenUsage }
   /** Collections, and the tasks and Maybes they added */
   collections: { count: number; found: number; usage: TokenUsage }
+  /** Recaps written up */
+  recaps: { count: number; usage: TokenUsage }
 }
 
 export function summarize(run: HistoryRecord): RunSummary {

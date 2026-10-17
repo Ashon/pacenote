@@ -15,6 +15,7 @@ import {
   WINDOW_MS,
 } from './areas.js'
 import { sessionMarks, type SessionMark } from './sessions.js'
+import { RECAPS_FILE } from './spent.js'
 import { readYou } from './store.js'
 import type {
   AreaRecord,
@@ -601,9 +602,10 @@ export function recapOf(input: {
   return view
 }
 
-// What Write it up wrote, by period (recaps.json, the app's)
+// What Write it up wrote, by period (recaps.json, the app's; what each
+// write-up spent is in spent.ts)
 
-export const RECAPS_FILE = 'recaps.json'
+export { RECAPS_FILE }
 
 export function readWritten(dataDir: string): Record<string, Written> {
   const file = readJson<{ written?: Record<string, Written> }>(
@@ -619,9 +621,10 @@ export function keepWritten(
   key: string,
   written: Written
 ): void {
+  const file = path.join(dataDir, RECAPS_FILE)
   const all = readWritten(dataDir)
   all[`${period}:${key}`] = written
-  writeJson(path.join(dataDir, RECAPS_FILE), { version: 1, written: all })
+  writeJson(file, { ...readJson<object>(file, {}), version: 1, written: all })
 }
 
 /**

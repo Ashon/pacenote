@@ -238,11 +238,11 @@ export function Overview() {
                 <div className="mt-4 flex min-h-32 flex-1">
                   <DayBars
                     label="Runs per day for the last 14 days, failures at the top"
-                    topClassName="bg-status-failed"
+                    topClassNames={['bg-status-failed']}
                     days={daily.map((day) => ({
                       day: day.day,
                       value: day.runs,
-                      top: day.failed,
+                      tops: [day.failed],
                       hover: String(day.runs),
                       title: `${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`,
                     }))}
@@ -466,7 +466,7 @@ function OverviewSkeleton({
           label: 'By source',
           meta: 'Last 14 days',
         }}
-        rows={2}
+        rows={3}
       />
     </>
   )
@@ -515,11 +515,11 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
         <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
             label="Tasks you handled per day for the last 14 days"
-            topClassName="bg-chart-4"
+            topClassNames={[]}
             days={trend.daily.map((day) => ({
               day: day.day,
               value: day.handled,
-              top: 0,
+              tops: [],
               hover: String(day.handled),
               title: `${day.day}: ${day.handled} handled`,
             }))}
@@ -567,21 +567,25 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
 
 /**
  * Tokens over the same 14 days, and where they went. New tokens per day stack
- * mentions at the bottom of each bar and task collections on top. Input read
- * back from the cache is counted apart: it is most of the input and costs far
- * less.
+ * mentions at the bottom of each bar, task collections above them and recap
+ * write-ups on top. Input read back from the cache is counted apart: it is
+ * most of the input and costs far less.
  */
 function TokenBand({ tokens }: { tokens?: TokenStats }) {
   const mentions = tokens ? newTokens(tokens.mentions.usage) : 0
   const collections = tokens ? newTokens(tokens.collections.usage) : 0
+  const recaps = tokens ? newTokens(tokens.recaps.usage) : 0
   const cacheRead = tokens
-    ? tokens.mentions.usage.cacheRead + tokens.collections.usage.cacheRead
+    ? tokens.mentions.usage.cacheRead +
+      tokens.collections.usage.cacheRead +
+      tokens.recaps.usage.cacheRead
     : 0
-  const all = mentions + collections
-  const top = Math.max(1, mentions, collections)
+  const all = mentions + collections + recaps
+  const top = Math.max(1, mentions, collections, recaps)
   const runs = tokens?.mentions.runs ?? 0
   const count = tokens?.collections.count ?? 0
   const found = tokens?.collections.found ?? 0
+  const written = tokens?.recaps.count ?? 0
 
   return (
     <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
@@ -602,19 +606,23 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
         />
         <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
-            label="New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections on top"
-            topClassName="bg-chart-4"
+            label="New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections above them, recap write-ups on top"
+            topClassNames={['bg-chart-5', 'bg-chart-4']}
             days={(tokens?.daily ?? []).map((day) => {
               const fromMentions = newTokens(day.mentions)
               const fromCollections = newTokens(day.collections)
-              const total = fromMentions + fromCollections
-              const cached = day.mentions.cacheRead + day.collections.cacheRead
+              const fromRecaps = newTokens(day.recaps)
+              const total = fromMentions + fromCollections + fromRecaps
+              const cached =
+                day.mentions.cacheRead +
+                day.collections.cacheRead +
+                day.recaps.cacheRead
               return {
                 day: day.day,
                 value: total,
-                top: fromCollections,
+                tops: [fromRecaps, fromCollections],
                 hover: formatTokens(total),
-                title: `${day.day}: ${formatTokens(total)} new (mentions ${formatTokens(fromMentions)}, task collections ${formatTokens(fromCollections)}), ${formatTokens(cached)} from cache`,
+                title: `${day.day}: ${formatTokens(total)} new (mentions ${formatTokens(fromMentions)}, task collections ${formatTokens(fromCollections)}, recaps ${formatTokens(fromRecaps)}), ${formatTokens(cached)} from cache`,
               }
             })}
           />
@@ -658,6 +666,17 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
                 : 'None run from the app yet'
             }
           />
+          <SourceRow
+            label="Recaps"
+            className="bg-chart-5"
+            value={recaps}
+            share={recaps / top}
+            hint={
+              written
+                ? `${written} ${written === 1 ? 'write-up' : 'write-ups'} · ${formatTokens(recaps / written)} each`
+                : 'None written up yet'
+            }
+          />
         </ul>
         <div className="mt-3.5 border-t border-border pt-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
@@ -678,7 +697,7 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
   )
 }
 
-/** A source in By source: its new tokens, against the larger of the two */
+/** A source in By source: its new tokens, against the largest of them */
 function SourceRow({
   label,
   className,
@@ -751,8 +770,11 @@ interface DayBar {
   day: string
   /** The bar's height, against the tallest day */
   value: number
-  /** The part of value painted at the top (failures, task collections) */
-  top: number
+  /**
+   * The parts of value painted at the top, topmost first (failures; recap
+   * write-ups, then task collections)
+   */
+  tops: number[]
   /** Shown over the bar on hover */
   hover: string
   title: string
@@ -760,21 +782,21 @@ interface DayBar {
 
 /**
  * Pill-shaped bars: filled over the background (well) by value, never under
- * 12% so a small day still shows. The part on top is a pill of its own, at
- * least as tall as the bar is wide, so every end stays round. The columns share
- * the width, so the chart never grows past its section; when they get too
- * narrow for every date, every other date (counting back from today) is
+ * 12% so a small day still shows. Each part on top is a pill of its own,
+ * at least as tall as the bar is wide, so every end stays round. The columns
+ * share the width, so the chart never grows past its section; when they get
+ * too narrow for every date, every other date (counting back from today) is
  * hidden.
  */
 function DayBars({
   days,
   label,
-  topClassName,
+  topClassNames,
 }: {
   days: DayBar[]
   label: string
-  /** The color of the part on top */
-  topClassName: string
+  /** The colors of the parts on top, topmost first */
+  topClassNames: string[]
 }) {
   const max = Math.max(1, ...days.map((day) => day.value))
   return (
@@ -800,17 +822,32 @@ function DayBars({
                   height: `${Math.max(12, (day.value / max) * 100)}%`,
                 }}
               >
-                {day.top > 0 && (
-                  <div
-                    className={cn(
-                      'absolute inset-x-0 top-0 rounded-full',
-                      topClassName
-                    )}
-                    style={{
-                      height: `min(100%, max(0.5rem, ${(day.top / day.value) * 100}%))`,
-                    }}
-                  />
-                )}
+                {/* Each part reaches down past the ones above it; the
+                    topmost is painted last */}
+                {day.tops
+                  .map((value, index) => {
+                    const above = day.tops.slice(0, index + 1)
+                    return {
+                      index,
+                      value,
+                      reach: above.reduce((sum, part) => sum + part, 0),
+                      pills: above.filter((part) => part > 0).length,
+                    }
+                  })
+                  .filter((part) => part.value > 0)
+                  .reverse()
+                  .map((part) => (
+                    <div
+                      key={part.index}
+                      className={cn(
+                        'absolute inset-x-0 top-0 rounded-full',
+                        topClassNames[part.index]
+                      )}
+                      style={{
+                        height: `min(100%, max(${part.pills * 0.5}rem, ${(part.reach / day.value) * 100}%))`,
+                      }}
+                    />
+                  ))}
               </div>
             )}
           </div>

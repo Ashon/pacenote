@@ -241,9 +241,10 @@ Run history:
 - Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
   which are most of the input and cost far less.
 - UI: run list (kind and status filters, search), "Overview" (last 14 days, success rate, average duration, top tools, the
-  tasks you handled per day and how they ended, new tokens per day for mentions and task collections), run detail
-  ("Timeline" of the work in the order request -> tool calls -> answer -> outputs, where Pace's mark looks around while it
-  works and stays as the answer's avatar; "Attachments", "Prompt", raw "JSON"; the Tokens figure breaks down on hover).
+  tasks you handled per day and how they ended, new tokens per day for mentions, task collections and recap write-ups),
+  run detail ("Timeline" of the work in the order request -> tool calls -> answer -> outputs, where Pace's mark looks
+  around while it works and stays as the answer's avatar; "Attachments", "Prompt", raw "JSON"; the Tokens figure breaks
+  down on hover).
   Runs in progress are reread every 1.5 seconds.
 
 Other:
