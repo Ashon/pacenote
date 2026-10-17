@@ -196,11 +196,10 @@ code {
 }
 .hero h1 {
   margin: 0;
-  font-size: clamp(2.75rem, 7.4vw, 5.25rem);
-  line-height: 1.02;
+  font-size: clamp(2.5rem, 6.2vw, 4.5rem);
+  line-height: 1.04;
   letter-spacing: -0.035em;
   font-weight: 750;
-  max-width: 14ch;
 }
 .release {
   display: inline-flex;
