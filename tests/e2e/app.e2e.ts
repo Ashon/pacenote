@@ -2484,6 +2484,10 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       { settings: on, now: new Date(now - HOUR), finished: true }
     )
     const store = new HistoryStore(home)
+    // Both earlier today, whatever the hour: Runs groups its list by day, and
+    // two rows held in one group must stay in one (hours back from now put the
+    // second in Yesterday from midnight to 3 a.m.)
+    const today = new Date(now).setHours(0, 0, 0, 0)
     const runs = ['Where do you run?', 'Is staging healthy?'].map(
       (request, i) => {
         const run = store.start(
@@ -2499,7 +2503,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
             request,
             backend: { reasoner: 'claude', sandbox: 'host' },
           },
-          new Date(now - (i + 2) * HOUR)
+          new Date(now - ((now - today) * (i + 1)) / 3)
         )
         run.patch({ answer: 'From this Mac: all good.' })
         run.finish('succeeded')
