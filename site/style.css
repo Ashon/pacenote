@@ -748,21 +748,31 @@ code {
   position: relative;
   overflow: hidden;
 }
-.cv-space {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-}
-.cv-space > * {
+.converge-stage > * {
   position: absolute;
 }
 .cv-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
-  line-height: 16px;
+  line-height: 18px;
   font-weight: 600;
   color: var(--muted-foreground);
   white-space: nowrap;
+}
+.cv-label.stacked {
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 15px;
+  text-align: center;
+}
+.cv-label svg,
+.cv-label img,
+.cv-ledger-label svg {
+  flex: none;
+  display: block;
 }
 .cv-label.hub {
   color: var(--primary);
@@ -794,12 +804,12 @@ code {
 .cv-seg.carried.down {
   background: repeating-linear-gradient(180deg, var(--primary) 0 6px, transparent 6px 11px);
 }
-.cv-head {
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 7px solid var(--primary);
+.cv-arrow {
+  color: var(--primary);
+  line-height: 0;
+}
+.cv-arrow svg {
+  display: block;
 }
 .cv-node {
   width: 14px;
@@ -813,10 +823,10 @@ code {
   background: var(--primary);
 }
 .cv-ring {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--track) 28%, transparent);
+  background: color-mix(in srgb, var(--track) 22%, transparent);
   opacity: 0;
 }
 .cv-chip {
@@ -828,13 +838,19 @@ code {
   background: var(--well);
   color: var(--foreground);
 }
+.cv-chip.wrap {
+  white-space: normal;
+}
 .cv-chip.hub {
   background: color-mix(in srgb, var(--track) 18%, var(--card));
   font-weight: 600;
 }
 .cv-ledger-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  line-height: 16px;
+  line-height: 18px;
   font-weight: 700;
   color: var(--primary);
   white-space: nowrap;
@@ -846,9 +862,9 @@ code {
   align-items: center;
 }
 .cv-ledger span {
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 15px;
-  padding: 3px 9px;
+  padding: 3px 8px;
   border-radius: 999px;
   white-space: nowrap;
   background: var(--secondary);

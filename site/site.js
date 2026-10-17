@@ -210,8 +210,8 @@ const NODES = {
   n0: { lane: 'slack', t: 0, text: 'mina asked you' },
   n1: { lane: 'pacenote', t: 1, text: 'On your list' },
   n2: { lane: 'claude', t: 2, text: 'Session in Claude Code' },
-  n3: { lane: 'pacenote', t: 3, text: 'How it ended' },
-  n4: { lane: 'slack', t: 4, text: 'Reply you send' },
+  n3: { lane: 'pacenote', t: 3, text: 'How it ended', tall: 'under' },
+  n4: { lane: 'slack', t: 4, text: 'Reply you send', wide: 'left' },
   nh: {
     lane: 'slack',
     t: 5,
@@ -226,7 +226,13 @@ const NODES = {
     wide: 'above',
   },
   n6: { lane: 'codex', t: 6, text: 'Session in Codex' },
-  n7: { lane: 'pacenote', t: 7, text: 'How it ended', wide: 'left' },
+  n7: {
+    lane: 'pacenote',
+    t: 7,
+    text: 'How it ended',
+    wide: 'left',
+    tall: 'under',
+  },
 }
 const LINES = [
   { from: 'n0', to: 'n1', beat: 1 },
@@ -252,7 +258,10 @@ const LEAD = 250
 const beatAt = (beat) => LEAD + (beat - 1) * BEAT
 const CONVERGE_MS = beatAt(7) + BEAT + 1400
 
-// The two ways to lay it out: time across and lanes down, or the other way
+// The two ways to lay it out: time across and lanes down, or the other way.
+// Positions are in a design space; drawing maps them to the width there is
+// and onto whole device pixels, while strokes, dots and words keep their own
+// size, so it stays sharp on any display.
 const LAYOUTS = {
   wide: {
     w: 960,
@@ -274,6 +283,32 @@ const LAYOUTS = {
   },
 }
 
+const ratio = () => window.devicePixelRatio || 1
+const snap = (v) => Math.round(v * ratio()) / ratio()
+
+// The app's own icons (lucide) for what each lane is; no vendor's logo
+const TERMINAL =
+  '<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>'
+const ICON_PATHS = {
+  slack:
+    '<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>',
+  claude: TERMINAL,
+  codex: TERMINAL,
+  keeps:
+    '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+}
+function icon(name) {
+  if (name === 'pacenote') {
+    const mark = document.querySelector('link[rel="icon"]')?.href ?? ''
+    return `<img src="${mark}" width="14" height="14" alt="">`
+  }
+  return `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`
+}
+
+// The arrowhead's tip stops this far from a node's centre, and is this long
+const TIP = 12
+const ARROW = 9
+
 function converge(figure) {
   const stage = figure.querySelector('.converge-stage')
   const caption = figure.querySelector('.converge-caption')
@@ -286,32 +321,34 @@ function converge(figure) {
   figure.classList.add('ready')
 
   let timeline
-  let shape
-  let space
+  let drawn = ''
   const build = () => {
     const width = stage.clientWidth
-    const next = width < 700 ? 'tall' : 'wide'
-    const L = LAYOUTS[next]
-    const scale = Math.min(width / L.w, next === 'tall' ? 1.3 : 1.15)
-    stage.style.height = px(L.h * scale)
-    if (next === shape && space) {
-      space.style.transform = `scale(${scale})`
-      space.style.left = px((width - L.w * scale) / 2)
-      return
+    if (`${width}:${ratio()}` === drawn) return
+    drawn = `${width}:${ratio()}`
+    const wide = width >= 700
+    const L = LAYOUTS[wide ? 'wide' : 'tall']
+    const s = Math.min(width / L.w, wide ? 1.15 : 1.3)
+    const ox = (width - L.w * s) / 2
+    const M = {
+      x: (x) => snap(ox + x * s),
+      y: (y) => snap(y * s),
+      len: (n) => snap(n * s),
     }
     const at = timeline ? timeline.now() : 0
     const state = timeline ? timeline.state : 'paused'
     for (const animation of timeline?.animations ?? []) animation.cancel()
-    shape = next
     stage.replaceChildren()
     caption.replaceChildren()
-    space = div('cv-space', stage, {
-      width: px(L.w),
-      height: px(L.h),
-      transform: `scale(${scale})`,
-      left: px((width - L.w * scale) / 2),
-    })
-    timeline = drawConverge(space, caption, L, next === 'wide', steps, timeline)
+    timeline = drawConverge(
+      stage,
+      caption,
+      L,
+      M,
+      wide,
+      steps,
+      timeline?.onstate
+    )
     timeline.seek(at)
     if (state === 'playing') timeline.play()
     else if (state === 'ended') timeline.end()
@@ -331,61 +368,64 @@ function converge(figure) {
       () => !button.dataset.chosen || timeline.resume
     )
   }
-  new ResizeObserver(() => {
-    const before = timeline
-    build()
-    if (timeline !== before) timeline.onstate = show
-  }).observe(stage)
+  let pending
+  const later = () => {
+    cancelAnimationFrame(pending)
+    pending = requestAnimationFrame(build)
+  }
+  new ResizeObserver(later).observe(stage)
+  // Moving to a display of another density redraws on its pixel grid
+  const density = () =>
+    window
+      .matchMedia(`(resolution: ${ratio()}dppx)`)
+      .addEventListener('change', () => (later(), density()), { once: true })
+  density()
 }
 
-function drawConverge(space, caption, L, wide, steps, old) {
-  const timeline = new Timeline(CONVERGE_MS, { onstate: old?.onstate })
+function drawConverge(stage, caption, L, M, wide, steps, onstate) {
+  const timeline = new Timeline(CONVERGE_MS, { onstate })
+  const at = (node) => {
+    const p = L.at(node)
+    return { x: M.x(p.x), y: M.y(p.y) }
+  }
   const hub = L.lane.pacenote
 
   // Lanes and their names; the Pacenote lane is a band the rest come back to
   const band = wide
-    ? { left: 132, top: hub - 30, width: 822, height: 60 }
-    : { left: hub - 27, top: 32, width: 54, height: 590 }
-  div('cv-band', space, {
-    left: px(band.left),
-    top: px(band.top),
-    width: px(band.width),
-    height: px(band.height),
+    ? { left: M.x(132), top: M.y(hub) - 30, width: M.len(822), height: 60 }
+    : { left: M.x(hub) - 27, top: M.y(44), width: 54, height: M.len(578) }
+  const box = (b) => ({
+    left: px(b.left),
+    top: px(b.top),
+    width: px(b.width),
+    height: px(b.height),
   })
-  const glow = div('cv-band-glow', space, {
-    left: px(band.left),
-    top: px(band.top),
-    width: px(band.width),
-    height: px(band.height),
-  })
+  div('cv-band', stage, box(band))
+  const glow = div('cv-band-glow', stage, box(band))
   for (const [lane, name] of LANES) {
     const pos = L.lane[lane]
-    const label = div(`cv-label${lane === 'pacenote' ? ' hub' : ''}`, space)
-    label.textContent = name
+    const label = div(`cv-label${lane === 'pacenote' ? ' hub' : ''}`, stage)
+    label.innerHTML = `${icon(lane)}<span>${name}</span>`
     if (wide) {
-      Object.assign(label.style, {
-        left: '0px',
-        top: px(pos - 8),
-        width: '120px',
-      })
-      div('cv-lane', space, {
-        left: '142px',
-        top: px(pos),
-        width: '808px',
+      Object.assign(label.style, { left: px(M.x(0)), top: px(M.y(pos) - 9) })
+      div('cv-lane', stage, {
+        left: px(M.x(142)),
+        top: px(M.y(pos)),
+        width: px(M.len(808)),
         height: '1px',
       })
     } else {
+      label.classList.add('stacked')
       Object.assign(label.style, {
-        left: px(pos - 44),
-        top: '6px',
-        width: '88px',
-        textAlign: 'center',
+        left: px(M.x(pos) - 42),
+        top: '0px',
+        width: '84px',
       })
-      div('cv-lane', space, {
-        left: px(pos),
-        top: '30px',
+      div('cv-lane', stage, {
+        left: px(M.x(pos)),
+        top: px(M.y(42)),
         width: '1px',
-        height: '596px',
+        height: px(M.len(584)),
       })
     }
   }
@@ -394,35 +434,45 @@ function drawConverge(space, caption, L, wide, steps, old) {
   // reaches shows as its first line sets out
   const shown = {}
   for (const line of LINES) {
-    const parts = route(L, wide, NODES[line.from], NODES[line.to], line)
+    const parts = route(L, wide, NODES[line.from], NODES[line.to], line).map(
+      ({ a, b }) => ({
+        a: { x: M.x(a.x), y: M.y(a.y) },
+        b: { x: M.x(b.x), y: M.y(b.y) },
+      })
+    )
+    const last = parts[parts.length - 1]
+    const tip = { ...last.b }
+    if (line.back) {
+      // The line stops at the arrowhead's base; its tip meets the node's edge
+      const dx = Math.sign(last.b.x - last.a.x)
+      const dy = Math.sign(last.b.y - last.a.y)
+      last.b = {
+        x: last.b.x - dx * (TIP + ARROW),
+        y: last.b.y - dy * (TIP + ARROW),
+      }
+      tip.dx = dx
+      tip.dy = dy
+    }
     let t = beatAt(line.beat) + 60
     for (const part of parts) {
       const d = parts.length > 1 ? 280 : 440
-      segment(space, timeline, part, line, t, d)
+      segment(stage, timeline, part, line, t, d)
       t += d
     }
     shown[line.to] = Math.min(shown[line.to] ?? Infinity, t - 40)
-    if (line.back) head(space, timeline, parts[parts.length - 1], t - 80)
+    if (line.back) arrow(stage, timeline, tip, t - 60)
   }
   for (const line of LINES)
     if (!(line.from in shown)) shown[line.from] = beatAt(line.beat) - 150
 
   for (const [id, node] of Object.entries(NODES)) {
-    const p = L.at(node)
+    const p = at(node)
     const t = shown[id]
     const isHub = node.lane === 'pacenote'
-    const dot = div(`cv-node${isHub ? ' hub' : ''}`, space, {
-      left: px(p.x - 7),
-      top: px(p.y - 7),
-    })
-    timeline.add(dot, [
-      { at: t, opacity: 0, scale: '0.3', easing: STANDARD },
-      { at: t + 240, opacity: 1, scale: '1' },
-    ])
     if (isHub) {
-      const ring = div('cv-ring', space, {
-        left: px(p.x - 13),
-        top: px(p.y - 13),
+      const ring = div('cv-ring', stage, {
+        left: px(p.x - TIP),
+        top: px(p.y - TIP),
       })
       const last = beatAt(7) + BEAT
       timeline.add(ring, [
@@ -430,7 +480,15 @@ function drawConverge(space, caption, L, wide, steps, old) {
         { at: last + 420, opacity: 1 },
       ])
     }
-    chip(space, timeline, L, wide, node, p, t + 200)
+    const dot = div(`cv-node${isHub ? ' hub' : ''}`, stage, {
+      left: px(p.x - 7),
+      top: px(p.y - 7),
+    })
+    timeline.add(dot, [
+      { at: t, opacity: 0, scale: '0.3', easing: STANDARD },
+      { at: t + 240, opacity: 1, scale: '1' },
+    ])
+    chip(stage, timeline, wide, node, p, t + 200, stage.clientWidth)
   }
 
   const finale = beatAt(7) + BEAT
@@ -440,21 +498,21 @@ function drawConverge(space, caption, L, wide, steps, old) {
   ])
 
   // What Pacenote keeps, one chip per beat, already in its place
-  const ledgerTop = wide ? 348 : 650
+  const ledgerTop = M.y(wide ? 348 : 650)
   const label = div(
     'cv-ledger-label',
-    space,
+    stage,
     wide
-      ? { left: '0px', top: px(ledgerTop + 4) }
-      : { left: '0px', top: px(ledgerTop - 24) }
+      ? { left: px(M.x(0)), top: px(ledgerTop + 3) }
+      : { left: px(M.x(0)), top: px(ledgerTop - 26) }
   )
-  label.textContent = 'Pacenote keeps'
+  label.innerHTML = `${icon('keeps')}<span>Pacenote keeps</span>`
   const ledger = div(
     'cv-ledger',
-    space,
+    stage,
     wide
-      ? { left: '142px', top: px(ledgerTop), width: '808px' }
-      : { left: '0px', top: px(ledgerTop), width: '340px' }
+      ? { left: px(M.x(142)), top: px(ledgerTop), width: px(M.len(808)) }
+      : { left: px(M.x(0)), top: px(ledgerTop), width: px(M.len(340)) }
   )
   for (const [text, beat] of LEDGER) {
     const item = document.createElement('span')
@@ -466,6 +524,10 @@ function drawConverge(space, caption, L, wide, steps, old) {
       { at: t + 240, opacity: 1, translate: '0 0' },
     ])
   }
+  // As tall as the drawing, or the ledger when it wraps on a narrow screen
+  stage.style.height = px(
+    Math.max(M.y(L.h), ledger.offsetTop + ledger.offsetHeight + 12)
+  )
 
   // One line of words per beat, the same as the list beside it
   steps.forEach((text, i) => {
@@ -505,21 +567,26 @@ function route(L, wide, from, to, line) {
   ]
 }
 
-function segment(space, timeline, part, line, t, d) {
+function segment(stage, timeline, part, line, t, d) {
   const { a, b } = part
   const thick = line.back ? 4 : 3
   const across = a.y === b.y
-  const cls = `cv-seg${line.back ? ' back' : ''}${line.carried ? ' carried' : ''}${line.carried && !across ? ' down' : ''}`
+  const kind = [
+    'cv-seg',
+    line.back && 'back',
+    line.carried && 'carried',
+    line.carried && !across && 'down',
+  ]
   const el = across
-    ? div(cls, space, {
+    ? div(kind.filter(Boolean).join(' '), stage, {
         left: px(Math.min(a.x, b.x)),
-        top: px(a.y - thick / 2),
+        top: px(snap(a.y - thick / 2)),
         width: px(Math.abs(b.x - a.x)),
         height: px(thick),
         transformOrigin: b.x >= a.x ? 'left center' : 'right center',
       })
-    : div(cls, space, {
-        left: px(a.x - thick / 2),
+    : div(kind.filter(Boolean).join(' '), stage, {
+        left: px(snap(a.x - thick / 2)),
         top: px(Math.min(a.y, b.y)),
         width: px(thick),
         height: px(Math.abs(b.y - a.y)),
@@ -531,44 +598,70 @@ function segment(space, timeline, part, line, t, d) {
   ])
 }
 
-/** The arrowhead where a tool's line comes back into Pacenote */
-function head(space, timeline, part, t) {
-  const { a, b } = part
-  const dx = Math.sign(b.x - a.x)
-  const dy = Math.sign(b.y - a.y)
-  const angle = dy < 0 ? 0 : dy > 0 ? 180 : dx > 0 ? 90 : -90
-  const el = div('cv-head', space, {
-    left: px(b.x - 5 - dx * 15),
-    top: px(b.y - 3.5 - dy * 15),
-    transform: `rotate(${angle}deg)`,
+/**
+ * The arrowhead where a tool's line comes back into Pacenote, drawn as a
+ * vector, its tip on the edge of the node's ring
+ */
+function arrow(stage, timeline, tip, t) {
+  const { x, y, dx, dy } = tip
+  const shapes = {
+    up: { w: 10, h: 9, d: 'M5 0L10 9H0Z', left: x - 5, top: y + TIP },
+    down: { w: 10, h: 9, d: 'M0 0H10L5 9Z', left: x - 5, top: y - TIP - ARROW },
+    left: { w: 9, h: 10, d: 'M0 5L9 0V10Z', left: x + TIP, top: y - 5 },
+    right: {
+      w: 9,
+      h: 10,
+      d: 'M9 5L0 0V10Z',
+      left: x - TIP - ARROW,
+      top: y - 5,
+    },
+  }
+  const way = dy < 0 ? 'up' : dy > 0 ? 'down' : dx < 0 ? 'left' : 'right'
+  const shape = shapes[way]
+  const el = div('cv-arrow', stage, {
+    left: px(snap(shape.left)),
+    top: px(snap(shape.top)),
   })
+  el.innerHTML = `<svg width="${shape.w}" height="${shape.h}" viewBox="0 0 ${shape.w} ${shape.h}" aria-hidden="true"><path d="${shape.d}" fill="currentColor"/></svg>`
   timeline.add(el, [
     { at: t, opacity: 0 },
     { at: t + 160, opacity: 1 },
   ])
 }
 
-function chip(space, timeline, L, wide, node, p, t) {
+function chip(stage, timeline, wide, node, p, t, room) {
   const isHub = node.lane === 'pacenote'
-  const el = div(`cv-chip${isHub ? ' hub' : ''}`, space)
+  const el = div(`cv-chip${isHub ? ' hub' : ''}`, stage)
   el.textContent = node.text
-  let place = wide
+  const place = wide
     ? (node.wide ?? 'below')
     : (node.tall ??
       (node.lane === 'claude' || node.lane === 'codex' ? 'left' : 'right'))
-  const spots = {
-    below: { left: px(p.x + 12), top: px(p.y + 10) },
-    above: { left: px(p.x + 12), top: px(p.y - 32) },
-    left: {
-      left: px(p.x - 12),
-      top: px(wide ? p.y + 10 : p.y - 11),
-      transform: 'translateX(-100%)',
-    },
-    right: { left: px(p.x + 14), top: px(p.y - 11) },
+  const spots = wide
+    ? {
+        below: [p.x + 16, p.y + 14],
+        above: [p.x + 16, p.y - 36],
+        left: [p.x - 16, p.y + 14, true],
+      }
+    : {
+        right: [p.x + 16, p.y - 11],
+        left: [p.x - 16, p.y - 11, true],
+        above: [p.x - 8, p.y - 40],
+        under: [p.x + 14, p.y + 12],
+      }
+  // A chip on a node's left side hangs from its right edge, so it has the
+  // room to its left; on a narrow screen a long one wraps
+  const [left, top, flip] = spots[place]
+  Object.assign(
+    el.style,
+    flip
+      ? { right: px(snap(room - left)), top: px(snap(top)) }
+      : { left: px(snap(left)), top: px(snap(top)) }
+  )
+  if (!wide) {
+    el.classList.add('wrap')
+    el.style.maxWidth = px(Math.floor(flip ? left - 4 : room - left - 4))
   }
-  if (!wide && place === 'above')
-    spots.above = { left: px(p.x - 8), top: px(p.y - 36) }
-  Object.assign(el.style, spots[place])
   timeline.add(el, [
     { at: t, opacity: 0, translate: '0 6px', easing: STANDARD },
     { at: t + 240, opacity: 1, translate: '0 0' },
@@ -697,7 +790,7 @@ function architecture(figure) {
     // On each card's left edge, so it never covers the words
     const centre = (id) => {
       const r = nodes[id].getBoundingClientRect()
-      return `${px(r.left - box.left)} ${px(r.top + r.height / 2 - box.top)}`
+      return `${px(snap(r.left - box.left))} ${px(snap(r.top + r.height / 2 - box.top))}`
     }
     const stops = [{ at: 0, opacity: 0, translate: centre(PATH[0][1]) }]
     PATH.forEach(([t, id], i) => {
