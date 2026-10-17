@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install - Pacenote</title>
+  <meta name="description" content="Install Pacenote with Homebrew. What you need, the setup that ends with Pace's first answer in Slack, and how to update or remove it.">
+  <link rel="canonical" href="https://pacenote.dev/install/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Install Pacenote">
+  <meta property="og:description" content="One Homebrew command, then a setup that ends when Pace answers you in Slack.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/install/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../media/pacenote-mark.svg">
+  <link rel="preload" href="../fonts/host-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote home">
+      <img src="../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="Pages">
+      <a href="../how-it-works/">How it works</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../install/" aria-current="page">Install</a>
+      <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head">
+      <h1>Install Pacenote</h1>
+      <p class="lede">One Homebrew command, then a setup in the app that ends when Pace answers you in Slack.</p>
+      <div class="get">
+        <div class="command" role="group" aria-label="Install with Homebrew">
+          <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+          <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
+          <span class="copied" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="surface">
+      <section class="block" id="needs" aria-labelledby="needs-title">
+        <h2 id="needs-title">What you need</h2>
+        <ul class="needs">
+          <li>An Apple silicon Mac on macOS 12 or later. The built-in sandbox needs macOS 15.</li>
+          <li>Claude Code on a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later on ChatGPT Plus, Pro or
+            Business, signed in on that Mac.</li>
+          <li>A Slack workspace where you can create an app, or your team's
+            <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">Pacenote hub</a>.</li>
+          <li>For collecting tasks: Claude Code with your claude.ai account's Slack connector.</li>
+        </ul>
+      </section>
+
+      <section class="block" id="setup" aria-labelledby="setup-title">
+        <h2 id="setup-title">Setup ends with Pace's first answer</h2>
+        <ol class="steps down">
+          <li>Install with Homebrew: <code>brew install --cask ashon/tap/pacenote</code></li>
+          <li>Open Pacenote. Setup walks you through your AI service, where answers run, Slack, and a review. Stop at any
+            step and pick it up later from Overview.</li>
+          <li>Mention <code>@Pace</code> in a thread. Setup is done when Pace answers you there.</li>
+        </ol>
+      </section>
+
+      <section class="block" id="update" aria-labelledby="update-title">
+        <h2 id="update-title">Update or remove</h2>
+        <p>Run <code>brew upgrade --cask pacenote</code> to update; the app tells you when a new version is out. Run
+          <code>brew uninstall --cask pacenote</code> to remove it. Settings and run history stay in
+          <code>~/.pacenote</code> across both; delete that folder to remove them too.</p>
+      </section>
+
+      <section class="block" id="before" aria-labelledby="before-title">
+        <h2 id="before-title">Before you install</h2>
+        <div class="qa">
+          <h3>What does it cost?</h3>
+          <p>Nothing for Pacenote. Answers use the Claude or ChatGPT plan you already have and count toward its limits.
+            Pacenote is a personal project, open source under the Apache License 2.0 and offered as is.</p>
+          <h3>Do I need my Slack admin?</h3>
+          <p>You need to be able to create and install an app in your workspace, and some workspaces ask an admin to
+            approve new apps. If your team runs a Pacenote hub, you pair your Mac with it instead.</p>
+          <h3>Does it work on Intel Macs, Windows or Microsoft Teams?</h3>
+          <p>Not today. Pacenote runs on Apple silicon Macs and works with Slack.</p>
+        </div>
+      </section>
+
+      <section class="block closing" aria-labelledby="next-title">
+        <h2 id="next-title">More in the docs</h2>
+        <p>Installing from source, restarts and the run lock are in
+          <a href="https://github.com/Ashon/pacenote/blob/main/docs/installation.md">Installation</a>, and every setting
+          is in <a href="https://github.com/Ashon/pacenote/blob/main/docs/settings.md">Settings</a>.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote is made by one person and offered as is.</p>
+    <nav aria-label="Project">
+      <a href="../privacy/">Privacy</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">Docs</a>
+      <a href="https://github.com/Ashon/pacenote/releases">Releases</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">License</a>
+    </nav>
+    <p class="legal">Pacenote is an independent project, not made, endorsed or supported by Anthropic, OpenAI or Slack.
+      Claude, Claude Code, Codex, ChatGPT and Slack are trademarks of their owners.</p>
+  </footer>
+
+  <script src="../site.js"></script>
+</body>
+</html>

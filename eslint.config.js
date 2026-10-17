@@ -26,6 +26,11 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // pacenote.dev's one script, run in the visitor's browser
+    files: ['site/**/*.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     // Prettier wraps code at 80 columns; this holds comments to it as well.
     // Strings, template literals, regexes and URLs may run longer.
     plugins: { '@stylistic': stylistic },

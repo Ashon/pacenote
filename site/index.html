@@ -1,12 +1,14 @@
 <!doctype html>
 <!--
-  pacenote.dev, plain HTML and CSS with no build step. The pictures are not kept here: the Pages
-  workflow (.github/workflows/pages.yml) copies them into media/ from docs/images, docs/diagrams and
-  assets, so the README and this page show the same files. To preview locally, run that workflow's
-  "stage" step from the repository root and open site/index.html.
+  pacenote.dev, plain HTML and CSS with no build step: this page, how-it-works/, privacy/ and
+  install/, which share the header, the footer, style.css and site.js (tests/site.test.ts holds the
+  nav and the links together). The app's pictures are not kept here: the Pages workflow
+  (.github/workflows/pages.yml) copies them into media/ from docs/images, docs/diagrams and assets,
+  so the README and the site show the same files. To preview, run that workflow's "stage" step from
+  the repository root and serve site/ over http (python3 -m http.server -d site).
 
   Every claim here must stay true to the code, as the README's must: recheck "What Pace never does"
-  when Slack, sandbox, broker or network code changes.
+  (here and on privacy/) when Slack, sandbox, broker or network code changes.
 -->
 <html lang="en">
 <head>
@@ -30,50 +32,42 @@
   <link rel="icon" type="image/svg+xml" href="media/pacenote-mark.svg">
   <link rel="preload" href="fonts/host-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
-  <!-- The track draws itself once when it comes into view. Without scripting it is simply drawn. -->
+  <!-- The track's line draws once when it comes into view; without scripting it is simply drawn. -->
   <script>document.documentElement.classList.add('js')</script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
 
   <header class="top">
-    <a class="brand" href="#top" aria-label="Pacenote, back to the top">
+    <a class="brand" href="./" aria-label="Pacenote home">
       <img src="media/pacenote-mark.svg" alt="" width="28" height="28">
       <span>Pacenote</span>
     </a>
-    <nav aria-label="Sections">
-      <a href="#how">How it works</a>
-      <a href="#never">What Pace never does</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/Ashon/pacenote#readme">Docs</a>
+    <nav aria-label="Pages">
+      <a href="how-it-works/">How it works</a>
+      <a href="privacy/">Privacy</a>
+      <a href="install/">Install</a>
+      <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
       <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
     </nav>
   </header>
 
   <main id="main">
-    <section class="hero" id="top">
+    <section class="hero">
       <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">What's new in v0.5.25</a>
       <h1>Ask in Slack.<br>Pick it up in your terminal.</h1>
       <p class="lede">Pacenote is a free Mac app. Its assistant, Pace, answers your Slack mentions with your own Claude
-        Code or Codex login, lists what people asked of you, and hands each task, with its history, to the terminal
-        session that does the work.</p>
-
+        Code or Codex login and hands each task, with its history, to the terminal session that does the work.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
           <code id="install-command">brew install --cask ashon/tap/pacenote</code>
           <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
-        <a class="button primary" href="https://github.com/Ashon/pacenote#readme">Read the docs</a>
+        <a class="button secondary" href="how-it-works/">How it works</a>
       </div>
-      <p class="next">Install with Homebrew. Setup ends when Pace answers you in Slack.</p>
-      <ul class="facts">
-        <li>Free and open source</li>
-        <li>Apple silicon, macOS 12 or later</li>
-        <li>Uses your Claude or ChatGPT plan</li>
-        <li>No telemetry</li>
-      </ul>
-
+      <p class="next">Free and open source. Needs an Apple silicon Mac and your Claude or ChatGPT plan. No
+        telemetry.</p>
       <figure class="window">
         <picture>
           <source media="(prefers-color-scheme: dark)" srcset="media/todo-dark.webp">
@@ -84,16 +78,10 @@
     </section>
 
     <div class="surface">
-      <section class="block" id="trajectory" aria-labelledby="trajectory-title">
-        <div class="intro">
-          <h2 id="trajectory-title">The ask is in Slack. The fix is in last week's session.</h2>
-          <p>Work reaches you in Slack threads and gets done in Claude Code or Codex. Each keeps its own history, so you
-            paste the thread again, explain it again, and hunt for where you stopped. Pacenote keeps each task's history
-            together on your Mac, whichever tool did the work.</p>
-          <p class="aside">Why the name: in rallying, the co-driver reads the pace notes so the driver can keep their
-            eyes on the road. You drive. Pace reads the notes.</p>
-        </div>
-
+      <section class="block" aria-labelledby="loop-title">
+        <h2 id="loop-title">From a Slack thread to a closed task</h2>
+        <p>Work reaches you in Slack and gets done in Claude Code or Codex, each with its own memory. Pacenote keeps one
+          task's history together on your Mac, whichever tool did the work.</p>
         <ol class="track" aria-label="A task, from the ask to how it ended">
           <li><b>Asked</b><span>A Slack thread and its link</span></li>
           <li><b>On your list</b><span>Collected into Todo, with a summary</span></li>
@@ -103,196 +91,77 @@
         </ol>
       </section>
 
-      <section class="block feature" aria-labelledby="ask-title">
-        <div class="copy">
-          <h2 id="ask-title">Ask Pace in Slack</h2>
-          <p>Mention <code>@Pace</code> in a thread. Pace reads the thread and its files, works the question out with the
-            <code>claude</code> or <code>codex</code> CLI you are signed in to, and answers in the same thread.</p>
-          <p>Every answer keeps a record of each step Pace took, so you can check how it got there. In the built-in
-            sandbox, Pace can answer with diagrams and charts, and add, list or close your tasks.</p>
+      <section class="block" aria-label="What Pace does">
+        <div class="row">
+          <div class="copy">
+            <h2>Pace answers in the thread</h2>
+            <p>Mention <code>@Pace</code> in a Slack thread. It reads the thread and its files, works the question out
+              with the <code>claude</code> or <code>codex</code> CLI you are signed in to, and answers right there.
+              Every step it took is kept.</p>
+            <a class="more" href="how-it-works/#answer">How an answer happens</a>
+          </div>
+          <figure class="shot">
+            <picture>
+              <source media="(prefers-color-scheme: dark)" srcset="assets/run-answer-dark.webp">
+              <img src="assets/run-answer-light.webp" width="940" height="845" loading="lazy"
+                alt="A run in Pacenote: alice asked in #ops what changed on web-01 this morning; Pace took two steps, a Grep of the deploy log and a Read of the config, and answered that the likely cause is the 09:02 deploy of payments-worker, offering to open a draft PR.">
+            </picture>
+          </figure>
         </div>
-        <figure class="shot">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="media/run-dark.webp">
-            <img src="media/run-light.webp" width="1600" height="1011" loading="lazy"
-              alt="A run in Pacenote: the question asked in #ops, the two tool steps Pace took, and its answer naming the likely cause.">
-          </picture>
-        </figure>
+        <div class="row">
+          <div class="copy">
+            <h2>Pick up where you left off</h2>
+            <p><b>Collect now</b> lists what people asked of you in Slack. <b>Continue in Claude Code</b> or Codex opens a
+              session that already has the thread, what Pace found and how related work ended last time.</p>
+            <a class="more" href="how-it-works/#todo">Your Todo and the handoff</a>
+          </div>
+          <figure class="shot">
+            <img src="assets/task-pickup.webp" width="1280" height="420" loading="lazy"
+              alt="A task in Todo: mina wants a review of PR #482 before Thursday. Last time, a related review was done in Claude Code with 2 comments; your Claude Code session started just now; Pace answered in the same thread yesterday. A button reads Continue in Claude Code.">
+          </figure>
+        </div>
+        <div class="row">
+          <div class="copy">
+            <h2>Wrap up with a reply you send</h2>
+            <p>When the work is done, the task closes with a note on how it ended. If someone is waiting, you get a
+              drafted reply to copy into the thread. Pace never sends it for you.</p>
+            <a class="more" href="how-it-works/#handoff">How a task closes</a>
+          </div>
+          <figure class="shot">
+            <img src="assets/task-wrapped.webp" width="1280" height="745" loading="lazy"
+              alt="A closed task: mina fixed the idempotency key and merged #482, done in Claude Code. Below it, your reply, copied just now: Reviewed #482, 3 comments on the idempotency key. Buttons read Copy and open thread and Draft again, with the note Pacenote never sends it for you.">
+          </figure>
+        </div>
       </section>
 
-      <section class="block" aria-labelledby="todo-title">
-        <div class="pair">
-          <div>
-            <h2 id="todo-title">Know what you were asked, and what you promised</h2>
-            <p>Press <b>Collect now</b> and Claude Code reads Slack through your claude.ai Slack connector, read-only.
-              You get a list of what people asked of you and what you said you would do. Anything it is unsure about
-              waits under Maybe, and no message becomes a task twice. Collecting is off until you turn it on.</p>
-          </div>
-          <div>
-            <h2>Pick up where you left off, in either tool</h2>
-            <p><b>Continue in Claude Code</b> or Codex opens a terminal session that already has the task, the thread,
-              what Pace found and how related work ended last time, even if that was in the other tool. When you finish,
-              the task closes with a note on how it ended and, if someone is waiting, a drafted reply. You send it.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="block" id="never" aria-labelledby="never-title">
+      <section class="block" aria-labelledby="never-title">
         <div class="promise">
-          <div class="intro">
-            <h2 id="never-title">What Pace never does</h2>
-            <p>Each limit is enforced in code, not left to the model. The
-              <a href="https://github.com/Ashon/pacenote/blob/main/docs/sandbox.md">sandbox</a> and
-              <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">how it works</a> docs show
-              how.</p>
-          </div>
-          <ul class="never">
-            <li><b>Answer anyone but you.</b> It runs on your login, so anyone else who mentions it gets a note only they
-              can see. Teammates each run their own Pace.</li>
-            <li><b>Answer in private channels or DMs.</b> It answers only in public channels it has been invited
-              to.</li>
-            <li><b>Send messages for you.</b> It replies only in the thread you asked in. Replies it drafts for your tasks
-              are yours to send.</li>
-            <li><b>Change your files.</b> On your Mac, the CLI gets read-only access to one folder you choose, never your
-              credential folders. In the sandbox, each answer runs in a Linux VM that reaches only the domains you allow
-              and is thrown away afterwards.</li>
-            <li><b>Hand your credentials to the model.</b> Slack and hub tokens never reach the CLI. With ops tools on,
-              SSH keys and cluster, GitHub and Jira tokens stay in a separate broker.</li>
-            <li><b>Open a public endpoint or phone home.</b> It connects out to Slack over Socket Mode, so nothing on
-              your Mac accepts connections from the internet. Besides Slack or your hub, your AI service and the ops
-              tools you turn on, it contacts GitHub to check for updates and, when you set up the sandbox, the hosts its
-              images are built from. There is no telemetry.</li>
-            <li><b>Charge you.</b> Pacenote is free. Answers run through the official CLI on the plan you already pay
-              for, and count toward its usage limits.</li>
+          <h2 id="never-title">What Pace never does</h2>
+          <ul class="claims">
+            <li>Answer anyone but you</li>
+            <li>Answer in private channels or DMs</li>
+            <li>Send messages for you</li>
+            <li>Change your files</li>
+            <li>Hand your credentials to the model</li>
+            <li>Open a public endpoint or phone home</li>
+            <li>Charge you</li>
           </ul>
+          <a class="more" href="privacy/">Why, and how to check each one</a>
         </div>
       </section>
 
-      <section class="block" id="how" aria-labelledby="how-title">
-        <div class="intro">
-          <h2 id="how-title">How an answer happens</h2>
-        </div>
-        <ol class="steps">
-          <li>You mention <code>@Pace</code>. The mention reaches the app on your Mac over Slack's Socket Mode, a
-            connection your Mac opens, or through your team's hub.</li>
-          <li>Pace checks that it is you, in a public channel, then reads the thread and its files.</li>
-          <li>It runs <code>claude</code> or <code>codex</code> on your Mac with read-only access to one folder, or in a
-            Linux VM thrown away after the answer.</li>
-          <li>It strips its own secrets from the answer, replies in the thread, and records every step.</li>
-        </ol>
-        <figure class="diagram">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="media/architecture-dark.svg">
-            <img src="media/architecture-light.svg" width="1200" height="816" loading="lazy"
-              alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker.">
-          </picture>
-        </figure>
-      </section>
-
-      <section class="block" aria-labelledby="also-title">
-        <div class="intro">
-          <h2 id="also-title">Also in Pacenote</h2>
-        </div>
-        <ul class="wells">
-          <li>
-            <h3>Recap your day, week or month</h3>
-            <p>A day as a standup, a week by area with what carries over, a month by where the work went. Copied as
-              text, ready to post.</p>
-          </li>
-          <li>
-            <h3>See the areas you work in</h3>
-            <p>Pacenote sorts your tasks and your Claude Code and Codex sessions into the areas you contribute to. You
-              correct what it gets wrong.</p>
-          </li>
-          <li>
-            <h3>Let your AI tools look things up</h3>
-            <p>Pacenote's MCP server lets Claude Code, Codex and other MCP clients read what Pace did and what is on your
-              list. Off until you add it, in one click.</p>
-          </li>
-        </ul>
-      </section>
-
-      <section class="block" id="install" aria-labelledby="install-title">
-        <div class="pair">
-          <div>
-            <h2 id="needs-title">What you need</h2>
-            <ul class="needs">
-              <li>An Apple silicon Mac on macOS 12 or later. The built-in sandbox needs macOS 15.</li>
-              <li>Claude Code on a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later on ChatGPT Plus,
-                Pro or Business, signed in on that Mac.</li>
-              <li>A Slack workspace where you can create an app, or your team's
-                <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">Pacenote hub</a>.</li>
-              <li>For collecting tasks: Claude Code with your claude.ai account's Slack connector.</li>
-            </ul>
-          </div>
-          <div>
-            <h2 id="install-title">Setup ends with Pace's first answer</h2>
-            <ol class="steps compact">
-              <li>Install with Homebrew: <code>brew install --cask ashon/tap/pacenote</code></li>
-              <li>Open Pacenote. Setup walks you through your AI service, where answers run, Slack, and a review. Stop
-                at any step and pick it up later.</li>
-              <li>Mention <code>@Pace</code> in a thread. Setup is done when Pace answers you there.</li>
-            </ol>
-            <p class="note">To update, run <code>brew upgrade --cask pacenote</code>. Settings and run history stay in
-              <code>~/.pacenote</code> across upgrades.</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="block" id="questions" aria-labelledby="questions-title">
-        <div class="intro">
-          <h2 id="questions-title">Questions</h2>
-        </div>
-        <div class="faq">
-          <details>
-            <summary>What leaves my Mac?</summary>
-            <p>The thread you ask about and its files go to the AI service you chose, Anthropic or OpenAI, through its
-              official CLI, and the answer goes back to Slack. Local does not mean private from that service: pick a
-              plan whose data terms fit your work. Run history, tasks and settings stay in <code>~/.pacenote</code>.</p>
-          </details>
-          <details>
-            <summary>How is this different from an AI assistant my company adds to Slack?</summary>
-            <p>A company assistant is set up by an admin and runs under the company's account. Pace is one you set up
-              yourself: it runs on your Mac, answers only you, and works with Claude Code or Codex on your own plan.</p>
-          </details>
-          <details>
-            <summary>Do I need my Slack admin?</summary>
-            <p>You need to be able to create and install an app in your workspace, and some workspaces ask an admin to
-              approve new apps. If your team runs a Pacenote hub, you pair your Mac with it instead.</p>
-          </details>
-          <details>
-            <summary>Can my teammates ask my Pace?</summary>
-            <p>No. Pace answers only you. Each teammate runs their own on their own Mac and login, and a team can share
-              one Slack app through a <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">hub</a>.</p>
-          </details>
-          <details>
-            <summary>What does it cost?</summary>
-            <p>Nothing for Pacenote. Answers use the Claude or ChatGPT plan you already have and count toward its
-              limits. Pacenote is a personal project, open source under the Apache License 2.0 and offered as is.</p>
-          </details>
-          <details>
-            <summary>Does it work on Intel Macs, Windows or Microsoft Teams?</summary>
-            <p>Not today. Pacenote runs on Apple silicon Macs and works with Slack.</p>
-          </details>
-          <details>
-            <summary>What is the built-in sandbox?</summary>
-            <p>A Linux VM per answer, started on your Mac with Apple's Containerization framework. It has no network
-              device of its own, reaches only the domains you allow through a proxy in Pace, and is thrown away after
-              the answer. It needs macOS 15 or later.</p>
-          </details>
-        </div>
-      </section>
-
-      <section class="block closing" aria-labelledby="closing-title">
-        <h2 id="closing-title">Install Pacenote</h2>
+      <section class="block closing" aria-labelledby="install-title">
+        <h2 id="install-title">Install Pacenote</h2>
         <div class="get">
           <div class="command" role="group" aria-label="Install with Homebrew">
             <code id="install-command-end">brew install --cask ashon/tap/pacenote</code>
             <button class="button secondary copy" type="button" data-copy="install-command-end">Copy</button>
             <span class="copied" role="status" aria-live="polite"></span>
           </div>
-          <a class="button primary" href="https://github.com/Ashon/pacenote#readme">Read the docs</a>
+          <a class="button primary" href="install/">Setup steps</a>
         </div>
+        <p>Needs an Apple silicon Mac on macOS 12 or later, Claude Code or Codex signed in with your plan, and a Slack
+          workspace where you can create an app.</p>
       </section>
     </div>
   </main>
@@ -300,6 +169,7 @@
   <footer class="status">
     <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote is made by one person and offered as is.</p>
     <nav aria-label="Project">
+      <a href="privacy/">Privacy</a>
       <a href="https://github.com/Ashon/pacenote">GitHub</a>
       <a href="https://github.com/Ashon/pacenote/tree/main/docs">Docs</a>
       <a href="https://github.com/Ashon/pacenote/releases">Releases</a>
@@ -309,34 +179,6 @@
       Claude, Claude Code, Codex, ChatGPT and Slack are trademarks of their owners.</p>
   </footer>
 
-  <script>
-    // Copy the install command; the status line says so for screen readers too.
-    for (const button of document.querySelectorAll('[data-copy]')) {
-      button.addEventListener('click', async () => {
-        const text = document.getElementById(button.dataset.copy).textContent
-        const status = button.parentElement.querySelector('.copied')
-        try {
-          await navigator.clipboard.writeText(text)
-          button.textContent = 'Copied'
-          status.textContent = 'Install command copied'
-        } catch {
-          status.textContent = 'Select the command to copy it'
-        }
-        setTimeout(() => { button.textContent = 'Copy'; status.textContent = '' }, 2000)
-      })
-    }
-    // The track draws once, the first time it is seen.
-    const track = document.querySelector('.track')
-    if ('IntersectionObserver' in window) {
-      new IntersectionObserver((entries, observer) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          track.classList.add('drawn')
-          observer.disconnect()
-        }
-      }, { threshold: 0.4 }).observe(track)
-    } else {
-      track.classList.add('drawn')
-    }
-  </script>
+  <script src="site.js"></script>
 </body>
 </html>

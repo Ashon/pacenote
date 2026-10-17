@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy: what Pace never does - Pacenote</title>
+  <meta name="description" content="What Pace never does, how each limit is enforced in code, what leaves your Mac and what stays on it.">
+  <link rel="canonical" href="https://pacenote.dev/privacy/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="What Pace never does">
+  <meta property="og:description" content="Each limit is enforced in code, not left to the model, and the code is open.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/privacy/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../media/pacenote-mark.svg">
+  <link rel="preload" href="../fonts/host-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote home">
+      <img src="../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="Pages">
+      <a href="../how-it-works/">How it works</a>
+      <a href="../privacy/" aria-current="page">Privacy</a>
+      <a href="../install/">Install</a>
+      <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head">
+      <h1>What Pace never does</h1>
+      <p class="lede">Each limit is enforced in code, not left to the model, and the code is open. Here is what each
+        one means and where to check it.</p>
+    </div>
+
+    <div class="surface">
+      <section class="block" aria-label="The limits">
+        <div class="claim">
+          <h2>Answer anyone but you</h2>
+          <p>Pace runs with your login, so it answers only the Slack member you set as its owner. Anyone else who
+            mentions it gets a note only they can see. Teammates each run their own Pace.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">How it works</a></p>
+        </div>
+        <div class="claim">
+          <h2>Answer in private channels or DMs</h2>
+          <p>The Slack app asks for no private-channel or DM scopes, and Pace answers only in public channels it has been
+            invited to. When it cannot tell whether a channel is public, it does not answer.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/slack-app-manifest.yaml">the Slack app's scopes</a></p>
+        </div>
+        <div class="claim">
+          <h2>Send messages for you</h2>
+          <p>It replies only in the thread you asked in. Replies it drafts for your tasks are shown to you to copy, and
+            nothing is posted until you post it. Ops tools, which can open draft PRs and Jira issues or comments, are
+            off until you turn them on.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/tasks.md">Your tasks</a></p>
+        </div>
+        <div class="claim">
+          <h2>Change your files</h2>
+          <p>On your Mac, the CLI gets read-only access to one folder you choose and never your credential folders, such
+            as <code>~/.ssh</code> or your AI tools' logins. In the built-in sandbox, each answer runs in a Linux VM that
+            reaches only the domains you allow and is thrown away afterwards.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/sandbox.md">Reasoner sandbox</a></p>
+        </div>
+        <div class="claim">
+          <h2>Hand your credentials to the model</h2>
+          <p>Slack and hub tokens never reach the CLI, and Pace takes its own secrets out of every answer. With ops tools
+            on, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for
+            read-only lookups, draft PRs, and Jira issues or comments.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">Ops tools</a></p>
+        </div>
+        <div class="claim">
+          <h2>Open a public endpoint or phone home</h2>
+          <p>It connects out to Slack over Socket Mode, so nothing on your Mac accepts connections from the internet.
+            There is no telemetry; everything it contacts is listed below.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">How it works</a></p>
+        </div>
+        <div class="claim">
+          <h2>Charge you</h2>
+          <p>Pacenote is free and open source. Answers run through the official CLI on the Claude or ChatGPT plan you
+            already pay for, and count toward its usage limits.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">the Apache License 2.0</a></p>
+        </div>
+      </section>
+
+      <section class="block" id="leaves" aria-labelledby="leaves-title">
+        <h2 id="leaves-title">What leaves your Mac</h2>
+        <p>Local does not mean private from your AI service: the thread you ask about goes to it. Pick a plan whose data
+          terms fit your work.</p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr><th scope="col">What</th><th scope="col">Where it goes</th><th scope="col">When</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>The thread you ask about, with its files</td><td>Anthropic or OpenAI, through the CLI you signed in to</td><td>Each time you mention Pace</td></tr>
+              <tr><td>Pace's answer</td><td>Slack, in that thread</td><td>Each answer</td></tr>
+              <tr><td>Mentions and answers, with a team hub</td><td>Your team's hub, on its way to Slack</td><td>Only if you pair with a hub</td></tr>
+              <tr><td>Slack messages read while collecting tasks</td><td>Anthropic, through Claude Code's Slack connector</td><td>When you press Collect now; off until you turn it on</td></tr>
+              <tr><td>Task titles and commit lines for a recap</td><td>Anthropic, through Claude Code</td><td>When you press Write it up</td></tr>
+              <tr><td>Lookups with ops tools</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
+              <tr><td>An update check</td><td>GitHub</td><td>Shortly after start, then every 12 hours</td></tr>
+              <tr><td>Sandbox images</td><td>GitHub's container registry and the hosts the images are built from</td><td>When you set up the sandbox</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="stays" aria-labelledby="stays-title">
+        <h2 id="stays-title">What stays on your Mac</h2>
+        <p>Settings, run history, your tasks and recaps live in <code>~/.pacenote</code>, a folder only you can read. Run
+          history is kept for 30 days unless you change it. Uninstalling keeps the folder; delete it to remove them.</p>
+      </section>
+
+      <section class="block" id="report" aria-labelledby="report-title">
+        <h2 id="report-title">Report a security issue</h2>
+        <p>Open an issue on <a href="https://github.com/Ashon/pacenote/issues">GitHub</a> that asks for a private
+          contact, and leave the details out of it.</p>
+      </section>
+
+      <section class="block closing" aria-labelledby="next-title">
+        <h2 id="next-title">Try it on your Mac</h2>
+        <div class="get">
+          <div class="command" role="group" aria-label="Install with Homebrew">
+            <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+            <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
+            <span class="copied" role="status" aria-live="polite"></span>
+          </div>
+          <a class="button primary" href="../install/">Setup steps</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote is made by one person and offered as is.</p>
+    <nav aria-label="Project">
+      <a href="../privacy/">Privacy</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">Docs</a>
+      <a href="https://github.com/Ashon/pacenote/releases">Releases</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">License</a>
+    </nav>
+    <p class="legal">Pacenote is an independent project, not made, endorsed or supported by Anthropic, OpenAI or Slack.
+      Claude, Claude Code, Codex, ChatGPT and Slack are trademarks of their owners.</p>
+  </footer>
+
+  <script src="../site.js"></script>
+</body>
+</html>
