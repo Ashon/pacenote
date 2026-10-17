@@ -53,6 +53,9 @@
   --border: oklch(0.91 0.016 168);
   --ring: rgba(12, 182, 126, 0.5);
   --track: #0cb67e;
+  --selected: oklch(0.935 0.026 167);
+  --status-succeeded: oklch(0.51 0.135 150);
+  --status-interrupted: oklch(0.53 0.125 65);
   --card-shadow:
     0 1px 2px oklch(0.3 0.03 170 / 0.05),
     0 10px 28px -14px oklch(0.3 0.03 170 / 0.14);
@@ -82,6 +85,9 @@
     --border: oklch(0.9 0.05 165 / 11%);
     --ring: rgba(60, 203, 150, 0.6);
     --track: #2ec790;
+    --selected: oklch(0.265 0.03 168);
+    --status-succeeded: oklch(0.78 0.16 148);
+    --status-interrupted: oklch(0.8 0.13 75);
     --card-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
     --window-shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 30px 70px -30px oklch(0 0 0 / 0.7);
   }
@@ -320,9 +326,6 @@ code {
   outline-offset: -1px;
   position: relative;
   z-index: 1;
-}
-.window img {
-  width: 100%;
 }
 
 /* Inner pages: a heading on the canvas, as a screen title in the app */
@@ -677,6 +680,538 @@ code {
 }
 .qa p + h3 {
   margin-top: 1.5rem;
+}
+
+/* App views: the app drawn in HTML with its own tokens, sizes and icons (icons.svg, from the app's
+   lucide), in place of screenshots, so a screen stays sharp at any density, follows light and dark,
+   and its words are text. Each is role="img" with a description; nothing in it takes focus. */
+.av {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--foreground);
+  text-align: left;
+  cursor: default;
+}
+.av-i {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  /* A symbol drawn through <use> inherits from here, not from the sprite */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.av-i.s12 {
+  width: 12px;
+  height: 12px;
+}
+.av-i.s14 {
+  width: 14px;
+  height: 14px;
+}
+.av-i.s18 {
+  width: 18px;
+  height: 18px;
+}
+.av-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.av-btn .av-i {
+  width: 14px;
+  height: 14px;
+}
+.av-btn.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.av-btn.outline {
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.av-btn.secondary {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+.av-btn.ghost {
+  padding: 0 6px;
+  color: var(--muted-foreground);
+}
+.av-btn.square {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+.av-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.av-badge .av-i {
+  width: 12px;
+  height: 12px;
+}
+.av-badge.due {
+  color: var(--status-interrupted);
+  background: color-mix(in srgb, var(--status-interrupted) 12%, transparent);
+}
+.av-badge.area,
+.av-badge.plain {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+.av-badge.ok {
+  color: var(--status-succeeded);
+  background: color-mix(in srgb, var(--status-succeeded) 12%, transparent);
+}
+.av-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.av-mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.av-muted {
+  color: var(--muted-foreground);
+}
+
+/* The window: chrome with the sidebar, the one content surface, the status bar */
+.av-window {
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  background: var(--canvas);
+}
+.av-bar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  align-items: center;
+  height: 44px;
+}
+.av-toggle {
+  padding-left: 22px;
+  color: var(--muted-foreground);
+  display: flex;
+}
+.av-search {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(420px, 80%);
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.av-search kbd {
+  margin-left: auto;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--secondary);
+}
+.av-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 12px 14px;
+}
+.av-brand img {
+  width: 24px;
+  height: 24px;
+}
+.av-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 9px 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.av-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 14px;
+  font-size: 13.5px;
+}
+.av-nav .av-i {
+  color: var(--muted-foreground);
+}
+.av-nav.current {
+  background: var(--selected);
+  font-weight: 600;
+}
+.av-nav.current .av-i {
+  color: var(--primary);
+}
+.av-nav.last {
+  margin-top: auto;
+}
+.av-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  font-weight: 600;
+}
+.av-main {
+  padding: 0 12px 0 0;
+  min-width: 0;
+}
+.av-surface {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  padding: 26px 36px 30px;
+  min-height: 100%;
+}
+.av-status {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 34px;
+  padding: 0 22px;
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+.av-status > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.av-status .ok {
+  color: var(--status-succeeded);
+  font-weight: 600;
+}
+.av-status .push {
+  margin-left: auto;
+}
+.av-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-succeeded);
+}
+
+/* Todo: a page head, tabs, and rows split by hairlines; a task opens in place */
+.av-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.av-title {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.av-title span {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+.av-tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 14px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--well);
+  font-size: 13px;
+}
+.av-tabs span {
+  padding: 3px 12px;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+}
+.av-tabs .on {
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 500;
+  box-shadow: 0 1px 2px oklch(0.3 0.03 170 / 0.08);
+}
+.av-rows {
+  margin-top: 16px;
+}
+.av-task {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.av-task-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+.av-task-main {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+}
+.av-chev {
+  margin-top: 2px;
+  color: var(--muted-foreground);
+}
+.av-chev.open {
+  transform: rotate(90deg);
+}
+.av-task-title {
+  font-size: 14.5px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.av-task-title.done {
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+.av-task-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.av-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.av-context {
+  margin: 12px 0 0 24px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--well);
+}
+.av-kv {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.av-k {
+  color: var(--muted-foreground);
+}
+.av-v {
+  min-width: 0;
+}
+.av-v b {
+  font-weight: 600;
+  margin-right: 6px;
+}
+.av-kv .av-btn.square {
+  height: 26px;
+  width: 26px;
+}
+.av-show {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--primary);
+}
+.av-reply {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.av-reply-box {
+  margin-top: 6px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.av-reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* A run: its facts, the request, the steps Pace took and its answer */
+.av-run {
+  padding: 20px 22px 22px;
+  background: var(--card);
+}
+.av-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.av-run-head .av-btn {
+  margin-left: auto;
+}
+.av-run-title {
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.av-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 14px 0 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.av-facts div {
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+}
+.av-facts div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.av-facts span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.av-facts b {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.av-facts small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.av-bubble {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+}
+.av-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 12px;
+  font-weight: 600;
+}
+.av-bubble-body {
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  background: var(--well);
+}
+.av-bubble.pace .av-bubble-body {
+  background: var(--card-accent);
+}
+.av-bubble-head {
+  font-weight: 600;
+}
+.av-bubble-head span {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.av-bubble-body p {
+  margin: 6px 0 0;
+}
+.av-bubble-body ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.av-bubble-body code {
+  font-size: 11.5px;
+}
+.av-steps {
+  margin: 8px 0 8px 14px;
+  padding: 4px 0 4px 22px;
+  border-left: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.av-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+.av-step .ok {
+  color: var(--status-succeeded);
+}
+.av-step .av-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.av-step b {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.av-step .time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.shot .av-surface,
+.shot.av-plain {
+  box-shadow: none;
+}
+.shot .av-taskview {
+  padding: 4px 18px 6px;
+  background: var(--card);
+}
+.av-taskview > .av-task {
+  border-top: 0;
 }
 
 /* Motion controls: pause, play or replay an animation that runs by itself (WCAG 2.2.2) */
@@ -1096,6 +1631,42 @@ code {
 }
 
 @media (max-width: 44rem) {
+  .av-window {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .av-bar,
+  .av-side,
+  .av-status {
+    display: none;
+  }
+  .av-main {
+    padding: 8px;
+  }
+  .av-surface {
+    padding: 18px 16px;
+  }
+  .av-context {
+    margin-left: 0;
+  }
+  .av-actions .av-btn.ghost.square {
+    display: none;
+  }
+  .av-kv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .av-k {
+    grid-column: 1 / -1;
+    margin-bottom: -6px;
+    font-size: 11px;
+  }
+  .av-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 10px;
+  }
+  .av-facts div:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
   /* The pages stay in reach: the nav takes its own row under the brand */
   .top {
     flex-wrap: wrap;

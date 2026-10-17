@@ -80,8 +80,12 @@ describe('pacenote.dev', () => {
           existsSync(html ? path.join(onDisk, 'index.html') : onDisk),
           `${page || 'home'}: ${ref}`
         ).toBe(true)
-        if (anchor)
-          expect(ids(read(target)).has(anchor), `${page}: ${ref}`).toBe(true)
+        if (!anchor) continue
+        // An icon names a symbol in the sprite; a page, an element on it
+        const named = target.endsWith('.svg')
+          ? ids(readFileSync(onDisk, 'utf8'))
+          : ids(read(target))
+        expect(named.has(anchor), `${page || 'home'}: ${ref}`).toBe(true)
       }
     }
   })
