@@ -882,7 +882,7 @@ function TaskOpen({
           <div className="mt-2 flex flex-col gap-1.5 border-t border-border pt-2.5">
             {drafting ? (
               <p className="flex items-center gap-2 text-body text-muted-foreground">
-                <PaceSpinner active className="size-6" />
+                <PaceSpinner writing className="size-6" />
                 <span className="text-shimmer">
                   Reading the thread, read only, to draft your reply.
                 </span>

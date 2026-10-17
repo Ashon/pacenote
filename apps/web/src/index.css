@@ -282,6 +282,22 @@
     -webkit-text-fill-color: transparent;
     animation: text-shimmer 2s linear infinite;
   }
+  /*
+   * Lines at work: where text is being written for you, faint lines with the
+   * same band sweeping across them
+   */
+  .writing-line {
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--primary) 9%, transparent) 35%,
+        color-mix(in oklch, var(--primary) 20%, transparent) 50%,
+        color-mix(in oklch, var(--primary) 9%, transparent) 65%
+      )
+      0 0 / 300% 100%;
+    animation: text-shimmer 2s linear infinite;
+  }
 }
 
 @keyframes text-shimmer {
@@ -297,6 +313,9 @@
   .text-shimmer {
     background: none;
     -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+  .writing-line {
     animation: none;
   }
 }

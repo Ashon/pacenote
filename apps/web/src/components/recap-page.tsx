@@ -17,7 +17,7 @@ import {
   MessageCircle,
   PenLine,
 } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -43,6 +43,7 @@ import {
 } from '@/lib/recap'
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
+import { PaceSpinner } from './pace-spinner'
 import { taskHash } from './task-row'
 
 const PERIODS: { value: RecapPeriod; label: string }[] = [
@@ -93,8 +94,15 @@ export function RecapPage({
   const recap = useRecap(period, periodKey)
   const write = useWriteRecap()
   const [writing, setWriting] = useState<string>()
+  /** The recap whose text just came, which comes in as it is written */
+  const [arrived, setArrived] = useState<string>()
   const [error, setError] = useState<string>()
   const view = recap.data
+  const shownKey = view ? `${view.period}:${view.key}` : undefined
+  // Back on a recap later, its text is simply there.
+  useEffect(() => {
+    if (arrived && arrived !== shownKey) setArrived(undefined)
+  }, [arrived, shownKey])
 
   const choose = (next: RecapPeriod) => {
     try {
@@ -106,9 +114,12 @@ export function RecapPage({
   }
   const writeUp = async () => {
     if (!view) return
+    const key = `${view.period}:${view.key}`
     setError(undefined)
-    setWriting(`${view.period}:${view.key}`)
-    setError(await write(view))
+    setWriting(key)
+    const failed = await write(view)
+    setError(failed)
+    setArrived(failed ? undefined : key)
     setWriting(undefined)
   }
 
@@ -131,11 +142,7 @@ export function RecapPage({
                   onClick={() => void writeUp()}
                 >
                   <PenLine />
-                  {writing ? (
-                    <span className="text-shimmer">Writing it up</span>
-                  ) : (
-                    'Write it up'
-                  )}
+                  {writing ? 'Writing it up' : 'Write it up'}
                 </Button>
               )}
               <CopyButton view={view} />
@@ -199,7 +206,8 @@ export function RecapPage({
               {view && (
                 <RecapBody
                   view={view}
-                  writing={writing === `${view.period}:${view.key}`}
+                  writing={writing === shownKey}
+                  arrived={arrived === shownKey}
                   onWriteAgain={() => void writeUp()}
                 />
               )}
@@ -262,43 +270,48 @@ function CopyButton({ view }: { view: RecapView }) {
 function RecapBody({
   view,
   writing,
+  arrived,
   onWriteAgain,
 }: {
   view: RecapView
   writing: boolean
+  /** Its text just came: it comes in word by word */
+  arrived: boolean
   onWriteAgain: () => void
 }) {
   const empty = view.areas.length === 0
+  // While it is written, the text's place shows it being written; the text
+  // takes that place when it comes.
+  const card = writing
+    ? 'writing'
+    : view.written
+      ? `written:${view.written.at}`
+      : 'none'
   return (
     <div>
-      {view.written && (
-        <section
-          aria-label="Written up"
-          className="mt-4 flex flex-col gap-1.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3"
-        >
-          <p className="max-w-[46rem] text-sm leading-relaxed select-text">
-            {view.written.text}
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              Written by Claude Code from the lines below, with no tools ·{' '}
-              {formatRelative(view.written.at)}
-            </span>
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled={writing}
-              onClick={onWriteAgain}
+      <Swap id={card}>
+        {writing ? (
+          <WritingUp />
+        ) : (
+          view.written && (
+            <section
+              aria-label="Written up"
+              className="mt-4 flex flex-col gap-1.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3"
             >
-              {writing ? (
-                <span className="text-shimmer">Writing it up</span>
-              ) : (
-                'Write again'
-              )}
-            </Button>
-          </div>
-        </section>
-      )}
+              <WrittenText text={view.written.text} arrived={arrived} />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  Written by Claude Code from the lines below, with no tools ·{' '}
+                  {formatRelative(view.written.at)}
+                </span>
+                <Button size="xs" variant="ghost" onClick={onWriteAgain}>
+                  Write again
+                </Button>
+              </div>
+            </section>
+          )
+        )}
+      </Swap>
       {empty ? (
         <p className="mt-5 border-t border-border py-8 text-sm text-muted-foreground">
           Nothing here for this {view.period}. Tasks you settle, your commits
@@ -311,6 +324,58 @@ function RecapBody({
       )}
       {!empty && <Sources view={view} />}
     </div>
+  )
+}
+
+/** Where the written text will be, while Claude Code writes it */
+function WritingUp() {
+  return (
+    <section
+      aria-label="Writing it up"
+      aria-busy
+      className="mt-4 flex items-start gap-3 rounded-xl bg-card-accent px-4 pt-3.5 pb-3.5"
+    >
+      <PaceSpinner writing />
+      <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
+        <span className="text-xs text-muted-foreground">
+          Claude Code is writing it up from the lines below
+        </span>
+        <span className="writing-line w-[92%]" />
+        <span className="writing-line w-[64%]" />
+      </div>
+    </section>
+  )
+}
+
+/** The written text; just come, it comes in word by word */
+function WrittenText({ text, arrived }: { text: string; arrived: boolean }) {
+  const words = arrived ? text.split(/\s+/).filter(Boolean) : []
+  return (
+    <p
+      className={cn(
+        'max-w-[46rem] text-sm leading-relaxed select-text',
+        arrived && 'motion-write-in'
+      )}
+      style={
+        arrived
+          ? ({ '--motion-n': words.length } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {arrived
+        ? words.map((word, i) => (
+            <Fragment key={i}>
+              {i > 0 && ' '}
+              <span
+                data-word
+                style={{ '--motion-i': i } as React.CSSProperties}
+              >
+                {word}
+              </span>
+            </Fragment>
+          ))
+        : text}
+    </p>
   )
 }
 

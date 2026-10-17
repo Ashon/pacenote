@@ -35,8 +35,9 @@ Each is put in its area (from [Where you contribute](you.md)); what fits none is
 **Write it up** has Claude Code sum the recap up in a few sentences: two or three for a day, up to five for a month, in
 the language most of your task titles are in, area by area, the commits summed up into what the work was about. It runs
 only when you click, as `claude -p` with no tools, no MCP servers and none of your settings, on your Claude Code login,
-and is given only the recap's own lines. What it wrote is kept in `PACENOTE_DATA_DIR/recaps.json`, shown above the
-recap, and comes back with the period; **Write again** replaces it.
+and is given only the recap's own lines. While it writes, the place the text will take shows Pace writing, and the
+text comes in there word by word. What it wrote is kept in `PACENOTE_DATA_DIR/recaps.json`, shown above the recap, and
+comes back with the period; **Write again** replaces it.
 
 ## Copy
 

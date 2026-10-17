@@ -33,6 +33,10 @@
   --motion-exit: calc(var(--motion-moderate) * 2 / 3);
   /* A change someone else made stays lit this long as it fades */
   --motion-linger: calc(1600ms * var(--motion-scale));
+  /* Written text comes in word by word, one this long after the other, all of
+     it within --motion-write */
+  --motion-write-step: calc(24ms * var(--motion-scale));
+  --motion-write: calc(720ms * var(--motion-scale));
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
@@ -223,6 +227,21 @@
   }
 
   /*
+   * write-in: text written for you arriving where it was being written
+   * (Recap's Write it up), word by word in reading order, each fading in.
+   * Each word is a [data-word] with its place in --motion-i; the text says
+   * how many there are in --motion-n, so a long one still takes no longer
+   * than --motion-write.
+   */
+  .motion-write-in [data-word] {
+    animation: motion-fade-in var(--motion-base) var(--ease-enter) both;
+    animation-delay: calc(
+      var(--motion-i, 0) *
+        min(var(--motion-write-step), var(--motion-write) / var(--motion-n, 1))
+    );
+  }
+
+  /*
    * progress: a bar filling as work goes on (the built-in sandbox being
    * prepared). It eases to each new length.
    */
@@ -253,6 +272,10 @@
     .motion-pop[data-state='closed'],
     .motion-fade[data-state='closed'] {
       animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
+    }
+    /* All the words at once */
+    .motion-write-in [data-word] {
+      animation: motion-fade-in calc(120ms * var(--motion-scale)) ease;
     }
     /* A color, not a movement: it still lights up and fades */
     .motion-flash[data-flash] {

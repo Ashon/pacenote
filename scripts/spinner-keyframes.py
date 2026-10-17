@@ -9,8 +9,19 @@ looks happen along the way, one of each in each half of the loop:
     the ring closes into a full eye. The pupil skims a few lines like reading
     a page (now and then a look back, a glance off the page, a lean in on a
     word), looks at you, and goes back to the ring, which opens again.
+Quieter moves come in between, each once a loop (twice for the blink):
+  - blink: the opening shuts and opens again, now and then twice.
+  - double take: a glance back part of the way, then the same spot again.
+  - think: the opening narrows like a squint while the dot drifts slowly side
+    to side, then widens.
+  - trace: one move is a smooth glide along the ring instead of a saccade,
+    the dot drawn out by its speed.
 Two full turns per loop, landing back on the rest position (the logo). The
 path is seeded random, so the rhythm is irregular but repeatable.
+
+Writing is a loop of its own (data-write), the same every time: the ring
+closes like a page, the dot comes off it as a pen and writes two lines in a
+hand, the lines fade and the pen goes back to the ring.
 
     pnpm spinner                        # writes pace-spinner.css (Prettier'd)
     pnpm spinner --seed 11 --svg /tmp/spinner.svg
@@ -47,6 +58,10 @@ READ_LINES = 3  # lines skimmed in a read
 READ_X = 46  # half width of a skimmed line, from the middle
 READ_Y = (-30, -4, 22)  # line heights, from the middle (screen space)
 READ_ZOOM = 1.5  # pupil size when it leans in on a word
+
+SQUINT = 19.0  # how much a think narrows the half opening, arc length
+GLIDE = 15.0  # how far a trace draws the dot out at its fastest, degrees
+WRITE_SECONDS = 4.2  # one written page (data-write)
 
 # Ring geometry: radius, half stroke (round cap radius), and the gap between
 # the pupil's cap and each track end, measured along the ring. At rest this
@@ -122,6 +137,35 @@ def plan_path(rng):
                 continue
             plan[i]["event"] = events.pop()
             used.append(i)
+    # The quieter moves, on stops still free, away from the others where they
+    # can be: a trace wants a long move, a think or a double take a stop worth
+    # a second look, and a blink fits anywhere. Each finds a stop: the distance
+    # gives way first, then the kind.
+    last = len(plan) - 1
+
+    def free(i, kinds, apart):
+        if plan[i]["event"] or plan[i]["kind"] not in kinds:
+            return False
+        return not apart or not any(
+            plan[j]["event"] for j in (i - 1, i + 1) if 0 <= j < len(plan)
+        )
+
+    for event, kinds in (
+        ("trace", ("L",)),
+        ("think", ("L", "M")),
+        ("take", ("M", "L")),
+        ("blink", ("S", "B", "M")),
+        ("blink", ("S", "B", "M", "L")),
+    ):
+        anything = ("L", "M", "S", "B")
+        picks = (
+            [i for i in range(1, last) if free(i, kinds, True)]
+            or [i for i in range(1, last) if free(i, kinds, False)]
+            or [i for i in range(1, last) if free(i, anything, True)]
+            or [i for i in range(1, last) if free(i, anything, False)]
+        )
+        if picks:
+            plan[rng.choice(picks)]["event"] = event
     return plan
 
 
@@ -139,20 +183,29 @@ def build(rng, plan):
         target = stop["at"]
         jump = target - cur
         sign = 1 if jump > 0 else -1
-        ov = max(1.5, abs(jump) * rng.uniform(0.04, 0.09)) * sign
-        rot.to(t, cur, SACC)
-        t += round(rng.uniform(45, 70) + abs(jump) * rng.uniform(0.35, 0.55))
-        rot.to(t, target + ov, "ease-out")
-        t += round(rng.uniform(30, 50))
-        rot.to(t, target - ov * rng.uniform(0.25, 0.45), "linear")
-        t += round(rng.uniform(22, 38))
-        rot.to(t, target + ov * rng.uniform(0.08, 0.18))
-        t += round(rng.uniform(22, 38))
-        rot.to(t, target)
+        if stop["event"] == "trace":
+            t = glide(rng, t, cur, target, rot, arc, gap)
+        else:
+            ov = max(1.5, abs(jump) * rng.uniform(0.04, 0.09)) * sign
+            rot.to(t, cur, SACC)
+            t += round(rng.uniform(45, 70) + abs(jump) * rng.uniform(0.35, 0.55))
+            rot.to(t, target + ov, "ease-out")
+            t += round(rng.uniform(30, 50))
+            rot.to(t, target - ov * rng.uniform(0.25, 0.45), "linear")
+            t += round(rng.uniform(22, 38))
+            rot.to(t, target + ov * rng.uniform(0.08, 0.18))
+            t += round(rng.uniform(22, 38))
+            rot.to(t, target)
         if stop["event"] == "focus":
             t = focus(rng, t, target, rot, arc, gap)
         elif stop["event"] == "read":
             t = read(rng, t, target, *tracks)
+        elif stop["event"] == "blink":
+            t = blink(rng, t, gap)
+        elif stop["event"] == "take":
+            t = take(rng, t, cur, target, rot)
+        elif stop["event"] == "think":
+            t = think(rng, t, target, rot, gap)
         # tremor while holding: a few tiny, uneven twitches
         left = stop["hold"]
         while left > 140 and target != END:
@@ -203,6 +256,87 @@ def focus(rng, t, angle, rot, arc, gap):
     t += round(rng.uniform(50, 70))
     both(t, 0.0)
     rot.to(t, angle)
+    return t
+
+
+def glide(rng, t, start, target, rot, arc, gap):
+    """A trace: instead of a saccade, the eye glides to the stop along the
+    ring, easing in and out, the dot drawn out into a short arc at its fastest
+    (the opening following it), and settles with a small overshoot."""
+    jump = target - start
+    sign = 1 if jump > 0 else -1
+    smooth = "cubic-bezier(.45,0,.25,1)"
+    rot.to(t, start, smooth)
+    arc.hold(t, "ease-in-out")
+    gap.hold(t, "ease-in-out")
+    move = round(abs(jump) * rng.uniform(4.6, 5.4))
+    peak = GLIDE * rng.uniform(0.85, 1.1)
+    arc.to(t + round(move * 0.45), peak, "ease-in-out")
+    gap.to(t + round(move * 0.45), gap_for(peak), "ease-in-out")
+    t += move
+    arc.to(t, 0.0)
+    gap.to(t, REST_GAP)
+    rot.to(t, target + sign * rng.uniform(3, 5), "ease-out")
+    t += round(rng.uniform(110, 140))
+    rot.to(t, target)
+    return t
+
+
+def blink(rng, t, gap):
+    """The opening shuts fast and opens a little slower; now and then twice."""
+    for times in range(2 if rng.random() < 0.5 else 1):
+        if times:
+            t += round(rng.uniform(120, 200))
+        gap.hold(t, "cubic-bezier(.4,0,1,1)")
+        t += round(rng.uniform(80, 100))
+        gap.to(t, 0.0)
+        t += round(rng.uniform(40, 70))
+        gap.to(t, 0.0, "cubic-bezier(.16,1,.3,1)")
+        t += round(rng.uniform(130, 170))
+        gap.to(t, REST_GAP)
+    return t
+
+
+def take(rng, t, start, target, rot):
+    """A double take: a moment on the spot, a quick look back part of the way,
+    and straight back to it with a small overshoot."""
+    back = target - (target - start) * rng.uniform(0.35, 0.5)
+    t += round(rng.uniform(160, 240))
+    rot.to(t, target, SACC)
+    t += round(rng.uniform(80, 110))
+    rot.to(t, back)
+    t += round(rng.uniform(90, 150))
+    rot.to(t, back, SACC)
+    t += round(rng.uniform(90, 120))
+    over = (target - back) * rng.uniform(0.05, 0.08)
+    rot.to(t, target + over, "ease-out")
+    t += round(rng.uniform(70, 100))
+    rot.to(t, target)
+    return t
+
+
+def think(rng, t, target, rot, gap):
+    """A think: the opening narrows like a squint and the dot drifts slowly
+    side to side, less each time, before the opening widens again."""
+    narrow = REST_GAP - SQUINT * rng.uniform(0.9, 1.1)
+    gap.hold(t, "cubic-bezier(.2,0,0,1)")
+    rot.to(t, target, "ease-in-out")
+    t += round(rng.uniform(220, 260))
+    gap.to(t, narrow)
+    sway = [
+        -rng.uniform(12, 16),
+        rng.uniform(9, 13),
+        -rng.uniform(6, 9),
+        rng.uniform(2, 4),
+        0.0,
+    ]
+    for d in sway:
+        t += round(rng.uniform(300, 420))
+        rot.to(t, target + d, "ease-in-out")
+    gap.to(t, narrow, "cubic-bezier(.2,0,0,1)")
+    t += round(rng.uniform(220, 260))
+    gap.to(t, REST_GAP)
+    rot.to(t, target)
     return t
 
 
@@ -370,6 +504,130 @@ def keyframes(name, frames, total, declare):
     return "\n".join(lines)
 
 
+# Writing (data-write): the lines the pen writes, as pace-spinner.tsx draws
+# them (two lines in a hand, as quadratic waves, 140 and 105 wide), and where
+# the pen is along them, by percent of the loop
+WRITE_LINES = (
+    # (y from the middle, wave segments, start %, end %)
+    (-26, 4, 14.0, 42.0),
+    (26, 3, 47.0, 68.0),
+)
+WRITE_X0 = -70  # where each line starts, from the middle
+WRITE_SEG = 35  # one wave segment's width
+WRITE_WAVE = 6  # how far the hand rises and falls
+PEN = 0.6  # the pen's size, against the dot's
+
+
+def write_css():
+    """The writing loop: the page closes (8-14%), the pen comes off the ring,
+    writes each line while its ink is drawn behind it, goes back (68-74%), the
+    ink fades and the page opens (72-82%)."""
+    sacc = SACC
+    home = (R * math.cos(math.radians(BASE)), R * math.sin(math.radians(BASE)))
+    hx, hy = round(home[0]), round(home[1])
+    x_frames = [(0, hx, None), (8, hx, sacc)]
+    y_frames = [(8, hy, 1.0, sacc)]
+    for n, (y, segs, start, end) in enumerate(WRITE_LINES):
+        x_frames.append((start, WRITE_X0, "linear"))
+        x_frames.append((end, WRITE_X0 + segs * WRITE_SEG, sacc))
+        half = (end - start) / (segs * 2)
+        # q then t: the wave rises, then falls, as the path's reflections go
+        for k in range(segs * 2 + 1):
+            dy = (0, -WRITE_WAVE, 0, WRITE_WAVE)[k % 4]
+            last = k == segs * 2
+            y_frames.append(
+                (start + k * half, y + dy, PEN, sacc if last else "ease-in-out")
+            )
+    x_frames.append((74, hx, None))
+    y_frames.append((73.99, hy, 1.0, None))
+
+    def frames(name, rows, declare):
+        lines = [f"@keyframes {name} {{"]
+        for row in rows:
+            at, *v, tf = row
+            timing = f" animation-timing-function: {tf};" if tf else ""
+            lines.append(f"  {at:.2f}% {{ {declare(*v)};{timing} }}")
+        lines.append("}")
+        return "\n".join(lines)
+
+    pen_x = frames(
+        "pace-spinner-write-pen-x",
+        x_frames + [(100, hx, None)],
+        lambda x: f"transform: translateX({x:.1f}px)",
+    )
+    pen = frames(
+        "pace-spinner-write-pen",
+        [(0, hy, 1.0, 0, None), (7.99, hy, 1.0, 0, None)]
+        + [(at, y, sc, 1, tf) for at, y, sc, tf in y_frames]
+        + [(74, hy, 1.0, 0, None), (100, hy, 1.0, 0, None)],
+        lambda y, sc, o: f"opacity: {o}; transform: translateY({y:.1f}px) scale({sc})",
+    )
+    inks = "\n".join(
+        f"""@keyframes pace-spinner-write-ink-{n + 1} {{
+  0%, {start:.2f}% {{ stroke-dashoffset: 101; opacity: 1; animation-timing-function: linear; }}
+  {end:.2f}%, 72% {{ stroke-dashoffset: 0; opacity: 1; }}
+  80% {{ stroke-dashoffset: 0; opacity: 0; }}
+  80.01%, 100% {{ stroke-dashoffset: 101; opacity: 0; }}
+}}"""
+        for n, (_, _, start, end) in enumerate(WRITE_LINES)
+    )
+    return f"""/*
+ * Writing (data-write): the ring closes like a page, the dot comes off it as a
+ * pen and writes two lines in a hand, the ink drawn behind it; then the ink
+ * fades, the pen goes back and the page opens. The same every time.
+ */
+.pace-spinner-ink {{
+  stroke-dasharray: 100 110;
+  stroke-dashoffset: 101;
+}}
+.pace-spinner-pen-x,
+.pace-spinner-pen {{
+  transform-box: view-box;
+  transform-origin: 256px 256px;
+}}
+.pace-spinner-pen {{
+  opacity: 0;
+}}
+.pace-spinner[data-write] :is(.pace-spinner-eye, .pace-spinner-front) {{
+  animation: none;
+}}
+.pace-spinner[data-write] .pace-spinner-track {{
+  animation: pace-spinner-write-page {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write] .pace-spinner-pupil {{
+  animation: pace-spinner-write-dot {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write] .pace-spinner-pen-x {{
+  animation: pace-spinner-write-pen-x {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write] .pace-spinner-pen {{
+  animation: pace-spinner-write-pen {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write] .pace-spinner-ink-1 {{
+  animation: pace-spinner-write-ink-1 {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write] .pace-spinner-ink-2 {{
+  animation: pace-spinner-write-ink-2 {WRITE_SECONDS}s infinite;
+}}
+.pace-spinner[data-write][data-still] :is(.pace-spinner-track, .pace-spinner-pupil, .pace-spinner-pen-x, .pace-spinner-pen, .pace-spinner-ink) {{
+  animation: none;
+}}
+@keyframes pace-spinner-write-page {{
+  0%, 8% {{ {track_dash(REST_GAP)}; animation-timing-function: cubic-bezier(.2,0,0,1); }}
+  14%, 72% {{ {track_dash(0.0)}; animation-timing-function: cubic-bezier(.16,1,.3,1); }}
+  82%, 100% {{ {track_dash(REST_GAP)}; }}
+}}
+@keyframes pace-spinner-write-dot {{
+  0%, 7.99% {{ opacity: 1; }}
+  8%, 73.99% {{ opacity: 0; }}
+  74%, 100% {{ opacity: 1; }}
+}}
+{pen_x}
+{pen}
+{inks}
+"""
+
+
 def css(seed):
     rng = random.Random(seed)
     (rot, arc, gap, gz, show_ring, show_front), total = build(rng, plan_path(rng))
@@ -381,9 +639,10 @@ def css(seed):
     return f"""/*
  * Generated by scripts/spinner-keyframes.py (seed {seed}): run `pnpm spinner`
  * instead of editing. Six animations of the same length, so they stay in step:
- * the eye turning, the pupil opening into an arc, the track's opening
- * following it, the pupil facing you in the middle, and the swap between the
- * two pupils.
+ * the eye turning (with its double take, trace and think), the pupil opening
+ * into an arc, the track's opening following it (and its blinks and squint),
+ * the pupil facing you in the middle, and the swap between the two pupils.
+ * Writing (data-write) is a loop of its own, at the end.
  * The rules without animation are the logo: PaceSpinner stops the loop
  * (data-still) and eases back to them from wherever the loop was.
  * Apart from the loop, the turn: the whole mark going round at a steady pace
@@ -429,13 +688,15 @@ def css(seed):
 {keyframes("pace-spinner-read", gz.frames, total, front)}
 {keyframes("pace-spinner-ring-pupil", show_ring.frames, total, opacity)}
 {keyframes("pace-spinner-front-pupil", show_front.frames, total, opacity)}
+{write_css()}
 /* Reduced motion: still, and a slow fade says it is still working. */
 @media (prefers-reduced-motion: reduce) {{
   .pace-spinner-eye,
   .pace-spinner-track,
   .pace-spinner-pupil,
   .pace-spinner-front,
-  .pace-spinner[data-turn] {{
+  .pace-spinner[data-turn],
+  .pace-spinner[data-write] :is(.pace-spinner-track, .pace-spinner-pupil, .pace-spinner-pen-x, .pace-spinner-pen, .pace-spinner-ink) {{
     animation: none;
   }}
   .pace-spinner:not([data-still]) {{

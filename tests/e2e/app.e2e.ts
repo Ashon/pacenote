@@ -2125,6 +2125,8 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         match: "Write a recap of the user's work",
         answer:
           'Most of the week went to Payments: you shipped retry backoff and kept the idempotency key on retries. The payment retry review is still open.',
+        // Long enough to see it being written
+        delayMs: 2500,
       },
     ])
     const { home, root } = world
@@ -2224,11 +2226,25 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/recap-week.png'),
     })
 
-    // Write it up: Claude Code with no tools, from the recap's lines only
+    // Write it up: Claude Code with no tools, from the recap's lines only.
+    // Meanwhile its place shows Pace writing.
     await page.getByRole('button', { name: 'Write it up' }).click()
+    const writingUp = page.getByRole('region', { name: 'Writing it up' })
+    await writingUp.waitFor()
+    expect(
+      await writingUp.locator('svg.pace-spinner[data-write]').count()
+    ).toBe(1)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/recap-writing.png'),
+    })
     await page
       .getByText('Most of the week went to Payments', { exact: false })
       .waitFor()
+    // It comes in where it was being written, word by word.
+    await writingUp.waitFor({ state: 'detached' })
+    expect(
+      await page.locator('.motion-write-in [data-word]').count()
+    ).toBeGreaterThan(10)
     await page.getByRole('button', { name: 'Write again' }).waitFor()
     const calls = readFileSync(
       path.join(world.claudeDir, 'calls.jsonl'),

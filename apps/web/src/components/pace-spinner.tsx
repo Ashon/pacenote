@@ -26,11 +26,22 @@ const TURN_RATE = { slow: 1, fast: 4 } as const
 /** How long a change of the turn's speed takes */
 const RAMP_MS = 600
 
+/** The lines a writing spinner writes (WRITE_LINES in spinner-keyframes.py) */
+const INK = [
+  'M186 230q17.5 -12 35 0t35 0t35 0t35 0',
+  'M186 282q17.5 -12 35 0t35 0t35 0',
+] as const
+
 /**
- * Pace's mark at work: the dot looks around on the ring, now and then opens
+ * Pace's mark at work: the dot looks around on the ring, blinks, takes a
+ * second look, squints in thought, glides along the ring, now and then opens
  * into an arc like a lens, or comes to the middle to face you and skims a few
  * lines (keyframes in pace-spinner.css, made by scripts/spinner-keyframes.py).
  * Only the mask moves; the gradient stays put.
+ * With writing, it writes instead, for as long as Pace writes something for
+ * you (Recap's Write it up, a drafted reply): the ring closes like a page and
+ * the dot comes off it as a pen and writes two lines. Show it only while the
+ * writing goes on; it does not ease back to the logo.
  * When active turns off, it eases back into the logo from wherever it was;
  * when it turns on, the loop starts again from the logo, still for its first
  * 0.3 seconds, so a short load never moves.
@@ -45,12 +56,15 @@ export function PaceSpinner({
   label,
   active = true,
   turn,
+  writing,
 }: {
   className?: string
   /** Read out instead of the text beside it; without one it is decoration */
   label?: string
   /** Looking around (default), or the logo */
   active?: boolean
+  /** Writing instead of looking around */
+  writing?: boolean
   /** Turning steadily, slow or fast; pass active={false} with it */
   turn?: keyof typeof TURN_RATE
 }) {
@@ -110,6 +124,7 @@ export function PaceSpinner({
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
+      data-write={writing ? '' : undefined}
       className={cn('pace-spinner size-7 shrink-0', className)}
     >
       <defs>
@@ -148,6 +163,31 @@ export function PaceSpinner({
             r="42"
             fill="#fff"
           />
+          {/* Writing: the ink, drawn as the pen goes, and the pen */}
+          {writing &&
+            INK.map((d, i) => (
+              <path
+                key={d}
+                className={`pace-spinner-ink pace-spinner-ink-${i + 1}`}
+                d={d}
+                pathLength={100}
+                fill="none"
+                stroke="#fff"
+                strokeWidth={30}
+                strokeLinecap="round"
+              />
+            ))}
+          {writing && (
+            <g className="pace-spinner-pen-x">
+              <circle
+                className="pace-spinner-pen"
+                cx="256"
+                cy="256"
+                r="42"
+                fill="#fff"
+              />
+            </g>
+          )}
         </mask>
       </defs>
       <rect

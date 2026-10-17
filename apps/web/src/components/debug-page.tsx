@@ -204,6 +204,21 @@ function SpinnerBench() {
           ))}
         </div>
 
+        {/* Writing: Recap's Write it up, a drafted reply */}
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4 border-b border-border pb-6">
+          {SIZES.map((size) => (
+            <figure
+              key={size}
+              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
+            >
+              <div style={{ width: size, height: size }}>
+                <PaceSpinner writing className="size-full" />
+              </div>
+              <figcaption className="tabular-nums">writing {size}px</figcaption>
+            </figure>
+          ))}
+        </div>
+
         {/* Where the app shows it: a run's timeline while Pace works */}
         <div className="flex flex-wrap gap-3">
           {(['bg-card', 'bg-card-accent', 'bg-well'] as const).map((bg) => (
