@@ -243,12 +243,24 @@ const bundleWatch = bundleInfo
       file: bundleInfo,
       running: app.getVersion(),
       onReplaced: (version) => {
-        log.info(`The app on disk is ${version} now; restarting into it`)
-        if (process.env.PACENOTE_DESKTOP_NO_RELAUNCH !== '1') app.relaunch()
+        restartInto(version)
         app.quit()
       },
     })
   : undefined
+let restarting = false
+/** Opens the version on disk once this copy is gone, once however asked */
+function restartInto(version: string): void {
+  if (restarting) return
+  restarting = true
+  log.info(`The app on disk is ${version} now; restarting into it`)
+  if (process.env.PACENOTE_DESKTOP_NO_RELAUNCH !== '1') app.relaunch()
+}
+/** Pace has stopped: an upgrade that went on meanwhile is opened as it goes */
+async function reopenIfReplaced(): Promise<void> {
+  const version = await bundleWatch?.onDisk()
+  if (version && version !== app.getVersion()) restartInto(version)
+}
 // An error nothing caught goes to the log instead of a dialog; the bot runs in
 // its own process either way.
 process.on('uncaughtException', (err) =>
@@ -2008,6 +2020,10 @@ let botStopping: Promise<void> | undefined
  * again to deliver it, and that copy is told to quit while it starts. So from
  * the first request on, nothing starts Pace again, and one stop answers them
  * all.
+ *
+ * Homebrew opens the new version only for an app gone within 10 seconds. One
+ * that takes longer (Pace finishing a request) finds the new version on disk
+ * once Pace has stopped, and opens it itself (reopenIfReplaced).
  */
 app.on('before-quit', (event) => {
   isQuitting = true
@@ -2021,10 +2037,13 @@ app.on('before-quit', (event) => {
   if (supervisor?.managing && !botStopped) {
     event.preventDefault()
     tray?.setToolTip(`${appName} - Pace: Stopping`)
-    botStopping ??= supervisor.stop().finally(() => {
-      botStopped = true
-      app.quit()
-    })
+    botStopping ??= supervisor
+      .stop()
+      .then(reopenIfReplaced)
+      .finally(() => {
+        botStopped = true
+        app.quit()
+      })
   }
 })
 app.on('window-all-closed', () => {

@@ -190,7 +190,10 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
         clearTimeout(timer)
         resolve()
       })
-      child.kill()
+      // A bot not spawned yet takes no signal (utilityProcess), so a stop as
+      // it starts reaches it once it has.
+      if (child.pid === undefined) child.once('spawn', () => child.kill())
+      else child.kill()
     })
   }
 

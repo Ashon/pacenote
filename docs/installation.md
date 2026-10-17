@@ -33,9 +33,11 @@ brew install --cask pacenote
   `~/.pacenote` (`PACENOTE_HOME`), outside the app, so they survive upgrades and uninstall. The folder is kept to your
   account (700, and `settings.json` 600), and the app's own log is `logs/desktop.log`, beside Pace's `logs/bot.log`.
 - `brew upgrade --cask pacenote` quits the running app first (the bot gets up to 15 seconds to finish its requests, and
-  the rest resume on the next start) and reopens it. If a copy of the old version is still running when the new one
-  moves in (a late quit request can open it again), it sees the new version on disk within seconds, stops Pace and
-  reopens as the new version. The app tells you when a new release is out ("Update" in its status bar).
+  the rest resume on the next start) and reopens it. Homebrew reopens only an app that quit within 10 seconds; one that
+  took longer, Pace finishing a request, opens the new version itself once Pace has stopped. If a copy of the old
+  version is still running when the new one moves in (a late quit request can open it again), it sees the new version
+  on disk within seconds, stops Pace and reopens as the new version. The app tells you when a new release is out
+  ("Update" in its status bar).
   Homebrew refreshes the tap at most once a day on its own, so right after a release run `brew update` first.
   `brew uninstall --cask pacenote` removes the app and keeps `~/.pacenote`.
 

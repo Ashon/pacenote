@@ -19,7 +19,8 @@ cask "pacenote" do
 
   # Tray-resident app: brew never quits a running instance on uninstall or upgrade, which would
   # leave the old process (and the bot it supervises) running from a deleted bundle. quit is
-  # upgrade-aware: brew reopens the app after the swap. Quitting lets the bot finish its requests.
+  # upgrade-aware: brew reopens the app after the swap if it quit within 10 seconds; an app that
+  # took longer (the bot finishing its requests) opens the new version itself once the bot stops.
   uninstall quit: "io.github.ashon.pacenote"
 
   # Config, run history and the sandbox allowlist live in ~/.pacenote (PACENOTE_HOME) and are kept.

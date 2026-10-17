@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -51,5 +51,22 @@ describe('the app bundle replaced while it runs', () => {
     expect(watch.check()).toBe(true)
     expect(onReplaced).toHaveBeenCalledTimes(1)
     watch.stop()
+  })
+
+  it('tells a copy that quits the version on disk, once a swap is over', async () => {
+    const file = path.join(root, 'quitting', 'Info.plist')
+    const watch = new BundleWatch({
+      file,
+      running: '0.5.24',
+      onReplaced: vi.fn(),
+    })
+    // Gone while the bundle is swapped, then the new one
+    setTimeout(() => {
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, plist('0.5.25'))
+    }, 100)
+    expect(await watch.onDisk(5_000)).toBe('0.5.25')
+    rmSync(file)
+    expect(await watch.onDisk(300)).toBeUndefined()
   })
 })

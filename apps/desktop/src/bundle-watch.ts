@@ -44,6 +44,22 @@ export class BundleWatch {
     this.timer = undefined
   }
 
+  /**
+   * The version on disk once a swap is over, for a copy that quits: a missing
+   * file is a swap in progress, waited for up to waitMs
+   */
+  async onDisk(waitMs = 10_000): Promise<string | undefined> {
+    const until = Date.now() + waitMs
+    for (;;) {
+      try {
+        return bundleVersion(readFileSync(this.options.file, 'utf8'))
+      } catch {
+        if (Date.now() >= until) return undefined
+        await new Promise((resolve) => setTimeout(resolve, 250))
+      }
+    }
+  }
+
   /** Looks now; true when another version has taken this one's place */
   check(): boolean {
     if (this.replaced) return true

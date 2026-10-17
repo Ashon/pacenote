@@ -238,6 +238,9 @@ export class VmBroker {
       log: options.log,
     })
     await this.egress.listen()
+    // Stopped while it got ready (a bot told to stop as it starts): no VM
+    // or way out that nothing would stop
+    if (this.stopping) return this.egress.close()
     mkdirSync(options.workDir, { recursive: true })
     this.launch(this.values(expected), [
       `${options.bundleDir}:/app`,

@@ -2383,6 +2383,47 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(starts).toHaveLength(2)
   })
 
+  it('opens the new version itself when the upgrade moved it in while Pace stopped', async () => {
+    world = await World.create()
+    const { slack } = world
+    const { version } = JSON.parse(
+      readFileSync(path.join(REPO, 'apps/desktop/package.json'), 'utf8')
+    ) as { version: string }
+    const plist = (v: string) =>
+      `<plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>${v}</string></dict></plist>`
+    const info = path.join(world.root, 'Info.plist')
+    writeFileSync(info, plist(version))
+    const page = await launch(world, {
+      settings: [
+        `SLACK_APP_TOKEN=${slack.appToken}`,
+        `SLACK_BOT_TOKEN=${slack.botToken}`,
+        `MENTION_ALLOWED_USERS=${world.alice.id}`,
+      ],
+      env: {
+        PACENOTE_DESKTOP_BUNDLE_INFO: info,
+        PACENOTE_DESKTOP_NO_RELAUNCH: '1',
+      },
+    })
+    await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+
+    // Homebrew stops waiting after 10 seconds, and moves the new version in
+    // while Pace is still stopping: the app looks once Pace has stopped.
+    const closed = app!.waitForEvent('close', { timeout: 60_000 })
+    await app!.evaluate(
+      ({ app }, [file, text]) => {
+        process.getBuiltinModule('node:fs').writeFileSync(file!, text!)
+        app.quit()
+      },
+      [info, plist('99.0.0')]
+    )
+    await closed
+    app = undefined
+    expect(
+      readFileSync(path.join(world.home, 'logs/desktop.log'), 'utf8')
+    ).toMatch(/The app on disk is 99\.0\.0 now; restarting into it/)
+    expect(world.status()).toBeUndefined()
+  })
+
   it("holds each screen's place while its data comes, so nothing moves when it does", async () => {
     world = await World.create()
     const home = world.home
