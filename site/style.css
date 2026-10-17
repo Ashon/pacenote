@@ -679,6 +679,347 @@ code {
   margin-top: 1.5rem;
 }
 
+/* Motion controls: pause, play or replay an animation that runs by itself (WCAG 2.2.2) */
+.motion-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease-out;
+}
+.motion-control:hover {
+  background: var(--secondary-hover);
+}
+.motion-control svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Home: every tool reports back to Pacenote. Drawn by site.js in a fixed design space, scaled to fit;
+   the list below it says the same for screen readers and without scripting. */
+.converge {
+  margin: 2.25rem 0 0;
+  position: relative;
+}
+.converge-stage,
+.converge-caption,
+.converge-top {
+  display: none;
+}
+.js .converge.ready .converge-stage,
+.js .converge.ready .converge-caption,
+.js .converge.ready .converge-top {
+  display: block;
+}
+.js .converge.ready .converge-list {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.converge-top {
+  display: none;
+  text-align: right;
+  margin-bottom: 0.5rem;
+}
+.js .converge.ready .converge-top {
+  display: flex;
+  justify-content: flex-end;
+}
+.converge-stage {
+  position: relative;
+  overflow: hidden;
+}
+.cv-space {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.cv-space > * {
+  position: absolute;
+}
+.cv-label {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.cv-label.hub {
+  color: var(--primary);
+  font-weight: 700;
+}
+.cv-lane {
+  background: var(--border);
+}
+.cv-band {
+  border-radius: 14px;
+  background: var(--card-accent);
+}
+.cv-band-glow {
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1.5px var(--track);
+  opacity: 0;
+}
+.cv-seg {
+  border-radius: 999px;
+  background: var(--track);
+}
+.cv-seg.back {
+  background: var(--primary);
+}
+.cv-seg.carried {
+  background: repeating-linear-gradient(90deg, var(--primary) 0 6px, transparent 6px 11px);
+  opacity: 0.7;
+}
+.cv-seg.carried.down {
+  background: repeating-linear-gradient(180deg, var(--primary) 0 6px, transparent 6px 11px);
+}
+.cv-head {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--primary);
+}
+.cv-node {
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--track);
+  border: 2px solid var(--card);
+}
+.cv-node.hub {
+  background: var(--primary);
+}
+.cv-ring {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--track) 28%, transparent);
+  opacity: 0;
+}
+.cv-chip {
+  font-size: 12px;
+  line-height: 16px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  background: var(--well);
+  color: var(--foreground);
+}
+.cv-chip.hub {
+  background: color-mix(in srgb, var(--track) 18%, var(--card));
+  font-weight: 600;
+}
+.cv-ledger-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.cv-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.cv-ledger span {
+  font-size: 11.5px;
+  line-height: 15px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-weight: 550;
+}
+.converge .converge-caption {
+  position: relative;
+  margin: 0.875rem 0 0;
+  min-height: 3.25em;
+  color: var(--muted-foreground);
+}
+.converge-caption span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: 60ch;
+}
+
+/* How it works: one answer, end to end, the architecture as cards a packet travels through */
+.arch {
+  margin: 2.25rem 0 0;
+  position: relative;
+}
+.arch .arch-head {
+  max-width: none;
+  margin: 0 0 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.arch-map {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 0.875rem;
+  align-items: start;
+}
+.arch-group {
+  background: var(--well);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.arch .arch-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.arch-title span {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.arch-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.arch-card b {
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+.arch-card span {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+.arch-reply {
+  background: var(--card-accent);
+}
+.arch-gone {
+  border-style: dashed;
+}
+.arch-chip {
+  position: relative;
+  overflow: hidden;
+  align-self: flex-start;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.arch-chip::before {
+  content: '✓ ';
+}
+.arch-chip.arch-blocked {
+  background: color-mix(in srgb, var(--destructive) 12%, var(--card));
+  color: var(--destructive);
+  text-decoration: line-through;
+}
+.arch-chip.arch-blocked::before {
+  content: '✕ ';
+}
+.arch-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--track) 14%, transparent);
+  box-shadow: inset 0 0 0 2px var(--track);
+  opacity: 0;
+  pointer-events: none;
+}
+.glow.stop {
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  box-shadow: inset 0 0 0 2px var(--destructive);
+}
+.packet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--track);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--track) 30%, transparent),
+    0 0 18px color-mix(in srgb, var(--track) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform, opacity;
+}
+.packet.ghost {
+  background: var(--destructive);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--destructive) 25%, transparent);
+}
+.steps.jumpable li::before {
+  display: none;
+}
+.step-num {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.step-num:hover {
+  background: var(--secondary-hover);
+}
+
 /* The last word on each page: one next step */
 .closing .get {
   margin-top: 1.25rem;
@@ -724,6 +1065,9 @@ code {
 }
 
 @media (max-width: 60rem) {
+  .arch-map {
+    grid-template-columns: 1fr;
+  }
   .row,
   .row:nth-child(even) {
     grid-template-columns: 1fr;

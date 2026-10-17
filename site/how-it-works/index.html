@@ -86,13 +86,40 @@
             Linux VM thrown away after the answer.</li>
           <li>It strips its own secrets from the answer, replies in the thread, and records every step.</li>
         </ol>
-        <figure class="diagram">
-          <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="../media/architecture-dark.svg">
-            <img src="../media/architecture-light.svg" width="1200" height="816" loading="lazy"
-              alt="Slack; Pace on your Mac as four layers (messenger, pipeline, reasoner, sandbox), beside the desktop app, the MCP server and ~/.pacenote; and the built-in sandbox's VMs: the renderer, and the reasoner with its two ways out, the proxy in Pace and ops-broker.">
-          </picture>
+        <figure class="arch" data-arch aria-labelledby="arch-title">
+          <p class="arch-head"><span id="arch-title">One answer, end to end</span></p>
+          <div class="arch-map">
+            <div class="arch-group">
+              <p class="arch-title">Slack <span>Your workspace</span></p>
+              <div class="arch-card" data-node="s_mention"><b>@Pace check web-01</b><span>A mention in #ops</span></div>
+              <div class="arch-card" data-node="s_socket"><b>Socket Mode</b><span>Events over a connection your Mac opens</span></div>
+              <div class="arch-card" data-node="s_api"><b>Web API</b><span>Replies, reactions, files</span></div>
+              <div class="arch-card arch-reply" data-node="s_reply" data-late><b>Pace</b><span>Likely cause: the 09:02 deploy</span></div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">Your Mac <span>Pace, run by the app</span></p>
+              <div class="arch-card" data-node="p_msg"><b>messengers/slack</b><span>Slack events in, answers out</span></div>
+              <div class="arch-card" data-node="p_pipe"><b>mention pipeline</b><span>Who may ask, the thread, its files</span></div>
+              <div class="arch-chip" data-node="p_checks" data-late>It is you · a public channel</div>
+              <div class="arch-card" data-node="p_reason"><b>reasoners/claude, codex</b><span>Calls the CLI, reads its steps</span></div>
+              <div class="arch-card" data-node="p_sandbox"><b>sandbox/vm</b><span>A Linux VM per answer</span></div>
+              <div class="arch-chip" data-node="p_redact" data-late>Its own secrets taken out</div>
+              <div class="arch-card" data-node="p_runs"><b>~/.pacenote</b><span>Run history, tasks, settings</span></div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">Built-in sandbox <span>pacenote-vm</span></p>
+              <div class="arch-card" data-node="v_vm"><b>reasoner VM</b><span>claude or codex · read-only image · no network device</span></div>
+              <div class="arch-card" data-node="v_proxy"><b>proxy in Pace</b><span>Allowed domains only</span></div>
+              <div class="arch-domains">
+                <div class="arch-chip" data-node="v_allow">api.anthropic.com</div>
+                <div class="arch-chip arch-blocked" data-node="v_block">example.com</div>
+              </div>
+              <div class="arch-card" data-node="v_broker"><b>ops-broker</b><span>SSH, k8s, GitHub, Jira: the credentials stay here</span></div>
+              <div class="arch-card arch-gone" data-node="v_gone"><b>Gone after the answer</b><span>Nothing kept in the VM</span></div>
+            </div>
+          </div>
         </figure>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/architecture.md">The whole architecture, in seven diagrams<span aria-hidden="true"> ↗</span></a>
       </section>
 
       <section class="block" id="sandbox" aria-labelledby="sandbox-title">

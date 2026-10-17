@@ -3,7 +3,7 @@
   pacenote.dev, plain HTML and CSS with no build step: this page, how-it-works/, privacy/ and
   install/, which share the header, the footer, style.css and site.js (tests/site.test.ts holds the
   nav and the links together). The app's pictures are not kept here: the Pages workflow
-  (.github/workflows/pages.yml) copies them into media/ from docs/images, docs/diagrams and assets,
+  (.github/workflows/pages.yml) copies them into media/ from docs/images and assets,
   so the README and the site show the same files. To preview, run that workflow's "stage" step from
   the repository root and serve site/ over http (python3 -m http.server -d site).
 
@@ -79,16 +79,22 @@
 
     <div class="surface">
       <section class="block" aria-labelledby="loop-title">
-        <h2 id="loop-title">From a Slack thread to a closed task</h2>
-        <p>Work reaches you in Slack and gets done in Claude Code or Codex, each with its own memory. Pacenote keeps one
-          task's history together on your Mac, whichever tool did the work.</p>
-        <ol class="track" aria-label="A task, from the ask to how it ended">
-          <li><b>Asked</b><span>A Slack thread and its link</span></li>
-          <li><b>On your list</b><span>Collected into Todo, with a summary</span></li>
-          <li><b>Picked up</b><span>With the thread and how related work ended</span></li>
-          <li><b>Worked on</b><span>Your sessions and the branch</span></li>
-          <li><b>Wrapped up</b><span>How it ended, and a reply to send</span></li>
-        </ol>
+        <h2 id="loop-title">Every tool reports back to Pacenote</h2>
+        <p>Asks come in from Slack threads, work happens in Claude Code or Codex, and each one tells Pacenote how it ended.
+          It all stays on your Mac as one history, so the next task starts with what came before, in either tool.</p>
+        <figure class="converge" data-converge>
+          <div class="converge-stage" aria-hidden="true"></div>
+          <p class="converge-caption" aria-hidden="true"></p>
+          <ol class="converge-list" aria-label="Two tasks, two tools, one history">
+            <li>mina asks you in Slack, and the ask lands on your Todo.</li>
+            <li>Pacenote hands it to a Claude Code session, with the thread.</li>
+            <li>Claude Code tells Pacenote how it ended.</li>
+            <li>Pacenote drafts the reply in the thread. You send it.</li>
+            <li>hyun asks in another thread, and that lands on your Todo too.</li>
+            <li>Pacenote hands it to Codex, with how mina's review ended.</li>
+            <li>Codex tells Pacenote how it ended. Two tools, one history.</li>
+          </ol>
+        </figure>
       </section>
 
       <section class="block" aria-label="What Pace does">

@@ -15,8 +15,6 @@ const PAGES = ['', 'how-it-works/', 'privacy/', 'install/']
 /** Where the Pages workflow copies each picture in media/ from */
 const MEDIA: Record<string, string> = {
   'pacenote-mark.svg': 'assets',
-  'architecture-light.svg': 'docs/diagrams',
-  'architecture-dark.svg': 'docs/diagrams',
 }
 
 const read = (page: string) =>

@@ -8,7 +8,6 @@ on:
     paths:
       - 'site/**'
       - 'docs/images/**'
-      - 'docs/diagrams/architecture-*.svg'
       - 'assets/pacenote-mark.svg'
       - '.github/workflows/pages.yml'
   # The release link above the headline names the latest release. Releases are published with the maintainer's own gh, so
@@ -36,13 +35,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The pictures have one home each, beside the README that shows them too; the page gets copies.
+      # The pictures have one home each, beside the README that shows them too; the site gets copies.
       - name: stage
         run: |
           set -euo pipefail
           mkdir -p site/media
           cp docs/images/*.webp site/media/
-          cp docs/diagrams/architecture-light.svg docs/diagrams/architecture-dark.svg site/media/
           cp assets/pacenote-mark.svg site/media/
       - name: stamp the latest release
         env:
