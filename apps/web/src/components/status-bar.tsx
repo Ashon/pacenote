@@ -19,8 +19,9 @@ import { useBotStatus } from '@/lib/api'
 import { useSupervisor, useUpdate } from '@/lib/desktop'
 import { useTasks } from '@/lib/tasks'
 import { formatRelative } from '@/lib/format'
+import { SkeletonWord } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { describeBot, TONE_CLASS } from './bot-state'
+import { botKnown, describeBot, TONE_CLASS } from './bot-state'
 
 /**
  * The window's footer: indicators to glance at from any screen, on the chrome
@@ -109,7 +110,8 @@ export function StatusBarView({
           />
         </span>
         <span className={cn('font-semibold', TONE_CLASS[tone].text)}>
-          Pace: {label}
+          Pace:{' '}
+          {botKnown(data, supervisor) ? label : <SkeletonWord width="4rem" />}
         </span>
       </Item>
       {status?.reasoner && (

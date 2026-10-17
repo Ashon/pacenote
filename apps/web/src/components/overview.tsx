@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Placeholder } from '@/components/ui/motion'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useStats } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
 import { useSetup } from '@/lib/setup'
@@ -99,6 +101,15 @@ export function Overview() {
   const maxTool = Math.max(1, ...(data?.topTools.map((t) => t.calls) ?? [1]))
   const [avgValue, avgUnit] = splitUnit(formatDuration(data?.avgDurationMs))
   const running = data?.byStatus.running ?? 0
+  // Everything below the title comes at once, when the figures and whether
+  // setup is done are both known: a setup card that came later would push
+  // the page down.
+  const desktop = Boolean(window.pacenoteDesktop)
+  const ready =
+    Boolean(data) &&
+    (!desktop ||
+      (setup.view !== undefined && supervisor !== undefined && trend.isFetched))
+  if (ready && desktop) rememberTaskBand(Boolean(trend.data))
 
   return (
     // One surface, no cards: the figures share a row split by hairlines, and
@@ -114,150 +125,350 @@ export function Overview() {
         </p>
       </header>
 
-      {setupOpen && setup.view ? (
-        <ResumeSetup
-          view={setup.view}
-          onFinish={() =>
-            void setup.save({ finished: true }).then(() => {
-              window.location.hash = setupSettingsRoute(supervisor?.issues)
-            })
-          }
-        />
-      ) : (
-        supervisor?.phase === 'setup' && (
-          <SetupCard
-            message={supervisor.message}
-            issues={supervisor.issues}
-            onGuide={
-              setup.view
-                ? () =>
-                    void setup.save({ finished: false }).then(() => {
-                      window.location.hash = '#/setup'
-                    })
-                : undefined
-            }
+      <Placeholder
+        ready={ready}
+        skeleton={
+          <OverviewSkeleton
+            taskBand={lastTaskBand()}
+            setupCard={lastSetupCard()}
           />
-        )
-      )}
-
-      {setupOpen && !data?.total ? (
-        <SetupFacts />
-      ) : (
-        <>
-          <section
-            aria-label="Totals"
-            className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4"
-          >
-            <Metric
-              icon={<Activity className="text-primary" />}
-              label="Total runs"
-              value={data ? formatNumber(data.total) : '-'}
-              unit={data?.total === 1 ? 'run' : 'runs'}
-              hint={data ? `${formatNumber(today)} today` : undefined}
-            />
-            <Metric
-              icon={<CircleCheck className="text-status-succeeded" />}
-              label="Success rate"
-              value={successRate === undefined ? '-' : String(successRate)}
-              unit="%"
-              hint={
-                data
-                  ? `${data.byStatus.failed} failed / ${data.byStatus.interrupted} interrupted`
-                  : undefined
+        }
+      >
+        {/* Measured, so the next time it shows the skeleton holds its place */}
+        <div
+          ref={(element) => {
+            // How tall the setup card is, with its margin (0 for none)
+            if (element) rememberSetupCard(element.offsetHeight)
+          }}
+          className="flow-root"
+        >
+          {setupOpen && setup.view ? (
+            <ResumeSetup
+              view={setup.view}
+              onFinish={() =>
+                void setup.save({ finished: true }).then(() => {
+                  window.location.hash = setupSettingsRoute(supervisor?.issues)
+                })
               }
             />
-            <Metric
-              icon={<Timer className="text-chart-1" />}
-              label="Average duration"
-              value={avgValue}
-              unit={avgUnit}
-              hint="Time to finish one request"
-            />
-            <Metric
-              icon={
-                <LoaderCircle
-                  className={cn(
-                    'text-status-running',
-                    running > 0 && 'animate-spin'
-                  )}
-                />
-              }
-              label="Running"
-              value={data ? String(running) : '-'}
-              unit={running === 1 ? 'run' : 'runs'}
-              hint={
-                running > 0 ? 'Generating replies now' : 'No active requests'
-              }
-              accent={running > 0}
-            />
-          </section>
-
-          <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
-            <section className="flex flex-col">
-              <CardHeader
-                icon={<BarChart3 className="text-primary" />}
-                label="Last 14 days"
-                meta="Runs per day"
-              />
-              <ChartTotal
-                value={formatNumber(recentRuns)}
-                unit={recentRuns === 1 ? 'run' : 'runs'}
-                hint={
-                  recentFailed > 0 ? `${recentFailed} failed` : 'No failures'
+          ) : (
+            supervisor?.phase === 'setup' && (
+              <SetupCard
+                message={supervisor.message}
+                issues={supervisor.issues}
+                onGuide={
+                  setup.view
+                    ? () =>
+                        void setup.save({ finished: false }).then(() => {
+                          window.location.hash = '#/setup'
+                        })
+                    : undefined
                 }
               />
-              <div className="mt-4 flex min-h-32 flex-1">
-                <DayBars
-                  label="Runs per day for the last 14 days, failures at the top"
-                  topClassName="bg-status-failed"
-                  days={daily.map((day) => ({
-                    day: day.day,
-                    value: day.runs,
-                    top: day.failed,
-                    hover: String(day.runs),
-                    title: `${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`,
-                  }))}
-                />
-              </div>
-            </section>
+            )
+          )}
+        </div>
 
-            <section>
-              <CardHeader
-                icon={<Wrench className="text-chart-1" />}
-                label="Top tools"
-                meta="Calls"
+        {setupOpen && !data?.total ? (
+          <SetupFacts />
+        ) : (
+          <>
+            <section
+              aria-label="Totals"
+              className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4"
+            >
+              <Metric
+                icon={<Activity className="text-primary" />}
+                label="Total runs"
+                value={data ? formatNumber(data.total) : '-'}
+                unit={data?.total === 1 ? 'run' : 'runs'}
+                hint={data ? `${formatNumber(today)} today` : undefined}
               />
-              {data?.topTools.length ? (
-                <ul className="mt-5 space-y-3">
-                  {data.topTools.slice(0, 5).map((tool) => (
-                    <li key={tool.name} className="text-xs">
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                        <span className="truncate font-mono">{tool.name}</span>
-                        <span className="shrink-0 font-medium tabular-nums">
-                          {tool.calls}
-                        </span>
-                      </div>
-                      <LineBar
-                        share={tool.calls / maxTool}
-                        className="pacenote-gradient"
-                      />
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="py-8 text-sm text-muted-foreground">
-                  No tool calls recorded.
-                </p>
-              )}
+              <Metric
+                icon={<CircleCheck className="text-status-succeeded" />}
+                label="Success rate"
+                value={successRate === undefined ? '-' : String(successRate)}
+                unit="%"
+                hint={
+                  data
+                    ? `${data.byStatus.failed} failed / ${data.byStatus.interrupted} interrupted`
+                    : undefined
+                }
+              />
+              <Metric
+                icon={<Timer className="text-chart-1" />}
+                label="Average duration"
+                value={avgValue}
+                unit={avgUnit}
+                hint="Time to finish one request"
+              />
+              <Metric
+                icon={
+                  <LoaderCircle
+                    className={cn(
+                      'text-status-running',
+                      running > 0 && 'animate-spin'
+                    )}
+                  />
+                }
+                label="Running"
+                value={data ? String(running) : '-'}
+                unit={running === 1 ? 'run' : 'runs'}
+                hint={
+                  running > 0 ? 'Generating replies now' : 'No active requests'
+                }
+                accent={running > 0}
+              />
             </section>
-          </div>
 
-          <TaskBand trend={trend.data ?? undefined} />
+            <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
+              <section className="flex flex-col">
+                <CardHeader
+                  icon={<BarChart3 className="text-primary" />}
+                  label="Last 14 days"
+                  meta="Runs per day"
+                />
+                <ChartTotal
+                  value={formatNumber(recentRuns)}
+                  unit={recentRuns === 1 ? 'run' : 'runs'}
+                  hint={
+                    recentFailed > 0 ? `${recentFailed} failed` : 'No failures'
+                  }
+                />
+                <div className="mt-4 flex min-h-32 flex-1">
+                  <DayBars
+                    label="Runs per day for the last 14 days, failures at the top"
+                    topClassName="bg-status-failed"
+                    days={daily.map((day) => ({
+                      day: day.day,
+                      value: day.runs,
+                      top: day.failed,
+                      hover: String(day.runs),
+                      title: `${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`,
+                    }))}
+                  />
+                </div>
+              </section>
 
-          <TokenBand tokens={data?.tokens} />
-        </>
-      )}
+              <section>
+                <CardHeader
+                  icon={<Wrench className="text-chart-1" />}
+                  label="Top tools"
+                  meta="Calls"
+                />
+                {data?.topTools.length ? (
+                  <ul className="mt-5 space-y-3">
+                    {data.topTools.slice(0, 5).map((tool) => (
+                      <li key={tool.name} className="text-xs">
+                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                          <span className="truncate font-mono">
+                            {tool.name}
+                          </span>
+                          <span className="shrink-0 font-medium tabular-nums">
+                            {tool.calls}
+                          </span>
+                        </div>
+                        <LineBar
+                          share={tool.calls / maxTool}
+                          className="pacenote-gradient"
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="py-8 text-sm text-muted-foreground">
+                    No tool calls recorded.
+                  </p>
+                )}
+              </section>
+            </div>
+
+            <TaskBand trend={trend.data ?? undefined} />
+
+            <TokenBand tokens={data?.tokens} />
+          </>
+        )}
+      </Placeholder>
     </div>
+  )
+}
+
+/** How tall the setup card was last time, with its margin; 0 for none */
+const SETUP_CARD_KEY = 'pacenote.overview.setup-card'
+
+function lastSetupCard(): number {
+  try {
+    return Number(localStorage.getItem(SETUP_CARD_KEY)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function rememberSetupCard(height: number) {
+  try {
+    localStorage.setItem(SETUP_CARD_KEY, String(height))
+  } catch {
+    // Without storage the skeleton leaves the setup card out.
+  }
+}
+
+/** Whether the tasks band showed last time: the skeleton holds its place */
+const TASK_BAND_KEY = 'pacenote.overview.task-band'
+
+function lastTaskBand(): boolean {
+  try {
+    return localStorage.getItem(TASK_BAND_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function rememberTaskBand(shown: boolean) {
+  try {
+    localStorage.setItem(TASK_BAND_KEY, shown ? '1' : '0')
+  } catch {
+    // Without storage the skeleton leaves the tasks band out.
+  }
+}
+
+/** A figure's place: its label as it is, its number and line as bars */
+function MetricSkeleton({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0">
+      <CardHeader icon={icon} label={label} />
+      <SkeletonText
+        className="mt-3 text-3xl font-semibold tracking-tight"
+        width="46%"
+      />
+      <SkeletonText className="mt-1 text-xs" width="66%" />
+    </div>
+  )
+}
+
+/**
+ * A band's place: on the left its total and its 14 days, on the right its
+ * list, the left as tall as it will be (it sets the band's height)
+ */
+function BandSkeleton({
+  left,
+  right,
+  rows,
+}: {
+  left: { icon: React.ReactNode; label: string; meta: string }
+  right: { icon: React.ReactNode; label: string; meta: string }
+  rows: number
+}) {
+  return (
+    <div className="mt-10 grid gap-10 border-t border-border pt-9 @min-[46rem]:grid-cols-2">
+      <section className="flex flex-col">
+        <CardHeader {...left} />
+        <div className="mt-5">
+          <SkeletonText
+            className="text-3xl font-semibold tracking-tight"
+            width="34%"
+          />
+          <SkeletonText className="mt-1 text-xs" width="28%" />
+        </div>
+        <SkeletonBlock className="mt-4 min-h-32 flex-1 rounded-xl" />
+      </section>
+      <section>
+        <CardHeader {...right} />
+        <ul className="mt-5 space-y-3">
+          {Array.from({ length: rows }, (_, i) => (
+            <li key={i} className="text-xs">
+              <SkeletonText className="mb-1.5" width={`${44 - i * 6}%`} />
+              <SkeletonBlock className="h-1.5 rounded-full" />
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  )
+}
+
+/** The page below the title while its figures come, drawn to its measure */
+function OverviewSkeleton({
+  taskBand,
+  setupCard,
+}: {
+  taskBand: boolean
+  /** The setup card's height last time, with its 1.5rem margin */
+  setupCard: number
+}) {
+  return (
+    <>
+      {setupCard > 0 && (
+        <SkeletonBlock
+          className="mt-6 rounded-2xl"
+          style={{ height: setupCard - 24 }}
+        />
+      )}
+      <section className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4">
+        <MetricSkeleton
+          icon={<Activity className="text-primary" />}
+          label="Total runs"
+        />
+        <MetricSkeleton
+          icon={<CircleCheck className="text-status-succeeded" />}
+          label="Success rate"
+        />
+        <MetricSkeleton
+          icon={<Timer className="text-chart-1" />}
+          label="Average duration"
+        />
+        <MetricSkeleton
+          icon={<LoaderCircle className="text-status-running" />}
+          label="Running"
+        />
+      </section>
+      <BandSkeleton
+        left={{
+          icon: <BarChart3 className="text-primary" />,
+          label: 'Last 14 days',
+          meta: 'Runs per day',
+        }}
+        right={{
+          icon: <Wrench className="text-chart-1" />,
+          label: 'Top tools',
+          meta: 'Calls',
+        }}
+        rows={5}
+      />
+      {taskBand && (
+        <BandSkeleton
+          left={{
+            icon: <ListChecks className="text-primary" />,
+            label: 'Tasks handled',
+            meta: 'Per day',
+          }}
+          right={{
+            icon: <Flag className="text-chart-1" />,
+            label: 'How they ended',
+            meta: 'Last 14 days',
+          }}
+          rows={3}
+        />
+      )}
+      <BandSkeleton
+        left={{
+          icon: <Coins className="text-primary" />,
+          label: 'Tokens per day',
+          meta: 'New tokens',
+        }}
+        right={{
+          icon: <Layers className="text-chart-1" />,
+          label: 'By source',
+          meta: 'Last 14 days',
+        }}
+        rows={2}
+      />
+    </>
   )
 }
 

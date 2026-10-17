@@ -14,7 +14,9 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { artifactUrl, useRun } from '@/lib/api'
 import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
@@ -33,8 +35,20 @@ export function RunDetail({ id }: { id: string }) {
       </p>
     )
   }
-  if (!run) return null
-  if (isCollection(run)) return <CollectionDetail key={run.id} run={run} />
+  // Until the run comes, its skeleton holds the pane's shape
+  return (
+    <Placeholder fill ready={Boolean(run)} skeleton={<RunDetailSkeleton />}>
+      {run &&
+        (isCollection(run) ? (
+          <CollectionDetail key={run.id} run={run} />
+        ) : (
+          <MentionDetail run={run} />
+        ))}
+    </Placeholder>
+  )
+}
+
+function MentionDetail({ run }: { run: RunRecord }) {
   return (
     <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
       <RunHeader run={run} />
@@ -73,6 +87,80 @@ export function RunDetail({ id }: { id: string }) {
           </TabsContent>
         </div>
       </ScrollArea>
+    </Tabs>
+  )
+}
+
+/**
+ * A run's pane while it comes: its header (status, request, tabs), its facts
+ * and its first exchange, each as tall as it will be
+ */
+function RunDetailSkeleton() {
+  return (
+    <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
+      <header className="border-b bg-card/90 px-8 pt-6 pb-0">
+        <div className="mx-auto max-w-3xl">
+          <div className="flex h-6 items-center gap-2">
+            <SkeletonBlock className="h-5 w-20 rounded-full" />
+            <SkeletonText className="w-60 text-xs" width="100%" />
+          </div>
+          <SkeletonText
+            className="mt-2.5 text-lg leading-snug font-semibold"
+            width="55%"
+          />
+          <TabsList className="mt-4 mb-3">
+            <TabsTrigger value="timeline" disabled>
+              Timeline
+            </TabsTrigger>
+            <TabsTrigger value="attachments" disabled>
+              Attachments
+            </TabsTrigger>
+            <TabsTrigger value="prompt" disabled>
+              Prompt
+            </TabsTrigger>
+            <TabsTrigger value="raw" disabled>
+              JSON
+            </TabsTrigger>
+          </TabsList>
+        </div>
+      </header>
+      <div className="@container mx-auto w-full max-w-3xl px-8 py-6">
+        <div className="mb-8 grid grid-cols-2 gap-y-4 border-b border-border pb-6 @min-[40rem]:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="min-w-0 px-4 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[40rem]:[&:nth-child(3)]:border-l-0 @max-[40rem]:[&:nth-child(3)]:pl-0"
+            >
+              <SkeletonText className="text-2xs" width="54%" />
+              <SkeletonText className="mt-1 text-sm" width="62%" />
+              <SkeletonText
+                className="text-2xs"
+                width={i % 2 ? '58%' : '70%'}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-5">
+          {[false, true].map((accent, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="shrink-0 pt-1">
+                <SkeletonBlock className="size-7 rounded-full" />
+              </div>
+              <div
+                className={
+                  accent
+                    ? 'min-w-0 flex-1 surface-card-accent px-5 py-4'
+                    : 'min-w-0 flex-1 surface-card px-5 py-4'
+                }
+              >
+                <SkeletonText className="mb-2 text-sm" width="24%" />
+                <SkeletonText className="text-sm leading-relaxed" width="86%" />
+                <SkeletonText className="text-sm leading-relaxed" width="58%" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </Tabs>
   )
 }

@@ -1,7 +1,9 @@
 import type { RunKind, RunStatus, RunSummary } from '@history/types'
 import { AtSign, ImageIcon, ListChecks, Search, Wrench } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
+import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useRuns } from '@/lib/api'
 import {
   formatDayGroup,
@@ -99,41 +101,82 @@ export function RunList({
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2 pb-3">
-          {groupByDay(runs.data ?? []).map((group) => (
-            <section key={group.day} className="mt-2 first:mt-0">
-              <h3 className="px-3 pt-1.5 pb-1 text-2xs font-medium text-muted-foreground">
-                {group.day}
-              </h3>
-              <div className="space-y-0.5">
-                {group.runs.map((run) => (
-                  <RunListItem
-                    key={run.id}
-                    run={run}
-                    today={group.day === 'Today'}
-                    selected={run.id === selectedId}
-                    onSelect={() => onSelect(run.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-          {runs.data && runs.data.length === 0 && (
-            <p className="px-3 py-10 text-center text-sm text-muted-foreground">
-              {q || status
-                ? 'No runs match the filters.'
-                : kind === 'collection'
-                  ? 'No task collections yet. Collect now on the Todo screen runs one.'
-                  : 'Pace has not answered any mentions yet.'}
-            </p>
-          )}
-          {runs.isError && (
-            <p className="px-3 py-10 text-center text-sm text-destructive">
-              Could not load run history.
-            </p>
-          )}
+          <Placeholder
+            ready={Boolean(runs.data) || runs.isError}
+            skeleton={<RunListSkeleton />}
+          >
+            {groupByDay(runs.data ?? []).map((group) => (
+              <section key={group.day} className="mt-2 first:mt-0">
+                <h3 className="px-3 pt-1.5 pb-1 text-2xs font-medium text-muted-foreground">
+                  {group.day}
+                </h3>
+                <div className="space-y-0.5">
+                  {group.runs.map((run) => (
+                    <RunListItem
+                      key={run.id}
+                      run={run}
+                      today={group.day === 'Today'}
+                      selected={run.id === selectedId}
+                      onSelect={() => onSelect(run.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            {runs.data && runs.data.length === 0 && (
+              <p className="px-3 py-10 text-center text-sm text-muted-foreground">
+                {q || status
+                  ? 'No runs match the filters.'
+                  : kind === 'collection'
+                    ? 'No task collections yet. Collect now on the Todo screen runs one.'
+                    : 'Pace has not answered any mentions yet.'}
+              </p>
+            )}
+            {runs.isError && (
+              <p className="px-3 py-10 text-center text-sm text-destructive">
+                Could not load run history.
+              </p>
+            )}
+          </Placeholder>
         </div>
       </ScrollArea>
     </aside>
+  )
+}
+
+/** Widths for skeleton items, so they do not read as one block */
+const ITEM_WIDTHS = [
+  ['82%', '58%'],
+  ['64%', '70%'],
+  ['88%', '52%'],
+  ['56%', '64%'],
+  ['74%', '48%'],
+  ['68%', '60%'],
+]
+
+/** The list's place while the runs come: a day and its runs, as tall */
+function RunListSkeleton() {
+  return (
+    <section>
+      <SkeletonText
+        className="px-3 pt-1.5 pb-1 text-2xs font-medium"
+        width="18%"
+      />
+      <div className="space-y-0.5">
+        {ITEM_WIDTHS.map(([title, meta], i) => (
+          <div key={i} className="flex w-full gap-2.5 rounded-xl px-3 py-2.5">
+            <SkeletonBlock className="mt-0.5 size-3.5 shrink-0 rounded-full" />
+            <span className="min-w-0 flex-1">
+              <SkeletonText
+                className="text-body leading-snug font-medium"
+                width={title}
+              />
+              <SkeletonText className="mt-1.5 text-2xs" width={meta} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

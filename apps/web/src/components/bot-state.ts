@@ -37,6 +37,18 @@ export const TONE_CLASS: Record<
  * Combines the status file (bot.json) and the desktop supervisor state into a
  * one-line status.
  */
+/** Phases that say what Pace is doing on their own, without its status */
+const DECISIVE = new Set(['building', 'stopping', 'setup', 'failed', 'crashed'])
+
+/**
+ * Whether Pace's state can be told yet: its status has come, or the app's
+ * phase says it alone. Until then a label would only guess ("Stopped").
+ */
+export const botKnown = (
+  view: BotStatusView | undefined,
+  supervisor: SupervisorState | undefined
+) => view !== undefined || DECISIVE.has(supervisor?.phase ?? '')
+
 export function describeBot(
   view: BotStatusView | undefined,
   supervisor: SupervisorState | undefined

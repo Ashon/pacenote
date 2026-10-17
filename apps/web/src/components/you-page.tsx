@@ -15,8 +15,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { usePresence } from '@/components/ui/motion'
+import { Placeholder, usePresence } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  SkeletonBlock,
+  SkeletonText,
+  SkeletonWord,
+} from '@/components/ui/skeleton'
 import { formatRelative, formatShortDay } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
@@ -62,8 +67,21 @@ export function YouPage({ openId }: { openId?: string }) {
       </Page>
     )
   const data = you.data
-  if (!data) return <Page />
+  // Until your areas are counted: the intro, and the list's place as it will
+  // be
+  if (!data)
+    return (
+      <Page meta={<SkeletonWord width="4.5rem" />}>
+        <Intro key="intro" />
+        <Placeholder
+          key="list"
+          ready={false}
+          skeleton={<AreaRowsSkeleton count={lastAreas()} />}
+        />
+      </Page>
+    )
   const active = data.areas.filter((area) => area.state === 'active')
+  rememberAreas(active.length)
   const resting = data.areas.filter((area) => area.state === 'resting')
   const accounts = accountsSentence(data.accounts)
   const row = (area: AreaView) => (
@@ -98,10 +116,7 @@ export function YouPage({ openId }: { openId?: string }) {
         )
       }
     >
-      <p className="mt-1.5 text-body text-muted-foreground">
-        Where you contribute and what is going on in each, from your tasks and
-        your Claude Code and Codex sessions.
-      </p>
+      <Intro key="intro" />
       {notice.mounted && (
         <div
           ref={notice.ref}
@@ -131,33 +146,102 @@ export function YouPage({ openId }: { openId?: string }) {
           </Button>
         </div>
       )}
-      {data.areas.length === 0 ? (
-        <p className="mt-5 border-t border-border py-8 text-sm text-muted-foreground">
-          Nothing yet. Your areas show up once you have tasks here, or work in a
-          repository with Claude Code or Codex.
-        </p>
-      ) : (
-        <ul className="mt-5">{active.map(row)}</ul>
-      )}
-      {resting.length > 0 && (
-        <>
-          <div className="mt-6 flex items-baseline gap-2.5 border-t border-border pt-4">
-            <h2 className="text-sm font-semibold text-muted-foreground">
-              Resting
-            </h2>
-            <span className="text-xs text-muted-foreground">
-              Nothing for 4 weeks. They come back when work does.
-            </span>
-          </div>
-          <ul className="mt-1">{resting.map(row)}</ul>
-        </>
-      )}
-      {accounts && data.areas.length > 0 && (
-        <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
-          Kept as {accounts}.
-        </p>
-      )}
+      <Placeholder
+        key="list"
+        ready
+        skeleton={<AreaRowsSkeleton count={lastAreas()} />}
+      >
+        {data.areas.length === 0 ? (
+          <p className="mt-5 border-t border-border py-8 text-sm text-muted-foreground">
+            Nothing yet. Your areas show up once you have tasks here, or work in
+            a repository with Claude Code or Codex.
+          </p>
+        ) : (
+          <ul className="mt-5">{active.map(row)}</ul>
+        )}
+        {resting.length > 0 && (
+          <>
+            <div className="mt-6 flex items-baseline gap-2.5 border-t border-border pt-4">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                Resting
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                Nothing for 4 weeks. They come back when work does.
+              </span>
+            </div>
+            <ul className="mt-1">{resting.map(row)}</ul>
+          </>
+        )}
+        {accounts && data.areas.length > 0 && (
+          <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
+            Kept as {accounts}.
+          </p>
+        )}
+      </Placeholder>
     </Page>
+  )
+}
+
+const Intro = () => (
+  <p className="mt-1.5 text-body text-muted-foreground">
+    Where you contribute and what is going on in each, from your tasks and your
+    Claude Code and Codex sessions.
+  </p>
+)
+
+/** How many areas there were last time: the skeleton's rows */
+const AREAS_KEY = 'pacenote.you.rows'
+
+function lastAreas(): number {
+  try {
+    const rows = Number(localStorage.getItem(AREAS_KEY))
+    return rows > 0 ? Math.min(rows, 6) : 3
+  } catch {
+    return 3
+  }
+}
+
+function rememberAreas(rows: number) {
+  try {
+    localStorage.setItem(AREAS_KEY, String(rows))
+  } catch {
+    // Without storage the skeleton has three rows.
+  }
+}
+
+/** Widths for skeleton rows, so they do not read as one block */
+const AREA_WIDTHS = [
+  ['30%', '52%', '38%'],
+  ['24%', '34%', '30%'],
+  ['36%', '44%', '26%'],
+]
+
+/**
+ * The list's place while your areas are counted: rows as tall as an area's
+ * (its name, its parts and what is going on, and its 8 weeks on the right)
+ */
+function AreaRowsSkeleton({ count }: { count: number }) {
+  return (
+    <ul className="mt-5">
+      {Array.from({ length: count }, (_, i) => {
+        const [name, parts, now] = AREA_WIDTHS[i % AREA_WIDTHS.length]!
+        return (
+          <li key={i} className="border-t border-border py-3.5">
+            <div className="flex items-start gap-4">
+              <div className="min-w-0 flex-1 pl-6">
+                <SkeletonText className="text-sm leading-snug" width={name} />
+                <SkeletonText
+                  className="mt-1 font-mono text-xs"
+                  width={parts}
+                />
+                <SkeletonText className="mt-1 text-xs" width={now} />
+              </div>
+              <SkeletonBlock className="h-8 w-[77px] rounded-md" />
+            </div>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

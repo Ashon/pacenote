@@ -33,9 +33,11 @@ export function Fact({
         <span className="truncate">{label}</span>
       </div>
       {tip ? <Tooltip content={tip}>{shown}</Tooltip> : shown}
-      {hint && (
-        <div className="truncate text-2xs text-muted-foreground">{hint}</div>
-      )}
+      {/* Its line keeps its place without a hint, so runs with and without
+          one are as tall */}
+      <div className="truncate text-2xs text-muted-foreground">
+        {hint || '\u00a0'}
+      </div>
     </div>
   )
 }

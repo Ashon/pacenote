@@ -2342,4 +2342,190 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const starts = desktopLog().match(/restarting into it/g) ?? []
     expect(starts).toHaveLength(2)
   })
+
+  it("holds each screen's place while its data comes, so nothing moves when it does", async () => {
+    world = await World.create()
+    const home = world.home
+    mkdirSync(home, { recursive: true })
+    const now = Date.now()
+    const HOUR = 3_600_000
+    const on = {
+      on: true,
+      dms: false,
+      exclude: [],
+      names: [],
+      groups: [],
+    }
+    // Open tasks, each with a due date (its row's chip), all asked in one
+    // channel (an area of your work), and runs to list
+    addTasks(
+      home,
+      [
+        [
+          'Review the payment retry PR',
+          'mina',
+          'C0PAY',
+          '#payments',
+          'Thursday',
+        ],
+        [
+          'Reply to jun about the retry limits',
+          'jun',
+          'C0PAY',
+          '#payments',
+          'Friday',
+        ],
+        ['Fix the flaky ledger test', 'hyun', 'C0PAY', '#payments', 'Monday'],
+      ].map(([title, by, channel, where, due], i) => ({
+        title: title!,
+        asked_by: by,
+        where: where!,
+        link: `https://acme.slack.com/archives/${channel}/p${Math.floor((now - (i + 1) * HOUR) / 1000)}000100`,
+        confidence: 'sure' as const,
+        due,
+      })),
+      { settings: on, now: new Date(now - HOUR), finished: true }
+    )
+    const store = new HistoryStore(home)
+    const runs = ['Where do you run?', 'Is staging healthy?'].map(
+      (request, i) => {
+        const run = store.start(
+          {
+            origin: {
+              messenger: 'slack',
+              conversation: 'C0OPS',
+              conversationLabel: '#ops',
+              thread: `17920${i}0000.000100`,
+              message: `17920${i}0000.000100`,
+              userId: world!.alice.id,
+            },
+            request,
+            backend: { reasoner: 'claude', sandbox: 'host' },
+          },
+          new Date(now - (i + 2) * HOUR)
+        )
+        run.patch({ answer: 'From this Mac: all good.' })
+        run.finish('succeeded')
+        return run
+      }
+    )
+    const page = await launch(world, { settings: ['TASKS=on'] })
+    await page.getByRole('button', { name: 'Recap', exact: true }).waitFor()
+    // Seen once, as by someone coming back: how many rows, and whether the
+    // card about your work showed, are remembered for the skeletons
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page.getByText('This is your work, as Pacenote sees it').waitFor()
+    await page.evaluate("window.location.hash = '#/you'")
+    await page.locator('[data-area-row]').first().waitFor()
+    // (Pace has no Slack app here: Overview says what to set up)
+    await page.getByText(/Pace: Setup needed/).waitFor()
+    await page.evaluate("window.location.hash = '#/'")
+    await page.locator('section[aria-label="Totals"]').waitFor()
+    await page.getByRole('button', { name: 'Open Settings' }).waitFor()
+    await page.evaluate("window.location.hash = '#/bot'")
+    // The app's notice (what to set up) is measured once it shows
+    await eventually(
+      "the notice's height",
+      async () =>
+        Number(
+          await page.evaluate("localStorage.getItem('pacenote.bot.notice')")
+        ) > 0
+    )
+
+    // Every answer from the app is held back a while: the IPC handlers in the
+    // main process, and the window's fetches of the local API
+    const SLOW = 1600
+    await app!.evaluate(({ ipcMain }, ms) => {
+      type Handler = (...args: unknown[]) => unknown
+      const handlers = (
+        ipcMain as unknown as { _invokeHandlers: Map<string, Handler> }
+      )._invokeHandlers
+      for (const [channel, handler] of [...handlers])
+        handlers.set(channel, async (...args: unknown[]) => {
+          await new Promise((resolve) => setTimeout(resolve, ms))
+          return handler(...args)
+        })
+    }, SLOW)
+    await app!.context().addInitScript({
+      content: `{
+        const fetched = window.fetch.bind(window)
+        window.fetch = (...args) =>
+          new Promise((resolve) => setTimeout(resolve, ${SLOW})).then(() => fetched(...args))
+      }`,
+    })
+
+    /**
+     * Where each anchor is, to the pixel: chrome by its top and its height; a
+     * block of data (^selector) by its top alone, since how much data there
+     * is sets its height
+     */
+    const where = (anchors: string[]) =>
+      page.evaluate(
+        `${JSON.stringify(anchors)}.map((anchor) => {
+          const data = anchor.startsWith('^')
+          const selector = data ? anchor.slice(1) : anchor
+          const box = document.querySelector(selector)?.getBoundingClientRect()
+          if (!box) return { selector, missing: true }
+          return data
+            ? { selector, top: Math.round(box.top) }
+            : { selector, top: Math.round(box.top), height: Math.round(box.height) }
+        })`
+      ) as Promise<{ selector: string; missing?: true }[]>
+    /**
+     * Opens a screen afresh (nothing cached), photographs it while its data
+     * is held back and again once it is in, and checks that each anchor is
+     * where the skeleton had it
+     */
+    const shoot = async (route: string, name: string, anchors: string[]) => {
+      await page.evaluate(
+        `window.location.hash = ${JSON.stringify(route)}; window.location.reload()`
+      )
+      await page.waitForLoadState('domcontentloaded')
+      await page.locator('.motion-skeleton').first().waitFor()
+      // Past its first moment: faded in
+      await page.waitForTimeout(500)
+      const held = await where(anchors)
+      await page.screenshot({
+        path: path.join(REPO, `test-results/skeleton-${name}-loading.png`),
+      })
+      await page
+        .locator('.motion-skeleton, .motion-skeleton-out')
+        .first()
+        .waitFor({ state: 'detached', timeout: 20_000 })
+      // The data has risen in
+      await page.waitForTimeout(500)
+      const shown = await where(anchors)
+      await page.screenshot({
+        path: path.join(REPO, `test-results/skeleton-${name}-loaded.png`),
+      })
+      expect(shown).toEqual(held)
+      expect(held.filter((anchor) => 'missing' in anchor)).toEqual([])
+    }
+
+    await shoot('#/tasks', 'todo', [
+      '[role="tablist"]',
+      'ul.mt-3 > li:nth-child(1)',
+      'ul.mt-3 > li:nth-child(2)',
+    ])
+    await shoot('#/recap/week', 'recap', [
+      '[aria-label="Recap of"]',
+      '^div.mt-2 > section:first-child',
+    ])
+    await shoot('#/you', 'you', ['^ul.mt-5 > li:first-child'])
+    await shoot('#/runs', 'runs', [
+      String.raw`.space-y-0\.5 > :first-child`,
+      String.raw`.space-y-0\.5 > :nth-child(2)`,
+    ])
+    await shoot(`#/runs/${runs[0]!.id}`, 'run', [
+      'header [role="tablist"]',
+      '.mb-8.grid',
+      '^.space-y-5 > :first-child',
+    ])
+    await shoot('#/', 'overview', ['section.mt-9', '^div.mt-10.border-t'])
+    await shoot('#/bot', 'pace', ['.mt-6.grid'])
+    await shoot('#/settings/general', 'settings', [
+      'nav[aria-label="Settings sections"]',
+      '^section.surface-group',
+    ])
+  }, 240_000)
 })

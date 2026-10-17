@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Swap, usePresence } from '@/components/ui/motion'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { accountsSentence, partKey, roleSentence, useFixYou } from '@/lib/you'
 
 /** At most this many areas on the card; the rest are on the You screen */
@@ -184,6 +185,76 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
           </div>
         )}
       </Swap>
+    </section>
+  )
+}
+
+/** How the card looked last time it showed: its rows, and the accounts line */
+const LAST_KEY = 'pacenote.tasks.your-work'
+
+export interface YourWorkShape {
+  rows: number
+  accounts: boolean
+}
+
+/** The card as it was last time, so its place is held while Todo loads */
+export function lastYourWork(): YourWorkShape | undefined {
+  try {
+    const shape = JSON.parse(
+      localStorage.getItem(LAST_KEY) ?? 'null'
+    ) as YourWorkShape | null
+    return shape && shape.rows > 0 ? shape : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Remembers how the card shows now (or that it does not) */
+export function rememberYourWork(you: YouView | null | undefined) {
+  const rows = you?.firstLook
+    ? Math.min(
+        SHOWN,
+        you.areas.filter((area) => area.state === 'active').length
+      )
+    : 0
+  try {
+    localStorage.setItem(
+      LAST_KEY,
+      JSON.stringify({
+        rows,
+        accounts: Boolean(you && accountsSentence(you.accounts)),
+      })
+    )
+  } catch {
+    // Without storage the skeleton leaves the card out.
+  }
+}
+
+/** The card's place while Todo loads: its heading, rows and buttons */
+export function YourWorkSkeleton({ rows, accounts }: YourWorkShape) {
+  return (
+    <section className="mt-4 flex flex-col gap-2.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3">
+      <SkeletonText className="text-sm font-semibold" width="42%" />
+      <ul>
+        {Array.from({ length: rows }, (_, i) => (
+          <li
+            key={i}
+            className="grid min-h-11 grid-cols-[9rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-primary/10 py-1.5 text-body first:border-t-0"
+          >
+            <SkeletonText width="70%" />
+            <span className="flex min-w-0 flex-col">
+              <SkeletonText width={i % 2 ? '48%' : '62%'} />
+              <SkeletonText className="font-mono text-xs" width="40%" />
+            </span>
+            <SkeletonText className="w-14 text-xs" width="100%" />
+          </li>
+        ))}
+      </ul>
+      {accounts && <SkeletonText className="text-xs" width="36%" />}
+      <div className="flex items-center gap-1.5">
+        <SkeletonBlock className="h-7 w-21 rounded-md" />
+        <SkeletonBlock className="h-7 w-24 rounded-md" />
+      </div>
     </section>
   )
 }

@@ -14,11 +14,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   type ListEntry,
+  Placeholder,
   Swap,
   useListMotion,
   usePresence,
 } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SkeletonText, SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   formatHourMinute,
@@ -31,7 +33,12 @@ import { cn } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow, taskHash } from './task-row'
-import { YourWork } from './your-work'
+import {
+  lastYourWork,
+  rememberYourWork,
+  YourWork,
+  YourWorkSkeleton,
+} from './your-work'
 
 type Tab = 'open' | 'maybe' | 'done'
 
@@ -51,6 +58,18 @@ function declinedOffers(): string[] {
     return JSON.parse(localStorage.getItem(OFFERS_KEY) ?? '[]') as string[]
   } catch {
     return []
+  }
+}
+
+/** How many open tasks there were last time: the skeleton's rows */
+const ROWS_KEY = 'pacenote.tasks.rows'
+
+function lastRows(): number {
+  try {
+    const rows = Number(localStorage.getItem(ROWS_KEY))
+    return rows > 0 ? Math.min(rows, 8) : 3
+  } catch {
+    return 3
   }
 }
 
@@ -118,7 +137,33 @@ export function TasksPage({
         </p>
       </Page>
     )
-  if (!data) return <Page />
+  // Until the tasks come, and your areas (their card, shown once after a
+  // collection, sits above the tabs): the header, the tabs and the list's
+  // place, as they will be, and the card's if it showed last time
+  const youKnown = !window.pacenoteDesktop?.you || you !== undefined
+  if (!data || !youKnown) {
+    const card = lastYourWork()
+    return (
+      <Page
+        meta={<SkeletonWord width="9rem" />}
+        action={<CollectButton running={false} />}
+      >
+        {card && (
+          <Placeholder
+            key="your-work"
+            ready={false}
+            skeleton={<YourWorkSkeleton {...card} />}
+          />
+        )}
+        <TaskTabs key="tabs" tab={tab} onTab={setTab} />
+        <Placeholder
+          key="list"
+          ready={false}
+          skeleton={<TaskRowsSkeleton count={lastRows()} />}
+        />
+      </Page>
+    )
+  }
   if (!data.settings.on)
     return (
       <Page>
@@ -127,6 +172,8 @@ export function TasksPage({
     )
 
   const open = data.tasks.filter((task) => task.status === 'open')
+  rememberRows(open.length)
+  rememberYourWork(data.collectedAt ? you : undefined)
   const maybe = data.tasks.filter((task) => task.status === 'maybe')
   const kept = (task: TaskView) =>
     task.id === openId && held?.id === openId && held.tab === tab
@@ -227,93 +274,157 @@ export function TasksPage({
         </Banner>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(value as Tab)
+      <TaskTabs
+        key="tabs"
+        tab={tab}
+        onTab={(value) => {
+          setTab(value)
           showAll()
         }}
-      >
-        <TabsList className="mt-5">
-          <TabsTrigger value="open">Open {open.length}</TabsTrigger>
-          <TabsTrigger value="maybe">Maybe {maybe.length}</TabsTrigger>
-          <TabsTrigger value="done">Done</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        counts={{ open: open.length, maybe: maybe.length }}
+      />
 
       {/* Another tab's list takes this one's place (swap) */}
-      <Swap id={tab}>
-        <NewTasks
-          count={waiting.length}
-          onShow={() => {
-            showAll()
-            setRevealed(waiting[0]?.id)
-          }}
-        />
-        {tab === 'maybe' && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Guesses Pace is not sure about. They stay out of the list until you
-            keep one.
-          </p>
-        )}
-        <TaskList
-          tasks={shown}
-          onKeyDown={onKeyDown}
-          revealed={revealed}
-          row={(task, motion) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              motion={motion}
-              cli={data.settings.cli}
-              working={data.working?.[task.id]}
-              live={live?.working[task.id]}
-              proposal={data.proposals?.[task.id]}
-              area={data.areas?.[task.id]}
-              askGroup={
-                task.status === 'maybe' &&
-                task.group &&
-                !data.groups?.yours.includes(task.group) &&
-                !data.groups?.notYours.includes(task.group)
-                  ? task.group
-                  : undefined
-              }
-              follows={
-                task.follows
-                  ? data.tasks.find((each) => each.id === task.follows)?.title
-                  : undefined
-              }
-              open={task.id === openId}
-              gone={tabOf(task) !== tab}
-              logEntry={task.id === openId ? logEntry : undefined}
-              onToggle={() =>
-                go(task.id === openId ? '#/tasks' : taskHash(task.id))
-              }
-              onDecide={(decision) => void decide(task.id, decision)}
-            />
+      <Placeholder
+        key="list"
+        ready
+        skeleton={<TaskRowsSkeleton count={lastRows()} />}
+      >
+        <Swap id={tab}>
+          <NewTasks
+            count={waiting.length}
+            onShow={() => {
+              showAll()
+              setRevealed(waiting[0]?.id)
+            }}
+          />
+          {tab === 'maybe' && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Guesses Pace is not sure about. They stay out of the list until
+              you keep one.
+            </p>
           )}
-        />
-        {shown.length === 0 && (
-          <p className="border-t border-border py-8 text-sm text-muted-foreground">
-            {tab === 'open'
-              ? data.collectedAt
-                ? 'Nothing open. The next collection reads what is new since this one.'
-                : 'Nothing yet. A first collection reads the last 7 days.'
-              : tab === 'maybe'
-                ? 'No Maybes.'
-                : 'Nothing settled in the last 14 days.'}
-          </p>
-        )}
-        {tab === 'done' && data.dismissRate !== undefined && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            You dismissed {Math.round(data.dismissRate * 100)}% of the tasks you
-            settled. Above about 30%, Pace is picking too loosely.
-          </p>
-        )}
-      </Swap>
+          <TaskList
+            tasks={shown}
+            onKeyDown={onKeyDown}
+            revealed={revealed}
+            row={(task, motion) => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                motion={motion}
+                cli={data.settings.cli}
+                working={data.working?.[task.id]}
+                live={live?.working[task.id]}
+                proposal={data.proposals?.[task.id]}
+                area={data.areas?.[task.id]}
+                askGroup={
+                  task.status === 'maybe' &&
+                  task.group &&
+                  !data.groups?.yours.includes(task.group) &&
+                  !data.groups?.notYours.includes(task.group)
+                    ? task.group
+                    : undefined
+                }
+                follows={
+                  task.follows
+                    ? data.tasks.find((each) => each.id === task.follows)?.title
+                    : undefined
+                }
+                open={task.id === openId}
+                gone={tabOf(task) !== tab}
+                logEntry={task.id === openId ? logEntry : undefined}
+                onToggle={() =>
+                  go(task.id === openId ? '#/tasks' : taskHash(task.id))
+                }
+                onDecide={(decision) => void decide(task.id, decision)}
+              />
+            )}
+          />
+          {shown.length === 0 && (
+            <p className="border-t border-border py-8 text-sm text-muted-foreground">
+              {tab === 'open'
+                ? data.collectedAt
+                  ? 'Nothing open. The next collection reads what is new since this one.'
+                  : 'Nothing yet. A first collection reads the last 7 days.'
+                : tab === 'maybe'
+                  ? 'No Maybes.'
+                  : 'Nothing settled in the last 14 days.'}
+            </p>
+          )}
+          {tab === 'done' && data.dismissRate !== undefined && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              You dismissed {Math.round(data.dismissRate * 100)}% of the tasks
+              you settled. Above about 30%, Pace is picking too loosely.
+            </p>
+          )}
+        </Swap>
+      </Placeholder>
 
       <RecentCollections collections={data.collections ?? []} />
     </Page>
+  )
+}
+
+function rememberRows(rows: number) {
+  try {
+    localStorage.setItem(ROWS_KEY, String(rows))
+  } catch {
+    // Without storage the skeleton has three rows.
+  }
+}
+
+/** Open, Maybe and Done, with their counts once the tasks are in */
+function TaskTabs({
+  tab,
+  onTab,
+  counts,
+}: {
+  tab: Tab
+  onTab: (tab: Tab) => void
+  counts?: { open: number; maybe: number }
+}) {
+  return (
+    <Tabs value={tab} onValueChange={(value) => onTab(value as Tab)}>
+      <TabsList className="mt-5">
+        <TabsTrigger value="open">
+          Open {counts ? counts.open : <SkeletonWord />}
+        </TabsTrigger>
+        <TabsTrigger value="maybe">
+          Maybe {counts ? counts.maybe : <SkeletonWord />}
+        </TabsTrigger>
+        <TabsTrigger value="done">Done</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  )
+}
+
+/** Widths for skeleton rows, so they do not read as one block */
+const TITLE_WIDTHS = ['62%', '48%', '56%', '42%']
+const META_WIDTHS = ['38%', '30%', '44%', '34%']
+
+/**
+ * The list's place while the tasks come: rows as tall as a task's row (its
+ * title, and its line of who, where and when with a chip on it)
+ */
+function TaskRowsSkeleton({ count }: { count: number }) {
+  return (
+    <ul className="mt-3">
+      {Array.from({ length: count }, (_, i) => (
+        <li key={i} className="border-t border-border py-3.5">
+          <div className="pl-6">
+            <SkeletonText
+              className="text-sm leading-snug"
+              width={TITLE_WIDTHS[i % TITLE_WIDTHS.length]}
+            />
+            <SkeletonText
+              className="mt-1 text-xs leading-[1.125rem]"
+              width={META_WIDTHS[i % META_WIDTHS.length]}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 

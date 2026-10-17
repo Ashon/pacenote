@@ -49,6 +49,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Placeholder } from '@/components/ui/motion'
 import {
   Collapsible,
   CollapsibleContent,
@@ -56,6 +57,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import {
   botControl,
   useLoginItem,
@@ -235,7 +237,27 @@ export function SettingsPage() {
       </p>
     )
   }
-  if (!view) return null
+  // Until the settings are read: the section list and the section's title as
+  // they will be, and its cards' place
+  if (!view)
+    return (
+      <div className="@container/settings flex h-full min-h-0">
+        <SettingsNav section={section} go={go} />
+        <div className="@container/content flex min-w-0 flex-1 flex-col">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="max-w-3xl space-y-8 px-8 py-7 @max-[36rem]/content:px-4">
+              <SectionTitle section={section} />
+              <Placeholder
+                key="body"
+                ready={false}
+                skeleton={<SectionSkeleton />}
+              />
+              <div className="h-10" />
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+    )
 
   /**
    * The value in effect once the draft is saved: the draft, else the file,
@@ -810,45 +832,18 @@ export function SettingsPage() {
     // A narrow screen keeps the section list as icons (@settings), and narrow
     // content stacks each row (@content).
     <div className="@container/settings flex h-full min-h-0">
-      <nav
-        aria-label="Settings sections"
-        className="flex w-56 shrink-0 flex-col gap-4 border-r border-sidebar-border px-2.5 py-5 @max-[44rem]/settings:w-14 @max-[44rem]/settings:px-2"
-      >
-        <h1 className="px-2.5 text-base font-semibold tracking-tight @max-[44rem]/settings:sr-only">
-          Settings
-        </h1>
-        {NAV.map((group) => (
-          <div key={group.label} className="space-y-0.5">
-            <p className="px-2.5 pb-1 text-2xs font-medium text-muted-foreground/80 @max-[44rem]/settings:sr-only">
-              {group.label}
-            </p>
-            {group.items.map((id) => (
-              <NavItem
-                key={id}
-                icon={SECTION_INFO[id].icon}
-                label={SECTION_INFO[id].label}
-                active={section === id}
-                changes={sectionChanges(id)}
-                issues={sectionIssues(id)}
-                hint={hints[id]}
-                onClick={() => go(id)}
-              />
-            ))}
-          </div>
-        ))}
-      </nav>
+      <SettingsNav
+        section={section}
+        go={go}
+        changes={sectionChanges}
+        issues={sectionIssues}
+        hints={hints}
+      />
 
       <div className="@container/content flex min-w-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1">
           <div className="max-w-3xl space-y-8 px-8 py-7 @max-[36rem]/content:px-4">
-            <header>
-              <h2 className="text-lg font-semibold tracking-tight">
-                {SECTION_INFO[section].label}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {SECTION_INFO[section].help}
-              </p>
-            </header>
+            <SectionTitle section={section} />
 
             {notice && (
               <div
@@ -885,7 +880,9 @@ export function SettingsPage() {
               </div>
             )}
 
-            {content[section]}
+            <Placeholder key="body" ready skeleton={<SectionSkeleton />}>
+              <div className="space-y-8">{content[section]}</div>
+            </Placeholder>
             <div className="h-10" />
           </div>
         </ScrollArea>
@@ -951,6 +948,102 @@ export function SettingsPage() {
           </footer>
         )}
       </div>
+    </div>
+  )
+}
+
+/** The sections, with their changes, issues and states once they are known */
+function SettingsNav({
+  section,
+  go,
+  changes = () => 0,
+  issues = () => 0,
+  hints = {},
+}: {
+  section: Section
+  go: (section: Section) => void
+  changes?: (section: Section) => number
+  issues?: (section: Section) => number
+  hints?: Partial<Record<Section, Hint>>
+}) {
+  return (
+    <nav
+      aria-label="Settings sections"
+      className="flex w-56 shrink-0 flex-col gap-4 border-r border-sidebar-border px-2.5 py-5 @max-[44rem]/settings:w-14 @max-[44rem]/settings:px-2"
+    >
+      <h1 className="px-2.5 text-base font-semibold tracking-tight @max-[44rem]/settings:sr-only">
+        Settings
+      </h1>
+      {NAV.map((group) => (
+        <div key={group.label} className="space-y-0.5">
+          <p className="px-2.5 pb-1 text-2xs font-medium text-muted-foreground/80 @max-[44rem]/settings:sr-only">
+            {group.label}
+          </p>
+          {group.items.map((id) => (
+            <NavItem
+              key={id}
+              icon={SECTION_INFO[id].icon}
+              label={SECTION_INFO[id].label}
+              active={section === id}
+              changes={changes(id)}
+              issues={issues(id)}
+              hint={hints[id]}
+              onClick={() => go(id)}
+            />
+          ))}
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+function SectionTitle({ section }: { section: Section }) {
+  return (
+    <header>
+      <h2 className="text-lg font-semibold tracking-tight">
+        {SECTION_INFO[section].label}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {SECTION_INFO[section].help}
+      </p>
+    </header>
+  )
+}
+
+/**
+ * A section's cards while the settings are read: a card's heading and its
+ * rows (a name, a line of help, and the control's place), as tall as theirs
+ */
+function SectionSkeleton() {
+  return (
+    <div className="space-y-8">
+      {[3, 2].map((rows, c) => (
+        <section key={c} className="surface-group">
+          <header className="border-b border-border px-4 py-3">
+            <SkeletonText
+              className="text-sm font-semibold"
+              width={c ? '22%' : '30%'}
+            />
+            <SkeletonText className="mt-0.5 text-xs" width="58%" />
+          </header>
+          <div className="divide-y divide-border">
+            {Array.from({ length: rows }, (_, i) => (
+              <div key={i} className="flex items-start gap-4 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <SkeletonText
+                    className="text-sm font-medium"
+                    width={`${38 - i * 6}%`}
+                  />
+                  <SkeletonText className="mt-0.5 text-xs" width="62%" />
+                </div>
+                <div className="flex min-h-7 shrink-0 items-center">
+                  <SkeletonBlock className="h-7 w-28 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

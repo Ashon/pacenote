@@ -26,8 +26,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Swap } from '@/components/ui/motion'
+import { Placeholder, Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  SkeletonBlock,
+  SkeletonText,
+  SkeletonWord,
+} from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatHourMinute, formatRelative, formatShortDay } from '@/lib/format'
 import {
@@ -126,7 +131,8 @@ export function RecapPage({
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
-        <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* As tall as its buttons before they come */}
+        <header className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-lg font-semibold tracking-tight">Recap</h1>
           <span className="text-sm text-muted-foreground">
             What you did, by day, week and month
@@ -179,7 +185,7 @@ export function RecapPage({
                   <ChevronLeft />
                 </Button>
                 <span className="px-1.5 text-sm font-semibold">
-                  {view ? recapTitle(view) : ' '}
+                  {view ? recapTitle(view) : <SkeletonWord width="8rem" />}
                 </span>
                 {view && recapWhen(view) && (
                   <span className="text-xs text-muted-foreground">
@@ -202,15 +208,22 @@ export function RecapPage({
                 {error}
               </p>
             )}
-            <Swap id={view ? `${view.period}:${view.key}` : 'loading'}>
-              {view && (
-                <RecapBody
-                  view={view}
-                  writing={writing === shownKey}
-                  arrived={arrived === shownKey}
-                  onWriteAgain={() => void writeUp()}
-                />
-              )}
+            {/* Another period takes this one's place; until its recap is
+                counted, its skeleton holds the place */}
+            <Swap id={`${period}:${periodKey ?? 'now'}`}>
+              <Placeholder
+                ready={Boolean(view)}
+                skeleton={<RecapSkeleton period={period} />}
+              >
+                {view && (
+                  <RecapBody
+                    view={view}
+                    writing={writing === shownKey}
+                    arrived={arrived === shownKey}
+                    onWriteAgain={() => void writeUp()}
+                  />
+                )}
+              </Placeholder>
             </Swap>
           </>
         )}
@@ -376,6 +389,69 @@ function WrittenText({ text, arrived }: { text: string; arrived: boolean }) {
           ))
         : text}
     </p>
+  )
+}
+
+/** Widths for skeleton lines, so they do not read as one block */
+const LINE_WIDTHS = ['58%', '72%', '46%', '64%', '52%']
+
+/** One of a recap's lines while it is counted: its icon's place and a bar */
+function LineSkeleton({ i }: { i: number }) {
+  return (
+    <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2.5 text-body">
+      <span className="flex h-5 items-center justify-center">
+        <SkeletonBlock className="size-2.5 rounded-full" />
+      </span>
+      <SkeletonText width={LINE_WIDTHS[i % LINE_WIDTHS.length]} />
+    </li>
+  )
+}
+
+/**
+ * A recap's place while it is counted, drawn to its measure: for a day, its
+ * Done and Next; for a week or a month, the totals and two areas
+ */
+function RecapSkeleton({ period }: { period: RecapPeriod }) {
+  if (period === 'day')
+    return (
+      <div>
+        {(['Done', 'Next'] as const).map((title, g) => (
+          <section key={title} className="mt-5">
+            <div className="mb-1.5 flex items-baseline gap-2.5">
+              <h2 className="text-sm font-semibold">{title}</h2>
+            </div>
+            <ul className="flex flex-col gap-2 border-t border-border pt-2.5">
+              {[0, 1].map((i) => (
+                <LineSkeleton key={i} i={g * 2 + i} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    )
+  return (
+    <div>
+      <SkeletonText className="mt-4 text-body" width="44%" />
+      <div className="mt-2">
+        {[3, 2].map((lines, a) => (
+          <section
+            key={a}
+            className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3.5 first:border-t-0 @xl:grid-cols-[12rem_minmax(0,1fr)]"
+          >
+            <div className="flex flex-col gap-1">
+              <SkeletonText className="text-sm" width={a ? '52%' : '66%'} />
+              <SkeletonText className="text-xs" width="80%" />
+              <SkeletonBlock className="mt-1 h-1.5 w-28 rounded-full" />
+            </div>
+            <ul className="flex flex-col gap-1.5">
+              {Array.from({ length: lines }, (_, i) => (
+                <LineSkeleton key={i} i={a * 3 + i} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
   )
 }
 

@@ -19,12 +19,18 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  SkeletonBlock,
+  SkeletonText,
+  SkeletonWord,
+} from '@/components/ui/skeleton'
 import { useBotLogs, useBotStatus } from '@/lib/api'
 import { botControl, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { describeBot, TONE_CLASS, type BotTone } from './bot-state'
+import { botKnown, describeBot, TONE_CLASS, type BotTone } from './bot-state'
 import { CodeBlock } from './code-block'
 import { PaceSpinner } from './pace-spinner'
 
@@ -43,6 +49,7 @@ const SOCKET_LABEL: Record<BotStatus['socket']['state'], string> = {
 export function BotPage() {
   const { data: view } = useBotStatus()
   const supervisor = useSupervisor()
+  const control = botControl()
   const status = view?.alive ? view.status : undefined
   const { tone, label } = describeBot(view, supervisor)
 
@@ -51,18 +58,30 @@ export function BotPage() {
       <div className="shrink-0 border-b px-10 pt-8 pb-6">
         <div className="@container mx-auto max-w-5xl">
           <div className="flex items-start gap-4">
-            <BotMark
-              tone={tone}
-              answering={(status?.requests.active ?? 0) > 0}
-              className="mt-1"
-            />
+            {/* Until Pace's state can be told, its mark's place, not a stop
+                sign */}
+            {botKnown(view, supervisor) ? (
+              <BotMark
+                tone={tone}
+                answering={(status?.requests.active ?? 0) > 0}
+                className="mt-1"
+              />
+            ) : (
+              <span className="motion-skeleton mt-1 shrink-0">
+                <SkeletonBlock className="size-10 rounded-xl" />
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
                 Pace
                 <span
                   className={cn('text-sm font-medium', TONE_CLASS[tone].text)}
                 >
-                  {label}
+                  {botKnown(view, supervisor) ? (
+                    label
+                  ) : (
+                    <SkeletonWord width="5rem" />
+                  )}
                 </span>
               </h1>
               <p className="mt-0.5 text-sm text-muted-foreground">
@@ -74,13 +93,33 @@ export function BotPage() {
             </div>
             <Controls supervisor={supervisor} />
           </div>
-          {supervisor?.message && <Notice supervisor={supervisor} />}
+          {/* The app's notice comes with what Pace is doing; until then, the
+              place it took last time (measured) */}
+          {control && supervisor === undefined ? (
+            lastNotice() > 0 && (
+              <div className="motion-skeleton">
+                <SkeletonBlock
+                  className="mt-3 rounded-lg"
+                  style={{ height: lastNotice() - 12 }}
+                />
+              </div>
+            )
+          ) : (
+            <div
+              ref={(element) => {
+                if (element) rememberNotice(element.offsetHeight)
+              }}
+              className="flow-root"
+            >
+              {supervisor?.message && <Notice supervisor={supervisor} />}
+            </div>
+          )}
           <div className="mt-6 grid grid-cols-2 gap-y-5 @min-[44rem]:grid-cols-4">
-            <Info icon={<Bot />} label="Bot account">
+            <Info icon={<Bot />} label="Bot account" known={Boolean(view)}>
               {status?.bot ? `@${status.bot.user}` : '-'}
               <Sub>{status?.bot?.team}</Sub>
             </Info>
-            <Info icon={<Cpu />} label="Reasoner">
+            <Info icon={<Cpu />} label="Reasoner" known={Boolean(view)}>
               {status?.reasoner ?? '-'}
               <Sub>
                 {status
@@ -88,7 +127,7 @@ export function BotPage() {
                   : undefined}
               </Sub>
             </Info>
-            <Info icon={<Inbox />} label="Requests">
+            <Info icon={<Inbox />} label="Requests" known={Boolean(view)}>
               {status ? `${status.requests.active} active` : '-'}
               <Sub>
                 {status
@@ -99,7 +138,7 @@ export function BotPage() {
                   : undefined}
               </Sub>
             </Info>
-            <Info icon={<Square />} label="Process">
+            <Info icon={<Square />} label="Process" known={Boolean(view)}>
               {status
                 ? `pid ${status.pid}`
                 : supervisor?.pid
@@ -297,6 +336,13 @@ function StopSign({ className }: { className?: string }) {
 function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
   const control = botControl()
   const [pending, setPending] = useState(false)
+  if (control && !supervisor)
+    return (
+      <div className="motion-skeleton flex shrink-0 items-center gap-1.5">
+        <SkeletonBlock className="h-8 w-20 rounded-md" />
+        <SkeletonBlock className="h-8 w-20 rounded-md" />
+      </div>
+    )
   if (!control || !supervisor) {
     return (
       <p className="shrink-0 text-right text-xs text-muted-foreground">
@@ -372,10 +418,13 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
 function Info({
   icon,
   label,
+  known,
   children,
 }: {
   icon: React.ReactNode
   label: string
+  /** The status has come; until then, its figure and line are bars */
+  known: boolean
   children: React.ReactNode
 }) {
   return (
@@ -385,17 +434,31 @@ function Info({
         {icon}
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-medium">{children}</div>
+      <Placeholder
+        ready={known}
+        skeleton={
+          <div className="mt-1 text-sm font-medium">
+            <SkeletonText width="54%" />
+            <SkeletonText className="text-2xs font-normal" width="76%" />
+          </div>
+        }
+      >
+        <div className="mt-1 truncate text-sm font-medium">{children}</div>
+      </Placeholder>
     </div>
   )
 }
 
+/**
+ * The line under a figure. It keeps its place when there is nothing to say
+ * (Pace stopped), so the header does not grow when Pace starts.
+ */
 function Sub({ children }: { children?: React.ReactNode }) {
-  return children ? (
+  return (
     <div className="truncate text-2xs font-normal text-muted-foreground">
-      {children}
+      {children || '\u00a0'}
     </div>
-  ) : null
+  )
 }
 
 type LogView = 'all' | 'socket' | 'mention' | 'problems'
@@ -514,10 +577,17 @@ function LogPanel() {
       >
         <div className="px-10 py-2 font-mono text-2xs leading-[1.6] select-text">
           <div className="mx-auto max-w-5xl">
+            {data === undefined && !isError && (
+              <div className="motion-skeleton">
+                {LOG_WIDTHS.map((width, i) => (
+                  <SkeletonText key={i} className="px-1.5" width={width} />
+                ))}
+              </div>
+            )}
             {lines.map((line, i) => (
               <LogRow key={`${line.at}-${i}`} line={line} />
             ))}
-            {lines.length === 0 && (
+            {(data !== undefined || isError) && lines.length === 0 && (
               <p className="py-10 text-center font-sans text-sm text-muted-foreground">
                 {isError ? 'Could not load logs.' : 'No logs to show.'}
               </p>
@@ -528,6 +598,28 @@ function LogPanel() {
     </section>
   )
 }
+
+/** The app's notice's height last time, with its margin; 0 for none */
+const NOTICE_KEY = 'pacenote.bot.notice'
+
+function lastNotice(): number {
+  try {
+    return Number(localStorage.getItem(NOTICE_KEY)) || 0
+  } catch {
+    return 0
+  }
+}
+
+function rememberNotice(height: number) {
+  try {
+    localStorage.setItem(NOTICE_KEY, String(height))
+  } catch {
+    // Without storage the skeleton leaves the notice out.
+  }
+}
+
+/** Widths for the log's skeleton lines */
+const LOG_WIDTHS = ['72%', '58%', '66%', '80%', '62%', '74%', '54%', '68%']
 
 function LogRow({ line }: { line: LogLine }) {
   const scope = (line.scope ?? '').replace(/^pacenote:?/, '') || 'main'

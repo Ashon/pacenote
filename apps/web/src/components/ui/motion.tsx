@@ -151,6 +151,80 @@ export const motionItem = (entry: { key: string; motion?: ItemMotion }) => ({
 })
 
 /**
+ * skeleton: while the data is not ready, `skeleton` holds the content's place
+ * (motion-skeleton: unseen for a moment, then fading in and breathing). When
+ * the data comes, the content rises in where the skeleton stood while the
+ * skeleton fades away over it; data that came before the skeleton showed
+ * simply appears, and so does content that is ready from the start. The
+ * skeleton is drawn to the content's measure, so nothing moves.
+ */
+export function Placeholder({
+  ready,
+  skeleton,
+  children,
+  className,
+  fill,
+}: {
+  ready: boolean
+  skeleton: React.ReactNode
+  children?: React.ReactNode
+  className?: string
+  /** Fills its parent's height, as a pane does */
+  fill?: boolean
+}) {
+  const [phase, setPhase] = useState<'skeleton' | 'leaving' | 'shown'>(
+    ready ? 'shown' : 'skeleton'
+  )
+  const held = useRef<HTMLDivElement>(null)
+  const leaving = useRef<HTMLDivElement>(null)
+  // The data came: was the skeleton on screen yet? (it is unseen at first)
+  useLayoutEffect(() => {
+    if (ready && phase === 'skeleton') {
+      const seen = Number(getComputedStyle(held.current!).opacity) > 0
+      setPhase(seen ? 'leaving' : 'shown')
+    } else if (!ready && phase !== 'skeleton') {
+      setPhase('skeleton')
+    }
+  }, [ready, phase])
+  useEffect(() => {
+    if (phase !== 'leaving') return
+    return afterMotion(leaving.current, () => setPhase('shown'))
+  }, [phase])
+
+  if (phase === 'skeleton' || !ready)
+    return (
+      <div
+        ref={held}
+        aria-busy
+        className={cn('motion-skeleton', fill && 'h-full', className)}
+      >
+        {skeleton}
+      </div>
+    )
+  return (
+    <div className={cn('relative', fill && 'h-full', className)}>
+      <div
+        className={cn(phase === 'leaving' && 'motion-loaded', fill && 'h-full')}
+      >
+        {children}
+      </div>
+      {phase === 'leaving' && (
+        <div
+          ref={leaving}
+          aria-hidden
+          className={cn(
+            'motion-skeleton-out pointer-events-none absolute inset-x-0 top-0',
+            fill && 'bottom-0'
+          )}
+        >
+          {skeleton}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * One element that leaves with motion: it stays mounted, with
  * data-state="closed", until its animations have finished. Put `ref` on it.
  */

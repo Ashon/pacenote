@@ -4,8 +4,9 @@
  * Motion answers what a person just did: opened a row, moved to a screen,
  * finished a task. Nothing else moves on its own, except Pace or an AI tool
  * at work (Pace's spinner, the status dot, an AI tool's dot on the task it
- * works on over MCP) and what an AI tool changes as you look (it lights up
- * and fades, without moving). Things come in decelerating (enter), leave
+ * works on over MCP), what an AI tool changes as you look (it lights up
+ * and fades, without moving) and a skeleton breathing while a screen's data
+ * comes. Things come in decelerating (enter), leave
  * accelerating (exit) and move or resize within the window on standard;
  * leaving takes about 2/3 of coming in.
  *
@@ -37,6 +38,10 @@
      it within --motion-write */
   --motion-write-step: calc(24ms * var(--motion-scale));
   --motion-write: calc(720ms * var(--motion-scale));
+  /* A skeleton shows only when the data takes longer than this, then breathes
+     once in this long */
+  --motion-skeleton-wait: calc(150ms * var(--motion-scale));
+  --motion-breathe: calc(1600ms * var(--motion-scale));
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
@@ -242,6 +247,43 @@
   }
 
   /*
+   * skeleton: the shape of a screen's data, held while the data comes
+   * (Placeholder, SkeletonText, SkeletonBlock). A bar sits in the line box of
+   * the text it stands for, so a row of bars is exactly as tall as the row of
+   * text. Nothing shows for the first moment; then the skeleton fades in and
+   * breathes until the data comes, which rises in where it stood while the
+   * skeleton fades away.
+   */
+  .skeleton-text::before {
+    content: '';
+    display: inline-block;
+    vertical-align: middle;
+    width: var(--skeleton-w, 60%);
+    max-width: 100%;
+    height: 0.62em;
+    border-radius: 9999px;
+    background: var(--skeleton);
+  }
+  .skeleton-block {
+    background: var(--skeleton);
+  }
+  .motion-skeleton {
+    animation: motion-fade-in var(--motion-base) var(--ease-enter)
+      var(--motion-skeleton-wait) both;
+  }
+  .motion-skeleton .skeleton-text::before,
+  .motion-skeleton .skeleton-block {
+    animation: motion-breathe var(--motion-breathe) ease-in-out
+      calc(var(--motion-skeleton-wait) + var(--motion-base)) infinite;
+  }
+  .motion-skeleton-out {
+    animation: motion-fade-out var(--motion-quick) var(--ease-exit) forwards;
+  }
+  .motion-loaded {
+    animation: motion-rise-in var(--motion-moderate) var(--ease-enter);
+  }
+
+  /*
    * progress: a bar filling as work goes on (the built-in sandbox being
    * prepared). It eases to each new length.
    */
@@ -272,6 +314,21 @@
     .motion-pop[data-state='closed'],
     .motion-fade[data-state='closed'] {
       animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
+    }
+    /* A still skeleton, and what comes fades in */
+    .motion-skeleton {
+      animation: motion-fade-in calc(120ms * var(--motion-scale)) ease
+        var(--motion-skeleton-wait) both;
+    }
+    .motion-skeleton .skeleton-text::before,
+    .motion-skeleton .skeleton-block {
+      animation: none;
+    }
+    .motion-skeleton-out {
+      animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
+    }
+    .motion-loaded {
+      animation: motion-fade-in calc(120ms * var(--motion-scale)) ease;
     }
     /* All the words at once */
     .motion-write-in [data-word] {
@@ -323,6 +380,13 @@
 @keyframes motion-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+/* A skeleton breathing */
+@keyframes motion-breathe {
+  50% {
+    opacity: 0.45;
   }
 }
 
