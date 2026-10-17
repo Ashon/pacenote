@@ -240,7 +240,13 @@ export interface TasksLive {
 /** How a collection from the app ended, and what it spent */
 export type CollectOutcome = (
   | { at: string; ok: true; added: number; maybe: number; skipped: number }
-  | { at: string; ok: false; error: string }
+  | {
+      at: string
+      ok: false
+      error: string
+      /** Claude Code on this Mac needs signing in again */
+      signedOut?: boolean
+    }
 ) & {
   /** Slack lookups it made */
   reads?: number

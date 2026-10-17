@@ -91,6 +91,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     // Collect now: Claude Code reads Slack, read only, in the main process
     collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
     stopCollect: () => ipcRenderer.invoke('pacenote:tasks:collect-stop'),
+    signIn: () => ipcRenderer.invoke('pacenote:tasks:sign-in'),
     // A task's detail, and continuing it: in a terminal (Claude Code or
     // Codex), or with a reply drafted for you to send
     detail: (id: string) => ipcRenderer.invoke('pacenote:tasks:detail', id),

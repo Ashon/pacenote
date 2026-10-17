@@ -14,6 +14,12 @@ describe('why a reasoner run failed', () => {
       ],
       ['codex run failed: unexpected status 401 Unauthorized', 'auth'],
       ['claude run failed: Invalid API key · Please run /login', 'auth'],
+      [
+        'Failed to authenticate: OAuth session expired and could not be refreshed',
+        'auth',
+      ],
+      ['OAuth token has been revoked. Please run /login.', 'auth'],
+      ['Not logged in. Run claude auth login to authenticate.', 'auth'],
       ['claude run failed: Claude AI usage limit reached|1760000000', 'limit'],
       ["codex run failed: You've hit your usage limit.", 'limit'],
       ['claude run failed: API Error: 429 rate_limit_error', 'limit'],

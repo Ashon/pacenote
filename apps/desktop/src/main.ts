@@ -145,6 +145,7 @@ import {
   resumeCommand,
   resumeSession,
   sessionFile,
+  signInClaude,
   startSession,
   terminalOf,
   type HandoffOptions,
@@ -1108,6 +1109,16 @@ function registerBotIpc(): void {
       (tool === 'claude' ? env().CLAUDE_BIN : env().CODEX_BIN)?.trim() || tool,
     terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
+  })
+  // A collection signed out: claude auth login, in your terminal
+  ipcMain.handle('pacenote:tasks:sign-in', async (event) => {
+    if (!fromMainWindow(event)) return undefined
+    try {
+      await signInClaude(handoff())
+      return {}
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
   })
   // Sessions you started yourself, from Claude Code's and Codex's logs on
   // this Mac (Settings > Todo > Show sessions you start yourself): linked to

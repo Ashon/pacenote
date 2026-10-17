@@ -28,6 +28,8 @@ import {
   resumeSession,
   sessionFile,
   shellQuote,
+  signInClaude,
+  signInScript,
   startSession,
   terminalOf,
   type HandoffOptions,
@@ -343,6 +345,32 @@ describe('the handoff', () => {
     await expect(resumeSession(options, codex)).rejects.toThrow(
       /not been found/
     )
+  })
+
+  it('signs Claude Code in again in the terminal, for a collection signed out', async () => {
+    expect(signInScript('/opt/claude').split('\n')).toEqual([
+      '#!/bin/zsh -l',
+      '# Written by Pacenote to sign Claude Code in again; safe to delete.',
+      "'/opt/claude' auth login && echo 'Signed in. Collect again in Pacenote.'",
+      '',
+    ])
+    const opened: { file: string; terminal: string }[] = []
+    await signInClaude({
+      dataDir: dir('sign-in-data'),
+      home: dir('sign-in-home'),
+      bin: (tool) => `/opt/${tool}`,
+      terminal: () => 'iterm',
+      planFirst: () => true,
+      open: async (file, terminal) => {
+        opened.push({ file, terminal })
+      },
+    })
+    expect(opened).toHaveLength(1)
+    expect(opened[0]!.terminal).toBe('iterm')
+    expect(readFileSync(opened[0]!.file, 'utf8')).toBe(
+      signInScript('/opt/claude')
+    )
+    expect(statSync(opened[0]!.file).mode & 0o777).toBe(0o700)
   })
 
   it('opens in the terminal you use, unless you chose one', () => {

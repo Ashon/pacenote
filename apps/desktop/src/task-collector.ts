@@ -7,6 +7,7 @@ import {
   claudeResultUsage,
   type TokenUsage,
 } from '../../../src/history/usage.js'
+import { failureCause } from '../../../src/mention/failure.js'
 import { claudeLineToEvents } from '../../../src/reasoners/claude.js'
 import {
   readTools,
@@ -33,8 +34,9 @@ const TIMEOUT_MS = 10 * 60_000
 const noConnector = (sources: readonly SourceId[]) =>
   `Claude Code has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in claude.ai's Settings > Connectors, then collect again.`
 const STOPPED = 'Stopped.'
-const SIGNED_OUT =
-  'Claude Code is not signed in. Run claude in a terminal and sign in, then collect again.'
+/** Collecting runs Claude Code on this Mac, whichever CLI answers mentions */
+export const SIGNED_OUT =
+  'Claude Code on this Mac is signed out, and collecting reads Slack through it.'
 
 /**
  * The command for one collection: Claude Code, headless, running Pacenote's
@@ -170,8 +172,11 @@ export class CollectStream {
     }
   }
 
-  /** How the collection ended, once the process is gone */
-  outcome(at: string, fallback?: string): CollectOutcome {
+  /**
+   * How the collection ended, once the process is gone; stderr, for a run
+   * that stopped before its result
+   */
+  outcome(at: string, fallback?: string, stderr = ''): CollectOutcome {
     const spent = this.usage
       ? { reads: this.reads, usage: this.usage }
       : { reads: this.reads }
@@ -184,16 +189,17 @@ export class CollectStream {
         skipped: this.skipped,
         ...spent,
       }
-    // Why the run itself failed comes first: signed out, there are no
-    // connectors at all.
+    // Why the run itself failed comes first: signed out (in its result, or
+    // on stderr when it stopped before one), there are no connectors at all.
+    const said = this.ended ? (this.ended.ok ? '' : this.ended.text) : stderr
+    if (!this.addError && fallback !== STOPPED && failureCause(said) === 'auth')
+      return { at, ok: false, error: SIGNED_OUT, signedOut: true, ...spent }
     const failed =
       this.ended && !this.ended.ok ? firstLine(this.ended.text) : ''
     const error =
       this.addError ??
       fallback ??
-      (/not logged in|\/login|invalid api key/i.test(failed)
-        ? SIGNED_OUT
-        : failed || undefined) ??
+      (failed || undefined) ??
       (this.missing.length && this.reads === 0
         ? noConnector(this.missing)
         : undefined) ??
@@ -326,7 +332,14 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     }
   ) {
     super()
-    if (options.last) this.current = { last: options.last }
+    // The history keeps the error alone
+    if (options.last)
+      this.current = {
+        last:
+          !options.last.ok && options.last.error === SIGNED_OUT
+            ? { ...options.last, signedOut: true }
+            : options.last,
+      }
   }
 
   get state(): TasksCollect {
@@ -361,7 +374,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         clearTimeout(timer)
         this.child?.kill('SIGTERM')
         this.child = undefined
-        const last = stream.outcome(this.now(), fallback)
+        const last = stream.outcome(this.now(), fallback, stderr)
         this.set({ last })
         this.keep(() => recorder?.finish(last))
         resolve(last)

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { failureCause } from '../../../src/mention/failure.js'
 import { readTools, writeTools } from '../../../src/tasks/sources.js'
 import type { TaskContext, TaskView } from '../../../src/tasks/types.js'
 
@@ -99,9 +100,10 @@ export function draftFrom(
     const text = (event.result ?? '').trim()
     if (event.is_error || !text)
       return {
-        error: /not logged in|\/login/i.test(text)
-          ? 'Claude Code is not signed in. Run claude in a terminal and sign in, then draft again.'
-          : text.split('\n')[0] || 'Claude Code wrote no draft.',
+        error:
+          failureCause(text) === 'auth'
+            ? 'Claude Code is not signed in. Run claude in a terminal and sign in, then draft again.'
+            : text.split('\n')[0] || 'Claude Code wrote no draft.',
       }
     return { text: redactSecrets(text) }
   }

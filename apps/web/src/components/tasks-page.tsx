@@ -636,9 +636,14 @@ function StatusLine({
   )
 }
 
-/** What the running collection is doing, or how the last one ended */
+/**
+ * What the running collection is doing, or how the last one ended. Signed
+ * out, it offers claude auth login in your terminal.
+ */
 function CollectStatus({ collect }: { collect: TasksCollect }) {
   const { running, last } = collect
+  // Why the terminal did not open, for the collection it was opened for
+  const [signIn, setSignIn] = useState<{ at: string; error: string }>()
   let text: string | undefined
   let spent: string | undefined
   if (running)
@@ -671,9 +676,28 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
     >
       <PaceSpinner active={Boolean(running)} className="size-6" />
       <span className={cn('min-w-0', running && 'text-shimmer')}>
-        {text ?? (last && !last.ok ? last.error : null)}
+        {text ??
+          (last && !last.ok
+            ? signIn?.at === last.at
+              ? signIn.error
+              : last.error
+            : null)}
         {spent && <span className="text-foreground/80"> {spent}</span>}
       </span>
+      {!running && last && !last.ok && last.signedOut && (
+        <Button
+          size="xs"
+          variant="outline"
+          className="text-foreground"
+          onClick={async () => {
+            const opened = await window.pacenoteDesktop?.tasks.signIn()
+            if (opened?.error) setSignIn({ at: last.at, error: opened.error })
+          }}
+        >
+          <SquareTerminal aria-hidden="true" />
+          Sign in to Claude Code
+        </Button>
+      )}
     </p>
   )
 }

@@ -159,6 +159,8 @@ declare global {
         /** Runs a collection (Claude Code, Slack read only) and waits for it */
         collect(): Promise<CollectOutcome | undefined>
         stopCollect(): Promise<void>
+        /** Opens claude auth login in your terminal, for Collect now */
+        signIn(): Promise<{ error?: string } | undefined>
         /** A task with what came before it and its work log */
         detail(id: string): Promise<TaskDetail | null>
         /** A task that looks done: close it with how it ended, or not yet */

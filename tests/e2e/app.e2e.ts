@@ -20,6 +20,7 @@ import {
   type Page,
 } from 'playwright-core'
 import { afterEach, describe, expect, it } from 'vitest'
+import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
@@ -1942,6 +1943,45 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/task-you-settings.png'),
     })
   }, 120_000)
+
+  it('offers to sign Claude Code in again when a collection finds it signed out', async () => {
+    world = await World.create([])
+    const { home, root } = world
+    // The last collection, as the history keeps it: Claude Code signed out
+    new HistoryStore(home)
+      .startCollection(
+        { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+        new Date(Date.now() - 60_000)
+      )
+      .finish('failed', { reads: 0, error: SIGNED_OUT })
+    // The terminal is a stand-in that keeps what it was given to open
+    const opened = path.join(root, 'opened.log')
+    const opener = path.join(root, 'open-terminal')
+    writeFileSync(opener, `#!/bin/sh\necho "$1" >> "${opened}"\n`)
+    chmodSync(opener, 0o755)
+    const page = await launch(world, {
+      settings: ['TASKS=on'],
+      env: { PACENOTE_HANDOFF_OPENER: opener },
+    })
+
+    // Todo says it is Claude Code on this Mac, and offers its sign-in.
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page.getByText(SIGNED_OUT).first().waitFor()
+    const signIn = page.getByRole('button', { name: 'Sign in to Claude Code' })
+    await signIn.waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-signed-out.png'),
+    })
+    await signIn.click()
+    const script = await eventually(
+      'the sign-in opened in the terminal',
+      () => {
+        const file = existsSync(opened) && readFileSync(opened, 'utf8').trim()
+        return file ? readFileSync(file, 'utf8') : undefined
+      }
+    )
+    expect(script).toContain(`'${world.claudeBin}' auth login`)
+  })
 
   it('shows where you contribute once after a collection, keeps your fixes, and opens an area from its task', async () => {
     world = await World.create([])

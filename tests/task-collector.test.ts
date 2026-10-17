@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   collectCommand,
   CollectStream,
+  SIGNED_OUT,
   TaskCollector,
 } from '../apps/desktop/src/task-collector.js'
 import type { RunEvent } from '../src/history/types.js'
@@ -169,7 +170,8 @@ describe('collecting from the app with Claude Code', () => {
     ))
       loggedOut.push(line)
     expect(loggedOut.outcome('T')).toMatchObject({
-      error: expect.stringMatching(/^Claude Code is not signed in/),
+      error: SIGNED_OUT,
+      signedOut: true,
     })
 
     const failed = new CollectStream()
@@ -253,6 +255,56 @@ describe('collecting from the app with Claude Code', () => {
     })
   })
 
+  it('tells a collection signed out, from its result or its stderr', async () => {
+    // A login that ran out, as a work Mac's claude 2.1.29x said it
+    const expired = new CollectStream()
+    for (const line of lines(init('connected'), {
+      type: 'result',
+      subtype: 'success',
+      is_error: true,
+      result:
+        'Failed to authenticate: OAuth session expired and could not be refreshed',
+    }))
+      expired.push(line)
+    expect(expired.outcome('T')).toEqual({
+      at: 'T',
+      ok: false,
+      error: SIGNED_OUT,
+      signedOut: true,
+      reads: 0,
+    })
+
+    // Stopped before its result: stderr says why
+    const revoked = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => process.env.PATH ?? '',
+      cwd: process.cwd(),
+      command: fake(
+        [],
+        "console.error('OAuth token has been revoked. Please run /login'); process.exit(1)"
+      ),
+    })
+    expect(await revoked.run()).toMatchObject({
+      ok: false,
+      error: SIGNED_OUT,
+      signedOut: true,
+    })
+
+    // A run that ended has its result to go by, whatever stderr held
+    const noisy = new CollectStream()
+    for (const line of lines(init(''), result('I have no Slack tools.')))
+      noisy.push(line)
+    expect(
+      noisy.outcome('T', undefined, 'MCP server returned 401 Unauthorized')
+    ).not.toHaveProperty('signedOut')
+
+    // Stopped is stopped, signed out or not
+    const stopped = new CollectStream()
+    expect(
+      stopped.outcome('T', 'Stopped.', 'Not logged in · Please run /login')
+    ).toMatchObject({ error: 'Stopped.' })
+  })
+
   it('starts with how the last logged collection ended', () => {
     const last = {
       at: '2026-10-10T05:00:00.000Z',
@@ -269,6 +321,15 @@ describe('collecting from the app with Claude Code', () => {
       last,
     })
     expect(collector.state).toEqual({ last })
+
+    // The history keeps the error alone: signed out still offers the sign-in
+    const signedOut = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => '',
+      cwd: process.cwd(),
+      last: { at: '2026-10-10T05:00:00.000Z', ok: false, error: SIGNED_OUT },
+    })
+    expect(signedOut.state.last).toMatchObject({ signedOut: true })
   })
 
   it('stops a collection, and tells when claude is missing or too slow', async () => {

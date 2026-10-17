@@ -334,6 +334,29 @@ export async function resumeSession(
   await (options.open ?? openInTerminal)(script, options.terminal())
 }
 
+/**
+ * The script that signs Claude Code in again: claude auth login, which goes
+ * on in the browser. The login stays Claude Code's; Pacenote never sees it.
+ */
+export function signInScript(bin: string): string {
+  return [
+    '#!/bin/zsh -l',
+    '# Written by Pacenote to sign Claude Code in again; safe to delete.',
+    `${shellQuote(bin)} auth login && echo 'Signed in. Collect again in Pacenote.'`,
+    '',
+  ].join('\n')
+}
+
+/** Opens claude auth login in the terminal, for a collection signed out */
+export async function signInClaude(options: HandoffOptions): Promise<void> {
+  const now = options.now?.() ?? new Date()
+  const dir = handoffDir(options.dataDir, now.getTime())
+  const script = path.join(dir, `sign-in-${now.getTime()}.command`)
+  writeFileSync(script, signInScript(options.bin('claude')), { mode: 0o700 })
+  chmodSync(script, 0o700)
+  await (options.open ?? openInTerminal)(script, options.terminal())
+}
+
 /** The command that continues a session, for copying */
 export const resumeCommand = (entry: Session) =>
   entry.session

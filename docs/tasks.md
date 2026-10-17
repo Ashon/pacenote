@@ -27,6 +27,9 @@ Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the c
   project`, in Pacenote's data folder), and the only built-in tool is ToolSearch. Pacenote passes its own MCP server, so it
   does not need to be added to Claude Code.
 - One collection runs at a time, for at most 10 minutes; Stop ends it.
+- It is Claude Code on this Mac whichever CLI answers your mentions, so its sign-in is the one that counts. When that
+  sign-in ran out or was revoked, the screen says so and offers **Sign in to Claude Code**: it opens `claude auth login`
+  in your terminal (the one in Settings > Todo), which goes on in the browser. Then collect again.
 - When it ends, the screen says what it added, the new tokens it spent and how many Slack lookups it made. Each collection
   the app runs is a run in the run history, beside the answers, and is kept as long as they are: under the list,
   **Recent collections** shows the last 7 days and opens a collection's run in Runs, and the Overview counts their tokens

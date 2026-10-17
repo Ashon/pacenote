@@ -11,7 +11,7 @@ const CAUSES: [FailureCause, RegExp][] = [
   ['timeout', /\btimed out\b/i],
   [
     'auth',
-    /\b401\b|failed to authenticate|authentication_error|invalid (?:x-)?api[ -]key|oauth (?:access )?token (?:is invalid|has expired)|not logged in|please (?:run \/login|log ?in)|\bunauthorized\b|invalid_grant/i,
+    /\b401\b|failed to authenticate|authentication_error|invalid (?:x-)?api[ -]key|oauth (?:access )?token (?:is invalid|has expired|has been revoked)|oauth session expired|oauth refresh token is no longer valid|not logged in|please (?:run \/login|log ?in)|run (?:\/login|claude auth login)|\bunauthorized\b|invalid_grant/i,
   ],
   ['limit', /\b429\b|rate[ _]limit|usage limit|quota|credit balance/i],
   [
