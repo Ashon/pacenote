@@ -56,6 +56,15 @@ describe('pacenote.dev', () => {
     for (const footer of footers) expect(footer).toEqual(footers[0])
   })
 
+  it("names the copyright holder NOTICE names, on every page's footer", () => {
+    const notice = readFileSync(path.resolve(SITE, '../NOTICE'), 'utf8')
+    const [, year, holder] = notice.match(/^Copyright (\d{4}) (.+)$/m)!
+    for (const page of PAGES) {
+      const footer = between(read(page), /<footer/, '</footer>')
+      expect(footer, page || 'home').toContain(`© ${year} ${holder}.`)
+    }
+  })
+
   it('links only to pages, pictures and anchors that are there', () => {
     for (const page of PAGES) {
       const html = read(page)
