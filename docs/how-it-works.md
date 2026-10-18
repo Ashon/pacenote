@@ -32,6 +32,9 @@ What happens between a mention and its answer: context, attachments, diagrams an
 - Before an answer is posted, the secrets the bot holds (its Slack tokens, the hub token, the sandbox login) and
   common secret formats (API keys, private keys, tokens) are replaced with `[REDACTED ...]`. The run history keeps
   the answer as posted, with a note of how many were redacted.
+- Every answer ends with a line saying an AI wrote it and with which tool: "_AI answer by Pace, with Claude Code_" (or
+  Codex). Everyone in the channel reads the answer, not only you, so it says so each time (Korea's AI Basic Act,
+  Article 31; Anthropic's Usage Policy). The run history keeps the answer without it.
 - It does not answer in private channels or DMs.
 - It runs up to `MENTION_CONCURRENCY` requests at once and queues up to 10 more. Beyond that it tells the asker, in a
   message only they can see, that it is busy.

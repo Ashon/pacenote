@@ -10,7 +10,7 @@ import { HistoryStore } from '../src/history/recorder.js'
 import type { RunRecord } from '../src/history/types.js'
 import { createLogger } from '../src/logger.js'
 import { InflightStore } from '../src/mention/inflight.js'
-import { MentionResponder } from '../src/mention/responder.js'
+import { aiNote, MentionResponder } from '../src/mention/responder.js'
 import type { Directory } from '../src/messengers/slack/directory.js'
 import { SlackMessenger } from '../src/messengers/slack/messenger.js'
 import {
@@ -24,6 +24,13 @@ import type { Reasoner, ReasonRequest } from '../src/reasoners/types.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-responder-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
+
+/** A messenger's posts for an answer: it and the AI note, cut as it cuts */
+const answered = (
+  messenger: Pick<Messenger, 'render'>,
+  text: string,
+  backend: 'claude' | 'codex' = 'claude'
+) => messenger.render(`${text}\n\n${aiNote(backend)}`)
 
 function setup(complete: (request: ReasonRequest) => Promise<string>) {
   const posts: string[] = []
@@ -179,7 +186,7 @@ describe('mention run history', () => {
       status: 'completed',
       result: 'up 3 days',
     })
-    expect(posts).toEqual(['It is *healthy*.'])
+    expect(posts).toEqual([`It is *healthy*.\n\n${aiNote('codex')}`])
     expect(reactions).toEqual(['+eyes', '-eyes'])
   })
 
@@ -338,7 +345,7 @@ describe('answering through any messenger', () => {
     expect(messenger.notices).toEqual([
       expect.stringMatching(/^Working on it\.\.\./),
     ])
-    expect(messenger.posts).toEqual(['a'.repeat(20), 'a'.repeat(20), 'aaaaa'])
+    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(45)))
     expect(messenger.updates).toEqual([])
   })
 
@@ -454,7 +461,7 @@ describe('answering through any messenger', () => {
     await responder.handle(mention)
     await responder.handle({ ...mention })
     expect(await responder.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual(['short'])
+    expect(messenger.posts).toEqual(answered(messenger, 'short'))
   })
 })
 
@@ -507,7 +514,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     const bot = responder(messenger)
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
     expect(messenger.updates).toEqual([])
     expect(messenger.marks).toEqual(['+working', '-working'])
   })
@@ -523,7 +530,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     })
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual(['done'])
+    expect(messenger.posts).toEqual(answered(messenger, 'done'))
     expect(messenger.marks).toEqual(['+working', '+slow', '-working', '-slow'])
   })
 
@@ -626,7 +633,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(messenger.notices).toEqual([
       expect.stringMatching(/^Working on it\.\.\./),
     ])
-    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
     expect(messenger.marks).toEqual([])
 
     const failing = new MarkingMessenger()
@@ -657,7 +664,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     await bot.resumePending()
     expect(await bot.drain(5_000)).toBe(true)
     expect(messenger.removed).toEqual(['p0'])
-    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
 
     // Where it cannot delete it, the placeholder points to the answer.
     const stuck = new MarkingMessenger()
@@ -716,7 +723,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     const bot = responder(messenger, { inflight })
     await bot.resumePending()
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual(['a'.repeat(20), 'aaaaa'])
+    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
     expect(messenger.updates).toEqual([])
     // The 👀 from before the restart is still there; marking again is a no-op.
     // It starts over, so a 📥 or ⏳ it had goes.
@@ -756,7 +763,10 @@ describe('marking a mention instead of posting a placeholder', () => {
     )
     release()
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts).toEqual(['done', 'done'])
+    expect(messenger.posts).toEqual([
+      ...answered(messenger, 'done'),
+      ...answered(messenger, 'done'),
+    ])
     expect(inflight.list()).toEqual([])
   })
 
@@ -803,7 +813,7 @@ describe('marking a mention instead of posting a placeholder', () => {
     const restarted = responder(next, { inflight })
     await restarted.resumePending()
     expect(await restarted.drain(5_000)).toBe(true)
-    expect(next.posts).toHaveLength(6)
+    expect(next.posts).toHaveLength(3 * answered(next, 'a'.repeat(25)).length)
     expect(inflight.list()).toEqual([])
   })
 
@@ -890,7 +900,9 @@ describe('marking a mention instead of posting a placeholder', () => {
     signedIn = true
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.posts.at(-1)).toBe('back')
+    expect(messenger.posts.slice(-answered(messenger, 'back').length)).toEqual(
+      answered(messenger, 'back')
+    )
     expect(problems.at(-1)).toBeUndefined()
   })
 })

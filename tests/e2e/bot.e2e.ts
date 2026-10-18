@@ -7,6 +7,10 @@ import { World } from './support/world.js'
  * Pacenote alone
  */
 
+/** An answer as posted: under it, the line saying an AI wrote it */
+const answer = (text: string, by = 'Claude Code') =>
+  `${text}\n\n_AI answer by Pace, with ${by}_`
+
 let world: World | undefined
 afterEach(async () => {
   await world?.stop()
@@ -45,7 +49,7 @@ describe('bot on its own Slack app', () => {
     // Slack mrkdwn, and the reaction comes off.
     expect(reply!.edits).toEqual([])
     expect(reply!.text).toBe(
-      '*Healthy*. See <https://runbook.example.com|the runbook>.'
+      answer('*Healthy*. See <https://runbook.example.com|the runbook>.')
     )
     expect(
       slack.callsTo('reactions.add').map((call) => call.args)
@@ -99,7 +103,7 @@ describe('bot on its own Slack app', () => {
     })
     const replies = await world.answered(ops.id, ts)
     expect(replies.map((reply) => [reply.text, reply.edits])).toEqual([
-      ['Healthy.', []],
+      [answer('Healthy.'), []],
     ])
     expect(slack.ephemerals).toEqual([
       {
@@ -134,7 +138,7 @@ describe('bot on its own Slack app', () => {
     })
     const [reply] = await world.answered(ops.id, ts)
     expect(reply!.thread_ts).toBe(ts)
-    expect(reply!.text).toBe('Deployed at 10:00.')
+    expect(reply!.text).toBe(answer('Deployed at 10:00.'))
     const prompt = world.claudeCalls()[0]!.prompt
     expect(prompt).toContain('@bob: the 10:00 deploy finished')
     expect(prompt).toContain('@alice: anyone seeing errors?')
@@ -193,7 +197,9 @@ describe('bot on its own Slack app', () => {
     const posted = replies.map((reply) => reply.text).join('\n')
     for (const line of [code[0]!, code[120]!, code.at(-1)!])
       expect(posted).toContain(line)
-    expect(replies.at(-1)!.text).toMatch(/Done\.$/)
+    expect(replies.at(-1)!.text).toMatch(
+      /Done\.\n\n_AI answer by Pace, with Claude Code_$/
+    )
   })
 
   it('reads a long thread to its end, passing its first message and the latest', async () => {
@@ -538,7 +544,7 @@ describe('bot on its own Slack app', () => {
     )
     await bot.stop()
     expect(slack.replies(ops.id, ts).map((reply) => reply.text)).toEqual([
-      'Done slowly.',
+      answer('Done slowly.'),
     ])
     expect(bot.output).toContain('waiting for in-progress requests')
   })
@@ -568,7 +574,7 @@ describe('bot on its own Slack app', () => {
 
     await world.startBot()
     const replies = await world.answered(ops.id, ts)
-    expect(replies.map((reply) => reply.text)).toEqual(['Survived.'])
+    expect(replies.map((reply) => reply.text)).toEqual([answer('Survived.')])
     await eventually(
       'the reaction to come off',
       () => slack.message(ops.id, ts)?.reactions?.length === 0
@@ -614,7 +620,9 @@ describe('bot on its own Slack app', () => {
       files: ['F0PNG'],
     })
     const [reply] = await world.answered(ops.id, root)
-    expect(reply!.text).toBe('Up 3 days; the chart is attached.')
+    expect(reply!.text).toBe(
+      answer('Up 3 days; the chart is attached.', 'Codex')
+    )
     const [call] = world.claudeCalls()
     expect(call).toMatchObject({
       cli: 'codex',

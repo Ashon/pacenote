@@ -51,6 +51,15 @@ const SLOW_AFTER_MS = 90_000
 /** The marks that say a request is under way, taken off once it settles */
 const PROGRESS: readonly Mark[] = ['waiting', 'working', 'slow']
 
+/**
+ * The line under every answer. Everyone in the channel reads it, not only the
+ * person Pace answers, so it says an AI wrote it and with what (Korea's AI
+ * Basic Act, Article 31; Anthropic's Usage Policy).
+ */
+export function aiNote(backend: Reasoner['backend']): string {
+  return `_AI answer by Pace, with ${backend === 'codex' ? 'Codex' : 'Claude Code'}_`
+}
+
 export interface MentionResponderDeps {
   config: Config
   /**
@@ -487,7 +496,8 @@ export class MentionResponder {
       )
       // Once any of it is in the thread, a restart does not answer again.
       note({ answer: 'posting' })
-      for (const chunk of messenger.render(text))
+      const said = text.trim() ? `${text}\n\n` : ''
+      for (const chunk of messenger.render(said + aiNote(reasoner.backend)))
         await messenger.post(mention, chunk)
       note({ answer: 'posted' })
       const generated = await this.shrinkImages(

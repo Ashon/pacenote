@@ -381,7 +381,7 @@ describe.skipIf(skip !== undefined)('built-in VM sandbox', () => {
     })
     const [reply] = await world.answered(ops.id, ts)
     expect(reply!.text).toBe(
-      'From the VM: Linux aarch64, uid 1000, network devices: lo, login set, example.com 403'
+      'From the VM: Linux aarch64, uid 1000, network devices: lo, login set, example.com 403\n\n_AI answer by Pace, with Claude Code_'
     )
     // Not the host's fake: it was never asked.
     expect(world.claudeCalls()).toEqual([])

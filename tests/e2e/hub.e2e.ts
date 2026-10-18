@@ -96,7 +96,9 @@ describe('team hub', () => {
       files: ['F0LOG'],
     })
     const [reply] = await world.answered(ops.id, ts)
-    expect(reply!.text).toBe('The *db* timed out.')
+    expect(reply!.text).toBe(
+      'The *db* timed out.\n\n_AI answer by Pace, with Claude Code_'
+    )
     expect(world.claudeCalls()[0]!.prompt).toContain('ERROR db timeout')
     // Every call reached Slack with the hub's bot token; the desktop only ever
     // had its hub token.
