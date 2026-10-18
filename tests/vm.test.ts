@@ -762,13 +762,15 @@ describe('config', () => {
       memoryMiB: 3072,
       cpus: 2,
       allowlistFile: '/home/me/.pacenote/sandbox/allowed-domains.txt',
+      // Its sign-in and its renewal, whether or not the file lists them yet
+      required: ['api.anthropic.com', 'platform.claude.com'],
     })
   })
 
-  it('needs the sandbox login', () => {
-    expect(() => loadConfig({ ...base, REASONER_SANDBOX: 'vm' })).toThrow(
-      /claude in the built-in sandbox needs a claude token/
-    )
+  it('starts without the sandbox login, which it then says it needs', () => {
+    expect(
+      loadConfig({ ...base, REASONER_SANDBOX: 'vm' }).reasoner.auth
+    ).toEqual({})
   })
 
   it('reaches the ops broker in a VM of its own at a local address', () => {

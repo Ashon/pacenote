@@ -1,4 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -32,10 +39,11 @@ const claudeOptions: ReasonerOptions = {
   timeoutMs: 1000,
   auth: { env: { CLAUDE_CODE_OAUTH_TOKEN: 'tok' } },
 }
+const codexLogin = path.join(dir, 'login', 'codex')
 const codexOptions: ReasonerOptions = {
   backend: 'codex',
   timeoutMs: 1000,
-  auth: { file: '/home/me/.codex/auth.json' },
+  auth: { login: codexLogin },
 }
 
 describe('claude adapter', () => {
@@ -50,6 +58,33 @@ describe('claude adapter', () => {
     expect(run.env).toEqual({ CLAUDE_CODE_OAUTH_TOKEN: 'tok' })
     expect(run.mounts ?? []).toEqual([])
     expect(run.input).toBe('p')
+  })
+
+  it("in a VM, signed in there, has its login folder as claude's config folder", async () => {
+    const login = path.join(dir, 'login', 'claude')
+    const first = await claudeAdapter.invocation(
+      { system: 's', prompt: 'p' },
+      { sandbox: vm, options: { ...claudeOptions, auth: { login } } }
+    )
+    const second = await claudeAdapter.invocation(
+      { system: 's', prompt: 'p' },
+      { sandbox: vm, options: { ...claudeOptions, auth: { login } } }
+    )
+    expect(first.env).toEqual({ CLAUDE_CONFIG_DIR: '/run/login' })
+    expect(first.mounts).toEqual([
+      { host: login, at: '/run/login', writable: true },
+    ])
+    writeFileSync(path.join(login, '.credentials.json'), '{}')
+    writeFileSync(path.join(login, '.claude.json'), '{}')
+    mkdirSync(path.join(login, 'projects'))
+    // The other run still uses it: nothing goes yet
+    await first.after?.()
+    expect(readdirSync(login)).toContain('projects')
+    await second.after?.()
+    expect(readdirSync(login).sort()).toEqual([
+      '.claude.json',
+      '.credentials.json',
+    ])
   })
 
   it('gives images on stdin as stream-json, without a mount', async () => {
@@ -82,7 +117,7 @@ describe('codex adapter', () => {
     expect(codexAdapter.canReadFiles(host)).toBe(true)
   })
 
-  it('in a container gets its login, the attachments, and /out as mounts', async () => {
+  it('in a VM gets its login folder as its home, the attachments, and /out', async () => {
     const out = path.join(dir, 'out')
     const run = await codexAdapter.invocation(
       {
@@ -94,13 +129,23 @@ describe('codex adapter', () => {
       { sandbox: vm, options: codexOptions }
     )
     expect(run.mounts).toEqual([
-      { host: '/home/me/.codex/auth.json', at: '/run/secrets/codex-auth.json' },
+      { host: codexLogin, at: '/run/login', writable: true },
       { host: dir, at: '/attachments' },
       { host: out, at: '/out', writable: true },
     ])
+    expect(run.env).toEqual({ CODEX_HOME: '/run/login' })
+    // Images it generates in its home go to the run's output folder
+    expect(readlinkSync(path.join(codexLogin, 'generated_images'))).toBe('/out')
     expect(run.args).toContain('--image=/attachments/shot.png')
     expect(run.input).toBe('<instructions>\ns\n</instructions>\n\np')
-    expect(run.after).toBeUndefined()
+    // Once the run lets go, what the run left there goes; the login stays
+    writeFileSync(path.join(codexLogin, 'auth.json'), '{}')
+    mkdirSync(path.join(codexLogin, 'sessions'))
+    await run.after?.()
+    expect(readdirSync(codexLogin).sort()).toEqual([
+      'auth.json',
+      'generated_images',
+    ])
   })
 
   it('on the host uses host paths and collects generated images afterwards', async () => {

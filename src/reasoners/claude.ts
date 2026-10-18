@@ -3,6 +3,7 @@ import { clip, contentText, splitToolName } from '../history/events.js'
 import type { RunEvent } from '../history/types.js'
 import { claudeResultUsage } from '../history/usage.js'
 import { SANDBOX_PATHS } from '../sandbox/runtime.js'
+import { holdLogin } from '../sandbox/vm-login.js'
 import { DENIED_GLOBS, readScope, type ReadScope } from './reads.js'
 import type { CliAdapter, McpServerRef, ReasonImage } from './types.js'
 
@@ -19,6 +20,11 @@ export const claudeAdapter: CliAdapter = {
   async invocation(request, { sandbox, options, readOnlyDir }) {
     const images = request.images ?? []
     const reads = readScope(sandbox, options, readOnlyDir)
+    // Signed in inside the sandbox: its login folder is claude's config folder
+    const login =
+      options.auth?.login && sandbox.isolated
+        ? holdLogin(options.auth.login, 'claude')
+        : undefined
     return {
       command: 'claude',
       args: claudeArgs({
@@ -33,10 +39,12 @@ export const claudeAdapter: CliAdapter = {
         images.length > 0
           ? await claudeStreamInput(request.prompt, images)
           : request.prompt,
-      env: options.auth?.env,
+      env: login?.env ?? options.auth?.env,
+      mounts: login ? [login.mount] : undefined,
       cwd: readOnlyDir
         ? { host: readOnlyDir, at: SANDBOX_PATHS.workspace }
         : undefined,
+      after: login && (async () => login.release()),
     }
   },
 

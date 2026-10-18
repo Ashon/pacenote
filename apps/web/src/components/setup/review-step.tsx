@@ -173,15 +173,19 @@ export function ReviewStep({
   // the latest
   const needsLogin =
     vm &&
-    backend === 'claude' &&
-    !settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
+    !sandbox.status?.signedIn &&
+    !(
+      backend === 'claude' &&
+      (settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set ||
+        settings.view?.secrets.SANDBOX_ANTHROPIC_API_KEY?.set)
+    )
   // Pace answers only you: your own app, once it knows who you are (one
   // member ID; a list from before Pace answered only you is not you yet).
   const allowed = allowedIds(values?.MENTION_ALLOWED_USERS)
   const owner = !hub && allowed.length === 1 ? allowed[0] : undefined
   const unknown = !hub && !owner
   const blocked = needsLogin
-    ? 'Get the sandbox its Claude login first'
+    ? `Sign the sandbox in to ${backend === 'codex' ? 'Codex' : 'Claude'} first`
     : unknown
       ? 'Say who you are first'
       : undefined
@@ -252,7 +256,16 @@ export function ReviewStep({
         </Problem>
       )}
       {needsLogin && (
-        <SandboxLogin set={false} onSaved={settings.refresh} required />
+        <SandboxLogin
+          cli={backend}
+          signedIn={false}
+          ready={sandbox.ready}
+          onSignedIn={() => {
+            sandbox.refresh()
+            settings.refresh()
+          }}
+          required
+        />
       )}
       <section className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
         <b className="text-sm font-semibold">Who can ask Pace</b>

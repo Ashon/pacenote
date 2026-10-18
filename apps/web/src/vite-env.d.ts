@@ -299,14 +299,23 @@ declare global {
         run(kind: SandboxJobKind): Promise<{ job?: SandboxJob; error?: string }>
         saveAllowlist(domains: string[]): Promise<AllowlistIssue[]>
         /**
-         * Runs claude setup-token and saves its token as
-         * SANDBOX_CLAUDE_OAUTH_TOKEN
+         * Signs the sandbox's CLI in, inside a VM: its link (and code) come
+         * through onLoginPrompt, and it resolves once it signed in or stopped
          */
-        claudeToken(): Promise<
-          | { ok: true; credential?: 'accepted' | 'rejected' | 'unknown' }
-          | { ok: false; error: string }
-        >
-        cancelClaudeToken(): Promise<void>
+        login(
+          cli: 'claude' | 'codex'
+        ): Promise<{ ok: true } | { ok: false; error: string }>
+        /** Claude: the code its page showed */
+        loginCode(code: string): Promise<void>
+        cancelLogin(): Promise<void>
+        signOut(cli: 'claude' | 'codex'): Promise<void>
+        onLoginPrompt(
+          callback: (prompt: {
+            url: string
+            code?: string
+            paste?: boolean
+          }) => void
+        ): () => void
         onJob(callback: (job: SandboxJob) => void): () => void
       }
     }

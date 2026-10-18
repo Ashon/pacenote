@@ -42,6 +42,11 @@ export interface VmSandboxOptions {
   cpus: number
   /** The allowed domains, read again when the file changes */
   allowlistFile: string
+  /**
+   * Domains the reasoner CLI cannot work without (REQUIRED_DOMAINS), allowed
+   * whether or not the file has them yet
+   */
+  required?: readonly string[]
   /** How the way out looks names up (tests point them at local servers) */
   resolve?: Resolve
   /**
@@ -337,8 +342,12 @@ export class VmSandbox implements Sandbox {
     return this.egress
   }
 
-  /** The allowed domains file, read again only when it changed */
+  /** The allowed domains: the file's, read again only when it changed */
   private allowedDomains(): string[] {
+    return [...this.fileDomains(), ...(this.options.required ?? [])]
+  }
+
+  private fileDomains(): string[] {
     try {
       const { mtimeMs } = statSync(this.options.allowlistFile)
       if (mtimeMs !== this.allowlist.mtimeMs)

@@ -9,7 +9,11 @@ import { defaultHome } from './settings/home.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
-import type { McpServerRef, ReasonerOptions } from './reasoners/types.js'
+import type {
+  McpServerRef,
+  ReasonerAuth,
+  ReasonerOptions,
+} from './reasoners/types.js'
 import {
   defaultSandboxDir,
   defaultVmBin,
@@ -21,6 +25,8 @@ import {
   VM_IMAGE,
   VM_RENDERER_IMAGE,
 } from './sandbox/vm-images.js'
+import { REQUIRED_DOMAINS } from './sandbox/allowlist.js'
+import { loginDir, signedIn } from './sandbox/vm-login.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 import { settingName } from './settings/settings-file.js'
 
@@ -165,7 +171,6 @@ export const EnvSchema = z.object({
     .default('2'),
   SANDBOX_CLAUDE_OAUTH_TOKEN: z.string().optional(),
   SANDBOX_ANTHROPIC_API_KEY: z.string().optional(),
-  SANDBOX_CODEX_AUTH_FILE: z.string().default('~/.codex/auth.json'),
 
   OPS_TOOLS: z.enum(['off', 'on']).default('off'),
 
@@ -615,42 +620,24 @@ function buildReasonerConfig(
     return { ...base, deniedReads: host.deniedReads }
   }
 
-  // The VM has no host keychain or config, so credentials are passed
-  // explicitly.
-  const claudeEnv: Record<string, string> = {}
-  if (e.SANDBOX_CLAUDE_OAUTH_TOKEN) {
-    claudeEnv.CLAUDE_CODE_OAUTH_TOKEN = e.SANDBOX_CLAUDE_OAUTH_TOKEN
-  } else if (e.SANDBOX_ANTHROPIC_API_KEY) {
-    claudeEnv.ANTHROPIC_API_KEY = e.SANDBOX_ANTHROPIC_API_KEY
-  }
-  if (e.REASONER === 'claude' && Object.keys(claudeEnv).length === 0) {
-    throw new MissingSettingError(
-      'SANDBOX_CLAUDE_OAUTH_TOKEN',
-      'claude in the built-in sandbox needs a claude token (claude setup-token) or an Anthropic API key.',
-      'sk-ant-oat01-stand-in'
-    )
-  }
-
-  const codexAuthFile = expandHome(e.SANDBOX_CODEX_AUTH_FILE)
-  if (e.REASONER === 'codex') {
-    if (!path.isAbsolute(codexAuthFile) || !existsSync(codexAuthFile)) {
-      throw new SettingError(
-        'SANDBOX_CODEX_AUTH_FILE',
-        `codex in the built-in sandbox needs its login file: ${codexAuthFile}`
-      )
-    }
-    if (!e.REASONER_MODEL) {
-      const defaults = readCodexDefaults(
-        path.join(path.dirname(codexAuthFile), 'config.toml')
-      )
-      base.model = defaults.model
-      base.reasoningEffort = defaults.reasoningEffort
-    }
+  // The VM has no host keychain or config: the CLI signs in there itself, into
+  // a login folder of its own (vm-login.ts), and Pacenote never reads what it
+  // keeps. An API key, or a claude token set by hand, also works for claude.
+  // Not signed in yet, Pace still starts and says so (src/index.ts), and the
+  // sign-in is in Settings > Sandbox.
+  let auth: ReasonerAuth = {}
+  if (signedIn(host.vm.root, e.REASONER))
+    auth = { login: loginDir(host.vm.root, e.REASONER) }
+  else if (e.REASONER === 'claude' && e.SANDBOX_CLAUDE_OAUTH_TOKEN)
+    auth = { env: { CLAUDE_CODE_OAUTH_TOKEN: e.SANDBOX_CLAUDE_OAUTH_TOKEN } }
+  else if (e.REASONER === 'claude' && e.SANDBOX_ANTHROPIC_API_KEY)
+    auth = { env: { ANTHROPIC_API_KEY: e.SANDBOX_ANTHROPIC_API_KEY } }
+  if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
+    const defaults = readCodexDefaults(path.join(host.codexHome, 'config.toml'))
+    base.model = defaults.model
+    base.reasoningEffort = defaults.reasoningEffort
   }
 
-  // Only the selected CLI's credentials go into its runs.
-  const auth =
-    e.REASONER === 'claude' ? { env: claudeEnv } : { file: codexAuthFile }
   const { broker, ...vm } = host.vm
   return {
     ...base,
@@ -664,6 +651,7 @@ function buildReasonerConfig(
       image: VM_IMAGE,
       memoryMiB: memoryMiB(e.SANDBOX_MEMORY),
       cpus: Number(e.SANDBOX_CPUS),
+      required: REQUIRED_DOMAINS[e.REASONER],
     },
   }
 }

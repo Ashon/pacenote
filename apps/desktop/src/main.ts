@@ -151,12 +151,12 @@ import {
   type HandoffOptions,
   type Session,
 } from './handoff.js'
-import { ClaudeTokenSetup } from './claude-token.js'
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
+import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
@@ -393,12 +393,13 @@ function claimStep<T>(run: () => Promise<T>): Promise<T> {
   return next
 }
 /**
- * Settings > Sandbox "Get token from Claude": runs claude setup-token and saves
- * its token to the settings file
+ * Settings > Sandbox "Sign in to Claude" or "Codex": the CLI signs in inside a
+ * VM itself; its link and code go to the screen as they come
  */
-const claudeToken = new ClaudeTokenSetup({
-  toolPath: () => toolPath(),
-  save: (token) => settings.save({ SANDBOX_CLAUDE_OAUTH_TOKEN: token }),
+const sandboxSignIn = new SandboxSignIn({
+  env: process.env,
+  onPrompt: (prompt) =>
+    mainWindow?.webContents.send('pacenote:sandbox:login-prompt', prompt),
 })
 
 /**
@@ -1803,13 +1804,19 @@ function registerBotIpc(): void {
     (event, domains: unknown) =>
       fromMainWindow(event) ? sandbox.saveAllowlist(domains) : []
   )
-  ipcMain.handle('pacenote:sandbox:claude-token', (event) =>
+  ipcMain.handle('pacenote:sandbox:login', (event, cli: unknown) =>
     fromMainWindow(event)
-      ? claudeToken.run()
+      ? sandboxSignIn.run(cli)
       : { ok: false, error: 'Not allowed.' }
   )
-  ipcMain.handle('pacenote:sandbox:claude-token-cancel', (event) => {
-    if (fromMainWindow(event)) claudeToken.cancel()
+  ipcMain.handle('pacenote:sandbox:login-code', (event, code: unknown) => {
+    if (fromMainWindow(event)) sandboxSignIn.submit(code)
+  })
+  ipcMain.handle('pacenote:sandbox:login-cancel', (event) => {
+    if (fromMainWindow(event)) sandboxSignIn.cancel()
+  })
+  ipcMain.handle('pacenote:sandbox:sign-out', (event, cli: unknown) => {
+    if (fromMainWindow(event)) sandboxSignIn.signOut(cli)
   })
   sandbox.on('job', (job) => {
     mainWindow?.webContents.send('pacenote:sandbox:job-changed', job)

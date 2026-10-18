@@ -1,10 +1,4 @@
-import {
-  CircleAlert,
-  CircleCheck,
-  Download,
-  KeyRound,
-  LoaderCircle,
-} from 'lucide-react'
+import { CircleAlert, CircleCheck, Download, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -12,6 +6,7 @@ import type { Detected, useSandboxSetup } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import type { SettingsView } from '@src/settings/fields'
 import type { SetupPart } from '@src/sandbox/vm-progress'
+import { SandboxSignIn } from '../sandbox-sign-in'
 import { ChoiceCard, Chip, Note, Problem, StepFrame } from './parts'
 
 type Runtime = 'vm' | 'none'
@@ -64,8 +59,12 @@ export function RuntimeStep({
   const runtime: Runtime = unsupported
     ? 'none'
     : (chosen ?? (saved === 'none' ? 'none' : 'vm'))
-  const tokenSet = Boolean(
-    settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
+  // Signed in inside the sandbox, or, for claude, a token or key set by hand
+  const signedIn = Boolean(
+    sandbox.status?.signedIn ||
+    (backend === 'claude' &&
+      (settings.view?.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set ||
+        settings.view?.secrets.SANDBOX_ANTHROPIC_API_KEY?.set))
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
@@ -207,14 +206,16 @@ export function RuntimeStep({
               </span>
             )}
           </p>
-          {backend === 'claude' ? (
-            <SandboxLogin set={tokenSet} onSaved={settings.refresh} later />
-          ) : (
-            <Note>
-              The sandbox uses this Mac's codex login (~/.codex/auth.json),
-              without showing it anything else.
-            </Note>
-          )}
+          <SandboxLogin
+            cli={backend}
+            signedIn={signedIn}
+            ready={sandbox.ready}
+            onSignedIn={() => {
+              sandbox.refresh()
+              settings.refresh()
+            }}
+            later
+          />
         </>
       )}
     </StepFrame>
@@ -246,73 +247,54 @@ function Point({
 }
 
 /**
- * The sandbox's own Claude login: claude setup-token in the browser, saved
- * without showing it here
+ * The sandbox's own sign-in, inside it (src/sandbox/vm-login.ts): Claude or
+ * Codex keeps its login there, apart from this Mac's
  */
 export function SandboxLogin({
-  set,
-  onSaved,
+  cli,
+  signedIn,
+  ready,
+  onSignedIn,
   later,
   required,
 }: {
-  set: boolean
-  onSaved: () => void
+  cli: 'claude' | 'codex'
+  signedIn: boolean
+  /** The sandbox is ready to run the sign-in */
+  ready: boolean
+  onSignedIn: () => void
   /** It can wait: said beside the button, which is then not required yet */
   later?: boolean
-  /** Pace cannot start without it: said beside its name */
+  /** Pace cannot answer without it: said beside its name */
   required?: boolean
 }) {
-  const sandbox = window.pacenoteDesktop?.sandbox
-  const [state, setState] = useState<
-    { step: 'idle' } | { step: 'waiting' } | { step: 'error'; message: string }
-  >({ step: 'idle' })
-  const get = async () => {
-    if (!sandbox) return
-    setState({ step: 'waiting' })
-    const result = await sandbox.claudeToken()
-    if (result.ok) {
-      setState({ step: 'idle' })
-      onSaved()
-    } else setState({ step: 'error', message: result.error })
-  }
+  const name = cli === 'claude' ? 'Claude' : 'Codex'
   return (
-    <div className="flex items-center gap-4 rounded-2xl px-4 py-3.5 ring-1 ring-border">
-      <KeyRound className="size-5 shrink-0 text-muted-foreground" />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex flex-wrap items-center gap-2">
-          <b className="text-sm font-semibold">
-            The sandbox needs its own Claude login
-          </b>
-          {required && <Chip tone="warn">Required</Chip>}
-        </span>
-        <span className="text-body text-muted-foreground">
-          {state.step === 'error'
-            ? state.message
-            : state.step === 'waiting'
-              ? 'Approve in your browser. Pacenote saves the token without showing it.'
-              : later
-                ? 'Pace needs it to answer from the sandbox. Get it now, or before Pace starts.'
-                : "It can't see the login on this Mac. Approve once in your browser, and Pacenote saves a token for the sandbox."}
-        </span>
+    <div className="flex flex-col gap-2 rounded-2xl px-4 py-3.5 ring-1 ring-border">
+      <span className="flex flex-wrap items-center gap-2">
+        <b className="text-sm font-semibold">
+          The sandbox needs its own {name} sign-in
+        </b>
+        {required && !signedIn && <Chip tone="warn">Required</Chip>}
+        {signedIn && (
+          <Chip tone="ok">
+            <CircleCheck />
+            Signed in
+          </Chip>
+        )}
       </span>
-      {set && state.step === 'idle' ? (
-        <Chip tone="ok">
-          <CircleCheck />
-          Signed in
-        </Chip>
-      ) : state.step === 'waiting' ? (
-        <Button
-          variant="ghost"
-          onClick={() => void sandbox?.cancelClaudeToken()}
-        >
-          <LoaderCircle className="animate-spin" />
-          Cancel
-        </Button>
-      ) : (
-        <Button variant="outline" onClick={() => void get()}>
-          Get a token from Claude
-        </Button>
+      {later && !signedIn && (
+        <span className="text-body text-muted-foreground">
+          Pace needs it to answer from the sandbox. Sign in now, or before Pace
+          starts.
+        </span>
       )}
+      <SandboxSignIn
+        cli={cli}
+        signedIn={signedIn}
+        ready={ready}
+        onSignedIn={onSignedIn}
+      />
     </div>
   )
 }

@@ -107,16 +107,11 @@ export function failureAdvice(
           text: `${backend}'s sign-in on this Mac was rejected. Sign in again in a terminal (${backend === 'codex' ? 'codex login' : 'claude, then /login'}).`,
           lasting: true,
         }
-      return backend === 'codex'
-        ? {
-            text: "codex's sign-in was rejected. Run codex login on this Mac; the sandbox uses that login's auth.json.",
-            lasting: true,
-          }
-        : {
-            text: "claude's sign-in in the sandbox was rejected. Get a new token in Settings > Sandbox > Reasoner login, then restart Pace.",
-            route: '#/settings/sandbox',
-            lasting: true,
-          }
+      return {
+        text: `${backend}'s sign-in in the sandbox was rejected or is missing. Sign in to ${backend === 'codex' ? 'Codex' : 'Claude'} in Settings > Sandbox > Reasoner login, then restart Pace.`,
+        route: '#/settings/sandbox',
+        lasting: true,
+      }
     case 'limit':
       return {
         text: `${backend} reached its usage limit. Pace answers again once the limit resets.`,

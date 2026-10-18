@@ -19,6 +19,7 @@ import {
 } from './allowlist.js'
 import { brokerExpected } from './env.js'
 import { defaultVmBin, vmStatus } from './vm.js'
+import { signedIn } from './vm-login.js'
 import { VM_BROKER_IMAGE, VM_IMAGE, VM_RENDERER_IMAGE } from './vm-images.js'
 import type { PendingApply, SandboxCheck, SandboxStatus } from './types.js'
 
@@ -59,11 +60,6 @@ export function commandRunner(env: NodeJS.ProcessEnv, cwd: string): Run {
       )
     })
 }
-
-const expandHome = (value: string, home: string) =>
-  value === '~' || value.startsWith('~/')
-    ? path.join(home, value.slice(1))
-    : value
 
 /**
  * The broker's commit author, resolved as it is when the broker starts:
@@ -153,37 +149,35 @@ export async function collectSandboxStatus(options: {
     existsSync(file)
       ? { label, ok: true, detail: file }
       : { label, ok: false, detail: `Missing: ${file}` }
-  if (isolated && reasoner === 'codex') {
-    status.checks.push({
-      ...fileCheck(
-        'codex login file',
-        expandHome(values.SANDBOX_CODEX_AUTH_FILE || '~/.codex/auth.json', home)
-      ),
+  // The sandbox's own sign-in (vm-login.ts): whether the CLI's credentials
+  // file is there, never what is in it
+  const signed = signedIn(vmRootPath(options.env, home), reasoner)
+  status.signedIn = signed
+  if (isolated) {
+    const name = reasoner === 'claude' ? 'Claude' : 'Codex'
+    const check: SandboxCheck = {
+      label: `Sandbox ${reasoner} login`,
       login: true,
-    })
-  }
-  if (isolated && reasoner === 'claude') {
-    const set = Boolean(
-      values.SANDBOX_CLAUDE_OAUTH_TOKEN || values.SANDBOX_ANTHROPIC_API_KEY
-    )
-    const state = set
-      ? await options.checkCredential?.({
-          oauthToken: values.SANDBOX_CLAUDE_OAUTH_TOKEN || undefined,
-          apiKey: values.SANDBOX_ANTHROPIC_API_KEY || undefined,
-        })
-      : undefined
-    status.checks.push({
-      label: 'Sandbox claude token',
-      login: true,
-      ok: set && state !== 'rejected',
-      detail: !set
-        ? 'Not set'
-        : state === 'accepted'
-          ? 'Set, and Claude accepts it'
-          : state === 'rejected'
-            ? 'Claude rejects it: get a new token in Reasoner login'
-            : 'Set',
-    })
+      ok: signed,
+      detail: signed
+        ? 'Signed in inside the sandbox'
+        : `Not signed in: Sign in to ${name} below`,
+    }
+    // As the config picks: the sign-in, a claude token set by hand, an API key
+    const apiKey = values.SANDBOX_ANTHROPIC_API_KEY || undefined
+    if (!signed && reasoner === 'claude' && values.SANDBOX_CLAUDE_OAUTH_TOKEN) {
+      check.ok = true
+      check.detail =
+        'Uses the claude token set by hand: signing in to Claude below replaces it'
+    } else if (!signed && reasoner === 'claude' && apiKey) {
+      const state = await options.checkCredential?.({ apiKey })
+      check.ok = state !== 'rejected'
+      check.detail =
+        state === 'rejected'
+          ? 'The Anthropic API key is rejected: sign in to Claude below, or set another key'
+          : 'Uses the Anthropic API key'
+    }
+    status.checks.push(check)
   }
   // Checks only configured features. For empty features the broker starts
   // without those tools. (Shown as off in the broker tools row)

@@ -82,11 +82,14 @@ describe('why a reasoner run failed', () => {
 
   it('tells the operator what to fix, and where', () => {
     expect(failureAdvice('auth', 'claude', 'vm')).toEqual({
-      text: expect.stringContaining('Get a new token in Settings > Sandbox'),
+      text: expect.stringContaining('Sign in to Claude in Settings > Sandbox'),
       route: '#/settings/sandbox',
       lasting: true,
     })
-    expect(failureAdvice('auth', 'codex', 'vm')?.text).toContain('codex login')
+    expect(failureAdvice('auth', 'codex', 'vm')).toMatchObject({
+      text: expect.stringContaining('Sign in to Codex in Settings > Sandbox'),
+      route: '#/settings/sandbox',
+    })
     expect(failureAdvice('auth', 'claude', 'host')?.text).toContain('/login')
     expect(failureAdvice('limit', 'claude', 'vm')?.lasting).toBe(true)
     expect(failureAdvice('unavailable', 'claude', 'vm')?.lasting).toBe(false)

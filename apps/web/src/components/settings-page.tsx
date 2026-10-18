@@ -29,7 +29,6 @@ import {
   Copy,
   FolderOpen,
   History,
-  KeyRound,
   ListChecks,
   LoaderCircle,
   MessagesSquare,
@@ -71,6 +70,7 @@ import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
 import { RepoFolders } from './repo-folders'
+import { SandboxSignIn } from './sandbox-sign-in'
 import { SlackYou } from './slack-you'
 import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
@@ -627,25 +627,22 @@ export function SettingsPage() {
             after: (
               <>
                 <LoginChecks sandbox={sandbox} />
-                {valueOf('REASONER') === 'claude' && (
-                  <ClaudeTokenSetup
-                    hasToken={Boolean(
-                      view.secrets.SANDBOX_CLAUDE_OAUTH_TOKEN?.set
-                    )}
-                    onRejected={load}
-                    onSaved={(credential) => {
-                      load()
-                      setNotice({
-                        tone: 'warn',
-                        text:
-                          credential === 'accepted'
-                            ? 'Saved a new claude token, and Claude accepts it. Restart Pace to use it.'
-                            : 'Saved a new claude token (Claude could not be reached to check it). Restart Pace to use it.',
-                        restart: true,
-                      })
-                    }}
-                  />
-                )}
+                <SandboxSignIn
+                  className="border-t border-border bg-well/60 px-4 py-3"
+                  cli={valueOf('REASONER') === 'codex' ? 'codex' : 'claude'}
+                  signedIn={Boolean(sandbox.status?.signedIn)}
+                  ready={Boolean(
+                    sandbox.status?.vm?.kernel && sandbox.status.vm.image
+                  )}
+                  onSignedIn={() => {
+                    sandbox.refresh()
+                    setNotice({
+                      tone: 'warn',
+                      text: 'Signed in inside the sandbox. Restart Pace to use it.',
+                      restart: true,
+                    })
+                  }}
+                />
               </>
             ),
           })}
@@ -1283,119 +1280,7 @@ function StateChip({
 }
 
 function credentialsHelp(reasoner: string): string {
-  return reasoner === 'codex'
-    ? 'The codex login passed into the sandbox for each request. Your own CLI login on this Mac is not used there.'
-    : 'The claude login passed into the sandbox for each request. Your own CLI login on this Mac is not used there.'
-}
-
-/**
- * Gets the sandbox's claude token from the Claude subscription: the app runs
- * claude setup-token, the user approves in the browser, and the token is saved
- * to the settings file in the main process (it never reaches this screen).
- */
-function ClaudeTokenSetup({
-  hasToken,
-  onSaved,
-  onRejected,
-}: {
-  /** A token is already saved; the action then replaces it */
-  hasToken: boolean
-  /** Saved, and what the API said about it (not rejected) */
-  onSaved: (credential?: 'accepted' | 'unknown') => void
-  /** Saved, but the API rejected it: the saved values changed all the same */
-  onRejected: () => void
-}) {
-  const bridge = window.pacenoteDesktop?.sandbox
-  const [state, setState] = useState<
-    { step: 'idle' } | { step: 'waiting' } | { step: 'error'; message: string }
-  >({ step: 'idle' })
-  // Leaving the screen stops a run that is still waiting for the browser.
-  useEffect(() => () => void bridge?.cancelClaudeToken?.(), [bridge])
-  if (!bridge?.claudeToken) return null
-
-  const start = () => {
-    setState({ step: 'waiting' })
-    void bridge.claudeToken().then((res) => {
-      if (res.ok) {
-        const { credential } = res
-        if (credential === 'rejected') {
-          onRejected()
-          setState({
-            step: 'error',
-            message:
-              'Saved the new token, but Claude rejects it. Try again, or run claude setup-token in a terminal and paste the token above.',
-          })
-        } else {
-          setState({ step: 'idle' })
-          onSaved(credential)
-        }
-      } else
-        setState(
-          res.error === 'Cancelled.'
-            ? { step: 'idle' }
-            : { step: 'error', message: res.error }
-        )
-    })
-  }
-
-  return (
-    <div className="border-t border-border bg-well/60 px-4 py-3">
-      {state.step === 'waiting' ? (
-        <div className="flex items-center gap-3">
-          <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />
-          <p className="min-w-0 flex-1 text-sm">
-            Approve in the browser window that opened. The token is saved here
-            when Claude hands it over.
-          </p>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void bridge.cancelClaudeToken()}
-          >
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3">
-          {state.step === 'error' && (
-            <TriangleAlert className="size-4 shrink-0 text-status-failed" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p
-              className={cn(
-                'text-sm',
-                state.step === 'error' ? 'text-status-failed' : 'font-medium'
-              )}
-            >
-              {state.step === 'error'
-                ? state.message
-                : hasToken
-                  ? 'Replace the token with a new one from your Claude subscription'
-                  : 'Get the token from your Claude subscription'}
-            </p>
-            {state.step === 'idle' && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Runs claude setup-token: approve in the browser and the one-year
-                token is saved here. Needs a Pro, Max, Team or Enterprise plan.
-              </p>
-            )}
-          </div>
-          <Button
-            size="sm"
-            variant={state.step === 'error' ? 'outline' : 'default'}
-            onClick={start}
-          >
-            <KeyRound />
-            {state.step === 'error'
-              ? 'Try again'
-              : hasToken
-                ? 'Get new token'
-                : 'Get token from Claude'}
-          </Button>
-        </div>
-      )}
-    </div>
-  )
+  return `${reasoner} signs in inside the sandbox and keeps its login there, separate from your ${reasoner} login on this Mac.`
 }
 
 type PairState =

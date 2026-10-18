@@ -157,7 +157,7 @@ Settings:
   that still needs its setup, "Off" for an unused sandbox or ops tools, and per section the number of unsaved changes or a red dot for
   values to fix. Changes in several sections are saved together from the bar at the bottom, which also names the section with a problem.
 - Fields show only when they apply: sandbox limits and the reasoner login only for the built-in sandbox, and only the selected
-  reasoner's (claude token or codex login file). Hidden values stay in the file. Each ops integration card says whether its fields turn it
+  reasoner's (the API key or a claude token, under Advanced). Hidden values stay in the file. Each ops integration card says whether its fields turn it
   on ("On", "Incomplete", "Off"). Rarely changed values are collapsed under "Advanced".
   Fields, groups and sections are defined only in `src/settings/fields.ts`, and a test checks that their defaults match the bot config (`src/config.ts`).
 - Secret values such as tokens are never sent to the UI. Only the prefix and the last 4 characters are shown; enter a new value to change one.
@@ -187,8 +187,10 @@ Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
   filesystem, the reasoner and diagram images and pacenote-vm. Settings that need Pace's restart show as pending at the
   top of the card, with "Restart Pace": when the config fingerprint (`configHash`) the bot wrote to its status file at
   startup differs from the one computed from the current settings.
-- The reasoner login's check (the claude token, the codex login file) shows in the login card. The allowed domains apply
-  from the next request.
+- The reasoner login card says whether Claude or Codex signed in inside the sandbox, with "Sign in to Claude" (or
+  "Codex"): the CLI's own login runs in a VM, and the card shows the page to open and the code to enter, or takes the
+  code Claude's page shows ([Reasoner login](sandbox.md#reasoner-login)). The allowed domains apply from the next
+  request.
 - The broker's checks (host list, kubeconfig, gh login, PR author) and "Rebuild kubeconfig" (`k8s:kubeconfig`) are in the
   Broker card under Ops tools. The broker's VM starts with Pace, so its settings and files apply when Pace restarts.
   Credential values are not read; only their presence is checked.

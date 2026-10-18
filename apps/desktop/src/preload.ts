@@ -189,11 +189,21 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     run: (kind: string) => ipcRenderer.invoke('pacenote:sandbox:run', kind),
     saveAllowlist: (domains: string[]) =>
       ipcRenderer.invoke('pacenote:sandbox:save-allowlist', domains),
-    // Runs claude setup-token; the token goes to the settings file in the main
-    // process and never comes back here.
-    claudeToken: () => ipcRenderer.invoke('pacenote:sandbox:claude-token'),
-    cancelClaudeToken: () =>
-      ipcRenderer.invoke('pacenote:sandbox:claude-token-cancel'),
+    // The CLI signs in inside a VM; only its link and code come here, never
+    // what it keeps.
+    login: (cli: string) => ipcRenderer.invoke('pacenote:sandbox:login', cli),
+    loginCode: (code: string) =>
+      ipcRenderer.invoke('pacenote:sandbox:login-code', code),
+    cancelLogin: () => ipcRenderer.invoke('pacenote:sandbox:login-cancel'),
+    signOut: (cli: string) =>
+      ipcRenderer.invoke('pacenote:sandbox:sign-out', cli),
+    onLoginPrompt: (callback: (prompt: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, prompt: unknown) =>
+        callback(prompt)
+      ipcRenderer.on('pacenote:sandbox:login-prompt', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:sandbox:login-prompt', listener)
+    },
     onJob: (callback: (job: unknown) => void) => {
       const listener = (_event: IpcRendererEvent, job: unknown) => callback(job)
       ipcRenderer.on('pacenote:sandbox:job-changed', listener)

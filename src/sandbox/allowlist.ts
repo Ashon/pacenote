@@ -13,7 +13,8 @@ export type { AllowlistIssue }
 
 /** Domains the reasoner CLI must have in order to work */
 export const REQUIRED_DOMAINS: Record<'claude' | 'codex', string[]> = {
-  claude: ['api.anthropic.com'],
+  // platform.claude.com: claude's sign-in in the sandbox, and its renewal
+  claude: ['api.anthropic.com', 'platform.claude.com'],
   codex: ['chatgpt.com', 'auth.openai.com', 'api.openai.com'],
 }
 

@@ -10,12 +10,13 @@ import {
 } from '../history/events.js'
 import type { RunEvent } from '../history/types.js'
 import { SANDBOX_PATHS, type Mount } from '../sandbox/runtime.js'
+import { holdLogin } from '../sandbox/vm-login.js'
 import { DENIED_GLOBS, readScope, type ReadScope } from './reads.js'
 import type { CliAdapter, McpServerRef } from './types.js'
 
 /**
- * Codex (codex exec). Takes images as files, can generate images, and gets its
- * login in an isolated sandbox from its auth.json, mounted read-only.
+ * Codex (codex exec). Takes images as files, can generate images, and in an
+ * isolated sandbox has the login folder it signed in to there as CODEX_HOME.
  */
 export const codexAdapter: CliAdapter = {
   id: 'codex',
@@ -34,11 +35,13 @@ export const codexAdapter: CliAdapter = {
       ? { host: path.dirname(images[0].path), at: SANDBOX_PATHS.attachments }
       : undefined
     const mounts: Mount[] = []
-    if (options.auth?.file)
-      mounts.push({
-        host: options.auth.file,
-        at: `${SANDBOX_PATHS.secrets}/codex-auth.json`,
-      })
+    // Signed in inside the sandbox: its login folder is codex's home there,
+    // where generated_images leads to the output folder (vm-login.ts)
+    const login =
+      options.auth?.login && sandbox.isolated
+        ? holdLogin(options.auth.login, 'codex')
+        : undefined
+    if (login) mounts.push(login.mount)
     if (attachments) mounts.push(attachments)
     // The sandbox's only writable host path. The image's entrypoint links
     // ~/.codex/generated_images here.
@@ -68,16 +71,17 @@ export const codexAdapter: CliAdapter = {
       // codex exec has no separate system prompt option, so the instructions
       // are prepended.
       input: `<instructions>\n${request.system}\n</instructions>\n\n${request.prompt}`,
+      env: login?.env,
       mounts,
       cwd: readOnlyDir
         ? { host: readOnlyDir, at: SANDBOX_PATHS.workspace }
         : undefined,
       // On the host, codex leaves generated images in ~/.codex; they are copied
-      // out after the run.
+      // out after the run. In the sandbox, the login folder is let go.
       after:
         outputDir && !sandbox.isolated
           ? () => collectCodexImages(outputDir, started)
-          : undefined,
+          : login && (async () => login.release()),
     }
   },
 

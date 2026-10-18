@@ -2,8 +2,9 @@
 # ~/.pacenote/sandbox is the one in use, edited in Settings > Sandbox; the next
 # request uses it.
 
-# claude CLI (Anthropic API)
+# claude CLI (Anthropic API, and its sign-in)
 api.anthropic.com
+platform.claude.com
 
 # codex CLI (ChatGPT login / OpenAI API)
 chatgpt.com

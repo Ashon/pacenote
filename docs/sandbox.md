@@ -32,7 +32,7 @@ bot (host) --pacenote-vm run--> a Linux VM of its own, with no network device
                                 |- /workspace     reference directory (read-only, optional)
                                 |- /attachments   attached images for codex (read-only)
                                 |- /out           codex's generated images (the one writable mount)
-                                |- /run/secrets   codex's auth.json (read-only)
+                                |- /run/login     the CLI's own login folder (Reasoner login)
                                 |- HOME, /tmp     tmpfs, empty on every run
                                 |- 127.0.0.1:3128 --socket--> egress proxy in Pace --> allowed domains only
                                 '- 127.0.0.1:8080 --socket--> the run's door in Pace --> /pace/mcp: Pace's own tools
@@ -50,10 +50,10 @@ Each CLI's adapter (`src/reasoners`) asks only for the mounts it needs; the path
 | Item | Limit |
 | --- | --- |
 | Isolation | A VM per request under its own Linux kernel, stopped when the request ends or is cut off. Requests at the same time each get their own |
-| Filesystem | The reasoner image read-only, and only the mounts above. A single file (codex's `auth.json`) is copied into the VM alone, never with its folder |
+| Filesystem | The reasoner image read-only, and only the mounts above. The login folder holds only what the CLI keeps to stay signed in; the rest it leaves there goes once no run is using it |
 | Network | No network device at all. The CLIs' `HTTPS_PROXY` is 127.0.0.1:3128, which the image forwards over a socket that pacenote-vm relays to Pace's own egress proxy (`src/sandbox/egress.ts`). It lets through only the domains in `~/.pacenote/sandbox/allowed-domains.txt` (exact names; CONNECT on 443, and plain HTTP; first created from `sandbox/allowed-domains.txt`), and reads it again when it changes, so an edit applies to the next request. It looks each name up itself and connects to that address, never to this Mac's own (loopback), the link-local range (where cloud metadata answers), "any" or multicast, even for an allowed name; private ranges stay reachable by name |
 | Privileges | uid 1000, the memory and CPUs set in Settings > Sandbox |
-| Auth | claude gets `SANDBOX_CLAUDE_OAUTH_TOKEN` or `SANDBOX_ANTHROPIC_API_KEY` by variable name only (not in process arguments); codex gets its `auth.json` read-only, copied to tmpfs |
+| Auth | The CLI signed in inside the sandbox, into its own login folder ([Reasoner login](#reasoner-login)); Pacenote never reads it. Instead, claude can get `SANDBOX_ANTHROPIC_API_KEY` or a token set by hand, by variable name only (not in process arguments) |
 | Pace's own tools | Each run gets a door of its own, a socket relayed in at 127.0.0.1:8080. Under `/pace/mcp` it serves Pacenote's tools for the person Pace answers ([Asking Pace in Slack](tasks.md#asking-pace-in-slack)), which read and write Pacenote's files here on this Mac; the VM never sees them. The rest goes to the ops broker, when ops tools are on |
 | On failure | Settings > Sandbox and the status bar say what is missing and how to set it up. Reasoner calls fail; it does not fall back to running on the host |
 
@@ -106,18 +106,35 @@ sandbox is set up, so it needs Apple silicon and macOS 15 as well.
 
 ## Reasoner login
 
-In the desktop app, Settings > Sandbox > Reasoner login > "Get token from Claude" does the `claude setup-token` step: it runs
-the command (under `script`, which gives it the terminal it needs), you approve in the browser, and the token it prints is
-saved to `SANDBOX_CLAUDE_OAUTH_TOKEN` without being shown. Pacenote never calls Anthropic's API with it: a claude.ai token is
-for Claude Code itself, so one that stopped working shows when a mention fails on it (in the status bar's check issues).
-An API key (`SANDBOX_ANTHROPIC_API_KEY`) is checked with a call that uses no quota (the model list) when Pace starts and in
-Settings > Sandbox's status ("Sandbox claude token"). The token is a one-year token for your own Claude subscription
-(Pro, Max, Team or Enterprise); the bot answers only you (`MENTION_ALLOWED_USERS`), and on the [team hub](team-hub.md)
-each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
-is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
+The sandbox signs in to Claude Code or Codex on its own, apart from this Mac's login. In the desktop app, Settings >
+Sandbox > Reasoner login > "Sign in to Claude" (or "Codex") runs the CLI's own login in a VM of its own
+(`src/sandbox/vm-login.ts`):
 
-From a terminal, `claude setup-token` prints the same token; put it in `sandbox.claudeToken` in
-`~/.pacenote/settings.json`.
+- Claude: `claude auth login` prints a claude.com page. You approve there, and the page shows a code, which you paste
+  into Pacenote; Pacenote hands it to the CLI.
+- Codex: `codex login --device-auth` prints an OpenAI page and a one-time code, which you enter there.
+
+The CLI keeps what it gets in a login folder of its own, `~/.pacenote/vm/login/claude` or `.../codex`. Each run's VM
+has that folder at `/run/login` as the CLI's config folder (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), so the CLI renews its
+login there itself. Pacenote never reads the folder: it checks only whether the credentials file is there, and once no
+run is using the folder it removes everything else the CLI left (sessions, history, logs), as HOME is emptied after
+every run. Signing in uses your own plan (Claude Pro, Max, Team or Enterprise; ChatGPT Plus, Pro or Business), and the
+bot answers only you (`MENTION_ALLOWED_USERS`); on the [team hub](team-hub.md) each member's desktop signs in and
+answers only that member.
+
+This follows Claude Code's terms, which let an end user sign in to the unmodified Claude Code binary with their own
+subscription, including where a platform hosts it, and bar a product from collecting or storing claude.ai credentials:
+the sign-in completes on Anthropic's own page, and the credentials stay with the CLI. This Mac's own codex login
+(`~/.codex/auth.json`) is not copied in, so a login the sandbox renews never undoes this Mac's.
+
+The login reaches only `platform.claude.com` and `api.anthropic.com` (Claude) or `auth.openai.com` (Codex). Runs allow
+the domains the CLI needs whether or not the allowed-domains file lists them yet: `platform.claude.com` is where claude
+renews its login.
+
+Not signed in yet, Pace still starts, and the status bar says what to do. An Anthropic API key
+(`SANDBOX_ANTHROPIC_API_KEY`) works instead of signing in to Claude, and is checked with a call that uses no quota (the
+model list) when Pace starts and in Settings > Sandbox's status. A token from `claude setup-token` you run yourself
+(`sandbox.claudeToken`) is still read, after the sign-in. Pacenote never calls Anthropic's API with a claude.ai token.
 
 ## Before the built-in sandbox
 

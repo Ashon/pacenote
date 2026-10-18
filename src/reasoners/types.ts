@@ -65,13 +65,14 @@ export interface McpServerRef {
 }
 
 /**
- * Credentials for a CLI that cannot reach the host's login (in an isolated
- * sandbox): values for its environment (claude's token), or a file it reads
- * (codex's auth.json).
+ * How a CLI signs in where it cannot reach the host's login (in an isolated
+ * sandbox): its own login folder, where it signed in inside the sandbox
+ * (vm-login.ts), or values for its environment (an API key, or a claude token
+ * set by hand).
  */
 export interface ReasonerAuth {
+  login?: string
   env?: Record<string, string>
-  file?: string
 }
 
 export interface ReasonerOptions {

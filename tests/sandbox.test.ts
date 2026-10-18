@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -53,48 +53,53 @@ describe('loadConfig sandbox', () => {
     MENTION_ALLOWED_USERS: 'U1',
   }
 
-  it('does not start the claude sandbox without its own credentials', () => {
-    expect(() => loadConfig({ ...env, REASONER_SANDBOX: 'vm' })).toThrow(
-      /needs a claude token/
-    )
-    const config = loadConfig({
-      ...env,
-      REASONER_SANDBOX: 'vm',
-      SANDBOX_CLAUDE_OAUTH_TOKEN: 'tok',
-    })
+  it('signs claude in the sandbox with its own sign-in there, or a token or key set by hand', () => {
+    const vmRoot = path.join(dir, 'vm-claude')
+    const sandbox = { ...env, REASONER_SANDBOX: 'vm', PACENOTE_VM_ROOT: vmRoot }
+    // Not signed in yet: Pace starts and says so (src/index.ts)
+    expect(loadConfig(sandbox).reasoner.auth).toEqual({})
+    const config = loadConfig({ ...sandbox, SANDBOX_CLAUDE_OAUTH_TOKEN: 'tok' })
     expect(config.reasoner.auth).toEqual({
       env: { CLAUDE_CODE_OAUTH_TOKEN: 'tok' },
     })
     expect(config.reasoner.vm).toBeDefined()
     expect(JSON.stringify(config.reasoner.vm)).not.toContain('tok')
+    expect(
+      loadConfig({ ...sandbox, SANDBOX_ANTHROPIC_API_KEY: 'key' }).reasoner.auth
+    ).toEqual({ env: { ANTHROPIC_API_KEY: 'key' } })
+    // Signed in inside the sandbox: its login folder, before anything set
+    const login = path.join(vmRoot, 'login', 'claude')
+    mkdirSync(login, { recursive: true })
+    writeFileSync(path.join(login, '.credentials.json'), '{}')
+    expect(
+      loadConfig({ ...sandbox, SANDBOX_CLAUDE_OAUTH_TOKEN: 'tok' }).reasoner
+        .auth
+    ).toEqual({ login })
   })
 
-  it('requires an auth file for the codex sandbox and takes the model from the host config.toml', () => {
-    const auth = path.join(dir, 'auth.json')
-    expect(() =>
-      loadConfig({
-        ...env,
-        REASONER: 'codex',
-        REASONER_SANDBOX: 'vm',
-        SANDBOX_CODEX_AUTH_FILE: auth,
-      })
-    ).toThrow(auth)
-
-    writeFileSync(auth, '{}')
+  it("signs codex in the sandbox only there, and takes the model from the host's config.toml", () => {
+    const vmRoot = path.join(dir, 'vm-codex')
+    const sandbox = {
+      ...env,
+      REASONER: 'codex',
+      REASONER_SANDBOX: 'vm',
+      PACENOTE_VM_ROOT: vmRoot,
+      CODEX_HOME: dir,
+    }
+    // This Mac's own codex login is never copied in
+    writeFileSync(path.join(dir, 'auth.json'), '{}')
+    expect(loadConfig(sandbox).reasoner.auth).toEqual({})
     writeFileSync(
       path.join(dir, 'config.toml'),
       'model = "gpt-x"\nmodel_reasoning_effort = "low"\n'
     )
-    const config = loadConfig({
-      ...env,
-      REASONER: 'codex',
-      REASONER_SANDBOX: 'vm',
-      SANDBOX_CODEX_AUTH_FILE: auth,
-    })
-    expect(config.reasoner).toMatchObject({
+    const login = path.join(vmRoot, 'login', 'codex')
+    mkdirSync(login, { recursive: true })
+    writeFileSync(path.join(login, 'auth.json'), '{}')
+    expect(loadConfig(sandbox).reasoner).toMatchObject({
       model: 'gpt-x',
       reasoningEffort: 'low',
-      auth: { file: auth },
+      auth: { login },
     })
   })
 })

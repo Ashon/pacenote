@@ -8,7 +8,7 @@ It holds the Slack tokens and logins, so it is kept to your account (600).
 {
   "slack": { "botToken": "xoxb-...", "appToken": "xapp-...", "memberId": "U..." },
   "answers": { "reasoner": "claude" },
-  "sandbox": { "runIn": "vm", "claudeToken": "sk-ant-oat01-..." },
+  "sandbox": { "runIn": "vm" },
   "tasks": { "enabled": true, "linkSessions": true }
 }
 ```
@@ -81,9 +81,8 @@ Each table is one group of the file. Select values are in the last column; the S
 | `sandbox.runIn` | `REASONER_SANDBOX` | `none` | Run environment: `vm` (built-in sandbox) or `none` (on this Mac) |
 | `sandbox.memory` | `SANDBOX_MEMORY` | `2g` | Memory limit |
 | `sandbox.cpus` | `SANDBOX_CPUS` | `2` | CPU limit |
-| `sandbox.claudeToken` | `SANDBOX_CLAUDE_OAUTH_TOKEN` | | claude token (`claude setup-token`) |
-| `sandbox.anthropicApiKey` | `SANDBOX_ANTHROPIC_API_KEY` | | Anthropic API key |
-| `sandbox.codexLoginFile` | `SANDBOX_CODEX_AUTH_FILE` | `~/.codex/auth.json` | codex login file |
+| `sandbox.claudeToken` | `SANDBOX_CLAUDE_OAUTH_TOKEN` | | claude token from `claude setup-token`, instead of signing in (advanced) |
+| `sandbox.anthropicApiKey` | `SANDBOX_ANTHROPIC_API_KEY` | | Anthropic API key, instead of signing in (advanced) |
 
 ### ops
 

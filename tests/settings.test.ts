@@ -293,20 +293,6 @@ describe('setting issues', () => {
         MENTION_ALLOWED_USERS: 'U1',
         MENTION_WORKSPACE: '/no/such/folder',
       },
-      {
-        SLACK_BOT_TOKEN: 'xoxb-1',
-        SLACK_APP_TOKEN: 'xapp-1',
-        MENTION_ALLOWED_USERS: 'U1',
-        REASONER_SANDBOX: 'vm',
-        REASONER: 'codex',
-        SANDBOX_CODEX_AUTH_FILE: '/no/such/auth.json',
-      },
-      {
-        SLACK_BOT_TOKEN: 'xoxb-1',
-        SLACK_APP_TOKEN: 'xapp-1',
-        MENTION_ALLOWED_USERS: 'U1',
-        REASONER_SANDBOX: 'vm',
-      },
     ].flatMap((env) => checkConfig(env))
     expect(issues.map((issue) => issue.key)).toEqual([
       'SLACK_BOT_TOKEN',
@@ -318,8 +304,6 @@ describe('setting issues', () => {
       'MENTION_ALLOWED_USERS',
       'MENTION_ALLOWED_USERS',
       'MENTION_WORKSPACE',
-      'SANDBOX_CODEX_AUTH_FILE',
-      'SANDBOX_CLAUDE_OAUTH_TOKEN',
     ])
     for (const { message } of issues)
       expect(message).not.toMatch(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/)

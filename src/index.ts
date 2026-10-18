@@ -273,9 +273,14 @@ async function main(): Promise<void> {
     problems: allProblems(),
     limits: [...connection.limits(), ...renderLimits],
   })
-  // An API key the API rejects (cut short, revoked) shows in the status at
-  // once, not only when a mention fails on it.
-  if (sandbox.isolated && reasoner.backend === 'claude')
+  // In the sandbox, a CLI with no sign-in there yet shows in the status at
+  // once, and so does an API key the API rejects (cut short, revoked), not
+  // only when a mention fails on them.
+  const auth = config.reasoner.auth
+  if (sandbox.isolated && !auth?.login && !auth?.env) {
+    reasonerProblem = `${failureAdvice('auth', reasoner.backend, sandbox.kind)?.text} (checked at startup)`
+    status.update({ problems: allProblems() })
+  } else if (sandbox.isolated && reasoner.backend === 'claude')
     void checkClaudeCredential(
       claudeCredential(config.reasoner.auth?.env ?? {})
     ).then((state) => {

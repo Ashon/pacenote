@@ -28,6 +28,11 @@ export interface SandboxStatus {
   activeRequests: number
   /** The built-in VM sandbox (on a Mac), chosen or not */
   vm?: VmStatus
+  /**
+   * Whether the reasoner CLI signed in inside the built-in sandbox
+   * (vm-login.ts), whether or not the sandbox is chosen yet
+   */
+  signedIn?: boolean
 }
 
 /** What the built-in VM sandbox has ready (src/sandbox/vm.ts) */

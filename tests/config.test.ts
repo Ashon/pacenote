@@ -245,7 +245,6 @@ describe('checkConfig', () => {
       { key: 'SLACK_BOT_TOKEN', missing: true },
       { key: 'SLACK_APP_TOKEN', missing: true },
       { key: 'MENTION_ALLOWED_USERS', missing: true },
-      { key: 'SANDBOX_CLAUDE_OAUTH_TOKEN', missing: true },
     ])
     expect(
       checkConfig({
@@ -258,12 +257,9 @@ describe('checkConfig', () => {
       { key: 'SLACK_APP_TOKEN', missing: true },
       { key: 'MENTION_ALLOWED_USERS', missing: undefined },
     ])
-    expect(checkConfig({ ...env, REASONER_SANDBOX: 'vm' })).toEqual([
-      expect.objectContaining({
-        key: 'SANDBOX_CLAUDE_OAUTH_TOKEN',
-        missing: true,
-      }),
-    ])
+    // The sandbox's sign-in is not a setting: Pace starts without it and says
+    // so (src/index.ts)
+    expect(checkConfig({ ...env, REASONER_SANDBOX: 'vm' })).toEqual([])
   })
 
   it('does not mark a wrong value as missing', () => {
