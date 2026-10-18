@@ -348,7 +348,7 @@ export function TaskRow({
               <button
                 type="button"
                 data-task-title
-                className="group -ml-6 flex items-start gap-2 rounded-sm text-left text-sm leading-snug font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="group -ml-6 flex items-start gap-2 rounded-sm text-left text-section leading-snug outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
                 <ChevronRight
                   aria-hidden="true"
@@ -368,7 +368,7 @@ export function TaskRow({
                 </span>
               </button>
             </CollapsibleTrigger>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
               {[who, task.source.label, formatRelative(task.postedAt)]
                 .filter(Boolean)
                 .join(' · ')}
@@ -448,7 +448,7 @@ export function TaskRow({
                 role="group"
                 aria-label={`Whether ${askedGroup.current} means you`}
               >
-                <span className="mr-1 text-xs text-muted-foreground">
+                <span className="mr-1 text-meta text-muted-foreground">
                   Does {askedGroup.current} mean you?
                 </span>
                 {[
@@ -603,7 +603,7 @@ export function TaskRow({
           </div>
         </div>
         {error && (
-          <p role="alert" className="mt-2 pl-6 text-sm text-status-failed">
+          <p role="alert" className="mt-2 pl-6 text-copy text-status-failed">
             {error}
           </p>
         )}
@@ -779,13 +779,13 @@ function TaskOpen({
             >
               {change.why}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-meta text-muted-foreground">
               {formatRelative(change.at)}
             </span>
           </Line>
         )}
         {!detail ? (
-          <p className="flex min-h-[30px] items-center text-xs text-muted-foreground">
+          <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
             Looking for what came before.
           </p>
         ) : (
@@ -805,7 +805,7 @@ function TaskOpen({
                       {task.wrapUp.text}
                     </span>
                     {detail.outcome && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-meta text-muted-foreground">
                         {detail.outcome}
                       </span>
                     )}
@@ -852,7 +852,7 @@ function TaskOpen({
                 />
               ))}
             {!earlier.last && !sessions[0] && !suggested.length && (
-              <p className="flex min-h-[30px] items-center text-xs text-muted-foreground">
+              <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
                 Nothing earlier in this thread
                 {task.repo ? `, in ${task.repo}` : ''}
                 {task.askedBy && task.kind === 'asked'
@@ -888,7 +888,7 @@ function TaskOpen({
               <>
                 <label
                   htmlFor={replyId}
-                  className="text-xs text-muted-foreground"
+                  className="text-meta text-muted-foreground"
                 >
                   {!latestDraft || reply !== undefined
                     ? 'Your reply'
@@ -916,7 +916,7 @@ function TaskOpen({
                     <RotateCw />
                     Draft again
                   </Button>
-                  <span className="ml-1 text-xs text-muted-foreground">
+                  <span className="ml-1 text-meta text-muted-foreground">
                     Pacenote never sends it for you.
                   </span>
                 </div>
@@ -963,7 +963,7 @@ function Line({
 }) {
   return (
     <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)_auto] items-center gap-3 text-body">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-meta text-muted-foreground">{label}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 py-1">
         {children}
       </span>
@@ -1009,7 +1009,7 @@ function EarlierLine({
       </Button>
     </Tooltip>
   ) : line.session ? (
-    <span className="text-xs text-muted-foreground">
+    <span className="text-meta text-muted-foreground">
       Waiting for {TOOL[line.session.tool]} to start it
     </span>
   ) : undefined
@@ -1026,7 +1026,7 @@ function EarlierLine({
       <span className="font-semibold">{text}</span>
     )
   const quiet = (text: string, hint?: string) => (
-    <span title={hint} className="text-xs text-muted-foreground">
+    <span title={hint} className="text-meta text-muted-foreground">
       {text}
     </span>
   )
@@ -1134,7 +1134,7 @@ function LooksDone({
         <span className="max-w-[40rem] select-text">
           {proposal.summary ?? `Its ${tool} session looks finished.`}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           {[
             `From its ${tool} session`,
             proposal.pr &&
@@ -1201,7 +1201,7 @@ function SuggestedLine({
       >
         {TOOL[suggestion.tool]} session
       </a>
-      <span title={suggestion.cwd} className="text-xs text-muted-foreground">
+      <span title={suggestion.cwd} className="text-meta text-muted-foreground">
         {[
           `mentions ${suggestion.shares.join(', ')}`,
           suggestion.lastActiveAt
@@ -1289,7 +1289,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
   return (
     <>
       <div className="flex flex-col gap-1.5">
-        <DialogTitle className="text-base font-semibold">
+        <DialogTitle className="text-heading">
           {task.repo
             ? `Where is ${task.repo} on this Mac?`
             : 'Where should the session open?'}
@@ -1348,7 +1348,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
               <span className="font-mono text-body font-semibold break-all">
                 {folder.path}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-meta text-muted-foreground">
                 {[
                   folder.error?.replace(/\.$/, '') ??
                     [
@@ -1382,14 +1382,14 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
           Choose another folder
         </Button>
       </div>
-      <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-xs text-muted-foreground">
+      <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
         {TOOL[tool]} runs as you, with your own permissions, and asks you before
         it changes anything. Pacenote opens the session and hands it the task;
         it runs no commands itself.
       </p>
       {error && (
-        <p role="alert" className="text-sm text-status-failed">
+        <p role="alert" className="text-copy text-status-failed">
           {error}
         </p>
       )}
@@ -1468,9 +1468,7 @@ function SessionLogPanel({
         className="w-[40rem] max-w-[calc(100vw-1rem)]"
       >
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
-          <DialogTitle className="text-sm font-semibold">
-            Session log
-          </DialogTitle>
+          <DialogTitle className="text-section">Session log</DialogTitle>
           <span className="flex-1" />
           <DialogClose asChild>
             <Button size="icon-sm" variant="ghost" aria-label="Close the log">
@@ -1481,7 +1479,7 @@ function SessionLogPanel({
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-4 px-6 py-5">
             {!entry ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-copy text-muted-foreground">
                 {detail.isPending
                   ? 'Finding the session.'
                   : 'There is no such session.'}
@@ -1489,10 +1487,8 @@ function SessionLogPanel({
             ) : (
               <>
                 <div className="flex flex-col gap-1">
-                  <h2 className="text-base font-semibold tracking-tight">
-                    {found.title}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
+                  <h2 className="text-heading">{found.title}</h2>
+                  <p className="text-meta text-muted-foreground">
                     {tool} session ·{' '}
                     <span className="font-mono">{entry.cwd}</span> ·{' '}
                     {formatDateTime(entry.startedAt)}
@@ -1518,7 +1514,7 @@ function SessionLogPanel({
                       }
                     >
                       <Copy />
-                      <span className="font-mono text-xs">
+                      <span className="font-mono text-meta">
                         {entry.tool === 'claude'
                           ? 'claude --resume'
                           : 'codex resume'}{' '}
@@ -1528,23 +1524,23 @@ function SessionLogPanel({
                   )}
                 </div>
                 {error && (
-                  <p role="alert" className="text-sm text-status-failed">
+                  <p role="alert" className="text-copy text-status-failed">
                     {error}
                   </p>
                 )}
                 {!log ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-copy text-muted-foreground">
                     Reading the session&apos;s log.
                   </p>
                 ) : log.error ? (
-                  <p className="text-sm text-muted-foreground">{log.error}</p>
+                  <p className="text-copy text-muted-foreground">{log.error}</p>
                 ) : (
                   <ol className="flex flex-col gap-3">
                     {(log.items ?? []).map((item, index) =>
                       item.role === 'tool' ? (
                         <li
                           key={index}
-                          className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-xs"
+                          className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-meta"
                         >
                           <span className="shrink-0 font-mono font-medium">
                             {item.name}
@@ -1557,7 +1553,7 @@ function SessionLogPanel({
                         <li key={index} className="flex items-start gap-3">
                           <span
                             className={cn(
-                              'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                              'flex size-7 shrink-0 items-center justify-center rounded-full text-meta font-semibold',
                               item.role === 'user'
                                 ? 'bg-secondary text-secondary-foreground'
                                 : 'bg-foreground text-background'
@@ -1574,10 +1570,10 @@ function SessionLogPanel({
                                 : 'border border-border'
                             )}
                           >
-                            <p className="text-sm font-semibold">
+                            <p className="text-section">
                               {item.role === 'user' ? 'You' : tool}
                               {item.at && (
-                                <span className="ml-2 text-2xs font-normal text-muted-foreground">
+                                <span className="ml-2 text-caption text-muted-foreground">
                                   {formatDateTime(item.at)}
                                 </span>
                               )}
@@ -1591,7 +1587,7 @@ function SessionLogPanel({
                     )}
                   </ol>
                 )}
-                <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                <p className="flex items-start gap-1.5 text-meta text-muted-foreground">
                   <MessagesSquare className="mt-px size-3.5 shrink-0" />
                   Read from {tool}&apos;s own session log on this Mac when you
                   opened it. Pacenote keeps only the session&apos;s id, folder

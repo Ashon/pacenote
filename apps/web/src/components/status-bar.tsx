@@ -83,7 +83,7 @@ export function StatusBarView({
   const openDataDir = window.pacenoteDesktop?.settings.openDataDir
 
   return (
-    <footer className="@container flex h-8 shrink-0 items-center gap-1 overflow-hidden px-4 text-2xs whitespace-nowrap text-muted-foreground">
+    <footer className="@container flex h-8 shrink-0 items-center gap-1 overflow-hidden px-4 text-caption whitespace-nowrap text-muted-foreground">
       {/* When setup is needed, Pace's status goes straight to the settings
           that fix it. */}
       <Item

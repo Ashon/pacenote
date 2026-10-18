@@ -27,7 +27,7 @@ function rememberBriefing(lines: number) {
 
 /** One row per line, each one line tall, so its place is known ahead */
 const GRID =
-  'mt-7 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm'
+  'mt-7 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-copy'
 
 export function BriefingSkeleton({ lines }: { lines: number }) {
   if (lines === 0) return null
@@ -35,8 +35,8 @@ export function BriefingSkeleton({ lines }: { lines: number }) {
     <div className={GRID}>
       {Array.from({ length: lines }, (_, i) => (
         <div key={i} className="contents">
-          <SkeletonText className="text-sm" width="70%" />
-          <SkeletonText className="text-sm" width={i % 2 ? '48%' : '64%'} />
+          <SkeletonText className="text-copy" width="70%" />
+          <SkeletonText className="text-copy" width={i % 2 ? '48%' : '64%'} />
         </div>
       ))}
     </div>

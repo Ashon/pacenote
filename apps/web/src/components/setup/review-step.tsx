@@ -267,8 +267,8 @@ export function ReviewStep({
           required
         />
       )}
-      <section className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
-        <b className="text-sm font-semibold">Who can ask Pace</b>
+      <section className="flex flex-col gap-2.5 rounded-xl bg-well px-5 py-4">
+        <b className="text-section">Who can ask Pace</b>
         <span className="flex flex-wrap items-center gap-2">
           {unknown ? (
             <span className="text-body text-status-failed">
@@ -306,7 +306,7 @@ export function ReviewStep({
         </span>
       </section>
 
-      <dl className="flex flex-col rounded-2xl ring-1 ring-border">
+      <dl className="flex flex-col rounded-xl ring-1 ring-border">
         <Row
           label="AI service"
           onChange={busy ? undefined : () => onChange('ai')}
@@ -400,13 +400,15 @@ export function ReviewStep({
 /** You, the one who may ask: by the name Slack showed, or your member ID */
 function Person({ name, id }: { name?: string; id?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-sm ring-1 ring-border">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-copy ring-1 ring-border">
       You
       {name ? (
         <span className="text-body text-muted-foreground">@{name}</span>
       ) : (
         id && (
-          <span className="font-mono text-xs text-muted-foreground">{id}</span>
+          <span className="font-mono text-meta text-muted-foreground">
+            {id}
+          </span>
         )
       )}
     </span>
@@ -423,7 +425,7 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex min-h-12 items-center gap-4 border-b border-border px-5 py-2.5 text-sm last:border-b-0">
+    <div className="flex min-h-12 items-center gap-4 border-b border-border px-5 py-2.5 text-copy last:border-b-0">
       <dt className="w-28 shrink-0 font-semibold text-muted-foreground">
         {label}
       </dt>

@@ -82,13 +82,11 @@ export function AnswerStep({
       )}
       {!done && (
         <div className="flex flex-col gap-2.5">
-          <b className="text-sm font-semibold">
-            Ask it something in a channel it is in
-          </b>
+          <b className="text-section">Ask it something in a channel it is in</b>
           <CommandLine text="@Pace what can you help me with?" />
           <p className="text-body text-muted-foreground">
             In another channel, invite it first with{' '}
-            <code className="rounded bg-well px-1.5 font-mono text-xs">
+            <code className="rounded-sm bg-well px-1.5 font-mono text-meta">
               /invite @Pace
             </code>
             .
@@ -97,7 +95,7 @@ export function AnswerStep({
       )}
       <div
         aria-live="polite"
-        className="rounded-2xl px-5 py-4 ring-1 ring-border"
+        className="rounded-xl px-5 py-4 ring-1 ring-border"
       >
         <Swap id={shown ? `${shown.id}:${shown.status}` : 'waiting'}>
           {shown ? (
@@ -155,9 +153,7 @@ function Answer({
       </span>
       <div className="flex items-center gap-4 rounded-xl bg-well px-4 py-3">
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-sm font-semibold">
-            "{run.request}"
-          </span>
+          <span className="truncate text-section">"{run.request}"</span>
           <span className="text-body text-muted-foreground">
             {run.conversationLabel}
             {run.userName ? ` · @${run.userName}` : ''}

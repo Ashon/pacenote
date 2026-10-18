@@ -45,10 +45,10 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
       className="motion-fade mt-4 flex flex-col gap-2.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3"
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5">
-        <h2 id="your-work" className="text-sm font-semibold">
+        <h2 id="your-work" className="text-section">
           This is your work, as Pacenote sees it
         </h2>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           {fixing
             ? 'Change what is off. Everything else stays as it is.'
             : 'From your last 30 days of tasks and sessions.'}
@@ -76,7 +76,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') event.currentTarget.blur()
                   }}
-                  className="h-7 min-w-0 rounded-md border border-input bg-background px-2 text-sm font-semibold outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                  className="h-7 min-w-0 rounded-md border border-input bg-background px-2 text-section outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
                 />
               ) : (
                 <span
@@ -91,7 +91,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
               )}
               <span className="flex min-w-0 flex-col">
                 {left ? (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-meta text-muted-foreground">
                     Not yours anymore. Its tasks stay where they are.
                   </span>
                 ) : (
@@ -102,7 +102,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                         {area.parts.map((part) => (
                           <span
                             key={partKey(part)}
-                            className="inline-flex h-6 items-center gap-0.5 rounded-full bg-card pr-0.5 pl-2 font-mono text-xs"
+                            className="inline-flex h-6 items-center gap-0.5 rounded-full bg-card pr-0.5 pl-2 font-mono text-meta"
                           >
                             {part.label}
                             <Button
@@ -120,7 +120,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                         ))}
                       </span>
                     ) : (
-                      <span className="truncate font-mono text-xs text-muted-foreground">
+                      <span className="truncate font-mono text-meta text-muted-foreground">
                         {area.parts.map((part) => part.label).join(' · ')}
                       </span>
                     )}
@@ -143,7 +143,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                   {left ? 'Undo' : 'Not mine'}
                 </Button>
               ) : (
-                <span className="text-right text-xs text-muted-foreground">
+                <span className="text-right text-meta text-muted-foreground">
                   {area.working
                     ? 'Working on it now'
                     : area.now.length
@@ -156,7 +156,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
         })}
       </ul>
       {accounts && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-meta text-muted-foreground">
           Found you as {accounts}.
         </p>
       )}
@@ -166,7 +166,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
             <Button size="sm" onClick={() => void fix.confirm()}>
               Done
             </Button>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-meta text-muted-foreground">
               Rename, merge or take apart areas any time on the{' '}
               <a href="#/you" className="text-primary hover:underline">
                 You
@@ -234,7 +234,7 @@ export function rememberYourWork(you: YouView | null | undefined) {
 export function YourWorkSkeleton({ rows, accounts }: YourWorkShape) {
   return (
     <section className="mt-4 flex flex-col gap-2.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3">
-      <SkeletonText className="text-sm font-semibold" width="42%" />
+      <SkeletonText className="text-section" width="42%" />
       <ul>
         {Array.from({ length: rows }, (_, i) => (
           <li
@@ -244,13 +244,13 @@ export function YourWorkSkeleton({ rows, accounts }: YourWorkShape) {
             <SkeletonText width="70%" />
             <span className="flex min-w-0 flex-col">
               <SkeletonText width={i % 2 ? '48%' : '62%'} />
-              <SkeletonText className="font-mono text-xs" width="40%" />
+              <SkeletonText className="font-mono text-meta" width="40%" />
             </span>
-            <SkeletonText className="w-14 text-xs" width="100%" />
+            <SkeletonText className="w-14 text-meta" width="100%" />
           </li>
         ))}
       </ul>
-      {accounts && <SkeletonText className="text-xs" width="36%" />}
+      {accounts && <SkeletonText className="text-meta" width="36%" />}
       <div className="flex items-center gap-1.5">
         <SkeletonBlock className="h-7 w-21 rounded-md" />
         <SkeletonBlock className="h-7 w-24 rounded-md" />

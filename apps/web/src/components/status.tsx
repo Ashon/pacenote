@@ -80,7 +80,7 @@ export function StatusBadge({ status }: { status: RunStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs font-medium',
+        'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-meta font-medium',
         meta.text,
         meta.bg
       )}

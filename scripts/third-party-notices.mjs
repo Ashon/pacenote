@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url'
  *
  * - The npm packages the bundles are built from: pnpm's production
  *   dependencies of the workspace, a superset of what the bundles keep
- * - What the web app bundles from its build tools: the Pretendard and Host
- *   Grotesk fonts and Tailwind CSS's styles
+ * - What the web app bundles from its build tools: the Pretendard font and
+ *   Tailwind CSS's styles
  * - With --swift, the Swift packages pacenote-vm is built from (apps/vm, after
  *   swift build has checked them out)
  *
@@ -63,22 +63,19 @@ function npmPackages() {
 /** What the web app bundles from packages it only builds with */
 function webAssets() {
   const requireWeb = createRequire(path.join(root, 'apps/web/package.json'))
-  return [
-    'pretendard',
-    '@fontsource-variable/host-grotesk',
-    'tailwindcss',
-    '@tailwindcss/typography',
-  ].map((name) => {
-    const manifest = requireWeb.resolve(`${name}/package.json`)
-    const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
-    return {
-      name,
-      version: pkg.version,
-      license: pkg.license,
-      homepage: pkg.homepage,
-      dir: path.dirname(manifest),
+  return ['pretendard', 'tailwindcss', '@tailwindcss/typography'].map(
+    (name) => {
+      const manifest = requireWeb.resolve(`${name}/package.json`)
+      const pkg = JSON.parse(readFileSync(manifest, 'utf8'))
+      return {
+        name,
+        version: pkg.version,
+        license: pkg.license,
+        homepage: pkg.homepage,
+        dir: path.dirname(manifest),
+      }
     }
-  })
+  )
 }
 
 /** The Swift packages pacenote-vm pins, from swift build's checkouts */

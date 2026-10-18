@@ -62,7 +62,7 @@ export function SearchField({
             <X className="size-3.5" />
           </button>
         ) : (
-          <kbd className="rounded border border-sidebar-border bg-muted px-1.5 font-sans text-2xs leading-[18px] text-muted-foreground group-focus-within:hidden">
+          <kbd className="rounded-sm border border-sidebar-border bg-muted px-1.5 font-sans text-caption leading-[18px] text-muted-foreground group-focus-within:hidden">
             {isMac ? '⌘K' : 'Ctrl K'}
           </kbd>
         )}

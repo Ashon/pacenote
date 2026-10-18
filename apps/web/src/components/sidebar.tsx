@@ -90,7 +90,7 @@ export function Sidebar({
         <span
           data-hidden={compact || undefined}
           aria-hidden={compact || undefined}
-          className="motion-layout-label text-base font-semibold tracking-tight"
+          className="motion-layout-label text-heading"
         >
           Pacenote
         </span>
@@ -98,7 +98,7 @@ export function Sidebar({
           <span
             data-hidden={compact || undefined}
             aria-hidden={compact || undefined}
-            className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-2xs font-semibold text-status-interrupted"
+            className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-caption font-semibold text-status-interrupted"
           >
             Dev
           </span>
@@ -166,7 +166,7 @@ function NavItem({
           <span
             {...labeled}
             aria-hidden={compact || undefined}
-            className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-2xs font-semibold text-primary tabular-nums"
+            className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
           >
             {count}
           </span>
@@ -176,7 +176,7 @@ function NavItem({
             {...iconOnly}
             aria-hidden
             className={cn(
-              'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-2xs font-semibold text-primary-foreground tabular-nums ring-2',
+              'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-caption font-semibold text-primary-foreground tabular-nums ring-2',
               current ? 'ring-selected' : 'ring-sidebar'
             )}
           >

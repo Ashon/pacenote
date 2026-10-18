@@ -75,10 +75,14 @@ Layout:
   The patterns live in `apps/web/src/motion.css` and the primitives in `apps/web/src/components/ui` (Collapsible, Dialog,
   the menu, the tooltip, Tabs, `Swap`, `useListMotion`, `usePresence`); `tests/web-motion.test.ts` fails on durations,
   easings or animations written anywhere else. The Debug section has a Motion bench that plays each pattern slowly.
-- Text takes its size from one scale in `apps/web/src/index.css` (2xs 11, xs 12, body 13, sm 14, base 16, lg 18), and
-  `tests/web-type.test.ts` fails on sizes made up elsewhere. Latin is set in Host Grotesk and Hangul in Pretendard, both
-  bundled with the app (pacenote.dev uses the same pair); anything else falls to the system font. A run's status in the
-  list is a dot when it succeeded and an icon otherwise, and every status color reads at 4.5:1 or more as text.
+- Text takes a role from `apps/web/src/index.css`, and each role carries its size, line height, tracking and, where the
+  role is a weight, its weight: number 30, title 18, heading 16, section, row and copy 14, body 13, meta 12, caption 11.
+  `tests/web-type.test.ts` fails on any other size and on a caption lighter than 500. Latin is set in the system font
+  (SF Pro, whose optical sizes keep small text sharp on a 1x display) and Hangul in Pretendard, bundled with the app;
+  pacenote.dev uses the same pair. Radii come from one ladder (6, 8, 10, 14, and 20 for a surface), and what lies over
+  the content (menus, tooltips, dialogs) takes one float shadow. A run's status in the list is a dot when it succeeded
+  and an icon otherwise, and every status color reads at 4.5:1 or more as text, on a selected row too; chart-1 is kept
+  to bars and charts, as it is too faint for icons and text.
 
 Bot management:
 

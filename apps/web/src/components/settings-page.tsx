@@ -232,7 +232,7 @@ export function SettingsPage() {
 
   if (!settings) {
     return (
-      <p className="p-10 text-center text-sm text-muted-foreground">
+      <p className="p-10 text-center text-copy text-muted-foreground">
         Settings can be changed in the desktop app.
       </p>
     )
@@ -845,7 +845,7 @@ export function SettingsPage() {
             {notice && (
               <div
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                  'flex items-center gap-2 rounded-lg px-3 py-2 text-copy',
                   notice.tone === 'ok'
                     ? 'bg-status-succeeded/10 text-status-succeeded'
                     : 'bg-status-interrupted/10 text-status-interrupted'
@@ -887,7 +887,7 @@ export function SettingsPage() {
         {changeCount > 0 && (
           <footer className="shrink-0 border-t bg-canvas/95 px-8 py-3 backdrop-blur @max-[36rem]/content:px-4">
             <div className="flex max-w-3xl flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">
+              <span className="text-row">
                 {changeCount} unsaved {changeCount === 1 ? 'change' : 'changes'}
               </span>
               {issues.length > 0 && (
@@ -895,7 +895,7 @@ export function SettingsPage() {
                   type="button"
                   disabled={!issueSection || issueSection === section}
                   onClick={() => issueSection && go(issueSection)}
-                  className="flex min-w-0 items-center gap-1 text-left text-xs text-status-failed enabled:hover:underline"
+                  className="flex min-w-0 items-center gap-1 text-left text-meta text-status-failed enabled:hover:underline"
                 >
                   <TriangleAlert className="size-3.5 shrink-0" />
                   <span className="truncate">
@@ -968,12 +968,12 @@ function SettingsNav({
       aria-label="Settings sections"
       className="flex w-56 shrink-0 flex-col gap-4 border-r border-sidebar-border px-2.5 py-5 @max-[44rem]/settings:w-14 @max-[44rem]/settings:px-2"
     >
-      <h1 className="px-2.5 text-base font-semibold tracking-tight @max-[44rem]/settings:sr-only">
+      <h1 className="px-2.5 text-heading @max-[44rem]/settings:sr-only">
         Settings
       </h1>
       {NAV.map((group) => (
         <div key={group.label} className="space-y-0.5">
-          <p className="px-2.5 pb-1 text-2xs font-medium text-muted-foreground/80 @max-[44rem]/settings:sr-only">
+          <p className="px-2.5 pb-1 text-caption text-muted-foreground/80 @max-[44rem]/settings:sr-only">
             {group.label}
           </p>
           {group.items.map((id) => (
@@ -997,10 +997,8 @@ function SettingsNav({
 function SectionTitle({ section }: { section: Section }) {
   return (
     <header>
-      <h2 className="text-lg font-semibold tracking-tight">
-        {SECTION_INFO[section].label}
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <h2 className="text-title">{SECTION_INFO[section].label}</h2>
+      <p className="mt-1 text-copy text-muted-foreground">
         {SECTION_INFO[section].help}
       </p>
     </header>
@@ -1017,21 +1015,15 @@ function SectionSkeleton() {
       {[3, 2].map((rows, c) => (
         <section key={c} className="surface-group">
           <header className="border-b border-border px-4 py-3">
-            <SkeletonText
-              className="text-sm font-semibold"
-              width={c ? '22%' : '30%'}
-            />
-            <SkeletonText className="mt-0.5 text-xs" width="58%" />
+            <SkeletonText className="text-section" width={c ? '22%' : '30%'} />
+            <SkeletonText className="mt-0.5 text-meta" width="58%" />
           </header>
           <div className="divide-y divide-border">
             {Array.from({ length: rows }, (_, i) => (
               <div key={i} className="flex items-start gap-4 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <SkeletonText
-                    className="text-sm font-medium"
-                    width={`${38 - i * 6}%`}
-                  />
-                  <SkeletonText className="mt-0.5 text-xs" width="62%" />
+                  <SkeletonText className="text-row" width={`${38 - i * 6}%`} />
+                  <SkeletonText className="mt-0.5 text-meta" width="62%" />
                 </div>
                 <div className="flex min-h-7 shrink-0 items-center">
                   <SkeletonBlock className="h-7 w-28 rounded-md" />
@@ -1069,7 +1061,7 @@ function NavItem({
       onClick={onClick}
       title={label}
       className={cn(
-        'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 @max-[44rem]/settings:justify-center @max-[44rem]/settings:px-0',
+        'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-copy transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 @max-[44rem]/settings:justify-center @max-[44rem]/settings:px-0',
         active
           ? 'bg-selected font-medium text-foreground'
           : 'text-muted-foreground hover:bg-selected/50 hover:text-foreground'
@@ -1103,7 +1095,7 @@ function NavItem({
           />
         ) : changes > 0 ? (
           <span
-            className="shrink-0 rounded-full bg-primary/12 px-1.5 text-2xs font-semibold text-primary tabular-nums"
+            className="shrink-0 rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
             title={`${changes} unsaved ${changes === 1 ? 'change' : 'changes'}`}
           >
             {changes}
@@ -1111,7 +1103,7 @@ function NavItem({
         ) : hint ? (
           <span
             className={cn(
-              'shrink-0 text-2xs font-normal',
+              'shrink-0 text-caption',
               hint.tone === 'warn'
                 ? 'text-status-interrupted'
                 : 'text-muted-foreground/70'
@@ -1136,11 +1128,11 @@ function SubHeading({
 }) {
   return (
     <div className="pt-3">
-      <h3 className="flex items-center gap-2 text-sm font-semibold">
+      <h3 className="flex items-center gap-2 text-section">
         {title}
         {chip}
       </h3>
-      {help && <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>}
+      {help && <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>}
     </div>
   )
 }
@@ -1159,11 +1151,13 @@ function CardHeader({
   return (
     <header className="flex items-start gap-3 border-b border-border px-4 py-3">
       <div className="min-w-0 flex-1">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <h3 className="flex items-center gap-2 text-section">
           {title}
           {chip}
         </h3>
-        {help && <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>}
+        {help && (
+          <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>
+        )}
       </div>
       {action}
     </header>
@@ -1250,7 +1244,7 @@ function Chip({
   return (
     <span
       className={cn(
-        'rounded px-1.5 text-2xs leading-4 font-medium',
+        'rounded-sm px-1.5 text-caption leading-4',
         CHIP_TONE[tone]
       )}
     >
@@ -1270,7 +1264,7 @@ function StateChip({
     <span
       title={title}
       className={cn(
-        'rounded px-1.5 text-2xs leading-4 font-medium',
+        'rounded-sm px-1.5 text-caption leading-4',
         STATE_CHIP[state].className
       )}
     >
@@ -1380,7 +1374,7 @@ function HubPairing({
         return paired ? (
           <div className="flex items-center gap-3">
             <CircleCheck className="size-4 shrink-0 text-status-succeeded" />
-            <p className="min-w-0 flex-1 text-sm">
+            <p className="min-w-0 flex-1 text-copy">
               This desktop is paired with the hub. Use Check connection to see
               as whom.
             </p>
@@ -1397,8 +1391,8 @@ function HubPairing({
         ) : (
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Pair this desktop</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="text-row">Pair this desktop</p>
+              <p className="mt-0.5 text-meta text-muted-foreground">
                 {state.note ??
                   'You get a code to send to Pace in Slack. Mentions you make then come to this desktop.'}
               </p>
@@ -1411,7 +1405,7 @@ function HubPairing({
         )
       case 'starting':
         return (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 text-copy text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" />
             Getting a code from the hub
           </p>
@@ -1419,11 +1413,11 @@ function HubPairing({
       case 'waiting':
         return (
           <div className="space-y-2.5">
-            <p className="text-sm">
+            <p className="text-copy">
               In Slack, mention Pace with this code in any channel it is in:
             </p>
             <div className="flex items-center gap-3">
-              <code className="rounded-lg bg-card px-3 py-2 font-mono text-base font-semibold tracking-wide shadow-xs select-all">
+              <code className="rounded-lg bg-card px-3 py-2 font-mono text-heading tracking-wide shadow-xs select-all">
                 @Pace connect {state.code}
               </code>
               <Button size="sm" variant="ghost" onClick={() => cancel()}>
@@ -1431,7 +1425,7 @@ function HubPairing({
               </Button>
             </div>
             {/* Pace itself is watching Slack for the mention. */}
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <PaceSpinner className="size-6" />
               <span>
                 <span className="text-shimmer">Waiting for the code.</span> It
@@ -1444,9 +1438,9 @@ function HubPairing({
       case 'confirming':
         return (
           <div className="flex items-center gap-3">
-            <p className="min-w-0 flex-1 text-sm">
+            <p className="min-w-0 flex-1 text-copy">
               <b>{state.user.name}</b>{' '}
-              <span className="font-mono text-xs text-muted-foreground">
+              <span className="font-mono text-meta text-muted-foreground">
                 ({state.user.id})
               </span>{' '}
               sent the code. Is this your Slack account?
@@ -1479,7 +1473,7 @@ function HubPairing({
         return (
           <div className="flex items-center gap-3">
             <TriangleAlert className="size-4 shrink-0 text-status-failed" />
-            <p className="min-w-0 flex-1 text-sm text-status-failed">
+            <p className="min-w-0 flex-1 text-copy text-status-failed">
               {state.message}
             </p>
             <Button
@@ -1514,7 +1508,7 @@ function Requirements({
   return (
     <ul className="space-y-1.5 border-t border-border bg-well/60 px-4 py-2.5">
       {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-2 text-xs">
+        <li key={item.label} className="flex items-center gap-2 text-meta">
           {item.ok ? (
             <CircleCheck className="size-3.5 shrink-0 text-status-succeeded" />
           ) : (
@@ -1554,7 +1548,7 @@ function PathControl({
       {/* A long path is cut short here; hover shows it whole. */}
       <span
         title={path}
-        className="max-w-64 truncate font-mono text-xs text-muted-foreground select-text"
+        className="max-w-64 truncate font-mono text-meta text-muted-foreground select-text"
       >
         {path}
       </span>
@@ -1697,7 +1691,7 @@ function Choice({
               onClick={() => onChange(option.value)}
               className="flex flex-1 flex-col justify-start rounded-xl px-3 py-2.5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
             >
-              <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="flex items-center gap-2 text-row">
                 <span
                   className={cn(
                     'grid size-3.5 shrink-0 place-items-center rounded-full border',
@@ -1711,7 +1705,7 @@ function Choice({
                 {option.label}
               </span>
               {option.help && (
-                <span className="mt-1 block text-xs text-muted-foreground">
+                <span className="mt-1 block text-meta text-muted-foreground">
                   {option.help}
                 </span>
               )}
@@ -1719,7 +1713,7 @@ function Choice({
             {footer && (
               <div
                 className={cn(
-                  'flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1.5 border-t px-3 py-2 text-xs',
+                  'flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1.5 border-t px-3 py-2 text-meta',
                   checked ? 'border-primary/20' : 'border-border'
                 )}
               >
@@ -1761,7 +1755,7 @@ function Control({
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                'font-mono text-xs',
+                'font-mono text-meta',
                 secret?.set ? 'text-foreground' : 'text-muted-foreground'
               )}
             >
@@ -1792,7 +1786,7 @@ function Control({
                 onEdit(false)
               }
             }}
-            className="h-7 font-mono text-xs"
+            className="h-7 font-mono text-meta"
           />
           <Button size="xs" onClick={onSave} disabled={!value.trim() || saving}>
             Save
@@ -1815,7 +1809,7 @@ function Control({
         <select
           value={value || field.default || ''}
           onChange={(e) => onChange(e.target.value)}
-          className="h-7 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 dark:bg-input/30"
+          className="h-7 rounded-md border border-input bg-background px-2 text-meta outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 dark:bg-input/30"
         >
           {field.options?.map((option) => (
             <option key={option.value} value={option.value}>
@@ -1835,7 +1829,7 @@ function Control({
           }
           onChange={(e) => onChange(e.target.value)}
           className={cn(
-            'h-7 text-xs',
+            'h-7 text-meta',
             field.type === 'number'
               ? 'w-32 text-right tabular-nums'
               : 'w-72 max-w-full'
@@ -1867,8 +1861,10 @@ function Row({
       className="flex items-start gap-4 px-4 py-3 @max-[36rem]/content:flex-col @max-[36rem]/content:gap-2"
     >
       <div className="min-w-0 flex-1 @max-[36rem]/content:w-full">
-        <div className="text-sm font-medium">{label}</div>
-        {help && <p className="mt-0.5 text-xs text-muted-foreground">{help}</p>}
+        <div className="text-row">{label}</div>
+        {help && (
+          <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>
+        )}
         <RowNotes warning={warning} issue={issue} />
       </div>
       <div className="flex min-h-7 max-w-full shrink-0 items-center">
@@ -1882,13 +1878,13 @@ function RowNotes({ warning, issue }: { warning?: string; issue?: string }) {
   return (
     <>
       {warning && (
-        <p className="mt-1 flex items-center gap-1 text-xs text-status-interrupted">
+        <p className="mt-1 flex items-center gap-1 text-meta text-status-interrupted">
           <TriangleAlert className="size-3.5 shrink-0" />
           <span className="select-text">{warning}</span>
         </p>
       )}
       {issue && (
-        <p className="mt-1 text-xs text-status-failed select-text">{issue}</p>
+        <p className="mt-1 text-meta text-status-failed select-text">{issue}</p>
       )}
     </>
   )
@@ -1920,7 +1916,7 @@ function ThemePicker() {
           aria-checked={mode === value}
           onClick={() => setMode(value)}
           className={cn(
-            'flex h-6 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
+            'flex h-6 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
             mode === value
               ? 'bg-card text-foreground shadow-xs dark:bg-selected'
               : 'text-muted-foreground hover:text-foreground'
@@ -2006,7 +2002,7 @@ function UpdatesCard({ update }: { update: UpdateState | undefined }) {
         >
           {update?.available && latest ? (
             <div className="flex items-center gap-1">
-              <code className="rounded-md bg-muted px-2 py-1 font-mono text-xs select-text">
+              <code className="rounded-md bg-muted px-2 py-1 font-mono text-meta select-text">
                 {BREW_UPGRADE}
               </code>
               <CopyButton text={BREW_UPGRADE} />
@@ -2075,7 +2071,7 @@ function Advanced({
       onOpenChange={setOpen}
       className={cn(bordered && 'border-t border-border')}
     >
-      <CollapsibleTrigger className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs text-muted-foreground hover:text-foreground">
+      <CollapsibleTrigger className="flex w-full items-center gap-1 px-4 py-2 text-left text-meta text-muted-foreground hover:text-foreground">
         <ChevronRight
           className={cn('size-3.5 transition-transform', open && 'rotate-90')}
         />
@@ -2092,7 +2088,7 @@ function CheckResult({ items }: { items: SlackCheckItem[] }) {
   return (
     <ul className="space-y-1 border-b border-border bg-well/60 px-4 py-2.5">
       {items.map((item) => (
-        <li key={item.label} className="flex items-start gap-2 text-xs">
+        <li key={item.label} className="flex items-start gap-2 text-meta">
           {item.ok ? (
             <CircleCheck className="mt-px size-3.5 shrink-0 text-status-succeeded" />
           ) : (

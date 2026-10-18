@@ -22,8 +22,8 @@ export function SlackAppSetup() {
     <div className="border-t border-border bg-well/60 px-4 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">No Slack app yet?</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="text-row">No Slack app yet?</p>
+          <p className="mt-0.5 text-meta text-muted-foreground">
             Slack opens with Pacenote's manifest filled in: choose your
             workspace and create the app.
           </p>
@@ -35,7 +35,7 @@ export function SlackAppSetup() {
           </a>
         </Button>
       </div>
-      <ol className="mt-2.5 list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+      <ol className="mt-2.5 list-decimal space-y-1 pl-5 text-meta text-muted-foreground">
         <li>
           Basic Information &gt; App-Level Tokens: generate a token with the
           connections:write scope. That is the App token.

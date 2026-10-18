@@ -28,11 +28,11 @@ export function ResumeSetup({
   return (
     <section
       aria-labelledby="resume-setup"
-      className="mt-6 flex items-center gap-5 rounded-2xl bg-card-accent px-6 py-5"
+      className="mt-6 flex items-center gap-5 rounded-xl bg-card-accent px-6 py-5"
     >
       <PacenoteMark className="size-10 shrink-0" />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <b id="resume-setup" className="text-sm font-semibold">
+        <b id="resume-setup" className="text-section">
           Finish setting up Pace
         </b>
         <span className="text-body text-muted-foreground">
@@ -58,7 +58,7 @@ export function ResumeSetup({
         <button
           type="button"
           onClick={onFinish}
-          className="text-xs font-semibold text-primary hover:underline"
+          className="text-meta font-semibold text-primary hover:underline"
         >
           Set it up in Settings instead
         </button>
@@ -139,18 +139,13 @@ function Fact({
 }) {
   return (
     <div className="flex flex-col gap-1 @min-[40rem]:px-6 @min-[40rem]:first:pl-0">
-      <span className="text-xs font-semibold text-muted-foreground">
+      <span className="text-meta font-semibold text-muted-foreground">
         {label}
       </span>
-      <span
-        className={cn(
-          'text-base font-semibold',
-          accent && 'text-status-running'
-        )}
-      >
+      <span className={cn('text-heading', accent && 'text-status-running')}>
         {value}
       </span>
-      <span className="text-xs text-muted-foreground">{hint}</span>
+      <span className="text-meta text-muted-foreground">{hint}</span>
     </div>
   )
 }

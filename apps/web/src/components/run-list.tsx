@@ -72,7 +72,7 @@ export function RunList({
               aria-checked={kind === filter.value}
               onClick={() => setKind(filter.value)}
               className={cn(
-                'h-6 flex-auto rounded-md px-1.5 text-xs font-medium whitespace-nowrap transition-colors',
+                'h-6 flex-auto rounded-md px-1.5 text-meta font-medium whitespace-nowrap transition-colors',
                 kind === filter.value
                   ? 'bg-card text-foreground shadow-xs dark:bg-selected'
                   : 'text-muted-foreground hover:text-foreground'
@@ -82,7 +82,7 @@ export function RunList({
             </button>
           ))}
         </div>
-        <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-xs text-muted-foreground">
+        <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-meta text-muted-foreground">
           Status
           <select
             value={status ?? ''}
@@ -107,7 +107,7 @@ export function RunList({
           >
             {groupByDay(runs.data ?? []).map((group) => (
               <section key={group.day} className="mt-2 first:mt-0">
-                <h3 className="px-3 pt-1.5 pb-1 text-2xs font-medium text-muted-foreground">
+                <h3 className="px-3 pt-1.5 pb-1 text-caption text-muted-foreground">
                   {group.day}
                 </h3>
                 <div className="space-y-0.5">
@@ -124,7 +124,7 @@ export function RunList({
               </section>
             ))}
             {runs.data && runs.data.length === 0 && (
-              <p className="px-3 py-10 text-center text-sm text-muted-foreground">
+              <p className="px-3 py-10 text-center text-copy text-muted-foreground">
                 {q || status
                   ? 'No runs match the filters.'
                   : kind === 'collection'
@@ -133,7 +133,7 @@ export function RunList({
               </p>
             )}
             {runs.isError && (
-              <p className="px-3 py-10 text-center text-sm text-destructive">
+              <p className="px-3 py-10 text-center text-copy text-destructive">
                 Could not load run history.
               </p>
             )}
@@ -158,10 +158,7 @@ const ITEM_WIDTHS = [
 function RunListSkeleton() {
   return (
     <section>
-      <SkeletonText
-        className="px-3 pt-1.5 pb-1 text-2xs font-medium"
-        width="18%"
-      />
+      <SkeletonText className="px-3 pt-1.5 pb-1 text-caption" width="18%" />
       <div className="space-y-0.5">
         {ITEM_WIDTHS.map(([title, meta], i) => (
           <div key={i} className="flex w-full gap-2.5 rounded-xl px-3 py-2.5">
@@ -171,7 +168,7 @@ function RunListSkeleton() {
                 className="text-body leading-snug font-medium"
                 width={title}
               />
-              <SkeletonText className="mt-1.5 text-2xs" width={meta} />
+              <SkeletonText className="mt-1.5 text-caption" width={meta} />
             </span>
           </div>
         ))}
@@ -217,7 +214,7 @@ function RunListItem({
             <span className="text-muted-foreground">(empty request)</span>
           )}
         </span>
-        <span className="mt-1.5 flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3 [&_svg]:shrink-0">
+        <span className="mt-1.5 flex items-center gap-1.5 text-caption text-muted-foreground [&_svg]:size-3 [&_svg]:shrink-0">
           {/* What it was: a mention from a channel, or a task collection */}
           {collection ? (
             <>

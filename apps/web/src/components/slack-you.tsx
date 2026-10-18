@@ -10,7 +10,7 @@ export function SlackYou({ owners }: { owners: string[] }) {
   if (you === undefined) return null
   const name = you ? (you.name ?? you.id) : undefined
   return (
-    <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+    <div className="border-t border-border px-4 py-3 text-meta text-muted-foreground">
       {you ? (
         <p>
           In Slack you are{' '}

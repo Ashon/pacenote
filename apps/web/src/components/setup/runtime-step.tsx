@@ -134,7 +134,7 @@ export function RuntimeStep({
           onChoose={() => setChosen('vm')}
         >
           <span className="flex items-center gap-2">
-            <b className="text-sm">Built-in sandbox</b>
+            <b className="text-section">Built-in sandbox</b>
             {unsupported ? (
               <Chip tone="neutral">Not on this Mac</Chip>
             ) : (
@@ -158,7 +158,7 @@ export function RuntimeStep({
           checked={runtime === 'none'}
           onChoose={() => setChosen('none')}
         >
-          <b className="text-sm">Directly on this Mac</b>
+          <b className="text-section">Directly on this Mac</b>
           <Point>Nothing to install or prepare</Point>
           <Point warn>
             Uses your own login and can read the files you point it to
@@ -270,11 +270,9 @@ export function SandboxLogin({
 }) {
   const name = cli === 'claude' ? 'Claude' : 'Codex'
   return (
-    <div className="flex flex-col gap-2 rounded-2xl px-4 py-3.5 ring-1 ring-border">
+    <div className="flex flex-col gap-2 rounded-xl px-4 py-3.5 ring-1 ring-border">
       <span className="flex flex-wrap items-center gap-2">
-        <b className="text-sm font-semibold">
-          The sandbox needs its own {name} sign-in
-        </b>
+        <b className="text-section">The sandbox needs its own {name} sign-in</b>
         {required && !signedIn && <Chip tone="warn">Required</Chip>}
         {signedIn && (
           <Chip tone="ok">
@@ -351,8 +349,8 @@ function Preparing({
         </>
       }
     >
-      <div className="flex flex-col gap-2.5 rounded-2xl bg-well px-5 py-4">
-        <span aria-live="polite" className="text-sm font-semibold">
+      <div className="flex flex-col gap-2.5 rounded-xl bg-well px-5 py-4">
+        <span aria-live="polite" className="text-section">
           {failed
             ? 'Preparing stopped'
             : done
@@ -377,7 +375,7 @@ function Preparing({
             style={{ width: `${Math.max(percent, 4)}%` }}
           />
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           Done once. After this, each request starts its sandbox in about a
           second.
         </span>
@@ -386,7 +384,7 @@ function Preparing({
         {progress?.parts.map((part) => (
           <li
             key={part.id}
-            className="flex items-center gap-3 border-b border-border py-2.5 text-sm last:border-b-0"
+            className="flex items-center gap-3 border-b border-border py-2.5 text-copy last:border-b-0"
           >
             <span
               className={cn(

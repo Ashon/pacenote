@@ -94,8 +94,8 @@ export function DebugPage() {
     <ScrollArea className="h-full">
       <div className="@container max-w-4xl space-y-8 px-8 py-7">
         <header>
-          <h1 className="text-lg font-semibold tracking-tight">Debug</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-title">Debug</h1>
+          <p className="mt-1 text-copy text-muted-foreground">
             Only in development builds. Nothing here changes Pace or its
             settings.
           </p>
@@ -149,13 +149,13 @@ function SpinnerBench() {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-sm font-semibold">Spinner</h2>
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <h2 className="mr-auto text-section">Spinner</h2>
+        <span className="text-meta text-muted-foreground tabular-nums">
           {loop}
         </span>
         <span
           className={cn(
-            'text-xs tabular-nums',
+            'text-meta tabular-nums',
             fps < 55 ? 'text-status-interrupted' : 'text-muted-foreground'
           )}
           title="Frames drawn in the last second, and the longest gap between two"
@@ -174,7 +174,7 @@ function SpinnerBench() {
       </div>
 
       {length > 0 && (
-        <label className="flex items-center gap-3 text-xs text-muted-foreground">
+        <label className="flex items-center gap-3 text-meta text-muted-foreground">
           Jump to
           <input
             type="range"
@@ -194,7 +194,7 @@ function SpinnerBench() {
           {SIZES.map((size) => (
             <figure
               key={size}
-              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
+              className="flex flex-col items-center gap-2 text-caption text-muted-foreground"
             >
               <div style={{ width: size, height: size }}>
                 <PaceSpinner className="size-full" />
@@ -209,7 +209,7 @@ function SpinnerBench() {
           {SIZES.map((size) => (
             <figure
               key={size}
-              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
+              className="flex flex-col items-center gap-2 text-caption text-muted-foreground"
             >
               <div style={{ width: size, height: size }}>
                 <PaceSpinner writing className="size-full" />
@@ -225,7 +225,7 @@ function SpinnerBench() {
             <div
               key={bg}
               className={cn(
-                'flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-xs font-medium text-status-running',
+                'flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-meta font-medium text-status-running',
                 bg
               )}
             >
@@ -280,12 +280,10 @@ function SettleBench() {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-sm font-semibold">
-          Loading, then the logo
-        </h2>
+        <h2 className="mr-auto text-section">Loading, then the logo</h2>
         <SpeedPicker value={speed} onChange={setSpeed} />
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         Pace looks around while a load runs and eases back into the logo when it
         ends, wherever it was. The loop is still for its first 0.3 seconds, so a
         shorter load never moves.
@@ -305,7 +303,7 @@ function SettleBench() {
           {loading ? <Square /> : <Play />}
           {loading ? 'Stop' : 'Load until stopped'}
         </Button>
-        <span className="ml-1 text-xs text-muted-foreground">
+        <span className="ml-1 text-meta text-muted-foreground">
           {loading
             ? length === undefined
               ? 'Loading until stopped'
@@ -325,7 +323,7 @@ function SettleBench() {
           {[24, 28, 48, 96, 192].map((size) => (
             <figure
               key={size}
-              className="flex flex-col items-center gap-2 text-2xs text-muted-foreground"
+              className="flex flex-col items-center gap-2 text-caption text-muted-foreground"
             >
               <div style={{ width: size, height: size }}>
                 <PaceSpinner active={loading} className="size-full" />
@@ -339,15 +337,17 @@ function SettleBench() {
             Pace's avatar sits and becomes the avatar when the answer comes. */}
         <div className="flex max-w-xl gap-3">
           <PaceSpinner active={loading} className="mt-1" />
-          <div className="min-w-0 flex-1 rounded-[20px] bg-card-accent px-5 py-4 text-sm">
+          <div className="min-w-0 flex-1 rounded-[20px] bg-card-accent px-5 py-4 text-copy">
             <div className="flex items-baseline gap-2">
               <span className="font-semibold">Pace</span>
               {loading ? (
-                <span className="text-shimmer text-2xs font-medium text-status-running">
+                <span className="text-shimmer text-caption text-status-running">
                   Working
                 </span>
               ) : (
-                <span className="text-2xs text-muted-foreground">Just now</span>
+                <span className="text-caption text-muted-foreground">
+                  Just now
+                </span>
               )}
             </div>
             <p className="mt-2 leading-relaxed">
@@ -379,14 +379,14 @@ function MarkBench() {
 
   return (
     <section className="space-y-5">
-      <h2 className="text-sm font-semibold">Pace screen</h2>
-      <p className="text-xs text-muted-foreground">
+      <h2 className="text-section">Pace screen</h2>
+      <p className="text-meta text-muted-foreground">
         The mark beside Pace&apos;s name. It looks around while Pace starts or
         stops, turns once in 16 seconds while Pace is connected, and four times
         as fast while it answers. Stopped, it is a gray stop sign. Switch states
         to see it change.
       </p>
-      <div className="grid gap-x-8 gap-y-3 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]">
+      <div className="grid gap-x-8 gap-y-3 text-meta text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>
         <Choice
           options={Object.keys(MARK_STATES).map((name) => ({
@@ -407,15 +407,13 @@ function MarkBench() {
         <div className="flex items-start gap-4">
           <BotMark tone={tone} answering={answering} className="mt-1" />
           <div>
-            <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <div className="flex items-center gap-2 text-title">
               Pace
-              <span
-                className={cn('text-sm font-medium', TONE_CLASS[tone].text)}
-              >
+              <span className={cn('text-row', TONE_CLASS[tone].text)}>
                 {pace}
               </span>
             </div>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-copy text-muted-foreground">
               {answering
                 ? `Answering ${active} ${active === 1 ? 'mention' : 'mentions'}`
                 : 'As on the Pace screen, at 40 px and at 96 px'}
@@ -490,17 +488,17 @@ function StatusBench() {
 
   return (
     <section className="space-y-5">
-      <h2 className="text-sm font-semibold">Status bar</h2>
-      <p className="text-xs text-muted-foreground">
+      <h2 className="text-section">Status bar</h2>
+      <p className="text-meta text-muted-foreground">
         The window&apos;s footer in made-up states. Requests and check issues
         show while Pace runs (Connected, Reconnecting, Disconnected).
       </p>
-      <div className="grid gap-x-8 gap-y-3 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]">
+      <div className="grid gap-x-8 gap-y-3 text-meta text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>
         <select
           value={pace}
           onChange={(e) => setPace(e.target.value)}
-          className="h-7 w-fit rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 dark:bg-input/30"
+          className="h-7 w-fit rounded-md border border-input bg-background px-2 text-meta text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 dark:bg-input/30"
         >
           {Object.keys(PACE_STATES).map((name) => (
             <option key={name}>{name}</option>
@@ -549,7 +547,7 @@ function StatusBench() {
           onOpenRoute={setOpened}
         />
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         {opened
           ? `That click would open ${opened}.`
           : 'Click an item to see where it would go. (the folder button opens Finder)'}
@@ -588,10 +586,10 @@ function MotionBench() {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-sm font-semibold">Motion</h2>
+        <h2 className="mr-auto text-section">Motion</h2>
         <SpeedPicker value={speed} onChange={setSpeed} />
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-meta text-muted-foreground">
         Each pattern on the components the screens use. With reduced motion on,
         nothing moves or resizes and what comes and goes fades.
       </p>
@@ -603,7 +601,7 @@ function MotionBench() {
             onChange={setScreen}
           />
           <Swap id={screen} className="mt-3">
-            <p className="rounded-xl bg-well px-4 py-6 text-sm">
+            <p className="rounded-xl bg-well px-4 py-6 text-copy">
               {screen}: the old screen fades out, then this one rises in.
             </p>
           </Swap>
@@ -620,7 +618,7 @@ function MotionBench() {
             </TabsList>
           </Tabs>
           <Swap id={tab} className="mt-3">
-            <p className="rounded-xl bg-well px-4 py-6 text-sm">
+            <p className="rounded-xl bg-well px-4 py-6 text-copy">
               The {tab} list.
             </p>
           </Swap>
@@ -628,7 +626,7 @@ function MotionBench() {
 
         <Bench title="reveal" note="A row opening in place">
           <Collapsible open={open} onOpenChange={setOpen}>
-            <CollapsibleTrigger className="group flex items-center gap-2 text-sm font-semibold">
+            <CollapsibleTrigger className="group flex items-center gap-2 text-section">
               <ChevronRight
                 className={cn(
                   'size-4 text-muted-foreground transition-transform',
@@ -666,7 +664,7 @@ function MotionBench() {
               <li
                 key={entry.key}
                 {...motionItem(entry)}
-                className="flex items-center border-t border-border py-2.5 text-sm"
+                className="flex items-center border-t border-border py-2.5 text-copy"
               >
                 <span className="flex-1">Task {entry.item}</span>
                 <Button
@@ -708,7 +706,7 @@ function MotionBench() {
             onOpenChange={() => setLayer(undefined)}
           >
             <DialogContent className="w-[28rem] gap-4 p-6">
-              <DialogTitle className="text-base font-semibold">
+              <DialogTitle className="text-heading">
                 Where should the session open?
               </DialogTitle>
               <DialogDescription className="text-body text-muted-foreground">
@@ -724,9 +722,7 @@ function MotionBench() {
           {layer === 'sheet' && (
             <Dialog open onOpenChange={() => setLayer(undefined)}>
               <DialogContent variant="sheet" className="w-[28rem] gap-3 p-6">
-                <DialogTitle className="text-sm font-semibold">
-                  Session log
-                </DialogTitle>
+                <DialogTitle className="text-section">Session log</DialogTitle>
                 <DialogDescription className="text-body text-muted-foreground">
                   It slides in and goes at once.
                 </DialogDescription>
@@ -791,8 +787,8 @@ function AtWorkRow({ working, due }: { working: boolean; due: string }) {
   const flash = useFlash({ due })
   return (
     <div className="mt-3 border-t border-border pt-2.5">
-      <p className="text-sm font-semibold">Review the payments retry PR</p>
-      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <p className="text-section">Review the payments retry PR</p>
+      <p className="mt-1 flex flex-wrap items-center gap-2 text-meta text-muted-foreground">
         mina · #payments
         <span
           {...flash('due')}
@@ -827,7 +823,7 @@ function Bench({
   return (
     <div>
       <h3 className="text-body font-semibold">{title}</h3>
-      <p className="mb-3 text-xs text-muted-foreground">{note}</p>
+      <p className="mb-3 text-meta text-muted-foreground">{note}</p>
       {children}
     </div>
   )
@@ -870,7 +866,7 @@ function Choice<T extends string | number>({
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'h-6 rounded-md px-2.5 text-xs font-medium tabular-nums transition-colors',
+            'h-6 rounded-md px-2.5 text-meta font-medium tabular-nums transition-colors',
             value === option.value
               ? 'bg-card text-foreground shadow-xs dark:bg-selected'
               : 'text-muted-foreground hover:text-foreground'

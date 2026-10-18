@@ -2,12 +2,26 @@ import { clsx, type ClassValue } from 'clsx'
 import { extendTailwindMerge } from 'tailwind-merge'
 
 /**
- * Merges class names, the later winning a conflict. It knows the type scale's
- * own sizes (index.css), so text-body is a size beside a text color, not a
- * color that one replaces.
+ * Merges class names, the later winning a conflict. It knows the type roles
+ * (index.css), so text-meta is a size beside a text color, not a color that
+ * one replaces.
  */
 const twMerge = extendTailwindMerge({
-  extend: { theme: { text: ['2xs', 'body'] } },
+  extend: {
+    theme: {
+      text: [
+        'number',
+        'title',
+        'heading',
+        'section',
+        'row',
+        'copy',
+        'body',
+        'meta',
+        'caption',
+      ],
+    },
+  },
 })
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))

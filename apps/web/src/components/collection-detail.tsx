@@ -53,7 +53,7 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
     <Tabs defaultValue="result" className="flex h-full min-h-0 flex-col">
       <header className="border-b bg-card/90 px-8 pt-6 pb-0 backdrop-blur">
         <div className="mx-auto max-w-3xl">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-meta text-muted-foreground">
             <StatusBadge status={run.status} />
             <Badge variant="secondary">
               <ListChecks />
@@ -78,14 +78,14 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
               </a>
             </Button>
           </div>
-          <h1 className="mt-2.5 line-clamp-2 text-lg leading-snug font-semibold tracking-tight select-text">
+          <h1 className="mt-2.5 line-clamp-2 text-title leading-snug select-text">
             {collectionTitle(run)}
           </h1>
           <TabsList className="mt-4 mb-3">
             <TabsTrigger value="result">Result</TabsTrigger>
             <TabsTrigger value="lookups">
               Lookups
-              <span className="rounded bg-muted px-1 text-2xs tabular-nums">
+              <span className="rounded-sm bg-muted px-1 text-caption tabular-nums">
                 {run.reads ?? 0}
               </span>
             </TabsTrigger>
@@ -190,7 +190,7 @@ function Result({ run }: { run: CollectionRunRecord }) {
     !skipped.length
   )
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-copy text-muted-foreground">
         Nothing new to add, and no open task changed or closed.
       </p>
     )
@@ -221,7 +221,7 @@ function Result({ run }: { run: CollectionRunRecord }) {
       )}
       {closed.length > 0 && (
         <Section
-          icon={<CircleCheck className="text-chart-1" />}
+          icon={<CircleCheck className="text-primary" />}
           title="Closed"
           meta={`${closed.length} ${closed.length === 1 ? 'task' : 'tasks'}`}
         >
@@ -257,7 +257,7 @@ function Result({ run }: { run: CollectionRunRecord }) {
       )}
       {wrapped.length > 0 && (
         <Section
-          icon={<ClipboardCheck className="text-chart-1" />}
+          icon={<ClipboardCheck className="text-primary" />}
           title="Wrapped up"
           meta={`${wrapped.length} ${wrapped.length === 1 ? 'task' : 'tasks'}`}
         >
@@ -313,8 +313,8 @@ function Section({
     <section>
       <div className="flex items-center gap-2 [&_svg]:size-4 [&_svg]:shrink-0">
         {icon}
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="ml-auto text-xs text-muted-foreground">{meta}</span>
+        <h2 className="text-section">{title}</h2>
+        <span className="ml-auto text-meta text-muted-foreground">{meta}</span>
       </div>
       <ul className="mt-2.5">{children}</ul>
     </section>
@@ -337,14 +337,14 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <a
           href={`#/tasks/${encodeURIComponent(id)}`}
-          className="text-sm font-semibold underline-offset-2 hover:underline"
+          className="text-section underline-offset-2 hover:underline"
         >
           {title}
         </a>
-        {meta && <p className="mt-1 text-xs text-muted-foreground">{meta}</p>}
+        {meta && <p className="mt-1 text-meta text-muted-foreground">{meta}</p>}
       </div>
       {state && (
-        <span className={cn('shrink-0 text-xs', STATE[state].className)}>
+        <span className={cn('shrink-0 text-meta', STATE[state].className)}>
           {STATE[state].label}
         </span>
       )}
@@ -357,17 +357,17 @@ function Stopped({ run }: { run: CollectionRunRecord }) {
   const connector = /slack connector/i.test(run.error ?? '')
   return (
     <div className="space-y-5">
-      <div className="flex gap-2 rounded-xl bg-status-failed/10 px-4 py-3 text-sm">
+      <div className="flex gap-2 rounded-xl bg-status-failed/10 px-4 py-3 text-copy">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-failed" />
         <div className="min-w-0">
           <p className="font-medium text-status-failed">
             {run.status === 'interrupted' ? 'Stopped' : 'Could not finish'}
           </p>
-          <p className="mt-0.5 text-sm break-words">
+          <p className="mt-0.5 text-copy break-words">
             {run.error ?? 'The collection stopped before it finished.'}
           </p>
           {connector && (
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className="mt-1.5 text-meta text-muted-foreground">
               A collection reads Slack as you, through your AI tool&apos;s
               connector. Pace&apos;s own Slack connection answers mentions and
               is not used here.
@@ -375,7 +375,7 @@ function Stopped({ run }: { run: CollectionRunRecord }) {
           )}
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-copy text-muted-foreground">
         Nothing was added or closed.
       </p>
     </div>
@@ -406,7 +406,7 @@ function Lookups({
             key={index}
             className="grid grid-cols-[3.25rem_1.25rem_minmax(0,1fr)_auto] items-start gap-x-2.5 border-t border-border py-2.5"
           >
-            <span className="text-2xs leading-5 text-muted-foreground tabular-nums">
+            <span className="text-caption leading-5 text-muted-foreground tabular-nums">
               +{formatDuration(group.offsetMs)}
             </span>
             <span className="grid h-5 place-items-center text-muted-foreground [&_svg]:size-3.5">
@@ -416,26 +416,26 @@ function Lookups({
               <span className="flex flex-wrap items-center gap-1.5">
                 <span className="text-body font-medium">{group.label}</span>
                 {group.count > 1 && (
-                  <span className="rounded-md bg-muted px-1.5 text-2xs leading-[18px] font-medium tabular-nums">
+                  <span className="rounded-md bg-muted px-1.5 text-caption leading-[18px] tabular-nums">
                     ×{group.count}
                   </span>
                 )}
-                <span className="font-mono text-2xs text-muted-foreground">
+                <span className="font-mono text-caption text-muted-foreground">
                   {group.tool}
                 </span>
                 {group.failed > 0 && (
-                  <span className="text-2xs text-status-failed">
+                  <span className="text-caption text-status-failed">
                     {group.failed} failed
                   </span>
                 )}
               </span>
               {group.note && (
-                <span className="mt-0.5 block text-xs text-muted-foreground">
+                <span className="mt-0.5 block text-meta text-muted-foreground">
                   {group.note}
                 </span>
               )}
             </span>
-            <span className="text-2xs leading-5 text-muted-foreground tabular-nums">
+            <span className="text-caption leading-5 text-muted-foreground tabular-nums">
               {group.durationMs !== undefined
                 ? formatDuration(group.durationMs)
                 : ''}
@@ -443,7 +443,7 @@ function Lookups({
           </li>
         ))}
       </ol>
-      <p className="mt-4 flex items-start gap-2 rounded-xl bg-well px-3 py-2.5 text-xs text-muted-foreground">
+      <p className="mt-4 flex items-start gap-2 rounded-xl bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
         What Slack returned is not kept: it is your messages. The record keeps
         which tool ran, when and for how long.

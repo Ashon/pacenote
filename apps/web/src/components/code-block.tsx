@@ -49,12 +49,12 @@ export function CodeBlock({
       )}
     >
       {label && (
-        <div className="flex h-7 items-center border-b border-card px-3 text-2xs font-medium text-muted-foreground">
+        <div className="flex h-7 items-center border-b border-card px-3 text-caption text-muted-foreground">
           {label}
         </div>
       )}
       <ScrollArea viewportClassName={maxHeight}>
-        <pre className="px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words select-text">
+        <pre className="px-3 py-2 font-mono text-meta leading-relaxed whitespace-pre-wrap break-words select-text">
           {code}
         </pre>
       </ScrollArea>

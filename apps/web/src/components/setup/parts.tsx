@@ -41,11 +41,11 @@ export function StepFrame({
           <h1
             ref={heading}
             tabIndex={-1}
-            className="mt-1 text-lg font-semibold tracking-tight outline-none"
+            className="mt-1 text-title outline-none"
           >
             {title}
           </h1>
-          <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-1.5 max-w-xl text-copy text-muted-foreground">
             {lead}
           </p>
           <div className="mt-6 flex flex-col gap-4">{children}</div>
@@ -77,7 +77,7 @@ export function ChoiceCard({
   return (
     <label
       className={cn(
-        'flex gap-3 rounded-2xl p-4 ring-1 ring-border transition-colors',
+        'flex gap-3 rounded-xl p-4 ring-1 ring-border transition-colors',
         disabled
           ? 'cursor-default bg-well/60'
           : checked
@@ -121,7 +121,7 @@ export function Chip({
   return (
     <span
       className={cn(
-        'inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap [&_svg]:size-3.5',
+        'inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-meta font-semibold whitespace-nowrap [&_svg]:size-3.5',
         CHIP[tone],
         className
       )}
@@ -153,7 +153,7 @@ export function CommandLine({
         raised ? 'bg-card ring-1 ring-border' : 'bg-well'
       )}
     >
-      <code className="min-w-0 flex-1 truncate font-mono text-sm select-all">
+      <code className="min-w-0 flex-1 truncate font-mono text-copy select-all">
         {text}
       </code>
       <Button
@@ -197,7 +197,7 @@ export function Problem({
   return (
     <div
       role="alert"
-      className="flex flex-col gap-2 rounded-2xl bg-status-failed/8 px-4 py-3.5"
+      className="flex flex-col gap-2 rounded-xl bg-status-failed/8 px-4 py-3.5"
     >
       <div className="flex items-start gap-3">
         <TriangleAlert className="mt-px size-4 shrink-0 text-status-failed" />
@@ -206,10 +206,10 @@ export function Problem({
       </div>
       {details && (
         <details className="group pl-7">
-          <summary className="cursor-pointer text-xs font-semibold text-muted-foreground hover:text-foreground">
+          <summary className="cursor-pointer text-meta font-semibold text-muted-foreground hover:text-foreground">
             Details
           </summary>
-          <pre className="mt-1.5 max-h-32 overflow-auto rounded-xl bg-well px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+          <pre className="mt-1.5 max-h-32 overflow-auto rounded-xl bg-well px-3 py-2 font-mono text-meta whitespace-pre-wrap text-muted-foreground">
             {details}
           </pre>
         </details>

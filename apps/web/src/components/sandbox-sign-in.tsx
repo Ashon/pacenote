@@ -86,7 +86,7 @@ export function SandboxSignIn({
     <div className={cn('flex flex-col gap-3', className)}>
       {state.step === 'prompt' ? (
         <div className="flex flex-col gap-2.5">
-          <p className="text-sm">
+          <p className="text-copy">
             {state.prompt.code ? (
               <>
                 Open the {name} page and enter this code:{' '}
@@ -130,7 +130,7 @@ export function SandboxSignIn({
             </Button>
           </div>
           {(state.prompt.code || state.sent) && (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <LoaderCircle className="size-3.5 animate-spin" />
               {state.sent
                 ? 'Signing in…'
@@ -150,7 +150,7 @@ export function SandboxSignIn({
           <div className="min-w-0 flex-1">
             <p
               className={cn(
-                'text-sm',
+                'text-copy',
                 state.step === 'error' ? 'text-status-failed' : 'font-medium'
               )}
             >
@@ -163,7 +163,7 @@ export function SandboxSignIn({
                     : `Sign in to ${name} inside the sandbox`}
             </p>
             {state.step !== 'error' && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-meta text-muted-foreground">
                 {ready
                   ? `${name} signs in on ${cli === 'claude' ? 'Claude' : 'OpenAI'}'s own page and keeps its login in the sandbox. Pacenote never sees it. Uses your own plan.`
                   : 'Once the sandbox is ready: the sign-in runs inside it.'}

@@ -30,7 +30,7 @@ export function RunDetail({ id }: { id: string }) {
   const { data: run, isError } = useRun(id)
   if (isError) {
     return (
-      <p className="p-10 text-center text-sm text-muted-foreground">
+      <p className="p-10 text-center text-copy text-muted-foreground">
         Run not found.
       </p>
     )
@@ -102,10 +102,10 @@ function RunDetailSkeleton() {
         <div className="mx-auto max-w-3xl">
           <div className="flex h-6 items-center gap-2">
             <SkeletonBlock className="h-5 w-20 rounded-full" />
-            <SkeletonText className="w-60 text-xs" width="100%" />
+            <SkeletonText className="w-60 text-meta" width="100%" />
           </div>
           <SkeletonText
-            className="mt-2.5 text-lg leading-snug font-semibold"
+            className="mt-2.5 text-title leading-snug"
             width="55%"
           />
           <TabsList className="mt-4 mb-3">
@@ -131,10 +131,10 @@ function RunDetailSkeleton() {
               key={i}
               className="min-w-0 px-4 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[40rem]:[&:nth-child(3)]:border-l-0 @max-[40rem]:[&:nth-child(3)]:pl-0"
             >
-              <SkeletonText className="text-2xs" width="54%" />
-              <SkeletonText className="mt-1 text-sm" width="62%" />
+              <SkeletonText className="text-caption" width="54%" />
+              <SkeletonText className="mt-1 text-copy" width="62%" />
               <SkeletonText
-                className="text-2xs"
+                className="text-caption"
                 width={i % 2 ? '58%' : '70%'}
               />
             </div>
@@ -153,9 +153,15 @@ function RunDetailSkeleton() {
                     : 'min-w-0 flex-1 surface-card px-5 py-4'
                 }
               >
-                <SkeletonText className="mb-2 text-sm" width="24%" />
-                <SkeletonText className="text-sm leading-relaxed" width="86%" />
-                <SkeletonText className="text-sm leading-relaxed" width="58%" />
+                <SkeletonText className="mb-2 text-copy" width="24%" />
+                <SkeletonText
+                  className="text-copy leading-relaxed"
+                  width="86%"
+                />
+                <SkeletonText
+                  className="text-copy leading-relaxed"
+                  width="58%"
+                />
               </div>
             </div>
           ))}
@@ -173,7 +179,7 @@ function RunHeader({ run }: { run: RunRecord }) {
   return (
     <header className="border-b bg-card/90 px-8 pt-6 pb-0 backdrop-blur">
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-meta text-muted-foreground">
           <StatusBadge status={run.status} />
           <Badge variant="secondary">
             <AtSign />
@@ -207,7 +213,7 @@ function RunHeader({ run }: { run: RunRecord }) {
             </Button>
           )}
         </div>
-        <h1 className="mt-2.5 line-clamp-2 text-lg leading-snug font-semibold tracking-tight select-text">
+        <h1 className="mt-2.5 line-clamp-2 text-title leading-snug select-text">
           {run.request || '(empty request)'}
         </h1>
         <TabsList className="mt-4 mb-3">
@@ -215,7 +221,7 @@ function RunHeader({ run }: { run: RunRecord }) {
           <TabsTrigger value="attachments">
             Attachments
             {run.attachments.length > 0 && (
-              <span className="rounded bg-muted px-1 text-2xs tabular-nums">
+              <span className="rounded-sm bg-muted px-1 text-caption tabular-nums">
                 {run.attachments.length}
               </span>
             )}
@@ -311,18 +317,18 @@ function Attachments({ run }: { run: RunRecord }) {
                 <Icon className="size-4 text-muted-foreground" />
               </span>
             )}
-            <div className="min-w-0 flex-1 text-sm">
+            <div className="min-w-0 flex-1 text-copy">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium">{item.name}</span>
-                <span className={`text-xs ${status.className}`}>
+                <span className={`text-meta ${status.className}`}>
                   {status.label}
                 </span>
               </div>
               {item.source && (
-                <p className="text-xs text-muted-foreground">{item.source}</p>
+                <p className="text-meta text-muted-foreground">{item.source}</p>
               )}
               {item.reason && (
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-meta text-muted-foreground">
                   {item.reason}
                 </p>
               )}

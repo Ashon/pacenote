@@ -343,7 +343,7 @@ function RunsPage({
         <button
           type="button"
           onClick={() => onSelect()}
-          className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border px-4 text-sm font-medium text-muted-foreground hover:text-foreground"
+          className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border px-4 text-row text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
           Runs
@@ -376,7 +376,7 @@ function RunsPage({
         {selectedId ? (
           <RunDetail key={selectedId} id={selectedId} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-copy text-muted-foreground">
             <MousePointerClick className="size-5" strokeWidth={1.75} />
             Pick a run to see what it did: what Pace was asked and how it
             answered, or what a collection found.

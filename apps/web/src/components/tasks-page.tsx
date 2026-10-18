@@ -138,7 +138,7 @@ export function TasksPage({
   if (!bridge)
     return (
       <Page>
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="mt-6 text-copy text-muted-foreground">
           Tasks are gathered by the desktop app.
         </p>
       </Page>
@@ -305,7 +305,7 @@ export function TasksPage({
             }}
           />
           {tab === 'maybe' && (
-            <p className="mt-3 text-xs text-muted-foreground">
+            <p className="mt-3 text-meta text-muted-foreground">
               Guesses Pace is not sure about. They stay out of the list until
               you keep one.
             </p>
@@ -348,7 +348,7 @@ export function TasksPage({
             )}
           />
           {shown.length === 0 && (
-            <p className="border-t border-border py-8 text-sm text-muted-foreground">
+            <p className="border-t border-border py-8 text-copy text-muted-foreground">
               {tab === 'open'
                 ? data.collectedAt
                   ? 'Nothing open. The next collection reads what is new since this one.'
@@ -359,7 +359,7 @@ export function TasksPage({
             </p>
           )}
           {tab === 'done' && data.dismissRate !== undefined && (
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="mt-4 text-meta text-muted-foreground">
               You dismissed {Math.round(data.dismissRate * 100)}% of the tasks
               you settled. Above about 30%, Pace is picking too loosely.
             </p>
@@ -420,11 +420,11 @@ function TaskRowsSkeleton({ count }: { count: number }) {
         <li key={i} className="border-t border-border py-3.5">
           <div className="pl-6">
             <SkeletonText
-              className="text-sm leading-snug"
+              className="text-copy leading-snug"
               width={TITLE_WIDTHS[i % TITLE_WIDTHS.length]}
             />
             <SkeletonText
-              className="mt-1 text-xs leading-[1.125rem]"
+              className="mt-1 text-meta leading-[1.125rem]"
               width={META_WIDTHS[i % META_WIDTHS.length]}
             />
           </div>
@@ -487,7 +487,7 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
           data-state={notice.state}
           data-side="bottom"
           onClick={onShow}
-          className="motion-pop -mt-[30px] h-7 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="motion-pop -mt-[30px] h-7 rounded-full bg-primary px-3 text-meta font-semibold text-primary-foreground shadow-float outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           {said.current} new {said.current === 1 ? 'task' : 'tasks'}
         </button>
@@ -509,9 +509,9 @@ function Page({
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         <header className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">Todo</h1>
+          <h1 className="text-title">Todo</h1>
           {meta && (
-            <span className="text-sm text-muted-foreground">{meta}</span>
+            <span className="text-copy text-muted-foreground">{meta}</span>
           )}
           <span className="flex-1" />
           {action}
@@ -524,7 +524,7 @@ function Page({
 
 function Banner({ children }: { tone: 'note'; children: React.ReactNode }) {
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-sm">
+    <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy">
       {children}
     </div>
   )
@@ -622,7 +622,7 @@ function StatusLine({
   return (
     <Swap id={collect.running ? 'collect' : (line?.key ?? 'last')}>
       {line ? (
-        <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="mt-1 flex items-center gap-2 text-copy text-muted-foreground">
           {/* In the spinner's place: the tool at work, or done */}
           <span className="flex size-6 shrink-0 items-center justify-center">
             {line.active ? (
@@ -674,7 +674,7 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
   return (
     <p
       className={cn(
-        'mt-1 flex items-center gap-2 text-sm',
+        'mt-1 flex items-center gap-2 text-copy',
         last && !last.ok && !running
           ? 'text-status-interrupted'
           : 'text-muted-foreground'
@@ -734,10 +734,10 @@ function RecentCollections({
     >
       <div className="flex items-center gap-2">
         <History className="size-4 shrink-0 text-primary" />
-        <h2 id="collections-title" className="text-sm font-semibold">
+        <h2 id="collections-title" className="text-section">
           Recent collections
         </h2>
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="ml-auto text-meta text-muted-foreground">
           Last 7 days · {collections.length}{' '}
           {collections.length === 1 ? 'collection' : 'collections'} ·{' '}
           {formatTokens(total)} new
@@ -757,13 +757,13 @@ function RecentCollections({
               <span
                 title={collectionNote(entry)}
                 className={cn(
-                  'truncate text-xs',
+                  'truncate text-meta',
                   entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
                 )}
               >
                 {collectionNote(entry)}
               </span>
-              <span className="flex items-center justify-end gap-2.5 text-xs">
+              <span className="flex items-center justify-end gap-2.5 text-meta">
                 <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
                   {spent[index]! > 0 && (
                     <span
@@ -781,7 +781,7 @@ function RecentCollections({
         ))}
       </ul>
       {collections.length > RECENT_SHOWN && (
-        <p className="border-t border-border pt-2.5 text-xs text-muted-foreground">
+        <p className="border-t border-border pt-2.5 text-meta text-muted-foreground">
           {collections.length - RECENT_SHOWN} more in the last 7 days.
         </p>
       )}
@@ -841,7 +841,7 @@ function collectionNote(entry: CollectionRecord): string {
 function Setup() {
   return (
     <div className="mt-2">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-copy text-muted-foreground">
         Pacenote has Claude Code read Slack with its own Slack connector, and
         keeps a short list here of what people asked of you and what you said
         you would do. Pacenote holds no Slack token for this, and nothing is
@@ -882,8 +882,8 @@ function SetupPart({
 }) {
   return (
     <section className="rounded-xl border border-border px-4 py-3.5">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+      <h2 className="text-section">{title}</h2>
+      <p className="mt-1.5 text-copy leading-relaxed text-muted-foreground">
         {children}
       </p>
     </section>

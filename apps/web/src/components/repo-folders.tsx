@@ -32,22 +32,22 @@ export function RepoFolders() {
 
   return (
     <div className="px-4 pb-4">
-      <p className="text-sm font-medium">Repository folders</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+      <p className="text-row">Repository folders</p>
+      <p className="mt-0.5 text-meta text-muted-foreground">
         Where each repository&apos;s code tasks open. Chosen the first time a
         task needs one; Pacenote checks that the folder&apos;s git remote
         matches.
       </p>
       {names.length === 0 ? (
-        <p className="mt-2 text-xs text-muted-foreground">None yet.</p>
+        <p className="mt-2 text-meta text-muted-foreground">None yet.</p>
       ) : (
         <ul className="mt-2.5 divide-y divide-card overflow-hidden rounded-lg bg-well">
           {names.map((repo) => (
             <li key={repo} className="flex items-center gap-3 px-3 py-2">
-              <span className="w-44 shrink-0 truncate font-mono text-xs font-semibold">
+              <span className="w-44 shrink-0 truncate font-mono text-meta font-semibold">
                 {repo}
               </span>
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground select-text">
+              <span className="min-w-0 flex-1 truncate font-mono text-meta text-muted-foreground select-text">
                 {repos[repo]}
               </span>
               <Button
@@ -72,7 +72,7 @@ export function RepoFolders() {
         </ul>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-status-failed">
+        <p role="alert" className="mt-2 text-meta text-status-failed">
           {error}
         </p>
       )}

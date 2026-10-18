@@ -46,9 +46,9 @@ function Card({
     <section className="surface-group">
       <header className="flex items-start gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold">{title}</h3>
+          <h3 className="text-section">{title}</h3>
           {help && (
-            <div className="mt-0.5 text-xs text-muted-foreground">{help}</div>
+            <div className="mt-0.5 text-meta text-muted-foreground">{help}</div>
           )}
         </div>
         {action}
@@ -184,7 +184,7 @@ export function EnvironmentDetails({
       <JobLog sandbox={sandbox} kinds={['vm']} className="mt-3" />
       {chosen && status && vm && (
         <div className="mt-3 overflow-hidden rounded-lg bg-well">
-          <div className="flex items-center gap-2 py-1 pr-1.5 pl-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 py-1 pr-1.5 pl-4 text-meta text-muted-foreground">
             <span className="min-w-0 flex-1">
               Built-in sandbox on this Mac, checked{' '}
               {formatRelative(status.checkedAt)}
@@ -315,7 +315,7 @@ export function BrokerCard({ sandbox }: { sandbox: Sandbox }) {
         ))}
         {kinds.map((kind) => (
           <div key={kind} className="flex items-center gap-3 px-4 py-2.5">
-            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+            <p className="min-w-0 flex-1 text-meta text-muted-foreground">
               {SANDBOX_JOBS[kind].help}
             </p>
             <JobButton sandbox={sandbox} kind={kind} />
@@ -339,7 +339,7 @@ function Line({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex items-start gap-3 px-4 py-2.5 text-xs">
+    <div className="flex items-start gap-3 px-4 py-2.5 text-meta">
       <span className="w-28 shrink-0 font-medium">{label}</span>
       <div className="flex min-w-0 flex-1 items-center gap-1.5">{children}</div>
     </div>
@@ -363,7 +363,7 @@ export function PendingList({
   }
   if (pending.length === 0) return null
   return (
-    <div className="flex items-start gap-3 bg-status-interrupted/8 px-4 py-3 text-xs">
+    <div className="flex items-start gap-3 bg-status-interrupted/8 px-4 py-3 text-meta">
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-status-interrupted" />
       <div className="min-w-0 flex-1">
         <p className="font-medium text-status-interrupted">
@@ -437,7 +437,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
       }
     >
       <div className="space-y-3 px-4 py-3">
-        <p className="flex items-start gap-1.5 rounded-lg bg-status-interrupted/10 px-3 py-2 text-xs text-status-interrupted">
+        <p className="flex items-start gap-1.5 rounded-lg bg-status-interrupted/10 px-3 py-2 text-meta text-status-interrupted">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
           Opening a domain lets the reasoner sandbox send data there directly.
           For internal systems that need tokens (GitHub etc.), connect them as
@@ -451,17 +451,17 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
             return (
               <li
                 key={domain}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs"
+                className="flex items-center gap-2 px-3 py-1.5 text-meta"
               >
                 <span className="font-mono select-text">{domain}</span>
                 {isRequired && (
-                  <span className="flex items-center gap-1 rounded bg-muted px-1.5 text-2xs text-muted-foreground">
+                  <span className="flex items-center gap-1 rounded-sm bg-muted px-1.5 text-caption text-muted-foreground">
                     <Lock className="size-2.5" />
                     Needed by reasoner CLI
                   </span>
                 )}
                 {!saved.includes(domain) && (
-                  <span className="text-2xs text-primary">Added</span>
+                  <span className="text-caption text-primary">Added</span>
                 )}
                 {issue && (
                   <span className="text-status-failed">{issue.message}</span>
@@ -488,7 +488,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && add()}
             placeholder="api.example.com"
-            className="h-7 w-72 font-mono text-xs"
+            className="h-7 w-72 font-mono text-meta"
           />
           <Button
             size="sm"
@@ -517,7 +517,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
           </div>
         </div>
         {issues.some((item) => !domains.includes(item.domain ?? '')) && (
-          <ul className="text-xs text-status-failed">
+          <ul className="text-meta text-status-failed">
             {issues
               .filter((item) => !domains.includes(item.domain ?? ''))
               .map((item) => (
@@ -528,7 +528,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
           </ul>
         )}
         {notice && !dirty && (
-          <p className="text-xs text-status-interrupted">{notice}</p>
+          <p className="text-meta text-status-interrupted">{notice}</p>
         )}
       </div>
     </Card>
@@ -555,7 +555,7 @@ export function JobLog({
   if (!shown && !failed) return null
   return (
     <div className={cn('space-y-2', className)}>
-      {failed && <p className="text-xs text-status-failed">{failed}</p>}
+      {failed && <p className="text-meta text-status-failed">{failed}</p>}
       {shown && <JobOutput job={shown} outputRef={output} />}
     </div>
   )
@@ -573,7 +573,7 @@ function JobOutput({
     Date.parse(job.startedAt)
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2 text-xs">
+      <div className="mb-2 flex items-center gap-2 text-meta">
         {job.state === 'running' ? (
           <LoaderCircle className="size-3.5 shrink-0 animate-spin text-status-running" />
         ) : job.state === 'succeeded' ? (
@@ -596,7 +596,7 @@ function JobOutput({
         className="rounded-lg bg-well"
         viewportClassName="max-h-64"
       >
-        <pre className="select-text px-3 py-2 font-mono text-2xs leading-relaxed whitespace-pre-wrap break-words">
+        <pre className="select-text px-3 py-2 font-mono text-caption leading-relaxed whitespace-pre-wrap break-words">
           {job.output.join('\n')}
         </pre>
       </ScrollArea>

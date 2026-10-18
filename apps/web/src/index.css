@@ -6,20 +6,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Latin in Host Grotesk, Hangul in Pretendard: the two typefaces of Pacenote,
- * on pacenote.dev too, with capitals of the same height (0.700 and 0.707 of the
- * em), so a line that mixes them reads as one. Each face covers only its own
- * script, so Pretendard can come first: the system font would otherwise answer
- * for Hangul itself (Apple SD Gothic Neo) and Pretendard would never be
- * reached. Anything neither covers (symbols, kana, hanzi) falls to the system
- * font. Host Grotesk's figures are all one width, so numbers line up without
- * tabular-nums.
- *
- * Two fixes for a line that mixes them. The space is Pretendard's (0.251 em):
- * Host Grotesk's (0.307 em) left gaps between Hangul words a fifth wider than
- * Pretendard spaces them. And Host Grotesk is set 4% larger (size-adjust), so
- * its lowercase (0.496 em against Pretendard's 0.530) does not shrink beside
- * Hangul; its capitals then stand at 0.728, still under Hangul's 0.788.
+ * Latin in the system font (SF Pro), Hangul in Pretendard. SF Pro has optical
+ * sizes, so the 11-14px text most of a screen is set in stays sharp on a 1x
+ * display, where macOS does not hint fonts. Pretendard is drawn to sit beside
+ * it: lowercase of nearly the same height (0.530 and 0.508 of the em) and
+ * Hangul a little above the capitals, so a mixed line needs no resizing. The
+ * face covers only Hangul and the space, so it can come first: the system font
+ * would otherwise answer for Hangul itself (Apple SD Gothic Neo) and Pretendard
+ * would never be reached. The space is Pretendard's so words in a Korean line
+ * are spaced as Pretendard spaces them.
  */
 @font-face {
   font-family: 'Pretendard';
@@ -31,49 +26,61 @@
   unicode-range:
     U+0020, U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
 }
-@font-face {
-  font-family: 'Host Grotesk';
-  src: url('../node_modules/@fontsource-variable/host-grotesk/files/host-grotesk-latin-wght-normal.woff2')
-    format('woff2-variations');
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-  size-adjust: 104%;
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
-    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
-    U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Host Grotesk';
-  src: url('../node_modules/@fontsource-variable/host-grotesk/files/host-grotesk-latin-ext-wght-normal.woff2')
-    format('woff2-variations');
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-  size-adjust: 104%;
-  unicode-range:
-    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
-    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
 
 /*
- * The type scale. Text takes one of these sizes, never one of its own
- * (tests/web-type.test.ts): 2xs 11 for counts, pills and the status bar, xs 12
- * for meta lines, body 13 for lists, menus and dialogs (as macOS sets its own
- * body), sm 14 for row titles and forms, base 16, lg 18 for page titles, 3xl
- * for the big numbers.
+ * The type roles. A screen picks a role for its text, not a size: each role
+ * carries its size, line height and tracking, and its weight where the role is
+ * a weight (titles, section heads, row titles, captions). The sizes keep the
+ * steps the screens were laid out on. tests/web-type.test.ts fails on any
+ * other size, and on caption text set lighter than 500 (11px needs the weight
+ * to stay sharp on a 1x display).
+ *   number   30  big figures on Overview (with tabular-nums)
+ *   title    18  page titles, setup steps
+ *   heading  16  dialog titles, the Settings header, the wordmark
+ *   section  14  heads of cards and lists
+ *   row      14  titles of task and run rows, form labels
+ *   copy     14  paragraphs, notices, page subtitles, empty states, inputs
+ *   body     13  lists, menus and dialogs, as macOS sets its own body
+ *   meta     12  the line under a row; with font-mono, commands and paths
+ *   caption  11  counts, pills and the status bar
+ * Muted text is meta or larger, or a caption.
  */
 @theme {
-  --text-2xs: 0.6875rem;
+  --text-*: initial;
+  --text-number: 1.875rem;
+  --text-number--line-height: 2.25rem;
+  --text-number--letter-spacing: -0.02em;
+  --text-number--font-weight: 600;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.625rem;
+  --text-title--letter-spacing: -0.015em;
+  --text-title--font-weight: 600;
+  --text-heading: 1rem;
+  --text-heading--line-height: 1.375rem;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+  --text-section: 0.875rem;
+  --text-section--line-height: 1.25rem;
+  --text-section--font-weight: 600;
+  --text-row: 0.875rem;
+  --text-row--line-height: 1.25rem;
+  --text-row--font-weight: 500;
+  --text-copy: 0.875rem;
+  --text-copy--line-height: 1.25rem;
   --text-body: 0.8125rem;
+  --text-body--line-height: 1.1875rem;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.0625rem;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 0.9375rem;
+  --text-caption--letter-spacing: 0.01em;
+  --text-caption--font-weight: 500;
 }
 
 @theme inline {
   --font-sans:
-    'Pretendard', 'Host Grotesk', -apple-system, BlinkMacSystemFont,
-    'Apple SD Gothic Neo', 'Segoe UI', 'Noto Sans KR', sans-serif;
+    'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Segoe UI', 'Noto Sans KR', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -111,22 +118,33 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  /*
+   * Radii: sm 6, md 8, lg 10, xl 14, and 20 for a surface (surface-card).
+   * Height: a well is flat, a control takes shadow-xs, a surface the card
+   * shadow, and what lies over the content shadow-float.
+   */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
+  --shadow-float: var(--float-shadow);
   --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
 }
 
 /*
  * Colors are taken from the emerald -> mint gradient of the logo (assets/pacenote.svg).
  *   Logo #01ab78 -> #1fc289 -> #48c89c, ring edge mint #a8e7d3
- *   Text contrast: white on light primary #007c5c 5.2:1, #04281d on dark primary #3ccb96 7.7:1
- *   Statuses are text as much as dots, so each reads at 4.5:1 or more on white and on its own pill (12% tint).
+ *   Text contrast: white on light primary #007154 6.0:1, #04281d on dark primary #3ccb96 7.7:1; as text, light primary
+ *   reads 5.0:1 even on a selected row
+ *   Statuses are text as much as dots, so each reads at 4.5:1 or more on white, on its own pill (12% tint) and on a
+ *   selected row.
  *   Succeeded is a leaf green apart from the brand's teal green, so a selected item, a link or a badge in primary
  *   does not read as a success; running is teal.
- *   chart-4 is the series stacked on the gradient (task collections on tokens per day): primary in light, mint in
- *   dark, so it differs from the gradient in lightness in both.
+ *   chart-1 is for bars, charts and the text selection only: at 2.6:1 on white it is too faint for an icon or text,
+ *   which take primary.
+ *   chart-4 is the series stacked on the gradient (task collections on tokens per day): the brand's deep green in
+ *   light (#007c5c, a step lighter than primary, which darkened for text; diagrams lead with it too), mint in dark, so
+ *   it differs from the gradient in lightness in both.
  * Surfaces, not borders, set the levels. Higher surfaces are lighter. (same rule in light and dark)
  *   sidebar: the window's chrome, card: the one content surface raised beside it,
  *   card-accent: emphasized surface such as bot replies and the setup notice,
@@ -156,7 +174,7 @@
   --well: oklch(0.972 0.008 168);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.23 0.025 172);
-  --primary: #007c5c;
+  --primary: #007154;
   --primary-foreground: #ffffff;
   --secondary: oklch(0.945 0.018 165);
   --secondary-foreground: oklch(0.3 0.05 168);
@@ -173,8 +191,8 @@
   --sidebar-accent: oklch(0.935 0.04 165);
   --sidebar-accent-foreground: oklch(0.27 0.06 165);
   --sidebar-border: oklch(0.91 0.016 168);
-  --status-running: oklch(0.51 0.1 185);
-  --status-succeeded: oklch(0.51 0.135 150);
+  --status-running: #007369;
+  --status-succeeded: #0b7637;
   --status-failed: oklch(0.53 0.19 25);
   --status-interrupted: oklch(0.53 0.125 65);
   --chart-1: #0cb67e;
@@ -187,6 +205,10 @@
   --card-shadow:
     0 1px 2px oklch(0.3 0.03 170 / 0.05),
     0 10px 28px -14px oklch(0.3 0.03 170 / 0.14);
+  /* Float shadow: what lies over the content (menus, tooltips, dialogs) */
+  --float-shadow:
+    0 2px 6px oklch(0.3 0.03 170 / 0.06),
+    0 18px 40px -12px oklch(0.3 0.03 170 / 0.22);
 }
 
 .dark {
@@ -229,6 +251,8 @@
   --chart-4: #a8e7d3;
   --chart-5: oklch(0.72 0.1 200);
   --card-shadow: 0 1px 2px oklch(0 0 0 / 0.25);
+  --float-shadow:
+    0 2px 6px oklch(0 0 0 / 0.3), 0 18px 40px -12px oklch(0 0 0 / 0.55);
 }
 
 @utility surface-card {

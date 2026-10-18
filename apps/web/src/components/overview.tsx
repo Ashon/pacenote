@@ -49,10 +49,10 @@ function SetupCard({
   onGuide?: () => void
 }) {
   return (
-    <div className="mt-6 flex items-center gap-4 rounded-2xl bg-card-accent px-5 py-4">
+    <div className="mt-6 flex items-center gap-4 rounded-xl bg-card-accent px-5 py-4">
       <div className="min-w-0 flex-1">
-        <h2 className="text-sm font-semibold">Set up Pace</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
+        <h2 className="text-section">Set up Pace</h2>
+        <p className="mt-0.5 text-copy text-muted-foreground">
           {message ?? 'Some settings are missing before Pace can start.'}
         </p>
       </div>
@@ -119,8 +119,8 @@ export function Overview() {
     <div className="@container mx-auto max-w-4xl px-10 py-9">
       {/* A page title like the other screens'; the brand is the sidebar's. */}
       <header>
-        <h1 className="text-lg font-semibold tracking-tight">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-title">Overview</h1>
+        <p className="mt-1 text-copy text-muted-foreground">
           How Pace has answered your Slack mentions and how your tasks went: how
           many, how well, with which tools, and with how many tokens.
         </p>
@@ -199,7 +199,7 @@ export function Overview() {
                 }
               />
               <Metric
-                icon={<Timer className="text-chart-1" />}
+                icon={<Timer className="text-primary" />}
                 label="Average duration"
                 value={avgValue}
                 unit={avgUnit}
@@ -255,14 +255,14 @@ export function Overview() {
 
               <section>
                 <CardHeader
-                  icon={<Wrench className="text-chart-1" />}
+                  icon={<Wrench className="text-primary" />}
                   label="Top tools"
                   meta="Calls"
                 />
                 {data?.topTools.length ? (
                   <ul className="mt-5 space-y-3">
                     {data.topTools.slice(0, 5).map((tool) => (
-                      <li key={tool.name} className="text-xs">
+                      <li key={tool.name} className="text-meta">
                         <div className="mb-1.5 flex items-baseline justify-between gap-2">
                           <span className="truncate font-mono">
                             {tool.name}
@@ -279,7 +279,7 @@ export function Overview() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="py-8 text-sm text-muted-foreground">
+                  <p className="py-8 text-copy text-muted-foreground">
                     No tool calls recorded.
                   </p>
                 )}
@@ -345,11 +345,8 @@ function MetricSkeleton({
   return (
     <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0">
       <CardHeader icon={icon} label={label} />
-      <SkeletonText
-        className="mt-3 text-3xl font-semibold tracking-tight"
-        width="46%"
-      />
-      <SkeletonText className="mt-1 text-xs" width="66%" />
+      <SkeletonText className="mt-3 text-number tabular-nums" width="46%" />
+      <SkeletonText className="mt-1 text-meta" width="66%" />
     </div>
   )
 }
@@ -372,11 +369,8 @@ function BandSkeleton({
       <section className="flex flex-col">
         <CardHeader {...left} />
         <div className="mt-5">
-          <SkeletonText
-            className="text-3xl font-semibold tracking-tight"
-            width="34%"
-          />
-          <SkeletonText className="mt-1 text-xs" width="28%" />
+          <SkeletonText className="text-number tabular-nums" width="34%" />
+          <SkeletonText className="mt-1 text-meta" width="28%" />
         </div>
         <SkeletonBlock className="mt-4 min-h-32 flex-1 rounded-xl" />
       </section>
@@ -384,7 +378,7 @@ function BandSkeleton({
         <CardHeader {...right} />
         <ul className="mt-5 space-y-3">
           {Array.from({ length: rows }, (_, i) => (
-            <li key={i} className="text-xs">
+            <li key={i} className="text-meta">
               <SkeletonText className="mb-1.5" width={`${44 - i * 6}%`} />
               <SkeletonBlock className="h-1.5 rounded-full" />
             </li>
@@ -411,7 +405,7 @@ function OverviewSkeleton({
     <>
       {setupCard > 0 && (
         <SkeletonBlock
-          className="mt-6 rounded-2xl"
+          className="mt-6 rounded-xl"
           style={{ height: setupCard - 24 }}
         />
       )}
@@ -426,7 +420,7 @@ function OverviewSkeleton({
           label="Success rate"
         />
         <MetricSkeleton
-          icon={<Timer className="text-chart-1" />}
+          icon={<Timer className="text-primary" />}
           label="Average duration"
         />
         <MetricSkeleton
@@ -441,7 +435,7 @@ function OverviewSkeleton({
           meta: 'Runs per day',
         }}
         right={{
-          icon: <Wrench className="text-chart-1" />,
+          icon: <Wrench className="text-primary" />,
           label: 'Top tools',
           meta: 'Calls',
         }}
@@ -455,7 +449,7 @@ function OverviewSkeleton({
             meta: 'Per day',
           }}
           right={{
-            icon: <Flag className="text-chart-1" />,
+            icon: <Flag className="text-primary" />,
             label: 'How they ended',
             meta: 'Last 14 days',
           }}
@@ -469,7 +463,7 @@ function OverviewSkeleton({
           meta: 'New tokens',
         }}
         right={{
-          icon: <Layers className="text-chart-1" />,
+          icon: <Layers className="text-primary" />,
           label: 'By source',
           meta: 'Last 14 days',
         }}
@@ -499,7 +493,7 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
           icon={<ListChecks className="text-primary" />}
           label="Tasks handled"
         />
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="mt-3 text-copy text-muted-foreground">
           None handled in the last 14 days.
           {trend.open > 0 && ` ${trend.open} still open.`}
         </p>
@@ -536,13 +530,13 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
 
       <section>
         <CardHeader
-          icon={<Flag className="text-chart-1" />}
+          icon={<Flag className="text-primary" />}
           label="How they ended"
           meta="Last 14 days"
         />
         <ul className="mt-5 space-y-3">
           {HOW.map(({ how, label }) => (
-            <li key={how} className="text-xs">
+            <li key={how} className="text-meta">
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
                 <span className="truncate font-medium">{label}</span>
                 <span className="shrink-0 font-medium tabular-nums">
@@ -558,7 +552,7 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
         </ul>
         {trend.medianMs !== undefined && (
           <div
-            className="mt-3.5 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"
+            className="mt-3.5 flex items-center gap-2 border-t border-border pt-3 text-meta text-muted-foreground"
             title="The median, from a task's message to when it was handled"
           >
             <span className="font-medium">Usually handled within</span>
@@ -638,11 +632,11 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
 
       <section>
         <CardHeader
-          icon={<Layers className="text-chart-1" />}
+          icon={<Layers className="text-primary" />}
           label="By source"
           meta="Last 14 days"
         />
-        <ul className="mt-5 space-y-3 text-xs">
+        <ul className="mt-5 space-y-3 text-meta">
           <SourceRow
             label="Mentions"
             className="pacenote-gradient"
@@ -685,7 +679,7 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
             }
           />
         </ul>
-        <div className="mt-3.5 border-t border-border pt-3 text-xs text-muted-foreground">
+        <div className="mt-3.5 border-t border-border pt-3 text-meta text-muted-foreground">
           <div className="flex items-center gap-2">
             <span className="size-2 shrink-0 rounded-full border border-input bg-well" />
             <span className="font-medium">Read from cache</span>
@@ -768,7 +762,7 @@ function ChartTotal({
   return (
     <div className="mt-5">
       <Value value={value} unit={unit} />
-      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+      <p className="mt-1 text-meta text-muted-foreground">{hint}</p>
     </div>
   )
 }
@@ -818,7 +812,7 @@ function DayBars({
           className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5"
           title={day.title}
         >
-          <span className="text-2xs text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="text-caption text-muted-foreground tabular-nums opacity-0 transition-opacity group-hover:opacity-100">
             {day.hover}
           </span>
           <div className="relative flex w-2 flex-1 flex-col justify-end overflow-hidden rounded-full bg-well">
@@ -860,7 +854,7 @@ function DayBars({
           </div>
           <span
             className={cn(
-              'text-2xs text-muted-foreground tabular-nums',
+              'text-caption text-muted-foreground tabular-nums',
               (days.length - 1 - index) % 2 === 1 &&
                 '@max-[16rem]/bars:invisible'
             )}
@@ -889,9 +883,9 @@ function CardHeader({
   return (
     <div className="flex items-center gap-2">
       <span className="flex shrink-0 [&_svg]:size-4">{icon}</span>
-      <h2 className="truncate text-sm font-semibold">{label}</h2>
+      <h2 className="truncate text-section">{label}</h2>
       {meta && (
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+        <span className="ml-auto shrink-0 text-meta text-muted-foreground">
           {meta}
         </span>
       )}
@@ -916,12 +910,8 @@ function Value({
         accent && 'text-status-running'
       )}
     >
-      <span className="text-3xl font-semibold tracking-tight">{value}</span>
-      {unit && (
-        <span className="text-sm font-medium text-muted-foreground">
-          {unit}
-        </span>
-      )}
+      <span className="text-number tabular-nums">{value}</span>
+      {unit && <span className="text-row text-muted-foreground">{unit}</span>}
     </div>
   )
 }
@@ -956,7 +946,7 @@ function Metric({
         />
       </div>
       {hint && (
-        <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
+        <p className="mt-1 truncate text-meta text-muted-foreground">{hint}</p>
       )}
     </div>
   )

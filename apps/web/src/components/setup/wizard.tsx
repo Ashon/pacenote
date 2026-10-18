@@ -188,7 +188,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
             <PacenoteMark className="size-6 shrink-0" />
             <span
               data-hidden={compact || undefined}
-              className="motion-layout-label text-base font-semibold tracking-tight"
+              className="motion-layout-label text-heading"
             >
               Pacenote
             </span>
@@ -221,7 +221,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                 <>
                   <span
                     className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold transition-colors',
+                      'grid size-6 shrink-0 place-items-center rounded-full text-meta font-semibold transition-colors',
                       current
                         ? 'bg-primary text-primary-foreground'
                         : reached
@@ -243,7 +243,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                   >
                     {STEP_LABELS[each]}
                     {preparing && (
-                      <span className="flex items-center gap-1.5 text-2xs font-semibold text-status-running">
+                      <span className="flex items-center gap-1.5 text-caption font-semibold text-status-running">
                         <span
                           role="progressbar"
                           aria-label="Preparing the built-in sandbox"
@@ -268,7 +268,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                       </span>
                     )}
                     {stopped && (
-                      <span className="text-2xs font-semibold text-status-failed">
+                      <span className="text-caption font-semibold text-status-failed">
                         Preparing stopped
                       </span>
                     )}
@@ -319,7 +319,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                 {compact ? <LogOut className="size-4" /> : 'Finish later'}
               </button>
               {!compact && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   Your choices are saved. Pick up from Overview.
                 </span>
               )}

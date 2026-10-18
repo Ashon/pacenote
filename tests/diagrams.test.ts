@@ -157,11 +157,11 @@ describe("the renderer's theme", () => {
     expect(read('mermaid.json')).toContain('"primaryBorderColor": "#d8e5df"')
     expect(read('render.sh')).toContain("-Ncolor='#d8e5df'")
     // Bars are filled with the logo's gradient, and series lead with the
-    // logo's emerald and the primary color.
+    // logo's emerald and the deep green of the app's charts.
     for (const { color } of vegaLite.bar.color.stops)
       expect(css).toContain(color)
     expect(css).toContain('--chart-1: #0cb67e')
-    expect(css).toContain('--primary: #007c5c')
+    expect(css).toContain('--chart-4: #007c5c')
     expect(vegaLite.range.category.slice(0, 2)).toEqual(['#0cb67e', '#007c5c'])
   })
 

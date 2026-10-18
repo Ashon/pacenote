@@ -22,20 +22,18 @@ export function Fact({
   tip?: React.ReactNode
 }) {
   const shown = (
-    <div className="mt-1 truncate text-sm font-semibold tabular-nums">
-      {value}
-    </div>
+    <div className="mt-1 truncate text-section tabular-nums">{value}</div>
   )
   return (
     <div className="min-w-0 px-4 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[40rem]:[&:nth-child(3)]:border-l-0 @max-[40rem]:[&:nth-child(3)]:pl-0">
-      <div className="flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
         {icon}
         <span className="truncate">{label}</span>
       </div>
       {tip ? <Tooltip content={tip}>{shown}</Tooltip> : shown}
       {/* Its line keeps its place without a hint, so runs with and without
           one are as tall */}
-      <div className="truncate text-2xs text-muted-foreground">
+      <div className="truncate text-caption text-muted-foreground">
         {hint || '\u00a0'}
       </div>
     </div>
@@ -96,7 +94,7 @@ export function UsageTip({
 
 export function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="py-16 text-center text-sm text-muted-foreground">
+    <p className="py-16 text-center text-copy text-muted-foreground">
       {children}
     </p>
   )

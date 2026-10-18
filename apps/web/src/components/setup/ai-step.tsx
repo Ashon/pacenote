@@ -137,7 +137,7 @@ export function AiStep({
       }
     >
       {!cli ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="flex items-center gap-2 text-copy text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
           Looking for Claude Code and Codex on this Mac
         </p>
@@ -216,7 +216,7 @@ function ServiceCard({
       onChoose={onChoose}
     >
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <b className="text-sm">{service.name}</b>
+        <b className="text-section">{service.name}</b>
         <span className="text-body text-muted-foreground">{service.plans}</span>
         <span className="flex-1" />
         {ready ? (
@@ -233,7 +233,7 @@ function ServiceCard({
         {ready ? (
           <>
             Found{' '}
-            <code className="rounded bg-well px-1.5 font-mono text-xs">
+            <code className="rounded-sm bg-well px-1.5 font-mono text-meta">
               {service.command}
               {check.version && ` ${check.version}`}
             </code>{' '}

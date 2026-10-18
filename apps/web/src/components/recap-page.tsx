@@ -133,8 +133,8 @@ export function RecapPage({
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         {/* As tall as its buttons before they come */}
         <header className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-lg font-semibold tracking-tight">Recap</h1>
-          <span className="text-sm text-muted-foreground">
+          <h1 className="text-title">Recap</h1>
+          <span className="text-copy text-muted-foreground">
             What you did, by day, week and month
           </span>
           <span className="flex-1" />
@@ -156,7 +156,7 @@ export function RecapPage({
           )}
         </header>
         {!bridge ? (
-          <p className="mt-6 text-sm text-muted-foreground">
+          <p className="mt-6 text-copy text-muted-foreground">
             Recaps are counted by the desktop app.
           </p>
         ) : (
@@ -184,11 +184,11 @@ export function RecapPage({
                 >
                   <ChevronLeft />
                 </Button>
-                <span className="px-1.5 text-sm font-semibold">
+                <span className="px-1.5 text-section">
                   {view ? recapTitle(view) : <SkeletonWord width="8rem" />}
                 </span>
                 {view && recapWhen(view) && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-meta text-muted-foreground">
                     {recapWhen(view)}
                   </span>
                 )}
@@ -204,7 +204,7 @@ export function RecapPage({
               </div>
             </div>
             {error && (
-              <p role="alert" className="mt-3 text-sm text-status-failed">
+              <p role="alert" className="mt-3 text-copy text-status-failed">
                 {error}
               </p>
             )}
@@ -252,7 +252,7 @@ function CopyButton({ view }: { view: RecapView }) {
         <DropdownMenuItem onSelect={() => void copy('markdown')}>
           <span className="flex flex-col">
             {view.period === 'day' ? 'Standup' : 'As Markdown'}
-            <span className="text-xs text-muted-foreground">
+            <span className="text-meta text-muted-foreground">
               Each part with its lines
             </span>
           </span>
@@ -260,7 +260,7 @@ function CopyButton({ view }: { view: RecapView }) {
         <DropdownMenuItem onSelect={() => void copy('slack')}>
           <span className="flex flex-col">
             For Slack
-            <span className="text-xs text-muted-foreground">
+            <span className="text-meta text-muted-foreground">
               The same, in Slack's formatting
             </span>
           </span>
@@ -269,7 +269,7 @@ function CopyButton({ view }: { view: RecapView }) {
           <DropdownMenuItem onSelect={() => void copy('summary')}>
             <span className="flex flex-col">
               The summary only
-              <span className="text-xs text-muted-foreground">
+              <span className="text-meta text-muted-foreground">
                 Just the sentences written up
               </span>
             </span>
@@ -313,7 +313,7 @@ function RecapBody({
             >
               <WrittenText text={view.written.text} arrived={arrived} />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-meta text-muted-foreground">
                   Written by Claude Code from the lines below, with no tools ·{' '}
                   {formatRelative(view.written.at)}
                 </span>
@@ -326,7 +326,7 @@ function RecapBody({
         )}
       </Swap>
       {empty ? (
-        <p className="mt-5 border-t border-border py-8 text-sm text-muted-foreground">
+        <p className="mt-5 border-t border-border py-8 text-copy text-muted-foreground">
           Nothing here for this {view.period}. Tasks you settle, your commits
           and your sessions show up here.
         </p>
@@ -350,7 +350,7 @@ function WritingUp() {
     >
       <PaceSpinner writing />
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           Claude Code is writing it up from the lines below
         </span>
         <span className="writing-line w-[92%]" />
@@ -366,7 +366,7 @@ function WrittenText({ text, arrived }: { text: string; arrived: boolean }) {
   return (
     <p
       className={cn(
-        'max-w-[46rem] text-sm leading-relaxed select-text',
+        'max-w-[46rem] text-copy leading-relaxed select-text',
         arrived && 'motion-write-in'
       )}
       style={
@@ -418,7 +418,7 @@ function RecapSkeleton({ period }: { period: RecapPeriod }) {
         {(['Done', 'Next'] as const).map((title, g) => (
           <section key={title} className="mt-5">
             <div className="mb-1.5 flex items-baseline gap-2.5">
-              <h2 className="text-sm font-semibold">{title}</h2>
+              <h2 className="text-section">{title}</h2>
             </div>
             <ul className="flex flex-col gap-2 border-t border-border pt-2.5">
               {[0, 1].map((i) => (
@@ -439,8 +439,8 @@ function RecapSkeleton({ period }: { period: RecapPeriod }) {
             className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3.5 first:border-t-0 @xl:grid-cols-[12rem_minmax(0,1fr)]"
           >
             <div className="flex flex-col gap-1">
-              <SkeletonText className="text-sm" width={a ? '52%' : '66%'} />
-              <SkeletonText className="text-xs" width="80%" />
+              <SkeletonText className="text-copy" width={a ? '52%' : '66%'} />
+              <SkeletonText className="text-meta" width="80%" />
               <SkeletonBlock className="mt-1 h-1.5 w-28 rounded-full" />
             </div>
             <ul className="flex flex-col gap-1.5">
@@ -533,16 +533,16 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
           <a
             href={areaHash(area.id)}
             title={`${area.name} on the You screen`}
-            className="text-sm font-semibold hover:text-primary"
+            className="text-section hover:text-primary"
           >
             {area.name}
           </a>
         ) : (
-          <span className="text-sm font-semibold text-muted-foreground">
+          <span className="text-section text-muted-foreground">
             {area.name}
           </span>
         )}
-        <span className="text-xs text-muted-foreground">
+        <span className="text-meta text-muted-foreground">
           {areaCounts(area)}
         </span>
         {area.id && (
@@ -575,7 +575,7 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
           />
         ))}
         {area.commitsMore > 0 && (
-          <li className="pl-6 text-xs text-muted-foreground">
+          <li className="pl-6 text-meta text-muted-foreground">
             and {area.commitsMore} more{' '}
             {area.commitsMore === 1 ? 'commit' : 'commits'}
             {area.repos.length > 0 && ` in ${area.repos.join(', ')}`}
@@ -604,7 +604,7 @@ function MonthChanges({ view }: { view: RecapView }) {
           key={label}
           className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 text-body"
         >
-          <span className="text-xs text-muted-foreground">{label}</span>
+          <span className="text-meta text-muted-foreground">{label}</span>
           <span>{text}</span>
         </div>
       ))}
@@ -657,20 +657,20 @@ function Line({
             {item.title}
           </a>
         ) : (
-          <span className={cn(commit ? 'font-mono text-xs' : 'font-medium')}>
+          <span className={cn(commit ? 'font-mono text-meta' : 'font-medium')}>
             {item.title}
           </span>
         )}
         {!plain && item.area && (
           <a
             href={areaHash(item.area.id)}
-            className="rounded-full bg-muted px-2 py-px text-2xs font-medium hover:text-foreground"
+            className="rounded-full bg-muted px-2 py-px text-caption hover:text-foreground"
           >
             {item.area.name}
           </a>
         )}
         {(item.note || at) && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-meta text-muted-foreground">
             {[kind === 'carried' ? 'carries over' : undefined, item.note, at]
               .filter(Boolean)
               .join(' · ')}
@@ -693,8 +693,10 @@ function Group({
   return (
     <section className="mt-5">
       <div className="mb-1.5 flex items-baseline gap-2.5">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+        <h2 className="text-section">{title}</h2>
+        {meta && (
+          <span className="text-meta text-muted-foreground">{meta}</span>
+        )}
       </div>
       <ul className="flex flex-col gap-2 border-t border-border pt-2.5">
         {children}
@@ -704,7 +706,7 @@ function Group({
 }
 
 const Quiet = ({ children }: { children: React.ReactNode }) => (
-  <li className="text-sm text-muted-foreground">{children}</li>
+  <li className="text-copy text-muted-foreground">{children}</li>
 )
 
 /** Where the recap comes from, at its foot */
@@ -720,7 +722,7 @@ function Sources({ view }: { view: RecapView }) {
   ].filter(Boolean)
   if (parts.length === 0) return null
   return (
-    <p className="mt-5 border-t border-border pt-3.5 text-xs text-muted-foreground">
+    <p className="mt-5 border-t border-border pt-3.5 text-meta text-muted-foreground">
       From {parts.join(', ')}.
     </p>
   )

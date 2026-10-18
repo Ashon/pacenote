@@ -34,10 +34,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     return (
       <div className="flex min-h-screen items-center justify-center bg-sidebar p-10">
         <div className="w-full max-w-md">
-          <h1 className="text-lg font-semibold tracking-tight">
-            This screen stopped working
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-title">This screen stopped working</h1>
+          <p className="mt-1 text-copy text-muted-foreground">
             Pace keeps answering. Reload to try again, or go back to Overview.
             What broke is in the app's log: Pace &gt; Open logs folder.
           </p>
@@ -45,7 +43,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             className="mt-4 rounded-lg bg-well"
             viewportClassName="max-h-48"
           >
-            <pre className="px-3 py-2 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground select-text">
+            <pre className="px-3 py-2 font-mono text-meta break-words whitespace-pre-wrap text-muted-foreground select-text">
               {error.message}
             </pre>
           </ScrollArea>

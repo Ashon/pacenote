@@ -31,7 +31,7 @@ function Tooltip({
           sideOffset={6}
           collisionPadding={8}
           className={cn(
-            'motion-pop z-50 max-w-xs rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md'
+            'motion-pop z-50 max-w-xs rounded-md bg-foreground px-2 py-1 text-meta text-background shadow-float'
           )}
         >
           {content}

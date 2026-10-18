@@ -252,7 +252,7 @@ function ChooseConnection({
           onChoose={() => choose('hub')}
         >
           <span className="flex items-center gap-2">
-            <b className="text-sm">Join your team's hub</b>
+            <b className="text-section">Join your team's hub</b>
             <Chip tone="neutral">For teams</Chip>
           </span>
           <span className="text-body text-muted-foreground">
@@ -266,7 +266,7 @@ function ChooseConnection({
           checked={connection === 'app'}
           onChoose={() => choose('app')}
         >
-          <b className="text-sm">Use your own Slack app</b>
+          <b className="text-section">Use your own Slack app</b>
           <span className="text-body text-muted-foreground">
             Create an app from the Pacenote manifest and bring back two tokens.
             Best when you're the only one using Pace.
@@ -275,7 +275,7 @@ function ChooseConnection({
       </div>
       <Collapsible open={connection === 'hub'}>
         <CollapsibleContent>
-          <div className="flex flex-col gap-3 rounded-2xl bg-well px-5 py-4">
+          <div className="flex flex-col gap-3 rounded-xl bg-well px-5 py-4">
             <label className="flex flex-col gap-1.5 text-body font-medium">
               Hub address
               <Input
@@ -342,7 +342,7 @@ function PairBody({
             In a channel Pace is in, send this. It expires in 10 minutes.
           </p>
           <CommandLine text={`@Pace connect ${state.code}`} raised />
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <p className="flex items-center gap-2 text-meta text-muted-foreground">
             <PaceSpinner className="size-6" />
             <span className="text-shimmer">Waiting for your mention</span>
           </p>
@@ -407,14 +407,12 @@ function WhoSent({
       <div className="flex items-center gap-3.5">
         <span
           aria-hidden="true"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/12 text-base font-semibold text-primary"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/12 text-heading text-primary"
         >
           {(user.realName ?? user.name).slice(0, 1).toUpperCase()}
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <b className="truncate text-sm font-semibold">
-            {user.realName ?? user.name}
-          </b>
+          <b className="truncate text-section">{user.realName ?? user.name}</b>
           <span className="truncate text-body text-muted-foreground">
             @{user.name} {where}
           </span>
@@ -424,7 +422,7 @@ function WhoSent({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="flex-1 text-sm font-semibold">Is this you?</span>
+        <span className="flex-1 text-section">Is this you?</span>
         {actions}
       </div>
     </div>
@@ -633,7 +631,7 @@ function AppTokens({
         <li className="flex items-center gap-3">
           <StepNumber n={1} className="self-start" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <b className="text-sm font-semibold">Create the app</b>
+            <b className="text-section">Create the app</b>
             <span className="text-body text-muted-foreground">
               Opens Slack with the Pacenote manifest filled in. Pick your
               workspace and choose Create.
@@ -664,7 +662,7 @@ function AppTokens({
             <>
               In the app's Basic Information, under App-Level Tokens, choose
               Generate Token and Scopes, add{' '}
-              <code className="rounded bg-well px-1 font-mono text-xs">
+              <code className="rounded-sm bg-well px-1 font-mono text-meta">
                 connections:write
               </code>
               , and copy the token.
@@ -720,7 +718,7 @@ function StepNumber({ n, className }: { n: number; className?: string }) {
   return (
     <span
       className={cn(
-        'grid size-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold text-muted-foreground',
+        'grid size-6 shrink-0 place-items-center rounded-full bg-muted text-meta font-semibold text-muted-foreground',
         className
       )}
     >
@@ -760,7 +758,7 @@ function TokenField({
         className="flex min-w-0 flex-1 flex-col gap-1.5"
         data-setting={setting}
       >
-        <b className="text-sm font-semibold">{label}</b>
+        <b className="text-section">{label}</b>
         <span className="flex items-center gap-2.5">
           <Input
             type="password"
@@ -794,7 +792,7 @@ function TokenField({
             {problem}
           </span>
         ) : null}
-        <span className="text-xs text-muted-foreground">{where}</span>
+        <span className="text-meta text-muted-foreground">{where}</span>
       </label>
     </li>
   )
@@ -891,22 +889,20 @@ function ItsMe({
       <ol className="flex flex-col gap-3">
         <li className="flex items-center gap-3">
           <StepNumber n={1} />
-          <span className="w-52 shrink-0 text-sm font-semibold">
+          <span className="w-52 shrink-0 text-section">
             Invite Pace to a public channel
           </span>
           <CommandLine text="/invite @Pace" />
         </li>
         <li className="flex items-center gap-3">
           <StepNumber n={2} />
-          <span className="w-52 shrink-0 text-sm font-semibold">
-            Mention it there
-          </span>
+          <span className="w-52 shrink-0 text-section">Mention it there</span>
           <CommandLine text="@Pace it's me" />
         </li>
       </ol>
       <div
         aria-live="polite"
-        className="rounded-2xl px-5 py-4 ring-1 ring-border"
+        className="rounded-xl px-5 py-4 ring-1 ring-border"
       >
         <Swap
           id={

@@ -40,7 +40,7 @@ function DialogContent({
       />
       <DialogPrimitive.Content
         className={cn(
-          'fixed z-50 flex flex-col bg-card shadow-2xl outline-none',
+          'fixed z-50 flex flex-col bg-card shadow-float outline-none',
           VARIANT[variant].content,
           className
         )}

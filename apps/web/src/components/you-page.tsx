@@ -61,7 +61,7 @@ export function YouPage({ openId }: { openId?: string }) {
   if (!bridge)
     return (
       <Page>
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="mt-6 text-copy text-muted-foreground">
           Your areas are counted by the desktop app.
         </p>
       </Page>
@@ -121,7 +121,7 @@ export function YouPage({ openId }: { openId?: string }) {
         <div
           ref={notice.ref}
           data-state={notice.state}
-          className="motion-fade mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-sm"
+          className="motion-fade mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy"
         >
           <span className="flex-1">
             {said.current?.name} is not listed as yours anymore.
@@ -152,7 +152,7 @@ export function YouPage({ openId }: { openId?: string }) {
         skeleton={<AreaRowsSkeleton count={lastAreas()} />}
       >
         {data.areas.length === 0 ? (
-          <p className="mt-5 border-t border-border py-8 text-sm text-muted-foreground">
+          <p className="mt-5 border-t border-border py-8 text-copy text-muted-foreground">
             Nothing yet. Your areas show up once you have tasks here, or work in
             a repository with Claude Code or Codex.
           </p>
@@ -162,10 +162,8 @@ export function YouPage({ openId }: { openId?: string }) {
         {resting.length > 0 && (
           <>
             <div className="mt-6 flex items-baseline gap-2.5 border-t border-border pt-4">
-              <h2 className="text-sm font-semibold text-muted-foreground">
-                Resting
-              </h2>
-              <span className="text-xs text-muted-foreground">
+              <h2 className="text-section text-muted-foreground">Resting</h2>
+              <span className="text-meta text-muted-foreground">
                 Nothing for 4 weeks. They come back when work does.
               </span>
             </div>
@@ -173,7 +171,7 @@ export function YouPage({ openId }: { openId?: string }) {
           </>
         )}
         {accounts && data.areas.length > 0 && (
-          <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
+          <p className="mt-5 border-t border-border pt-4 text-meta text-muted-foreground">
             Kept as {accounts}.
           </p>
         )}
@@ -229,12 +227,12 @@ function AreaRowsSkeleton({ count }: { count: number }) {
           <li key={i} className="border-t border-border py-3.5">
             <div className="flex items-start gap-4">
               <div className="min-w-0 flex-1 pl-6">
-                <SkeletonText className="text-sm leading-snug" width={name} />
+                <SkeletonText className="text-copy leading-snug" width={name} />
                 <SkeletonText
-                  className="mt-1 font-mono text-xs"
+                  className="mt-1 font-mono text-meta"
                   width={parts}
                 />
-                <SkeletonText className="mt-1 text-xs" width={now} />
+                <SkeletonText className="mt-1 text-meta" width={now} />
               </div>
               <SkeletonBlock className="h-8 w-[77px] rounded-md" />
             </div>
@@ -300,7 +298,7 @@ function AreaRow({
                   <button
                     type="button"
                     className={cn(
-                      'group flex items-center gap-2 rounded-sm text-left text-sm leading-snug font-semibold outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                      'group flex items-center gap-2 rounded-sm text-left text-section leading-snug outline-none hover:text-primary focus-visible:ring-[3px] focus-visible:ring-ring/50',
                       resting && 'text-muted-foreground'
                     )}
                   >
@@ -319,16 +317,16 @@ function AreaRow({
                 <span
                   key={role.role}
                   title={role.evidence}
-                  className="rounded-full bg-muted px-2 py-px text-2xs font-medium text-foreground/80"
+                  className="rounded-full bg-muted px-2 py-px text-caption text-foreground/80"
                 >
                   {ROLE_LABEL[role.role]}
                 </span>
               ))}
             </div>
-            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+            <p className="mt-1 truncate font-mono text-meta text-muted-foreground">
               {area.parts.map((part) => part.label).join(' · ')}
             </p>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
+            <p className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-meta text-muted-foreground">
               {area.working && (
                 <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
                   <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
@@ -422,10 +420,10 @@ function AreaRow({
                       key={role.role}
                       className="inline-flex items-center gap-2 pr-2"
                     >
-                      <span className="rounded-full bg-card px-2 py-px text-2xs font-medium">
+                      <span className="rounded-full bg-card px-2 py-px text-caption">
                         {ROLE_LABEL[role.role]}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-meta text-muted-foreground">
                         {role.evidence}
                       </span>
                     </span>
@@ -445,7 +443,7 @@ function AreaRow({
                         >
                           {task.title}
                         </a>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-meta text-muted-foreground">
                           {[
                             task.askedBy && `${task.askedBy} asked you`,
                             task.due && `due ${task.due}`,
@@ -468,7 +466,7 @@ function AreaRow({
                     {area.lately.map((task) => (
                       <span key={task.id} className="flex flex-wrap gap-x-2">
                         <span className="font-semibold">{task.title}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-meta text-muted-foreground">
                           {[task.outcome, formatRelative(task.at)]
                             .filter(Boolean)
                             .join(' · ')}
@@ -477,7 +475,7 @@ function AreaRow({
                     ))}
                     <a
                       href="#/recap/week"
-                      className="text-xs text-primary hover:underline"
+                      className="text-meta text-primary hover:underline"
                     >
                       {area.latelyMore > 0
                         ? `and ${area.latelyMore} more in 30 days, in Recap`
@@ -490,7 +488,7 @@ function AreaRow({
                 {area.parts.map((part) => (
                   <span
                     key={partKey(part)}
-                    className="inline-flex h-6 items-center gap-0.5 rounded-full bg-card pr-0.5 pl-2 font-mono text-xs"
+                    className="inline-flex h-6 items-center gap-0.5 rounded-full bg-card pr-0.5 pl-2 font-mono text-meta"
                   >
                     {part.label}
                     {area.parts.length > 1 ? (
@@ -544,7 +542,7 @@ function Rename({
         if (event.key === 'Enter') finish(value)
         if (event.key === 'Escape') finish(undefined)
       }}
-      className="h-7 w-56 rounded-md border border-input bg-background px-2 text-sm font-semibold outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+      className="h-7 w-56 rounded-md border border-input bg-background px-2 text-section outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
     />
   )
 }
@@ -583,7 +581,7 @@ function Line({
 }) {
   return (
     <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)] items-start gap-3 py-1 text-body">
-      <span className="pt-0.5 text-xs text-muted-foreground">{label}</span>
+      <span className="pt-0.5 text-meta text-muted-foreground">{label}</span>
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {children}
       </span>
@@ -607,9 +605,9 @@ function Page({
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         <header className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold tracking-tight">You</h1>
+          <h1 className="text-title">You</h1>
           {meta && (
-            <span className="text-sm text-muted-foreground">{meta}</span>
+            <span className="text-copy text-muted-foreground">{meta}</span>
           )}
         </header>
         {children}

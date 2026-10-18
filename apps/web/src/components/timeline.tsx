@@ -52,14 +52,14 @@ export function Timeline({ run }: { run: RunRecord }) {
     <div className="space-y-5">
       <Bubble
         avatar={
-          <span className="grid size-7 place-items-center rounded-full bg-secondary text-xs font-semibold text-secondary-foreground">
+          <span className="grid size-7 place-items-center rounded-full bg-secondary text-meta font-semibold text-secondary-foreground">
             {(run.origin.userName ?? '?').slice(0, 1).toUpperCase()}
           </span>
         }
         title={`@${run.origin.userName ?? run.origin.userId}`}
         meta={`${run.origin.conversationLabel} / ${formatDateTime(run.startedAt)}`}
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+        <p className="text-copy leading-relaxed whitespace-pre-wrap">
           {run.request || (
             <span className="text-muted-foreground">
               (empty request: answered from the conversation context)
@@ -67,7 +67,7 @@ export function Timeline({ run }: { run: RunRecord }) {
           )}
         </p>
         {run.context.messages > 0 && (
-          <p className="mt-1.5 text-2xs text-muted-foreground">
+          <p className="mt-1.5 text-caption text-muted-foreground">
             {run.context.messages} thread{' '}
             {run.context.messages === 1 ? 'message' : 'messages'}
             {run.attachments.length > 0
@@ -125,7 +125,7 @@ export function Timeline({ run }: { run: RunRecord }) {
                   className="max-h-80 w-full bg-white object-contain"
                 />
               </a>
-              <figcaption className="border-t border-canvas px-3 py-1.5 text-xs text-muted-foreground">
+              <figcaption className="border-t border-canvas px-3 py-1.5 text-meta text-muted-foreground">
                 {output.title}
                 {output.kind === 'diagram'
                   ? ' (diagram block)'
@@ -146,13 +146,13 @@ export function Timeline({ run }: { run: RunRecord }) {
       )}
 
       {run.error && run.status !== 'succeeded' && (
-        <div className="flex gap-2 rounded-xl bg-status-failed/10 px-4 py-3 text-sm">
+        <div className="flex gap-2 rounded-xl bg-status-failed/10 px-4 py-3 text-copy">
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-failed" />
           <div className="min-w-0">
             <p className="font-medium text-status-failed">
               {run.status === 'interrupted' ? 'Interrupted' : 'Failed'}
             </p>
-            <p className="mt-0.5 font-mono text-xs break-words whitespace-pre-wrap text-muted-foreground">
+            <p className="mt-0.5 font-mono text-meta break-words whitespace-pre-wrap text-muted-foreground">
               {run.error}
             </p>
             {run.cause && <Advice run={run} cause={run.cause} />}
@@ -174,7 +174,7 @@ function Advice({
   const advice = failureAdvice(cause, run.backend.reasoner, run.backend.sandbox)
   if (!advice) return null
   return (
-    <p className="mt-2 text-sm text-foreground">
+    <p className="mt-2 text-copy text-foreground">
       {advice.text}
       {advice.route && (
         <>
@@ -221,9 +221,9 @@ function Bubble({
         )}
       >
         <div className={cn('flex items-baseline gap-2', children && 'mb-2')}>
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-section">{title}</span>
           {meta && (
-            <span className="text-2xs text-muted-foreground">{meta}</span>
+            <span className="text-caption text-muted-foreground">{meta}</span>
           )}
         </div>
         {children}
@@ -244,7 +244,7 @@ function Disclosure({
   const [open, setOpen] = useState(false)
   return (
     <Collapsible open={open} onOpenChange={setOpen} className={className}>
-      <CollapsibleTrigger className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-2xs text-muted-foreground hover:text-foreground">
+      <CollapsibleTrigger className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-caption text-muted-foreground hover:text-foreground">
         <ChevronRight
           className={cn('size-3 transition-transform', open && 'rotate-90')}
         />
@@ -275,14 +275,14 @@ function Step({ event }: { event: RunEvent }) {
           label="Thinking"
           preview={event.text}
         >
-          <p className="px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+          <p className="px-3 py-2 text-meta leading-relaxed whitespace-pre-wrap text-muted-foreground">
             {event.text}
           </p>
         </ExpandableRow>
       )
     case 'note':
       return (
-        <div className="flex items-center gap-1.5 py-1 text-2xs text-status-interrupted">
+        <div className="flex items-center gap-1.5 py-1 text-caption text-status-interrupted">
           <Info className="size-3.5 shrink-0" />
           {event.text}
           <span className="text-muted-foreground">{formatClock(event.at)}</span>
@@ -290,7 +290,7 @@ function Step({ event }: { event: RunEvent }) {
       )
     case 'error':
       return (
-        <div className="flex items-start gap-1.5 py-1 text-xs text-status-failed">
+        <div className="flex items-start gap-1.5 py-1 text-meta text-status-failed">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
           <span className="break-words">{event.message}</span>
         </div>
@@ -332,7 +332,7 @@ function ToolStep({
         // The server (ops, codex_apps, etc.) is a small tag; only the tool name
         // is shown large.
         <span className="flex items-center gap-1.5">
-          <span className="flex items-center gap-1 rounded-md bg-well px-1.5 py-px text-2xs font-medium text-muted-foreground [&_svg]:size-3">
+          <span className="flex items-center gap-1 rounded-md bg-well px-1.5 py-px text-caption text-muted-foreground [&_svg]:size-3">
             {isTool ? <Wrench /> : <SquareTerminal />}
             {isTool ? event.server : 'shell'}
           </span>
@@ -370,7 +370,7 @@ function ToolStep({
           />
         ) : (
           event.status === 'running' && (
-            <p className="px-1 text-xs text-muted-foreground">Running...</p>
+            <p className="px-1 text-meta text-muted-foreground">Running...</p>
           )
         )}
       </div>
@@ -398,7 +398,7 @@ function ExpandableRow({
       onOpenChange={setOpen}
       className={cn('rounded-lg', open && 'bg-card')}
     >
-      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent/60">
+      <CollapsibleTrigger className="flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-meta transition-colors hover:bg-accent/60">
         {/* A long preview never shrinks the icon. Only the preview text
             shrinks. */}
         <span className="flex shrink-0">{icon}</span>
@@ -408,7 +408,7 @@ function ExpandableRow({
             {preview}
           </span>
         )}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground tabular-nums">
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground tabular-nums">
           {trailing && trailing !== '-' && trailing}
           <ChevronRight
             className={cn('size-3.5 transition-transform', open && 'rotate-90')}

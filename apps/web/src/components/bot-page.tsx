@@ -72,11 +72,9 @@ export function BotPage() {
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <h1 className="flex items-center gap-2 text-title">
                 Pace
-                <span
-                  className={cn('text-sm font-medium', TONE_CLASS[tone].text)}
-                >
+                <span className={cn('text-row', TONE_CLASS[tone].text)}>
                   {botKnown(view, supervisor) ? (
                     label
                   ) : (
@@ -84,7 +82,7 @@ export function BotPage() {
                   )}
                 </span>
               </h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              <p className="mt-0.5 text-copy text-muted-foreground">
                 {status
                   ? `Socket Mode ${SOCKET_LABEL[status.socket.state]} ${formatRelative(status.socket.since)}` +
                     `, ${status.socket.reconnects} ${status.socket.reconnects === 1 ? 'reconnect' : 'reconnects'}`
@@ -156,7 +154,7 @@ export function BotPage() {
               {status.problems.map((problem) => (
                 <li
                   key={problem}
-                  className="flex items-start gap-1.5 text-xs text-status-interrupted"
+                  className="flex items-start gap-1.5 text-meta text-status-interrupted"
                 >
                   <TriangleAlert className="mt-px size-3.5 shrink-0" />
                   {problem}
@@ -170,7 +168,7 @@ export function BotPage() {
               {status.limits.map((limit) => (
                 <li
                   key={limit}
-                  className="flex items-start gap-1.5 text-xs text-muted-foreground"
+                  className="flex items-start gap-1.5 text-meta text-muted-foreground"
                 >
                   <InfoIcon className="mt-px size-3.5 shrink-0" />
                   {limit}
@@ -213,7 +211,7 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
   return (
     <div
       className={cn(
-        'mt-3 flex items-start gap-3 rounded-lg border px-3 py-2.5 text-xs',
+        'mt-3 flex items-start gap-3 rounded-lg border px-3 py-2.5 text-meta',
         tone
           ? [tone.bg, tone.text]
           : 'border-transparent bg-muted/60 text-muted-foreground'
@@ -345,7 +343,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
     )
   if (!control || !supervisor) {
     return (
-      <p className="shrink-0 text-right text-xs text-muted-foreground">
+      <p className="shrink-0 text-right text-meta text-muted-foreground">
         Start and stop Pace
         <br />
         from the desktop app.
@@ -430,20 +428,20 @@ function Info({
   return (
     // One figure in a row split by hairlines, not a card of its own
     <div className="min-w-0 px-5 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[44rem]:[&:nth-child(3)]:border-l-0 @max-[44rem]:[&:nth-child(3)]:pl-0">
-      <div className="flex items-center gap-1.5 text-2xs text-muted-foreground [&_svg]:size-3.5">
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground [&_svg]:size-3.5">
         {icon}
         {label}
       </div>
       <Placeholder
         ready={known}
         skeleton={
-          <div className="mt-1 text-sm font-medium">
+          <div className="mt-1 text-row">
             <SkeletonText width="54%" />
-            <SkeletonText className="text-2xs font-normal" width="76%" />
+            <SkeletonText className="text-caption" width="76%" />
           </div>
         }
       >
-        <div className="mt-1 truncate text-sm font-medium">{children}</div>
+        <div className="mt-1 truncate text-row">{children}</div>
       </Placeholder>
     </div>
   )
@@ -455,7 +453,7 @@ function Info({
  */
 function Sub({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="truncate text-2xs font-normal text-muted-foreground">
+    <div className="truncate text-caption text-muted-foreground">
       {children || '\u00a0'}
     </div>
   )
@@ -520,7 +518,7 @@ function LogPanel() {
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b px-10 py-2.5">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="text-sm font-medium">Logs</span>
+          <span className="text-row">Logs</span>
           <div className="ml-2 flex gap-1">
             {LOG_VIEWS.map((item) => (
               <button
@@ -528,7 +526,7 @@ function LogPanel() {
                 type="button"
                 onClick={() => setView(item.value)}
                 className={cn(
-                  'h-6 rounded-full px-2.5 text-xs font-medium transition-colors',
+                  'h-6 rounded-full px-2.5 text-meta font-medium transition-colors',
                   view === item.value
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -544,7 +542,7 @@ function LogPanel() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search logs"
-              className="h-7 pl-7 text-xs"
+              className="h-7 pl-7 text-meta"
             />
           </div>
           <Button
@@ -575,7 +573,7 @@ function LogPanel() {
         }}
         className="min-h-0 flex-1"
       >
-        <div className="px-10 py-2 font-mono text-2xs leading-[1.6] select-text">
+        <div className="px-10 py-2 font-mono text-caption leading-[1.6] select-text">
           <div className="mx-auto max-w-5xl">
             {data === undefined && !isError && (
               <div className="motion-skeleton">
@@ -588,7 +586,7 @@ function LogPanel() {
               <LogRow key={`${line.at}-${i}`} line={line} />
             ))}
             {(data !== undefined || isError) && lines.length === 0 && (
-              <p className="py-10 text-center font-sans text-sm text-muted-foreground">
+              <p className="py-10 text-center font-sans text-copy text-muted-foreground">
                 {isError ? 'Could not load logs.' : 'No logs to show.'}
               </p>
             )}
@@ -627,7 +625,7 @@ function LogRow({ line }: { line: LogLine }) {
   return (
     <div
       className={cn(
-        'flex gap-3 rounded px-1.5 hover:bg-accent/50',
+        'flex gap-3 rounded-sm px-1.5 hover:bg-accent/50',
         line.level === 'ERROR' && 'bg-status-failed/5'
       )}
     >

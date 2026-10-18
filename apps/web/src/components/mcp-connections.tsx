@@ -30,7 +30,7 @@ export function McpConnections({ about }: { about: string }) {
   return (
     <div className="space-y-2 border-t border-border px-4 py-3">
       <div className="flex items-start gap-2">
-        <p className="flex-1 text-xs text-muted-foreground">{about}</p>
+        <p className="flex-1 text-meta text-muted-foreground">{about}</p>
         <Button
           size="xs"
           variant="ghost"
@@ -53,7 +53,7 @@ export function McpClientRows({ className }: { className?: string }) {
   const { busy, change } = useMcpChange()
   if (!clients.data)
     return (
-      <p className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+      <p className="flex items-center gap-2 py-1 text-meta text-muted-foreground">
         <LoaderCircle className="size-3.5 animate-spin" />
         Checking Claude Code and Codex…
       </p>
@@ -67,14 +67,14 @@ export function McpClientRows({ className }: { className?: string }) {
         return (
           <li
             key={client.id}
-            className="flex items-start gap-2 px-3 py-2 text-xs"
+            className="flex items-start gap-2 px-3 py-2 text-meta"
           >
             <StateIcon state={client.state} busy={busy === client.id} />
             <span className="w-24 shrink-0 font-medium">{client.name}</span>
             <span className="min-w-0 flex-1 text-muted-foreground select-text">
               {describe(client)}
               {client.state === 'elsewhere' && client.command && (
-                <span className="block truncate font-mono text-2xs">
+                <span className="block truncate font-mono text-caption">
                   {client.command}
                 </span>
               )}
@@ -190,12 +190,12 @@ function ByHand() {
   return (
     <>
       {!launch.ready && (
-        <p className="text-xs text-status-interrupted">
+        <p className="text-meta text-status-interrupted">
           The server is not built yet: run pnpm bundle in the repository.
         </p>
       )}
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <CollapsibleTrigger className="flex items-center gap-1 text-meta text-muted-foreground hover:text-foreground">
           <ChevronRight
             className={cn('size-3.5 transition-transform', open && 'rotate-90')}
           />
