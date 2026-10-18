@@ -312,7 +312,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       text: `<@${slack.botUserId}> how is web-01?`,
     })
     const [reply] = await world.answered(ops.id, ts)
-    expect(reply!.text).toBe('*Healthy*. Up 3 days.')
+    expect(reply!.text).toBe(
+      '*Healthy*. Up 3 days.\n\n_AI answer by Pace, with Claude Code_'
+    )
 
     // The run shows up in the history with the answer and a link back to the
     // mention in Slack.
@@ -408,7 +410,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       text: `<@${slack.botUserId}> how is web-01?`,
     })
     const [reply] = await world.answered(ops.id, ts)
-    expect(reply!.text).toBe('*Healthy*. Up 3 days.')
+    expect(reply!.text).toBe(
+      '*Healthy*. Up 3 days.\n\n_AI answer by Pace, with Claude Code_'
+    )
     await page.getByText('First answer sent').waitFor()
     await page.getByText('"how is web-01?"').waitFor()
     await page.getByRole('heading', { name: 'Pace is set up' }).waitFor()
@@ -640,7 +644,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       // The built-in sandbox can be chosen before its own login.
       const use = page.getByRole('button', { name: 'Use the built-in sandbox' })
       expect(await use.isDisabled()).toBe(false)
-      await page.getByText('Get it now, or before Pace starts.').waitFor()
+      await page.getByText('Sign in now, or before Pace starts.').waitFor()
       await use.click()
       await page
         .getByRole('heading', { name: 'Preparing the built-in sandbox' })
@@ -1554,7 +1558,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       // The built-in sandbox is the choice; its login is in already, and it
       // was prepared before, so setup goes straight on.
       await page.getByRole('radio', { name: /Built-in sandbox/ }).click()
-      await page.getByText('Signed in').waitFor()
+      await page.getByText('Signed in', { exact: true }).waitFor()
       await page
         .getByRole('button', { name: 'Use the built-in sandbox' })
         .click()
@@ -1617,6 +1621,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
       await page.evaluate("window.location.hash = '#/settings/sandbox'")
       await page.getByRole('radio', { name: /^Built-in sandbox/ }).click()
+      // A claude token instead of signing in there, under Advanced
+      await page
+        .locator('section')
+        .filter({ hasText: 'Reasoner login' })
+        .getByRole('button', { name: /^Advanced/ })
+        .click()
       await enterSecret(
         page,
         'SANDBOX_CLAUDE_OAUTH_TOKEN',
@@ -1653,7 +1663,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       })
       const [reply] = await world.answered(ops.id, ts)
       expect(reply!.text).toBe(
-        'From the VM: Linux aarch64, uid 1000, network devices: lo, login set, example.com 403'
+        'From the VM: Linux aarch64, uid 1000, network devices: lo, login set, example.com 403\n\n_AI answer by Pace, with Claude Code_'
       )
     },
     240_000
