@@ -194,6 +194,13 @@ const div = (cls, parent, style = {}) => {
   parent.append(el)
   return el
 }
+const vector = (tag, parent, attrs) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag)
+  for (const [name, value] of Object.entries(attrs))
+    el.setAttribute(name, value)
+  parent.append(el)
+  return el
+}
 const px = (n) => `${Math.round(n * 10) / 10}px`
 
 /* ---------- Home: every tool reports back to Pacenote ---------- */
@@ -430,8 +437,12 @@ function drawConverge(stage, caption, L, M, wide, steps, onstate) {
     }
   }
 
-  // A node shows when the first line reaching it arrives; one that nothing
-  // reaches shows as its first line sets out
+  // The lines, under the nodes. A node shows when the first line reaching it
+  // arrives; one that nothing reaches shows as its first line sets out
+  const lines = vector('svg', stage, {
+    class: 'cv-lines',
+    'aria-hidden': 'true',
+  })
   const shown = {}
   for (const line of LINES) {
     const parts = route(L, wide, NODES[line.from], NODES[line.to], line).map(
@@ -453,14 +464,12 @@ function drawConverge(stage, caption, L, M, wide, steps, onstate) {
       tip.dx = dx
       tip.dy = dy
     }
-    let t = beatAt(line.beat) + 60
-    for (const part of parts) {
-      const d = parts.length > 1 ? 280 : 440
-      segment(stage, timeline, part, line, t, d)
-      t += d
-    }
-    shown[line.to] = Math.min(shown[line.to] ?? Infinity, t - 40)
-    if (line.back) arrow(stage, timeline, tip, t - 60)
+    const t = beatAt(line.beat) + 60
+    const d = parts.length > 1 ? 560 : 440
+    const points = [parts[0].a, ...parts.map((part) => part.b)]
+    trace(lines, timeline, points, line, t, d)
+    shown[line.to] = Math.min(shown[line.to] ?? Infinity, t + d - 40)
+    if (line.back) arrow(stage, timeline, tip, t + d - 60)
   }
   for (const line of LINES)
     if (!(line.from in shown)) shown[line.from] = beatAt(line.beat) - 150
@@ -567,34 +576,74 @@ function route(L, wide, from, to, line) {
   ]
 }
 
-function segment(stage, timeline, part, line, t, d) {
-  const { a, b } = part
+// A turn between two straight parts rounds off this much, at most
+const BEND = 12
+let reveals = 0
+
+/**
+ * One line as a path that draws itself on: its straight parts with both
+ * edges on whole device pixels, and each turn between them a quarter circle
+ */
+function trace(lines, timeline, points, line, t, d) {
   const thick = line.back ? 4 : 3
-  const across = a.y === b.y
-  const kind = [
-    'cv-seg',
-    line.back && 'back',
-    line.carried && 'carried',
-    line.carried && !across && 'down',
-  ]
-  const el = across
-    ? div(kind.filter(Boolean).join(' '), stage, {
-        left: px(Math.min(a.x, b.x)),
-        top: px(snap(a.y - thick / 2)),
-        width: px(Math.abs(b.x - a.x)),
-        height: px(thick),
-        transformOrigin: b.x >= a.x ? 'left center' : 'right center',
-      })
-    : div(kind.filter(Boolean).join(' '), stage, {
-        left: px(snap(a.x - thick / 2)),
-        top: px(Math.min(a.y, b.y)),
-        width: px(thick),
-        height: px(Math.abs(b.y - a.y)),
-        transformOrigin: b.y >= a.y ? 'center top' : 'center bottom',
-      })
-  timeline.add(el, [
-    { at: t, scale: across ? '0 1' : '1 0', easing: STANDARD },
-    { at: t + d, scale: '1 1' },
+  const on = (v) => snap(v - thick / 2) + thick / 2
+  const p = points.map((point) => ({ ...point }))
+  for (let i = 0; i < p.length - 1; i++) {
+    if (points[i].y === points[i + 1].y) p[i].y = p[i + 1].y = on(points[i].y)
+    else p[i].x = p[i + 1].x = on(points[i].x)
+  }
+  const n = (v) => Math.round(v * 1000) / 1000
+  const way = (a, b) => ({ x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) })
+  const span = (a, b) => Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+  let path = `M${n(p[0].x)} ${n(p[0].y)}`
+  let length = span(p[0], p[1])
+  for (let i = 1; i < p.length - 1; i++) {
+    const [a, c, b] = [p[i - 1], p[i], p[i + 1]]
+    const into = way(a, c)
+    const out = way(c, b)
+    const r = Math.min(BEND, span(a, c), span(c, b))
+    const clockwise = into.x * out.y - into.y * out.x > 0 ? 1 : 0
+    path +=
+      `L${n(c.x - into.x * r)} ${n(c.y - into.y * r)}` +
+      `A${n(r)} ${n(r)} 0 0 ${clockwise} ${n(c.x + out.x * r)} ${n(c.y + out.y * r)}`
+    length += span(c, b) - 2 * r + (Math.PI / 2) * r
+  }
+  const end = p[p.length - 1]
+  path += `L${n(end.x)} ${n(end.y)}`
+
+  // It draws on as one dash as long as the line slides along it; a dashed
+  // line draws on through a mask that does the same
+  let pen
+  const kind = ['cv-line', line.back && 'back', line.carried && 'carried']
+  const attrs = { d: path, class: kind.filter(Boolean).join(' ') }
+  if (line.carried) {
+    const id = `cv-reveal-${++reveals}`
+    const mask = vector('mask', lines, {
+      id,
+      maskUnits: 'userSpaceOnUse',
+      x: 0,
+      y: 0,
+      width: '100%',
+      height: '100%',
+    })
+    pen = vector('path', mask, {
+      d: path,
+      fill: 'none',
+      stroke: '#fff',
+      'stroke-width': thick + 2,
+    })
+    vector('path', lines, {
+      ...attrs,
+      'stroke-width': thick,
+      mask: `url(#${id})`,
+    })
+  } else {
+    pen = vector('path', lines, { ...attrs, 'stroke-width': thick })
+  }
+  pen.style.strokeDasharray = `${length} ${length}`
+  timeline.add(pen, [
+    { at: t, strokeDashoffset: `${length}px`, easing: STANDARD },
+    { at: t + d, strokeDashoffset: '0px' },
   ])
 }
 

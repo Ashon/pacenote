@@ -1325,19 +1325,24 @@ code {
   box-shadow: inset 0 0 0 1.5px var(--track);
   opacity: 0;
 }
-.cv-seg {
-  border-radius: 999px;
-  background: var(--track);
+.cv-lines {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
-.cv-seg.back {
-  background: var(--primary);
+.cv-line {
+  fill: none;
+  stroke: var(--track);
 }
-.cv-seg.carried {
-  background: repeating-linear-gradient(90deg, var(--primary) 0 6px, transparent 6px 11px);
+.cv-line.back {
+  stroke: var(--primary);
+}
+.cv-line.carried {
+  stroke: var(--primary);
+  stroke-dasharray: 6 5;
   opacity: 0.7;
-}
-.cv-seg.carried.down {
-  background: repeating-linear-gradient(180deg, var(--primary) 0 6px, transparent 6px 11px);
 }
 .cv-arrow {
   color: var(--primary);
