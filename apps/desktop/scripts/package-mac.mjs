@@ -99,9 +99,9 @@ let extractedElectron
 
 /**
  * Electron.app, unpacked with ditto from electron's own download of its
- * release zip (checksum-verified, cached). The install's copy is not used: its
- * installer unpacks with extract-zip, which stops after the first file on
- * Node 26.
+ * release zip (checksum-verified, cached). The install's copy is not used:
+ * electron fetches it only when first run, and ditto unpacks an app bundle
+ * with its symlinks and attributes as macOS packed them.
  */
 async function electronApp() {
   // @electron/get is electron's own downloader.

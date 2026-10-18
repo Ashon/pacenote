@@ -594,6 +594,11 @@ function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
       body: trouble.body,
     })
     notice.on('click', () => showMainWindow(trouble.route))
+    // macOS shows notifications only for a signed app (an unsigned
+    // development build gets this) and only once notifications are allowed
+    notice.on('failed', (_event, error) =>
+      log.warn(`Could not show a notification: ${error}`)
+    )
     notice.show()
   }
 }
