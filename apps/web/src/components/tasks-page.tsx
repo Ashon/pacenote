@@ -423,8 +423,9 @@ function TaskRowsSkeleton({ count }: { count: number }) {
               className="text-copy leading-snug"
               width={TITLE_WIDTHS[i % TITLE_WIDTHS.length]}
             />
+            {/* the meta line, as tall as its chips: 17px and 1px above and below */}
             <SkeletonText
-              className="mt-1 text-meta leading-[1.125rem]"
+              className="mt-1 text-meta leading-[1.1875rem]"
               width={META_WIDTHS[i % META_WIDTHS.length]}
             />
           </div>
