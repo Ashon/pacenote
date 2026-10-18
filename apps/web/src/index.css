@@ -14,6 +14,12 @@
  * reached. Anything neither covers (symbols, kana, hanzi) falls to the system
  * font. Host Grotesk's figures are all one width, so numbers line up without
  * tabular-nums.
+ *
+ * Two fixes for a line that mixes them. The space is Pretendard's (0.251 em):
+ * Host Grotesk's (0.307 em) left gaps between Hangul words a fifth wider than
+ * Pretendard spaces them. And Host Grotesk is set 4% larger (size-adjust), so
+ * its lowercase (0.496 em against Pretendard's 0.530) does not shrink beside
+ * Hangul; its capitals then stand at 0.728, still under Hangul's 0.788.
  */
 @font-face {
   font-family: 'Pretendard';
@@ -23,7 +29,7 @@
   font-style: normal;
   font-display: swap;
   unicode-range:
-    U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
+    U+0020, U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
 }
 @font-face {
   font-family: 'Host Grotesk';
@@ -32,6 +38,7 @@
   font-weight: 300 800;
   font-style: normal;
   font-display: swap;
+  size-adjust: 104%;
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -44,6 +51,7 @@
   font-weight: 300 800;
   font-style: normal;
   font-display: swap;
+  size-adjust: 104%;
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
@@ -266,7 +274,9 @@
     height: 100%;
   }
   body {
-    @apply bg-background font-sans text-foreground antialiased;
+    /* macOS's own font smoothing (auto), not antialiased: antialiased turns off
+       the stem darkening macOS gives text, which left strokes thin and soft */
+    @apply bg-background font-sans text-foreground subpixel-antialiased;
     overflow: hidden;
     /* An app, not a page: its chrome (labels, titles, buttons, cards) is not text to select or drag.
        Content worth copying opts back in with select-text (requests, replies, logs, paths, keys, errors). */
