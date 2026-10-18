@@ -56,7 +56,6 @@ import { SandboxService } from './sandbox.js'
 import { UpdateCheck } from './updates.js'
 import { diagnosticsText, tailFile } from './diagnostics.js'
 import { resolveAppPaths } from './app-paths.js'
-import { checkClaudeCredential } from '../../../src/sandbox/claude-credential.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
 import {
   latestCollection,
@@ -400,8 +399,6 @@ function claimStep<T>(run: () => Promise<T>): Promise<T> {
 const claudeToken = new ClaudeTokenSetup({
   toolPath: () => toolPath(),
   save: (token) => settings.save({ SANDBOX_CLAUDE_OAUTH_TOKEN: token }),
-  verify: (token) =>
-    checkClaudeCredential({ oauthToken: token }, { fresh: true }),
 })
 
 /**

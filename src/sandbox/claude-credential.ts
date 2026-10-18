@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto'
 
 /**
- * Whether the sandbox's claude credential (SANDBOX_CLAUDE_OAUTH_TOKEN or
- * SANDBOX_ANTHROPIC_API_KEY) still works, asked with a call that uses no quota:
- * the model list. A token cut short or revoked shows up here, before a mention
- * fails on it.
+ * Whether the sandbox's API key (SANDBOX_ANTHROPIC_API_KEY) still works, asked
+ * with a call that uses no quota: the model list. A key cut short or revoked
+ * shows up here, before a mention fails on it.
+ *
+ * A claude.ai token (SANDBOX_CLAUDE_OAUTH_TOKEN) is not checked: it is for
+ * Claude Code itself, and Pacenote never calls Anthropic's API with one. One
+ * that stopped working shows when a mention fails on it.
  * - accepted: the API answered 200
  * - rejected: the API answered 401
  * - unknown: anything else (no network, a proxy, another status), so a check
@@ -34,30 +37,20 @@ export function claudeCredential(
   }
 }
 
-/** Undefined when there is no credential to check */
+/** Undefined when there is no API key to check */
 export async function checkClaudeCredential(
   credential: ClaudeCredential,
   options: { fresh?: boolean; fetchImpl?: typeof fetch; now?: number } = {}
 ): Promise<CredentialState | undefined> {
-  const { oauthToken, apiKey } = credential
-  if (!oauthToken && !apiKey) return undefined
+  const { apiKey } = credential
+  if (!apiKey) return undefined
   const now = options.now ?? Date.now()
-  const key = createHash('sha256')
-    .update(oauthToken ?? `key:${apiKey}`)
-    .digest('hex')
+  const key = createHash('sha256').update(apiKey).digest('hex')
   const cached = cache.get(key)
   if (!options.fresh && cached && now - cached.at < CACHE_MS)
     return cached.state
 
-  const headers: Record<string, string> = {
-    'anthropic-version': '2023-06-01',
-    ...(oauthToken
-      ? {
-          Authorization: `Bearer ${oauthToken}`,
-          'anthropic-beta': 'oauth-2025-04-20',
-        }
-      : { 'x-api-key': apiKey! }),
-  }
+  const headers = { 'anthropic-version': '2023-06-01', 'x-api-key': apiKey }
   let state: CredentialState
   try {
     const res = await (options.fetchImpl ?? fetch)(modelsUrl(), {

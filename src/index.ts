@@ -273,8 +273,8 @@ async function main(): Promise<void> {
     problems: allProblems(),
     limits: [...connection.limits(), ...renderLimits],
   })
-  // A claude credential the API rejects (cut short, revoked) shows in the
-  // status at once, not only when a mention fails on it.
+  // An API key the API rejects (cut short, revoked) shows in the status at
+  // once, not only when a mention fails on it.
   if (sandbox.isolated && reasoner.backend === 'claude')
     void checkClaudeCredential(
       claudeCredential(config.reasoner.auth?.env ?? {})

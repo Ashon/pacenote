@@ -108,9 +108,10 @@ sandbox is set up, so it needs Apple silicon and macOS 15 as well.
 
 In the desktop app, Settings > Sandbox > Reasoner login > "Get token from Claude" does the `claude setup-token` step: it runs
 the command (under `script`, which gives it the terminal it needs), you approve in the browser, and the token it prints is
-saved to `SANDBOX_CLAUDE_OAUTH_TOKEN` without being shown, then checked with the API: the screen says whether Claude accepts it.
-The token is checked the same way, with a call that uses no quota (the model list), when Pace starts (a rejected one shows
-in the status bar's check issues) and in Settings > Sandbox's status ("Sandbox claude token"). The token is a one-year token for your own Claude subscription
+saved to `SANDBOX_CLAUDE_OAUTH_TOKEN` without being shown. Pacenote never calls Anthropic's API with it: a claude.ai token is
+for Claude Code itself, so one that stopped working shows when a mention fails on it (in the status bar's check issues).
+An API key (`SANDBOX_ANTHROPIC_API_KEY`) is checked with a call that uses no quota (the model list) when Pace starts and in
+Settings > Sandbox's status ("Sandbox claude token"). The token is a one-year token for your own Claude subscription
 (Pro, Max, Team or Enterprise); the bot answers only you (`MENTION_ALLOWED_USERS`), and on the [team hub](team-hub.md)
 each member's desktop answers only that member. Mounting `~/.claude` into the sandbox
 is not an alternative: on macOS the login lives in the Keychain, and the folder holds every past session and your hooks.
