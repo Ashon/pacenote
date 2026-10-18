@@ -141,6 +141,7 @@ async function main(): Promise<void> {
         home: homedir(),
         settings: () => readTasksSettings(process.env, settingsFilePath()),
         owner: () => messenger.owner,
+        isPublic: (conversation) => messenger.isPublic(conversation),
         history: config.history ? new HistoryReader(config.dataDir) : undefined,
         version: process.env.PACENOTE_VERSION ?? 'dev',
       })

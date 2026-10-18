@@ -9,9 +9,11 @@ import { serveOwnTools, type OwnToolsOptions } from '../src/pace/tools.js'
 import type { Requester } from '../src/sandbox/runtime.js'
 import { openBrokerDoor } from '../src/sandbox/vm-broker.js'
 import { readActivity } from '../src/tasks/activity.js'
+import { recapSummary } from '../src/tasks/mcp.js'
 import type { TasksSettings } from '../src/tasks/settings.js'
 import { readTasks } from '../src/tasks/store.js'
-import { addTasks } from '../src/tasks/write.js'
+import { addFollowUp, addTasks } from '../src/tasks/write.js'
+import { countYou } from '../src/you/store.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-own-tools-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -173,7 +175,7 @@ describe("Pace's own tools in the sandbox", () => {
     })
   })
 
-  it('lists the open tasks without the ones from DMs, and closes one when told', async () => {
+  it('lists only the open tasks from public channels and your own, and closes one when told', async () => {
     const dataDir = path.join(root, 'list')
     mkdirSync(dataDir, { recursive: true })
     addTasks(
@@ -186,6 +188,12 @@ describe("Pace's own tools in the sandbox", () => {
           confidence: 'sure',
         },
         {
+          title: 'Draft the launch plan',
+          where: '#secret-launch',
+          link: 'https://acme.slack.com/archives/C0SECRET/p1792000050000100',
+          confidence: 'sure',
+        },
+        {
           title: 'Review the webhook change',
           where: '#webhooks',
           link: 'https://acme.slack.com/archives/C0HOOK/p1792000100000100',
@@ -194,17 +202,39 @@ describe("Pace's own tools in the sandbox", () => {
       ],
       { settings: settings() }
     )
-    await withDoor({ dataDir }, asking, async (socket) => {
+    const draft = readTasks(dataDir).tasks.find((t) =>
+      t.title.startsWith('Draft')
+    )!
+    // Your own, but carrying on from the private one: as private as it is
+    addFollowUp(dataDir, {
+      title: 'Send the launch plan to legal',
+      why: 'Left after the draft',
+      after: draft.id,
+    })
+    addFollowUp(dataDir, {
+      title: 'Renew the TLS certificate',
+      why: 'It expires next week',
+    })
+    const titles = (tasks: { title: string }[]) =>
+      tasks.map((t) => t.title).sort()
+    // #webhooks and #portfolio, where Pace is asked, are the public ones
+    const isPublic = async (id: string) => id === 'C0HOOK' || id === 'C0PORT'
+    await withDoor({ dataDir, isPublic }, asking, async (socket) => {
       const { value } = await call(socket, 'my_tasks')
-      expect(value.tasks.map((t: { title: string }) => t.title)).toEqual([
+      expect(titles(value.tasks)).toEqual([
+        'Renew the TLS certificate',
         'Review the webhook change',
       ])
       const closed = await call(socket, 'close_task', {
-        task: value.tasks[0].id,
+        task: value.tasks.find((t: { title: string }) =>
+          t.title.startsWith('Review')
+        ).id,
         note: 'Reviewed and approved',
       })
       expect(closed.value.closed.title).toBe('Review the webhook change')
-      expect((await call(socket, 'my_tasks')).value.tasks).toEqual([])
+      expect(titles((await call(socket, 'my_tasks')).value.tasks)).toEqual([
+        'Renew the TLS certificate',
+      ])
       expect(
         readTasks(dataDir).tasks.find((t) => t.title.startsWith('Review'))
           ?.closed
@@ -214,6 +244,55 @@ describe("Pace's own tools in the sandbox", () => {
         note: 'Reviewed and approved',
       })
     })
+    // A channel that cannot be looked up counts as private
+    await withDoor({ dataDir }, asking, async (socket) => {
+      expect(titles((await call(socket, 'my_tasks')).value.tasks)).toEqual([
+        'Renew the TLS certificate',
+      ])
+    })
+  })
+
+  it('tells a channel where the user works without their private channels', async () => {
+    const dataDir = path.join(root, 'work')
+    mkdirSync(dataDir, { recursive: true })
+    const at = Math.floor((Date.now() - 60_000) / 1000)
+    const asked = (channel: string, where: string, title: string) =>
+      [1, 2, 3].map((k) => ({
+        title: `${title} ${k}`,
+        asked_by: 'mina',
+        where,
+        link: `https://acme.slack.com/archives/${channel}/p${at + k}000100`,
+        confidence: 'sure' as const,
+      }))
+    addTasks(
+      dataDir,
+      [
+        ...asked('C0SECRET', '#secret-launch', 'Launch step'),
+        ...asked('C0HOOK', '#webhooks', 'Webhook fix'),
+      ],
+      { settings: settings() }
+    )
+    // The desktop app keeps the areas it finds, the private one too
+    const found = await countYou({ dataDir, keep: true })
+    expect(found.areas.map((area) => area.name).sort()).toEqual([
+      'Secret launch',
+      'Webhooks',
+    ])
+    const isPublic = async (id: string) => id !== 'C0SECRET'
+    await withDoor({ dataDir, isPublic }, asking, async (socket) => {
+      const work = await call(socket, 'my_work')
+      expect(work.value.areas.map((a: { name: string }) => a.name)).toEqual([
+        'Webhooks',
+      ])
+      expect(JSON.stringify(work.value)).toContain('Webhook fix')
+      expect(JSON.stringify(work.value)).not.toMatch(/launch/i)
+      const recap = await call(socket, 'my_recap', { period: 'month' })
+      expect(recap.error).toBeUndefined()
+      expect(JSON.stringify(recap.value)).not.toMatch(/launch/i)
+    })
+    // The user's own recap, in their AI tools, still has all of it
+    const own = await recapSummary({ dataDir }, 'month', undefined)
+    expect(JSON.stringify(own)).toMatch(/launch/i)
   })
 
   it('acts only for the owner, as the door says, and not while Todo is off', async () => {

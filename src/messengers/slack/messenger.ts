@@ -134,6 +134,10 @@ export class SlackMessenger implements Messenger {
     }
   }
 
+  async isPublic(conversation: string): Promise<boolean> {
+    return (await this.options.directory.channel(conversation)).isPublic
+  }
+
   async venue(mention: Mention): Promise<Venue> {
     const channel = await this.options.directory.channel(mention.conversation)
     return channel.isPublic

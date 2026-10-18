@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { redactSecrets } from '../broker/redact.js'
+import type { Audience } from '../you/areas.js'
 import { countRecap, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
 import type { AreaRole } from '../you/types.js'
@@ -855,11 +856,19 @@ export function openTasks(
     }))
 }
 
-/** Where the user contributes, as my_work gives it (and Pace's own tools) */
+/**
+ * Where the user contributes, as my_work gives it (and Pace's own tools, for
+ * the audience of a channel)
+ */
 export async function workSummary(
-  options: Pick<TaskToolsOptions, 'dataDir' | 'home'>
+  options: Pick<TaskToolsOptions, 'dataDir' | 'home'>,
+  audience?: Audience
 ) {
-  const you = await countYou({ dataDir: options.dataDir, home: options.home })
+  const you = await countYou({
+    dataDir: options.dataDir,
+    home: options.home,
+    audience,
+  })
   const { slack, github } = you.accounts
   return {
     you: {
@@ -897,7 +906,8 @@ export async function workSummary(
 export async function recapSummary(
   options: Pick<TaskToolsOptions, 'dataDir' | 'home'>,
   period: 'day' | 'week' | 'month',
-  date: string | undefined
+  date: string | undefined,
+  audience?: Audience
 ) {
   const [y, m, d] = (date ?? '').split('-').map(Number)
   const day = date ? new Date(y!, m! - 1, d) : new Date()
@@ -906,6 +916,7 @@ export async function recapSummary(
     home: options.home,
     period,
     key: periodKey(period, day),
+    audience,
   })
   if (!counted) throw new Error(`No ${period} for ${date}`)
   const { view, commits } = counted

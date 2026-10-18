@@ -180,7 +180,7 @@ tasks", "what is on my list?", "the retry review is done", "what did I do this w
 | Tool | What it does |
 | --- | --- |
 | `add_tasks` | Keeps what you asked for as tasks, each linking to your request in the thread; the same title still open there is kept once |
-| `my_tasks` | Your open tasks, without the ones from DMs |
+| `my_tasks` | Your open tasks from public channels, and your own from this Mac |
 | `close_task` | Closes a task you say is done, with what was done in a line |
 | `my_work` | Where you contribute ([Where you contribute](you.md)) |
 | `my_recap` | What you did in a day, a week or a month ([Recap](recap.md)) |
@@ -188,8 +188,10 @@ tasks", "what is on my list?", "the retry review is done", "what did I do this w
 
 - **Only for you.** They act for the person Pace answers, as Pacenote's door into the run says, never as the reasoner
   says; anyone else gets nothing from them.
-- **Said in a channel.** Everyone there reads the answer, so tasks from DMs are left out, and earlier answers come only
-  from that channel, where they were already posted.
+- **Said in a channel.** Everyone there reads the answer, so the tools speak only of public channels and your own work
+  on this Mac: tasks, areas and recaps leave out DMs and private channels (and a channel Slack cannot tell about), a
+  task of your own that carries on from one of those, and the recap you wrote. Earlier answers come only from that
+  channel, where they were already posted.
 - **In your Todo.** Tasks Pace keeps are sure, from **Pace**, in the channel you asked in, and Todo says so as it
   happens. A request to keep tasks goes to your Todo unless you name Jira or another tracker.
 - They answer only while "Gather my tasks from Slack" is on, as the tools for AI tools do. The VM never sees Pacenote's

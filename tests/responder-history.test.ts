@@ -224,6 +224,9 @@ class MemoryMessenger implements Messenger {
       ? { label: 'room-1', answerable: true }
       : { label: 'dm', answerable: false, refusal: 'Not here.' }
   }
+  async isPublic() {
+    return this.answerable
+  }
   async request(mention: Mention) {
     return {
       text: mention.text,

@@ -47,6 +47,37 @@ const PEOPLE = 3
 export const partKey = (part: Pick<AreaPart, 'kind' | 'id'>) =>
   `${part.kind}:${part.id.toLowerCase()}`
 
+/**
+ * What one audience may hear of your work. Pace answers in a channel that
+ * everyone there reads, so it speaks only of tasks from public channels and
+ * your own from this Mac.
+ */
+export interface Audience {
+  task: (task: TaskView) => boolean
+  /** A Slack conversation, by ID */
+  channel: (conversation: string) => boolean
+}
+
+/**
+ * The areas an audience may hear of, without the channels it may not. An area
+ * with a repository is named for it and stays; one without is named for one
+ * of its channels, so it goes when any of them may not be heard of.
+ */
+export function areasFor(
+  records: readonly AreaRecord[],
+  audience?: Audience
+): AreaRecord[] {
+  if (!audience) return [...records]
+  return records.flatMap((record) => {
+    const heard = record.parts.filter(
+      (part) => part.kind !== 'channel' || audience.channel(part.id)
+    )
+    if (heard.length === record.parts.length) return [record]
+    if (!record.parts.some((part) => part.kind === 'repo')) return []
+    return [{ ...record, parts: heard }]
+  })
+}
+
 /** One piece of your work: a task or a session, and the parts it touches */
 export interface Signal {
   at: number

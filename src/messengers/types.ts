@@ -144,6 +144,11 @@ export interface Messenger {
   readonly owner: string | undefined
 
   venue(mention: Mention): Promise<Venue>
+  /**
+   * Whether a conversation is one everyone in the workspace can read (Slack: a
+   * public channel); false when it cannot be told
+   */
+  isPublic(conversation: string): Promise<boolean>
   request(mention: Mention): Promise<Request>
   /**
    * Earlier messages for context, oldest first, without the given message IDs

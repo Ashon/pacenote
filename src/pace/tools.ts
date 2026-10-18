@@ -10,7 +10,11 @@ import type { OwnTools } from '../sandbox/vm-broker.js'
 import { recordActivity } from '../tasks/activity.js'
 import { openTasks, recapSummary, workSummary } from '../tasks/mcp.js'
 import type { TasksSettings } from '../tasks/settings.js'
+import { allTaskViews } from '../tasks/store.js'
+import type { TaskView } from '../tasks/types.js'
 import { addThreadTasks, closeTask } from '../tasks/write.js'
+import type { Audience } from '../you/areas.js'
+import { readYou } from '../you/store.js'
 
 /**
  * Pace's own tools: what Pacenote keeps for the person Pace answers (their
@@ -20,9 +24,10 @@ import { addThreadTasks, closeTask } from '../tasks/write.js'
  * sees Pacenote's files; these tools read and write them here, for the run's
  * requester as the door says, never as the reasoner says.
  * - Only for the person Pace answers (the messenger's owner).
- * - The answer goes to a channel everyone in it reads: tasks from DMs are left
- *   out, and earlier answers come only from the same channel, where they were
- *   already posted.
+ * - The answer goes to a channel everyone in it reads: tasks, areas and recaps
+ *   speak only of public channels and the person's own work on this Mac, never
+ *   of DMs or private channels, and earlier answers come only from the same
+ *   channel, where they were already posted.
  * - The Todo tools open only while Settings > Todo is on, as for AI tools.
  */
 export interface OwnToolsOptions {
@@ -34,6 +39,11 @@ export interface OwnToolsOptions {
   owner: () => string | undefined
   /** The run history, when it is kept */
   history?: HistoryReader
+  /**
+   * Whether a Slack conversation is a public channel, which an answer may
+   * speak of; without it, none is
+   */
+  isPublic?: (conversation: string) => Promise<boolean>
   version: string
 }
 
@@ -50,10 +60,51 @@ const ANSWER_CHARS = 1500
 const readOnly = { readOnlyHint: true, openWorldHint: false }
 const writes = { readOnlyHint: false, openWorldHint: false }
 
-/** Tasks from DMs, which a channel never hears of from Pace */
+/** Tasks from DMs, which need no lookup to be left out */
 const fromDm = (task: { source: { conversation: string; label: string } }) =>
   task.source.conversation.startsWith('D') ||
   /^(dm|group dm)\b/i.test(task.source.label.trim())
+
+/**
+ * What a channel may hear of from Pace, where everyone reads its answer:
+ * tasks from public channels, and the person's own from this Mac unless they
+ * carry on from one that is not. A DM, a private channel, or a conversation
+ * whose lookup fails is not heard of.
+ */
+async function audienceOf(options: OwnToolsOptions): Promise<Audience> {
+  const tasks = allTaskViews(options.dataDir)
+  const conversations = new Set([
+    ...tasks
+      .filter((task) => task.source.app !== 'local' && !fromDm(task))
+      .map((task) => task.source.conversation),
+    ...readYou(options.dataDir).areas.flatMap((area) =>
+      area.parts
+        .filter((part) => part.kind === 'channel')
+        .map((part) => part.id)
+    ),
+  ])
+  const heard = new Set<string>()
+  const { isPublic } = options
+  if (isPublic)
+    await Promise.all(
+      [...conversations].map(async (id) => {
+        if (await isPublic(id).catch(() => false)) heard.add(id)
+      })
+    )
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const task = (each: TaskView, seen: Set<string>): boolean => {
+    if (each.source.app !== 'local') return heard.has(each.source.conversation)
+    const before = each.follows ? byId.get(each.follows) : undefined
+    if (!before) return true
+    if (seen.has(before.id)) return false
+    seen.add(each.id)
+    return task(before, seen)
+  }
+  return {
+    task: (each) => task(each, new Set()),
+    channel: (id) => heard.has(id),
+  }
+}
 
 export function createOwnToolsServer(
   options: OwnToolsOptions,
@@ -100,7 +151,7 @@ export function createOwnToolsServer(
     'my_tasks',
     {
       description:
-        "The open tasks in the user's Todo in Pacenote, newest first: what was asked of them or what they said they would do, who asked, where, a due hint and a link. Tasks from DMs are left out here.",
+        "The open tasks in the user's Todo in Pacenote, newest first: what was asked of them or what they said they would do, who asked, where, a due hint and a link. Only tasks from public channels and the user's own are given here; those from DMs and private channels are left out.",
       inputSchema: {
         limit: z
           .number()
@@ -113,9 +164,9 @@ export function createOwnToolsServer(
       annotations: readOnly,
     },
     ({ limit }) =>
-      respond(true, () => {
-        const tasks = openTasks(options, limit ?? 20, (task) => !fromDm(task))
-        return { tasks }
+      respond(true, async () => {
+        const heard = await audienceOf(options)
+        return { tasks: openTasks(options, limit ?? 20, heard.task) }
       })
   )
 
@@ -226,7 +277,8 @@ export function createOwnToolsServer(
         'Where the user contributes: their areas (the repositories, Slack channels and user groups each is made of), how they contribute to each, what is open in each, what they did there lately, and who asks them most.',
       annotations: readOnly,
     },
-    () => respond(true, () => workSummary(options))
+    () =>
+      respond(true, async () => workSummary(options, await audienceOf(options)))
   )
 
   server.registerTool(
@@ -245,7 +297,9 @@ export function createOwnToolsServer(
       annotations: readOnly,
     },
     ({ period, date }) =>
-      respond(true, () => recapSummary(options, period, date))
+      respond(true, async () =>
+        recapSummary(options, period, date, await audienceOf(options))
+      )
   )
 
   const { history } = options

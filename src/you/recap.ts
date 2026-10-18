@@ -7,12 +7,14 @@ import { allTaskViews, readJson, writeJson } from '../tasks/store.js'
 import type { TaskView, WorkEntry } from '../tasks/types.js'
 import { readWork } from '../tasks/work.js'
 import {
+  areasFor,
   findAreas,
   partKey,
   reconcile,
   signalsOf,
   taskArea,
   WINDOW_MS,
+  type Audience,
 } from './areas.js'
 import { sessionMarks, type SessionMark } from './sessions.js'
 import { RECAPS_FILE } from './spent.js'
@@ -630,7 +632,9 @@ export function keepWritten(
 /**
  * A period's recap, counted from your work on this Mac: tasks, the work log,
  * your areas (found now when none are kept yet, for the MCP server), your
- * sessions and commits (with a home), and Pace's runs when given
+ * sessions and commits (with a home), and Pace's runs when given. For an
+ * audience (Pace in a channel), only what it may hear of, and not the recap
+ * you wrote, which was written from all of it.
  */
 export async function countRecap(options: {
   dataDir: string
@@ -639,6 +643,7 @@ export async function countRecap(options: {
   key?: string
   now?: number
   runs?: (since: Date) => RunLine[]
+  audience?: Audience
 }): Promise<{ view: RecapView; commits: Commit[] } | undefined> {
   const now = options.now ?? Date.now()
   const key = options.key ?? periodKey(options.period, new Date(now))
@@ -654,7 +659,10 @@ export async function countRecap(options: {
         leaveOut: [dataDir],
       })
     : []
-  const tasks = allTaskViews(dataDir, now)
+  const { audience } = options
+  const tasks = allTaskViews(dataDir, now).filter(
+    (task) => !audience || audience.task(task)
+  )
   const you = readYou(dataDir)
   let areas = you.areas
   if (areas.length === 0)
@@ -663,6 +671,7 @@ export async function countRecap(options: {
       findAreas(signalsOf(tasks, sessions, now)),
       new Date(now)
     ).records
+  areas = areasFor(areas, audience)
   // Each repository's folders on this Mac: remembered ones and sessions'
   const folders = new Map<string, string[]>()
   const add = (repo: string, folder: string) => {
@@ -693,7 +702,9 @@ export async function countRecap(options: {
     commits,
     runs: options.runs?.(range.start),
     emails,
-    written: readWritten(dataDir)[`${options.period}:${key}`],
+    written: audience
+      ? undefined
+      : readWritten(dataDir)[`${options.period}:${key}`],
   })
   return view && { view, commits }
 }
