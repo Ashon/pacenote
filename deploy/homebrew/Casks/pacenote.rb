@@ -8,8 +8,8 @@ cask "pacenote" do
 
   url "https://github.com/Ashon/pacenote/releases/download/v#{version}/Pacenote-v#{version}-macos-arm64.app.zip"
   name "Pacenote"
-  desc "Slack bot that answers mentions with local claude or codex CLIs"
-  homepage "https://github.com/Ashon/pacenote"
+  desc "Slack assistant that answers only you, with your local claude or codex CLI"
+  homepage "https://pacenote.dev/"
 
   # Apple silicon only; Electron 38 and later need macOS 12.
   depends_on arch: :arm64
@@ -33,7 +33,7 @@ cask "pacenote" do
   ]
 
   caveats <<~EOS
-    Pacenote answers your Slack mentions with your local claude or codex CLI login.
+    Pace answers you in Slack when you mention it, with your local claude or codex CLI login.
     Before the first mention:
       - log in to claude or codex (codex 0.138 or later)
       - open Pacenote: a first run opens on setup, from the AI service on this Mac to Pace's
