@@ -10,7 +10,8 @@ on:
       - 'assets/pacenote-mark.svg'
       - '.github/workflows/pages.yml'
   # The release link above the headline names the latest release. Releases are published with the maintainer's own gh, so
-  # the release event does reach this workflow.
+  # the release event does reach this workflow. It runs on the release's tag, which the github-pages environment does not
+  # deploy from, so it only starts this workflow again on main (relay below).
   release:
     types: [published]
   workflow_dispatch:
@@ -25,7 +26,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A workflow_dispatch started with GITHUB_TOKEN does start a run, unlike other events it starts.
+  relay:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "${{ github.repository }}" --ref main
+
   deploy:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
