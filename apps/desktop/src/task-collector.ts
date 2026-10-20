@@ -423,12 +423,13 @@ export function recordCollection(
 }
 
 /** A line for the run history when a collection goes to the other CLI */
-const switchNote = (switched: Switch, to: OwnCli) =>
-  `${switchWords(switched)}${
-    switched.until
-      ? ` until ${new Date(switched.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-      : ''
-  }, so ${CLI_NAMES[to]} collected.`
+const switchNote = (switched: Switch, to: OwnCli) => {
+  const at = switched.until ? new Date(switched.until) : undefined
+  const pad = (n: number) => String(n).padStart(2, '0')
+  // 15:00, as the screens say it
+  const until = at ? ` until ${pad(at.getHours())}:${pad(at.getMinutes())}` : ''
+  return `${switchWords(switched)}${until}, so ${CLI_NAMES[to]} collected.`
+}
 
 /**
  * Collect now on the Todo screen: runs one collection at a time on the CLI

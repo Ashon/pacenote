@@ -589,7 +589,7 @@ describe('collecting with Codex', () => {
       expect.objectContaining({
         kind: 'note',
         text: expect.stringMatching(
-          /^Claude Code was at its usage limit until .*, so Codex collected\.$/
+          /^Claude Code was at its usage limit until 15:00, so Codex collected\.$/
         ),
       })
     )
