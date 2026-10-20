@@ -29,6 +29,11 @@ describe('why a reasoner run failed', () => {
       ['{"type":"usage_limit_reached"}', 'limit'],
       ['workspace_member_credits_depleted', 'limit'],
       ['Context limit reached', 'other'],
+      // opencode, its model's server out of reach
+      [
+        'ConnectionRefused: Unable to connect. Is the computer able to access the url?',
+        'unavailable',
+      ],
       [
         'claude run failed: API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}',
         'unavailable',

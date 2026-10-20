@@ -2323,6 +2323,12 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
   it('recaps a week and a day from your tasks and commits, writes it up on a click, and copies it', async () => {
     world = await World.create([
       {
+        cli: 'opencode',
+        match: "Write a recap of the user's work",
+        answer:
+          'Payments, written by opencode: retry backoff shipped, the review still open.',
+      },
+      {
         match: "Write a recap of the user's work",
         answer:
           'Most of the week went to Payments: you shipped retry backoff and kept the idempotency key on retries. The payment retry review is still open.',
@@ -2400,9 +2406,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       by: 'claude-code',
       note: 'Merged #482',
     })
-    // The app runs the fake Claude Code for Write it up itself.
+    // The app runs the fake Claude Code (and opencode) for Write it up itself.
     const page = await launch(world, {
-      settings: ['TASKS=on'],
+      settings: ['TASKS=on', `OPENCODE_BIN=${world.opencodeBin}`],
       env: { FAKE_CLAUDE_DIR: world.claudeDir },
     })
     await page.getByRole('button', { name: 'Recap', exact: true }).waitFor()
@@ -2507,6 +2513,67 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/overview-recap-tokens-dark.png'),
     })
     await page.emulateMedia({ colorScheme: 'light' })
+
+    // Pacenote's own work on opencode, with the model chosen for it: it
+    // writes the recap up, and says it reads no Slack yet.
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    await page
+      .getByRole('radiogroup', { name: 'Run it with' })
+      .getByRole('radio', { name: 'opencode' })
+      .click()
+    await page
+      .locator('[data-setting="TASKS_AI_OPENCODE_MODEL"] input')
+      .fill('gpu/qwen3.8-flash-next')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await page.getByText('Saved.').waitFor()
+    expect(saved(world)).toMatchObject({
+      TASKS_AI: 'opencode',
+      TASKS_AI_OPENCODE_MODEL: 'gpu/qwen3.8-flash-next',
+    })
+    const opencodeRow = page.locator('[data-own-ai] [data-cli="opencode"]')
+    await opencodeRow
+      .getByText(
+        'Ready. Looks done and Write it up run here; Collect now and drafts go to Claude Code, as it reads no Slack yet.'
+      )
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/own-ai-opencode-settings.png'),
+    })
+    await page.evaluate("window.location.hash = '#/recap/week'")
+    await page.getByRole('button', { name: 'Write again' }).click()
+    await page
+      .getByText('Payments, written by opencode', { exact: false })
+      .waitFor()
+    await page
+      .getByText(/^Written by opencode from the lines below, with no tools/)
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/recap-written-opencode.png'),
+    })
+    const byOpencode = world.claudeCalls().filter((c) => c.cli === 'opencode')
+    const run = byOpencode.find((c) => c.args[0] === 'run')!
+    expect(run.args).toEqual(
+      expect.arrayContaining([
+        '--standalone',
+        '--agent',
+        'pacenote-plain',
+        '-m',
+        'gpu/qwen3.8-flash-next',
+      ])
+    )
+    expect(run.prompt).toContain("Write a recap of the user's work")
+    expect(run.config).toBe(path.join(home, 'opencode-pacenote.json'))
+    expect(run.cwd).toBe(home)
+    // Its session is taken out of opencode's history after.
+    await eventually('the session deleted', () =>
+      world
+        ?.claudeCalls()
+        .some(
+          (c) =>
+            c.cli === 'opencode' &&
+            c.args.join(' ').startsWith('session delete --standalone')
+        )
+    )
   }, 120_000)
 
   it('restarts into the version an upgrade put in its place, stopping Pace first', async () => {

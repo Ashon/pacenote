@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { lastMessage } from '../../../src/history/events.js'
@@ -15,7 +16,11 @@ import {
   readCodexDefaults,
   type CodexDefaults,
 } from '../../../src/reasoners/codex.js'
-import { CLI_NAMES, type OwnCli } from '../../../src/tasks/own-ai.js'
+import {
+  CLI_NAMES,
+  type ConnectorCli,
+  type OwnCli,
+} from '../../../src/tasks/own-ai.js'
 import {
   readTools,
   SOURCES,
@@ -37,9 +42,13 @@ import {
  *   change or delete off; a tool that is not read only needs an approval it
  *   never gets (approval_policy=never), so its others that write are refused.
  *   Your model and reasoning effort are taken from your config.toml.
+ * - opencode run starts a private server (--standalone) that loads, besides
+ *   your own config (its providers and models), Pacenote's: an agent with no
+ *   tools at all and nothing it may do on this Mac. It has no Slack connector
+ *   here yet, so it does only the work that needs no tools.
  */
 
-/** The CLIs' commands on this Mac (CLAUDE_BIN, CODEX_BIN) */
+/** The CLIs' commands on this Mac (CLAUDE_BIN, CODEX_BIN, OPENCODE_BIN) */
 export type Bins = Record<OwnCli, string>
 
 /** Your codex model and reasoning effort, from ~/.codex/config.toml */
@@ -57,9 +66,104 @@ const codexBase = (codex: CodexDefaults = {}) =>
     reads: { denied: [] },
   })
 
+/** Pacenote's config for opencode runs, kept in the data folder */
+export const OPENCODE_CONFIG_FILE = 'opencode-pacenote.json'
+/** The agent with no tools, for work that needs none */
+export const OPENCODE_PLAIN_AGENT = 'pacenote-plain'
+
+/**
+ * Pacenote's opencode config: an agent with no tools at all, denied
+ * everything it could do on this Mac. A few steps, so it never reaches its
+ * last one, where opencode tells the model its tools are gone.
+ */
+export function opencodeConfig(): object {
+  const deny = Object.fromEntries(
+    [
+      'edit',
+      'read',
+      'bash',
+      'webfetch',
+      'websearch',
+      'external_directory',
+      'question',
+      'task',
+    ].map((action) => [action, 'deny'])
+  )
+  return {
+    $schema: 'https://opencode.ai/config.json',
+    agent: {
+      [OPENCODE_PLAIN_AGENT]: {
+        description: "Pacenote's own work that needs no tools",
+        mode: 'primary',
+        steps: 3,
+        tools: { '*': false },
+        permission: deny,
+      },
+    },
+  }
+}
+
+/** Writes Pacenote's opencode config in the data folder; returns its path */
+export function writeOpencodeConfig(dataDir: string): string {
+  const file = path.join(dataDir, OPENCODE_CONFIG_FILE)
+  writeFileSync(file, `${JSON.stringify(opencodeConfig(), null, 2)}\n`)
+  return file
+}
+
+/** What an opencode run needs: Pacenote's config, the model, where it runs */
+export interface OpencodeRun {
+  config: string
+  /** provider/model; opencode's own default without one */
+  model?: string
+  cwd: string
+  title?: string
+}
+
+/** A headless run: its command, what it reads on stdin, and its environment */
+export interface Invocation {
+  command: [string, string[]]
+  input: string
+  env?: Record<string, string>
+}
+
+/**
+ * A run with no tools, no MCP servers and none of your settings, the prompt
+ * on stdin (opencode takes it as its message: its stdin stays empty)
+ */
+export function plainInvocation(
+  cli: OwnCli,
+  bin: string,
+  prompt: string,
+  options: { codex?: CodexDefaults; opencode?: OpencodeRun } = {}
+): Invocation {
+  if (cli !== 'opencode')
+    return { command: plainCommand(cli, bin, options.codex), input: prompt }
+  const run = options.opencode
+  if (!run) throw new Error('An opencode run needs its config.')
+  return {
+    command: [
+      bin,
+      [
+        'run',
+        '--standalone',
+        '--format',
+        'json',
+        '--agent',
+        OPENCODE_PLAIN_AGENT,
+        ...(run.title ? ['--title', run.title] : []),
+        ...(run.model ? ['-m', run.model] : []),
+        prompt,
+      ],
+    ],
+    input: '',
+    // opencode works where PWD says, not in the process's folder
+    env: { OPENCODE_CONFIG: run.config, PWD: run.cwd },
+  }
+}
+
 /** A run with no tools, no MCP servers and none of your settings */
 export function plainCommand(
-  cli: OwnCli,
+  cli: ConnectorCli,
   bin: string,
   codex?: CodexDefaults
 ): [string, string[]] {
@@ -87,7 +191,7 @@ export function plainCommand(
  * so the caller passes the text on stdin instead.
  */
 export function connectorCommand(
-  cli: OwnCli,
+  cli: ConnectorCli,
   bin: string,
   options: {
     launch: McpLaunch
@@ -167,9 +271,10 @@ export type Output = ({ text: string } | { error: string }) & {
 
 /**
  * The final answer in a CLI's output: claude's result object (json, or the
- * last line of stream-json), codex's last message
+ * last line of stream-json), codex's last message, opencode's last text
  */
 export function outputOf(cli: OwnCli, stdout: string): Output | undefined {
+  if (cli === 'opencode') return opencodeOutput(stdout)
   if (cli === 'codex') {
     const events: RunEvent[] = stdout
       .split('\n')
@@ -208,6 +313,69 @@ export function outputOf(cli: OwnCli, stdout: string): Output | undefined {
   return undefined
 }
 
+interface OpencodeEvent {
+  type?: string
+  sessionID?: string
+  error?: { message?: string; data?: { message?: string } }
+  part?: {
+    text?: string
+    tokens?: {
+      input?: number
+      output?: number
+      reasoning?: number
+      cache?: { read?: number; write?: number }
+    }
+  }
+}
+
+/** The session an opencode run made, to take out of its history after */
+export function opencodeSession(stdout: string): string | undefined {
+  for (const line of stdout.split('\n')) {
+    try {
+      const id = (JSON.parse(line) as OpencodeEvent).sessionID
+      if (id) return id
+    } catch {
+      // not an event
+    }
+  }
+  return undefined
+}
+
+/**
+ * opencode run --format json: the last text, or its error, and the tokens
+ * of its steps (a last step with no tools reports none, so they are a floor)
+ */
+function opencodeOutput(stdout: string): Output | undefined {
+  let text: string | undefined
+  let error: string | undefined
+  let usage: TokenUsage | undefined
+  for (const line of stdout.split('\n')) {
+    let event: OpencodeEvent
+    try {
+      event = JSON.parse(line) as OpencodeEvent
+    } catch {
+      continue
+    }
+    if (event.type === 'text' && event.part?.text?.trim())
+      text = event.part.text.trim()
+    else if (event.type === 'error')
+      error =
+        event.error?.data?.message ?? event.error?.message ?? 'opencode failed'
+    else if (event.type === 'step_finish' && event.part?.tokens) {
+      const tokens = event.part.tokens
+      usage = {
+        input: (usage?.input ?? 0) + (tokens.input ?? 0),
+        cacheRead: (usage?.cacheRead ?? 0) + (tokens.cache?.read ?? 0),
+        cacheWrite: (usage?.cacheWrite ?? 0) + (tokens.cache?.write ?? 0),
+        output:
+          (usage?.output ?? 0) + (tokens.output ?? 0) + (tokens.reasoning ?? 0),
+      }
+    }
+  }
+  const said = text ? { text } : error ? { error } : undefined
+  return said && { ...said, ...(usage ? { usage } : {}) }
+}
+
 /** How a headless run ended, as the process left it */
 export interface Exit {
   stdout: string
@@ -221,6 +389,7 @@ export interface Exit {
 export function runHeadless(options: {
   command: [string, string[]]
   input: string
+  env?: Record<string, string>
   cwd: string
   toolPath: string
   timeoutMs: number
@@ -238,7 +407,7 @@ export function runHeadless(options: {
     }
     const child = spawn(command, args, {
       cwd: options.cwd,
-      env: { ...process.env, PATH: options.toolPath },
+      env: { ...process.env, ...options.env, PATH: options.toolPath },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     const timer = setTimeout(() => {
@@ -272,4 +441,47 @@ export function exitError(
   if (output && 'error' in output && output.error)
     return output.error.split('\n')[0]!
   return exit.stderr.trim().split('\n')[0] || what.nothing
+}
+
+/**
+ * Runs a piece of work with no tools on a CLI, and for opencode takes its
+ * session out of opencode's history after, as claude and codex keep none
+ */
+export async function runPlain(options: {
+  cli: OwnCli
+  bin: string
+  prompt: string
+  codex?: CodexDefaults
+  opencode?: OpencodeRun
+  cwd: string
+  toolPath: string
+  timeoutMs: number
+}): Promise<Exit> {
+  const { command, input, env } = plainInvocation(
+    options.cli,
+    options.bin,
+    options.prompt,
+    options
+  )
+  const exit = await runHeadless({
+    command,
+    input,
+    env,
+    cwd: options.cwd,
+    toolPath: options.toolPath,
+    timeoutMs: options.timeoutMs,
+  })
+  const session =
+    options.cli === 'opencode' ? opencodeSession(exit.stdout) : undefined
+  if (session)
+    void runHeadless({
+      // A private server too: Pacenote never starts opencode's background one
+      command: [options.bin, ['session', 'delete', '--standalone', session]],
+      input: '',
+      env,
+      cwd: options.cwd,
+      toolPath: options.toolPath,
+      timeoutMs: 30_000,
+    })
+  return exit
 }

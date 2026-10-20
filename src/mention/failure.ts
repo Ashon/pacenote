@@ -26,7 +26,7 @@ const CAUSES: [FailureCause, RegExp][] = [
   ],
   [
     'unavailable',
-    /\b(?:500|502|503|529)\b|overloaded|service unavailable|econnrefused|econnreset|enotfound|getaddrinfo|socket hang up/i,
+    /\b(?:500|502|503|529)\b|overloaded|service unavailable|econnrefused|connectionrefused|unable to connect|econnreset|enotfound|getaddrinfo|ehostunreach|no route to host|socket hang up/i,
   ],
 ]
 

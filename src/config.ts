@@ -9,6 +9,7 @@ import { defaultHome } from './settings/home.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
+import { OWN_CLIS } from './tasks/own-ai.js'
 import type {
   McpServerRef,
   ReasonerAuth,
@@ -157,6 +158,8 @@ export const EnvSchema = z.object({
   REASONER_TIMEOUT_SEC: z.coerce.number().int().positive().default(900),
   CLAUDE_BIN: z.string().default('claude'),
   CODEX_BIN: z.string().default('codex'),
+  /** opencode on this Mac, for Pacenote's own work (the desktop app) */
+  OPENCODE_BIN: z.string().default('opencode'),
   REASONER_SANDBOX: z.preprocess(
     sandboxSetting,
     z.enum(['none', 'vm']).default('none')
@@ -224,8 +227,10 @@ export const EnvSchema = z.object({
    * judges, writes recaps up and drafts replies, and whether the other one
    * takes over when it cannot
    */
-  TASKS_AI: z.enum(REASONER_IDS).default('claude'),
+  TASKS_AI: z.enum(OWN_CLIS).default('claude'),
   TASKS_AI_FALLBACK: z.enum(['on', 'off']).default('on'),
+  /** opencode's provider/model for it; empty: opencode's own default */
+  TASKS_AI_OPENCODE_MODEL: z.string().optional(),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
@@ -335,6 +340,8 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS_SUGGEST_DONE',
   'TASKS_AI',
   'TASKS_AI_FALLBACK',
+  'TASKS_AI_OPENCODE_MODEL',
+  'OPENCODE_BIN',
 ])
 
 /**

@@ -1,7 +1,7 @@
 import {
   CLI_NAMES,
+  cliOrder,
   OWN_CLIS,
-  otherCli,
   switchWords,
   type CliReadiness,
   type CliState,
@@ -78,7 +78,8 @@ export function describeCli(
   now = new Date()
 ): { tone: Tone; text: string; signIn?: boolean } {
   const chosen = view.chosen === cli
-  const other = CLI_NAMES[otherCli(cli)]
+  // Who does the work while this one cannot: the first that may take over
+  const next = cliOrder(view.chosen, view.fallback, {}).find((c) => c !== cli)
   if (!ready.installed) return { tone: 'off', text: 'Not on this Mac.' }
   if (ready.tooOld)
     return { tone: 'warn', text: 'Too old. Update it to use it here.' }
@@ -87,8 +88,17 @@ export function describeCli(
   if (state?.until)
     return {
       tone: 'rest',
-      text: `${state.unable === 'unavailable' ? 'Overloaded' : 'At its usage limit'} until ${untilWords(state.until, now)}.${chosen && view.fallback ? ` ${other} does the work until then.` : ''}`,
+      text: `${state.unable === 'unavailable' ? 'Unavailable' : 'At its usage limit'} until ${untilWords(state.until, now)}.${chosen && next ? ` ${CLI_NAMES[next]} does the work until then.` : ''}`,
     }
+  if (cli === 'opencode') {
+    if (!chosen) return { tone: 'off', text: 'Used only when chosen.' }
+    return {
+      tone: 'ok',
+      text: next
+        ? `Ready. Looks done and Write it up run here; Collect now and drafts go to ${CLI_NAMES[next]}, as it reads no Slack yet.`
+        : "Ready. Looks done and Write it up run here; Collect now and drafts need Claude Code or Codex, and switching when it can't is off.",
+    }
+  }
   if (state?.unable === 'connector')
     return {
       tone: 'warn',
@@ -96,7 +106,10 @@ export function describeCli(
     }
   if (chosen) return { tone: 'ok', text: 'Ready. It does the work.' }
   return view.fallback
-    ? { tone: 'ok', text: `Ready to take over when ${other} can't.` }
+    ? {
+        tone: 'ok',
+        text: `Ready to take over when ${CLI_NAMES[view.chosen]} can't.`,
+      }
     : { tone: 'off', text: "Not used: switching when it can't is off." }
 }
 
@@ -144,7 +157,7 @@ export function OwnAiStatus({
     >
       <div className="flex items-start gap-2">
         <p className="flex-1 text-meta text-muted-foreground">
-          Each runs with your own login on this Mac.
+          Each runs on this Mac, with your own login or opencode's config.
         </p>
         <Button
           size="xs"
@@ -159,7 +172,7 @@ export function OwnAiStatus({
       {!view ? (
         <p className="flex items-center gap-2 py-1 text-meta text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" />
-          Checking Claude Code and Codex…
+          Checking Claude Code, Codex and opencode…
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-lg bg-well/60">

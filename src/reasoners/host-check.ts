@@ -81,6 +81,31 @@ export async function checkCli(
   }
 }
 
+/**
+ * The first opencode that runs with a private server (--standalone) and
+ * reports its run as JSON events, as Pacenote's own work runs it
+ */
+export const OPENCODE_MIN_VERSION = '2.0.0'
+
+/**
+ * Whether opencode can do Pacenote's own work on this Mac: installed and new
+ * enough. It signs in to nothing itself: its models come from your opencode
+ * config, and one that cannot be reached shows when it runs.
+ */
+export async function checkOpencode(
+  run: CliRunner
+): Promise<{ installed: boolean; signedIn: boolean; tooOld?: boolean }> {
+  try {
+    const output = (await run(['--version'])).stdout
+    const version = /(\d+\.\d+\.\d+)/.exec(output)?.[1]
+    const tooOld =
+      version !== undefined && olderThan(version, OPENCODE_MIN_VERSION)
+    return { installed: true, signedIn: true, ...(tooOld ? { tooOld } : {}) }
+  } catch {
+    return { installed: false, signedIn: false }
+  }
+}
+
 /** checkCli's problems alone, for the status */
 export async function hostCliProblems(
   backend: ReasonerId,

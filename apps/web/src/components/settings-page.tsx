@@ -70,6 +70,7 @@ import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
 import { OwnAiStatus } from './own-ai-status'
+import { isOwnCli } from '@src/tasks/own-ai'
 import { RepoFolders } from './repo-folders'
 import { SandboxSignIn } from './sandbox-sign-in'
 import { SlackYou } from './slack-you'
@@ -702,7 +703,9 @@ export function SettingsPage() {
         {card('ownWork', {
           after: (
             <OwnAiStatus
-              chosen={view.values.TASKS_AI === 'codex' ? 'codex' : 'claude'}
+              chosen={
+                isOwnCli(view.values.TASKS_AI) ? view.values.TASKS_AI : 'claude'
+              }
               fallback={view.values.TASKS_AI_FALLBACK !== 'off'}
             />
           ),

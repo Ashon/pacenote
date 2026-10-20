@@ -2,10 +2,19 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { judge } from '../apps/desktop/src/done-watch.js'
-import { draftFrom } from '../apps/desktop/src/drafter.js'
-import { outputOf, plainCommand } from '../apps/desktop/src/headless.js'
+import { draftFrom, draftReply } from '../apps/desktop/src/drafter.js'
+import {
+  opencodeConfig,
+  outputOf,
+  plainCommand,
+  plainInvocation,
+  writeOpencodeConfig,
+} from '../apps/desktop/src/headless.js'
 import { writeRecap } from '../apps/desktop/src/recap-writer.js'
+import { checkOpencode } from '../src/reasoners/host-check.js'
+import type { TaskContext, TaskView } from '../src/tasks/types.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-headless-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -169,5 +178,179 @@ describe("Pacenote's own work, headless", () => {
         'Codex is not signed in. Run codex login in a terminal, then draft again.',
       unable: 'auth',
     })
+  })
+})
+
+/** opencode run --format json (opencode 2.0.32): steps, text, tokens */
+const opencodeSaid = (text: string, session = 'ses_1') =>
+  lines(
+    { type: 'step_start', sessionID: session, part: { type: 'step-start' } },
+    {
+      type: 'step_finish',
+      sessionID: session,
+      part: {
+        type: 'step-finish',
+        tokens: {
+          input: 5601,
+          output: 38,
+          reasoning: 207,
+          cache: { read: 100, write: 0 },
+        },
+      },
+    },
+    { type: 'step_start', sessionID: session, part: { type: 'step-start' } },
+    { type: 'text', sessionID: session, part: { type: 'text', text } }
+  )
+
+describe("Pacenote's own work on opencode", () => {
+  it('runs opencode on a private server, with an agent that has no tools and may do nothing', () => {
+    const config = opencodeConfig() as {
+      agent: Record<
+        string,
+        { tools: Record<string, boolean>; permission: Record<string, string> }
+      >
+    }
+    const agent = config.agent['pacenote-plain']!
+    expect(agent.tools).toEqual({ '*': false })
+    expect(Object.values(agent.permission).every((p) => p === 'deny')).toBe(
+      true
+    )
+    expect(Object.keys(agent.permission)).toEqual(
+      expect.arrayContaining(['bash', 'edit', 'read', 'webfetch'])
+    )
+    const file = writeOpencodeConfig(root)
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(config)
+
+    const run = plainInvocation('opencode', '/opt/opencode', 'Decide.', {
+      opencode: {
+        config: file,
+        model: 'dgx-lb/qwen3.8-flash-next',
+        cwd: root,
+        title: 'Pacenote: looks done',
+      },
+    })
+    expect(run.command).toEqual([
+      '/opt/opencode',
+      [
+        'run',
+        '--standalone',
+        '--format',
+        'json',
+        '--agent',
+        'pacenote-plain',
+        '--title',
+        'Pacenote: looks done',
+        '-m',
+        'dgx-lb/qwen3.8-flash-next',
+        'Decide.',
+      ],
+    ])
+    // Its stdin closes at once; it works where PWD says.
+    expect(run.input).toBe('')
+    expect(run.env).toEqual({ OPENCODE_CONFIG: file, PWD: root })
+  })
+
+  it("reads opencode's last text, its tokens, and its error", () => {
+    expect(outputOf('opencode', opencodeSaid(' {"done": true} '))).toEqual({
+      text: '{"done": true}',
+      usage: { input: 5601, cacheRead: 100, cacheWrite: 0, output: 245 },
+    })
+    expect(
+      outputOf(
+        'opencode',
+        lines({
+          type: 'error',
+          error: {
+            type: 'provider.transport',
+            message:
+              'ConnectionRefused: Unable to connect. Is the computer able to access the url?',
+          },
+        })
+      )
+    ).toEqual({
+      error:
+        'ConnectionRefused: Unable to connect. Is the computer able to access the url?',
+    })
+  })
+
+  it('judges and writes a recap up with opencode, then takes its session out of its history', async () => {
+    const calls = path.join(root, 'opencode-calls.log')
+    const bin = path.join(root, 'opencode')
+    writeFileSync(
+      bin,
+      `#!/bin/sh\necho "$PWD $OPENCODE_CONFIG $*" >> "${calls}"\nif [ "$1" = session ]; then exit 0; fi\ncat <<'EOF'\n${opencodeSaid('{"done": false, "summary": "Still open."}', 'ses_judge')}\nEOF\n`
+    )
+    chmodSync(bin, 0o755)
+    const config = writeOpencodeConfig(root)
+    expect(
+      await judge({
+        cli: 'opencode',
+        bin,
+        opencode: { config },
+        toolPath: process.env.PATH ?? '',
+        cwd: root,
+        prompt: 'Decide.',
+      })
+    ).toEqual({ done: false, summary: 'Still open.', left: undefined })
+    expect(
+      await writeRecap({
+        cli: 'opencode',
+        bin,
+        opencode: { config, model: 'dgx-lb/qwen3.8-flash-next' },
+        toolPath: process.env.PATH ?? '',
+        cwd: root,
+        prompt: 'Sum it up.',
+      })
+    ).toMatchObject({ text: '{"done": false, "summary": "Still open."}' })
+    // The deletes run on their own: wait for them.
+    for (let i = 0; i < 50; i++) {
+      if (readFileSync(calls, 'utf8').split('\n').filter(Boolean).length >= 4)
+        break
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    const log = readFileSync(calls, 'utf8').trim().split('\n')
+    expect(log[0]).toBe(
+      `${root} ${config} run --standalone --format json --agent pacenote-plain --title Pacenote: looks done Decide.`
+    )
+    expect(log).toContain(
+      `${root} ${config} session delete --standalone ses_judge`
+    )
+    expect(
+      log.some((line) => line.includes('-m dgx-lb/qwen3.8-flash-next'))
+    ).toBe(true)
+  })
+
+  it('steps aside from a draft, which needs Slack, and says it is on this Mac or not', async () => {
+    expect(
+      await draftReply({
+        cli: 'opencode',
+        bin: 'opencode',
+        launch: { command: 'node', args: [], env: {} },
+        toolPath: '',
+        cwd: root,
+        task: {} as TaskView,
+        context: {} as TaskContext,
+      })
+    ).toEqual({
+      error: 'opencode reads no Slack in Pacenote yet.',
+      unable: 'connector',
+    })
+    expect(
+      await checkOpencode(async () => ({
+        stdout: 'opencode v2.0.32\n',
+        stderr: '',
+      }))
+    ).toEqual({ installed: true, signedIn: true })
+    expect(
+      await checkOpencode(async () => ({
+        stdout: 'opencode v1.9.0',
+        stderr: '',
+      }))
+    ).toEqual({ installed: true, signedIn: true, tooOld: true })
+    expect(
+      await checkOpencode(async () => {
+        throw new Error('opencode executable not found')
+      })
+    ).toEqual({ installed: false, signedIn: false })
   })
 })

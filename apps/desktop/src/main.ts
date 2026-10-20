@@ -154,9 +154,13 @@ import {
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
-import { codexDefaults, type Bins } from './headless.js'
+import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
 import { OwnAi, refusalOf } from './own-ai.js'
-import { cliReadiness, type OwnAiView } from '../../../src/tasks/own-ai.js'
+import {
+  cliReadiness,
+  isOwnCli,
+  type OwnAiView,
+} from '../../../src/tasks/own-ai.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
 import { SandboxSignIn } from './sandbox-login.js'
@@ -168,7 +172,7 @@ import {
   listenForClaim,
   type ClaimListener,
 } from '../../../src/messengers/slack/claim.js'
-import { checkCli } from '../../../src/reasoners/host-check.js'
+import { checkCli, checkOpencode } from '../../../src/reasoners/host-check.js'
 import { hostEnv } from '../../../src/sandbox/host.js'
 import { runProcess } from '../../../src/sandbox/process.js'
 import { vmUnsupported } from '../../../src/sandbox/vm.js'
@@ -427,17 +431,30 @@ const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
  */
 const ownAi = new OwnAi({
   dataDir,
-  chosen: () =>
-    settings.effectiveEnv().TASKS_AI === 'codex' ? 'codex' : 'claude',
+  chosen: () => {
+    const chosen = settings.effectiveEnv().TASKS_AI
+    return isOwnCli(chosen) ? chosen : 'claude'
+  },
   fallback: () => settings.effectiveEnv().TASKS_AI_FALLBACK !== 'off',
   onChange: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
 })
+/**
+ * opencode's run for Pacenote's own work: Pacenote's config (written once, in
+ * the data folder) and the model chosen in Settings > Todo
+ */
+let opencodeConfigFile: string | undefined
+const opencodeRun = () => {
+  opencodeConfigFile ??= writeOpencodeConfig(dataDir)
+  const model = settings.effectiveEnv().TASKS_AI_OPENCODE_MODEL?.trim()
+  return { config: opencodeConfigFile, ...(model ? { model } : {}) }
+}
 /** The CLIs' commands on this Mac */
 const cliBins = (): Bins => {
   const env = settings.effectiveEnv()
   return {
     claude: env.CLAUDE_BIN?.trim() || 'claude',
     codex: env.CODEX_BIN?.trim() || 'codex',
+    opencode: env.OPENCODE_BIN?.trim() || 'opencode',
   }
 }
 
@@ -1083,6 +1100,7 @@ function registerBotIpc(): void {
           cli,
           bin: cliBins()[cli],
           codex: codexDefaults(process.env),
+          opencode: opencodeRun(),
           toolPath: toolPath(),
           cwd: dataDir,
           prompt,
@@ -1309,6 +1327,7 @@ function registerBotIpc(): void {
                   cli,
                   bin: cliBins()[cli],
                   codex: codexDefaults(process.env),
+                  opencode: opencodeRun(),
                   toolPath: toolPath(),
                   cwd: dataDir,
                   prompt: judgePrompt(task, items, pr),
@@ -1761,6 +1780,18 @@ function registerBotIpc(): void {
     ])
     return { claude, codex }
   }
+  /** opencode, for Pacenote's own work only */
+  const detectOpencode = () => {
+    const command = settings.effectiveEnv().OPENCODE_BIN?.trim() || 'opencode'
+    return checkOpencode((args) =>
+      runProcess(command, args, {
+        cwd: tmpdir(),
+        input: '',
+        timeoutMs: 20_000,
+        env: { ...hostEnv(process.env), PATH: toolPath() },
+      })
+    )
+  }
   ipcMain.handle('pacenote:setup:detect', async (event) => {
     if (!fromMainWindow(event)) return null
     return {
@@ -1778,15 +1809,17 @@ function registerBotIpc(): void {
     'pacenote:ai:state',
     async (event): Promise<OwnAiView | null> => {
       if (!fromMainWindow(event)) return null
-      const clis = await detectClis()
+      const [clis, opencode] = await Promise.all([
+        detectClis(),
+        detectOpencode(),
+      ])
       return {
-        chosen: ownAi.chosen(),
-        fallback: ownAi.fallback(),
+        ...ownAi.now(),
         clis: {
           claude: cliReadiness(clis.claude),
           codex: cliReadiness(clis.codex),
+          opencode: cliReadiness(opencode),
         },
-        state: ownAi.state(),
       }
     }
   )

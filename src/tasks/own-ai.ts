@@ -1,5 +1,4 @@
 import { failureCause } from '../mention/failure.js'
-import { REASONER_IDS, type ReasonerId } from '../reasoners/ids.js'
 
 /**
  * Pacenote's own work on this Mac (Collect now, the looks done judge, Recap's
@@ -8,19 +7,38 @@ import { REASONER_IDS, type ReasonerId } from '../reasoners/ids.js'
  * imports it too.
  */
 
-export const OWN_CLIS = REASONER_IDS
-export type OwnCli = ReasonerId
+/**
+ * Claude Code and Codex, which also answer for Pace, and opencode, which runs
+ * the model you set up in it (a local or company model, through an
+ * OpenAI-compatible API)
+ */
+export const OWN_CLIS = ['claude', 'codex', 'opencode'] as const
+export type OwnCli = (typeof OWN_CLIS)[number]
+
+/**
+ * The CLIs that take over when the one chosen cannot: Claude Code and Codex.
+ * opencode does the work only when it is the one chosen.
+ */
+export const TAKING_OVER: readonly OwnCli[] = ['claude', 'codex']
+
+/** The CLIs that read Slack through their own connector */
+export type ConnectorCli = 'claude' | 'codex'
 
 export const CLI_NAMES: Record<OwnCli, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  opencode: 'opencode',
 }
 
-export const otherCli = (cli: OwnCli): OwnCli =>
-  cli === 'claude' ? 'codex' : 'claude'
+/**
+ * What a CLI with no Slack connector here says when work needs one: opencode,
+ * until Pacenote connects it to Slack
+ */
+export const NO_SLACK_YET = (cli: OwnCli) =>
+  `${CLI_NAMES[cli]} reads no Slack in Pacenote yet.`
 
 export const isOwnCli = (value: unknown): value is OwnCli =>
-  value === 'claude' || value === 'codex'
+  OWN_CLIS.includes(value as OwnCli)
 
 /**
  * Why a CLI could not do the work, so the other one may: at its usage limit,
@@ -96,8 +114,8 @@ export interface CliState {
 export type OwnAiState = Partial<Record<OwnCli, CliState>>
 
 /**
- * The CLIs a piece of work goes to, in order: the chosen one, then the other
- * when it may take over; a resting chosen one goes last, so work goes to one
+ * The CLIs a piece of work goes to, in order: the chosen one, then Claude Code
+ * and Codex when they may take over; resting ones go last, so work goes to one
  * that can do it
  */
 export function cliOrder(
@@ -106,10 +124,9 @@ export function cliOrder(
   state: OwnAiState
 ): OwnCli[] {
   if (!fallback) return [chosen]
-  const other = otherCli(chosen)
-  return state[chosen]?.until && !state[other]?.until
-    ? [other, chosen]
-    : [chosen, other]
+  const order = [chosen, ...TAKING_OVER.filter((cli) => cli !== chosen)]
+  const resting = (cli: OwnCli) => Boolean(state[cli]?.until)
+  return [...order.filter((cli) => !resting(cli)), ...order.filter(resting)]
 }
 
 /** A switch to the other CLI: from which, why, and until when it rests */
@@ -122,7 +139,7 @@ export interface Switch {
 /** Why a CLI could not, as a line reads it: "at its usage limit" */
 export const UNABLE_WORDS: Record<Unable, string> = {
   limit: 'at its usage limit',
-  unavailable: 'overloaded',
+  unavailable: 'unavailable',
   auth: 'signed out',
   missing: 'not on this Mac',
   connector: 'without its Slack connector',

@@ -602,3 +602,63 @@ describe('collecting with Codex', () => {
     expect(await next).toMatchObject({ ok: true, by: 'codex' })
   })
 })
+
+describe('collecting with opencode chosen', () => {
+  it('steps aside, as it reads no Slack yet, and Claude Code collects in the same run', async () => {
+    const ended: { outcome: CollectOutcome; attempts?: number }[] = []
+    const spawned: OwnCli[] = []
+    const collector = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => process.env.PATH ?? '',
+      cwd: process.cwd(),
+      ai: new OwnAi({ chosen: () => 'opencode', fallback: () => true }),
+      recorder: () => ({
+        event: () => undefined,
+        finish: (outcome, attempts) => ended.push({ outcome, attempts }),
+      }),
+      command: (cli) => {
+        spawned.push(cli)
+        return [
+          process.execPath,
+          [
+            '-e',
+            `for (const line of ${JSON.stringify(
+              lines(
+                init('connected'),
+                toolUse('1', 'mcp__claude_ai_Slack__slack_read_thread'),
+                toolUse('2', 'mcp__pacenote__add_tasks'),
+                toolResult('2', JSON.stringify({ added: [], skipped: [] })),
+                result('Nothing new.')
+              )
+            )}) console.log(line)`,
+          ],
+        ]
+      },
+    })
+    const last = await collector.run()
+    expect(spawned).toEqual(['claude'])
+    expect(last).toMatchObject({
+      ok: true,
+      by: 'claude',
+      switched: { from: 'opencode', unable: 'connector' },
+    })
+    expect(ended).toEqual([{ outcome: last, attempts: 2 }])
+
+    // Switching off: it says why there is nothing.
+    const alone = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => '',
+      cwd: process.cwd(),
+      ai: new OwnAi({ chosen: () => 'opencode', fallback: () => false }),
+      command: () => {
+        throw new Error('nothing to spawn')
+      },
+    })
+    expect(await alone.run()).toMatchObject({
+      ok: false,
+      error: 'opencode reads no Slack in Pacenote yet.',
+      unable: 'connector',
+      by: 'opencode',
+    })
+  })
+})

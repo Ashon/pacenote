@@ -16,7 +16,7 @@ import type {
   WorkEntry,
   WorkFile,
 } from '../../../src/tasks/types.js'
-import { exitError, outputOf, plainCommand, runHeadless } from './headless.js'
+import { exitError, outputOf, runPlain, type OpencodeRun } from './headless.js'
 
 /**
  * Whether a task looks done once its session went quiet. Pacenote does not
@@ -174,15 +174,24 @@ export async function judge(options: {
   cli: OwnCli
   bin: string
   codex?: CodexDefaults
+  /** For opencode: Pacenote's config and the model */
+  opencode?: Omit<OpencodeRun, 'cwd'>
   toolPath: string
   cwd: string
   prompt: string
   timeoutMs?: number
 }): Promise<Judgement | { error: string; unable?: Unable }> {
   const name = CLI_NAMES[options.cli]
-  const exit = await runHeadless({
-    command: plainCommand(options.cli, options.bin, options.codex),
-    input: options.prompt,
+  const exit = await runPlain({
+    cli: options.cli,
+    bin: options.bin,
+    prompt: options.prompt,
+    codex: options.codex,
+    opencode: options.opencode && {
+      title: 'Pacenote: looks done',
+      cwd: options.cwd,
+      ...options.opencode,
+    },
     cwd: options.cwd,
     toolPath: options.toolPath,
     timeoutMs: options.timeoutMs ?? TIMEOUT_MS,

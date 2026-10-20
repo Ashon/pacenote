@@ -156,6 +156,23 @@ describe("which CLI does Pacenote's own work", () => {
     })
   })
 
+  it('runs opencode only when chosen, then Claude Code and Codex, resting ones last', () => {
+    expect(cliOrder('opencode', true, {})).toEqual([
+      'opencode',
+      'claude',
+      'codex',
+    ])
+    expect(cliOrder('opencode', false, {})).toEqual(['opencode'])
+    expect(cliOrder('codex', true, {})).toEqual(['codex', 'claude'])
+    const at = NOW.toISOString()
+    expect(
+      cliOrder('opencode', true, {
+        opencode: { at, unable: 'unavailable', until: at },
+        claude: { at, unable: 'limit', until: at },
+      })
+    ).toEqual(['codex', 'opencode', 'claude'])
+  })
+
   it('keeps what each CLI last did in the data folder, for Settings and Todo', async () => {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'pacenote-own-ai-'))
     try {

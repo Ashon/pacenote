@@ -76,8 +76,9 @@ you did lately. Pacenote finds them on its own and shows them to you once; you o
 ### Recap your day, week and month
 
 **Recap** reads the same work at three distances: a day as a standup, a week by area with what carries over, a month by
-where it went. It counts your tasks and your own commits as they are, has your AI write it up in a few sentences only
-when you ask, and copies it as a standup or an update for you to post.
+where it went. It counts your tasks and your own commits as they are, has your AI (Claude Code, Codex, or opencode with
+a model of your own) write it up in a few sentences only when you ask, and copies it as a standup or an update for you
+to post.
 
 ### Share the history with your AI tools
 

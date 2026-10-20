@@ -7,7 +7,7 @@ import {
   type OwnCli,
   type Unable,
 } from '../../../src/tasks/own-ai.js'
-import { exitError, outputOf, plainCommand, runHeadless } from './headless.js'
+import { exitError, outputOf, runPlain, type OpencodeRun } from './headless.js'
 
 /**
  * Write it up: the CLI that does Pacenote's own work (own-ai.ts) sums a recap
@@ -53,15 +53,24 @@ export async function writeRecap(options: {
   cli: OwnCli
   bin: string
   codex?: CodexDefaults
+  /** For opencode: Pacenote's config and the model */
+  opencode?: Omit<OpencodeRun, 'cwd'>
   toolPath: string
   cwd: string
   prompt: string
   timeoutMs?: number
 }): Promise<WriteResult> {
   const name = CLI_NAMES[options.cli]
-  const exit = await runHeadless({
-    command: plainCommand(options.cli, options.bin, options.codex),
-    input: options.prompt,
+  const exit = await runPlain({
+    cli: options.cli,
+    bin: options.bin,
+    prompt: options.prompt,
+    codex: options.codex,
+    opencode: options.opencode && {
+      title: 'Pacenote: write it up',
+      cwd: options.cwd,
+      ...options.opencode,
+    },
     cwd: options.cwd,
     toolPath: options.toolPath,
     timeoutMs: options.timeoutMs ?? TIMEOUT_MS,

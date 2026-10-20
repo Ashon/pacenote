@@ -17,8 +17,10 @@ import {
 import { collectPrompt } from '../../../src/tasks/mcp.js'
 import {
   CLI_NAMES,
+  NO_SLACK_YET,
   switchWords,
   unableFrom,
+  type ConnectorCli,
   type OwnCli,
   type Switch,
   type Unable,
@@ -44,14 +46,14 @@ const TASK_TOOLS = [
 ]
 const TIMEOUT_MS = 10 * 60_000
 /** What to do when the sources' connectors are not in the CLI */
-const noConnector = (cli: OwnCli, sources: readonly SourceId[]) =>
+const noConnector = (cli: ConnectorCli, sources: readonly SourceId[]) =>
   `${CLI_NAMES[cli]} has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in ${SOURCES[sources[0] ?? 'slack'].connectors[cli].where}, then collect again.`
 const STOPPED = 'Stopped.'
 /**
  * Collecting runs the CLI on this Mac, whichever one answers mentions, so it
  * may be signed out there while Pace answers.
  */
-export const SIGNED_OUT: Record<OwnCli, string> = {
+export const SIGNED_OUT: Record<ConnectorCli, string> = {
   claude:
     'Claude Code on this Mac is signed out, and collecting reads Slack through it.',
   codex:
@@ -67,7 +69,7 @@ export const SIGNED_OUT: Record<OwnCli, string> = {
 export function collectCommand(
   launch: McpLaunch,
   options: {
-    cli?: OwnCli
+    cli?: ConnectorCli
     bin?: string
     sources?: readonly SourceId[]
     codex?: CodexDefaults
@@ -141,7 +143,7 @@ export class CollectStream {
 
   constructor(
     private readonly sources: readonly SourceId[] = SOURCE_IDS,
-    readonly cli: OwnCli = 'claude'
+    readonly cli: ConnectorCli = 'claude'
   ) {}
 
   push(line: string): void {
@@ -336,7 +338,7 @@ function firstLine(text: string | undefined): string {
 export class CollectionEvents {
   private readonly connectorCalls = new Set<string>()
 
-  constructor(private readonly cli: OwnCli = 'claude') {}
+  constructor(private readonly cli: ConnectorCli = 'claude') {}
 
   from(line: string, at?: string): RunEvent[] {
     const kept: RunEvent[] = []
@@ -543,6 +545,16 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     recorder: CollectionRecorder | undefined,
     switched?: Switch
   ): Promise<CollectOutcome> {
+    // A collection reads Slack: a CLI with no connector here steps aside.
+    if (cli === 'opencode')
+      return Promise.resolve({
+        at: this.now(),
+        ok: false,
+        error: NO_SLACK_YET(cli),
+        unable: 'connector',
+        reads: 0,
+        by: cli,
+      })
     const stream = new CollectStream(SOURCE_IDS, cli)
     const steps = new CollectionEvents(cli)
     this.set({

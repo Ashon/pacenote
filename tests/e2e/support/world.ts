@@ -17,6 +17,10 @@ import { eventually, type ManagedProcess, REPO, startBot } from './processes.js'
 
 export const FAKE_CLAUDE = path.join(REPO, 'tests/e2e/support/fake-claude.mjs')
 export const FAKE_CODEX = path.join(REPO, 'tests/e2e/support/fake-codex.mjs')
+export const FAKE_OPENCODE = path.join(
+  REPO,
+  'tests/e2e/support/fake-opencode.mjs'
+)
 
 export interface ClaudeRule {
   /** Regex on the request (case-insensitive) */
@@ -27,18 +31,21 @@ export interface ClaudeRule {
   tools?: { name: string; input?: unknown; result?: string }[]
   /** codex only: leaves a generated PNG, as codex does when it draws one */
   image?: boolean
-  /** Only this CLI follows the rule; both do without it */
-  cli?: 'claude' | 'codex'
+  /** Only this CLI follows the rule; all do without it */
+  cli?: 'claude' | 'codex' | 'opencode'
 }
 
 export interface ClaudeCall {
-  /** codex for the fake codex; the fake claude leaves it out */
-  cli?: 'codex'
+  /** codex or opencode for those fakes; the fake claude leaves it out */
+  cli?: 'codex' | 'opencode'
   args: string[]
   system: string
   prompt: string
   request: string
   images: number
+  /** opencode: the config it was given (OPENCODE_CONFIG), and its folder */
+  config?: string
+  cwd?: string
 }
 
 /**
@@ -59,6 +66,8 @@ export class World {
   readonly claudeBin = path.join(this.root, 'claude', 'claude')
   /** CODEX_BIN: the fake codex, by the same rules, for REASONER=codex */
   readonly codexBin = path.join(this.root, 'claude', 'codex')
+  /** OPENCODE_BIN: the fake opencode, by the same rules, for TASKS_AI */
+  readonly opencodeBin = path.join(this.root, 'claude', 'opencode')
   readonly alice = this.slack.addUser({ id: 'U0ALICE', name: 'alice' })
   readonly bob = this.slack.addUser({ id: 'U0BOB', name: 'bob' })
   readonly ops = this.slack.addChannel({
@@ -86,6 +95,11 @@ export class World {
       `#!/bin/sh\nexec "${process.execPath}" "${FAKE_CODEX}" "$@"\n`
     )
     chmodSync(this.codexBin, 0o755)
+    writeFileSync(
+      this.opencodeBin,
+      `#!/bin/sh\nexec "${process.execPath}" "${FAKE_OPENCODE}" "$@"\n`
+    )
+    chmodSync(this.opencodeBin, 0o755)
   }
 
   static async create(rules: ClaudeRule[] = [], answer = 'OK'): Promise<World> {

@@ -3,7 +3,9 @@ import { redactSecrets } from '../../../src/broker/redact.js'
 import type { CodexDefaults } from '../../../src/reasoners/codex.js'
 import {
   CLI_NAMES,
+  NO_SLACK_YET,
   unableFrom,
+  type ConnectorCli,
   type OwnCli,
   type Unable,
 } from '../../../src/tasks/own-ai.js'
@@ -72,7 +74,7 @@ const DRAFT_TOOLS = ['task_context']
  * (headless.ts)
  */
 export function draftCommand(
-  cli: OwnCli,
+  cli: ConnectorCli,
   bin: string,
   launch: McpLaunch,
   codex?: CodexDefaults
@@ -86,7 +88,7 @@ export function draftCommand(
 }
 
 /** How to sign a CLI in again, in a terminal */
-export const SIGN_IN: Record<OwnCli, string> = {
+export const SIGN_IN: Record<ConnectorCli, string> = {
   claude: 'Run claude in a terminal and sign in',
   codex: 'Run codex login in a terminal',
 }
@@ -104,7 +106,7 @@ export function draftFrom(
   if (!output) return { error: `${name} stopped before it wrote a draft.` }
   if ('text' in output) return { text: redactSecrets(output.text) }
   const unable = unableFrom(output.error)
-  if (unable === 'auth')
+  if (unable === 'auth' && cli !== 'opencode')
     return {
       error: `${name} is not signed in. ${SIGN_IN[cli]}, then draft again.`,
       unable,
@@ -125,6 +127,9 @@ export async function draftReply(options: {
   timeoutMs?: number
 }): Promise<{ text: string } | { error: string; unable?: Unable }> {
   const name = CLI_NAMES[options.cli]
+  // A draft reads the thread: only a CLI with a Slack connector can
+  if (options.cli === 'opencode')
+    return { error: NO_SLACK_YET(options.cli), unable: 'connector' }
   const exit = await runHeadless({
     command: draftCommand(
       options.cli,
