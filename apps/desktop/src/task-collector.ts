@@ -5,20 +5,34 @@ import type { HistoryStore } from '../../../src/history/recorder.js'
 import type { RunEvent } from '../../../src/history/types.js'
 import {
   claudeResultUsage,
+  runUsage,
   type TokenUsage,
 } from '../../../src/history/usage.js'
 import { failureCause } from '../../../src/mention/failure.js'
 import { claudeLineToEvents } from '../../../src/reasoners/claude.js'
 import {
-  readTools,
+  codexLineToEvents,
+  type CodexDefaults,
+} from '../../../src/reasoners/codex.js'
+import { collectPrompt } from '../../../src/tasks/mcp.js'
+import {
+  CLI_NAMES,
+  switchWords,
+  unableFrom,
+  type OwnCli,
+  type Switch,
+  type Unable,
+} from '../../../src/tasks/own-ai.js'
+import {
   SOURCE_IDS,
   SOURCES,
   sourceNames,
   sourceOfTool,
-  writeTools,
   type SourceId,
 } from '../../../src/tasks/sources.js'
 import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
+import { connectorCommand, type Bins } from './headless.js'
+import { OwnAi } from './own-ai.js'
 
 const TASK_TOOLS = [
   'collect_context',
@@ -27,61 +41,53 @@ const TASK_TOOLS = [
   'close_task',
   'wrap_up_task',
   'my_tasks',
-].map((name) => `mcp__pacenote__${name}`)
-const ADD_TASKS = 'mcp__pacenote__add_tasks'
+]
 const TIMEOUT_MS = 10 * 60_000
-/** What to do when the sources' connectors are not in Claude Code */
-const noConnector = (sources: readonly SourceId[]) =>
-  `Claude Code has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in claude.ai's Settings > Connectors, then collect again.`
+/** What to do when the sources' connectors are not in the CLI */
+const noConnector = (cli: OwnCli, sources: readonly SourceId[]) =>
+  `${CLI_NAMES[cli]} has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in ${SOURCES[sources[0] ?? 'slack'].connectors[cli].where}, then collect again.`
 const STOPPED = 'Stopped.'
-/** Collecting runs Claude Code on this Mac, whichever CLI answers mentions */
-export const SIGNED_OUT =
-  'Claude Code on this Mac is signed out, and collecting reads Slack through it.'
+/**
+ * Collecting runs the CLI on this Mac, whichever one answers mentions, so it
+ * may be signed out there while Pace answers.
+ */
+export const SIGNED_OUT: Record<OwnCli, string> = {
+  claude:
+    'Claude Code on this Mac is signed out, and collecting reads Slack through it.',
+  codex:
+    'Codex on this Mac is signed out, and collecting reads Slack through it.',
+}
 
 /**
- * The command for one collection: Claude Code, headless, running Pacenote's
- * collect_tasks prompt with only its sources' read tools (sources.ts) and
- * Pacenote's task tools, every source's tools that write denied.
- * - Only project settings load (none, in the data folder), so the user's own
- *   Claude Code permissions, plugins, CLAUDE.md and MCP servers stay out; the
- *   claude.ai connectors still load.
- * - Pacenote's server comes from this app (--mcp-config), so Claude Code does
- *   not need it added.
- * - The only built-in tool is ToolSearch, to load the MCP tools.
+ * The command for one collection: the CLI, headless, running Pacenote's
+ * collect_tasks prompt with only its sources' read tools and Pacenote's task
+ * tools (headless.ts). Claude Code runs the prompt from Pacenote's server;
+ * codex is given its text (collectInput).
  */
 export function collectCommand(
   launch: McpLaunch,
-  sources: readonly SourceId[] = SOURCE_IDS
+  options: {
+    cli?: OwnCli
+    bin?: string
+    sources?: readonly SourceId[]
+    codex?: CodexDefaults
+  } = {}
 ): [string, string[]] {
-  return [
-    'claude',
-    [
-      '-p',
-      '/mcp__pacenote__collect_tasks',
-      '--setting-sources',
-      'project',
-      '--mcp-config',
-      JSON.stringify({
-        mcpServers: { pacenote: { type: 'stdio', ...launch } },
-      }),
-      '--tools',
-      'ToolSearch',
-      '--permission-mode',
-      'default',
-      '--allowedTools',
-      ...TASK_TOOLS,
-      ...readTools(sources),
-      '--disallowedTools',
-      ...writeTools(),
-      '--no-session-persistence',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-    ],
-  ]
+  const cli = options.cli ?? 'claude'
+  return connectorCommand(cli, options.bin ?? cli, {
+    launch,
+    tools: TASK_TOOLS,
+    sources: options.sources ?? SOURCE_IDS,
+    slash: '/mcp__pacenote__collect_tasks',
+    codex: options.codex,
+  })
 }
 
-interface StreamEvent {
+/** A collection's stdin: nothing for claude, the prompt for codex */
+export const collectInput = (cli: OwnCli): string | undefined =>
+  cli === 'codex' ? collectPrompt() : undefined
+
+interface ClaudeEvent {
   type?: string
   subtype?: string
   mcp_servers?: { name: string; status: string }[]
@@ -101,10 +107,25 @@ interface ContentBlock {
   content?: unknown
 }
 
+interface CodexEvent {
+  type?: string
+  message?: string
+  error?: { message?: string }
+  item?: {
+    id?: string
+    type?: string
+    server?: string
+    tool?: string
+    text?: string
+    result?: { content?: unknown } | null
+    error?: { message?: string } | string | null
+  }
+}
+
 /**
- * Reads Claude Code's stream-json output of a collection: how many times it
- * read its sources, what add_tasks answered, how the run ended and the tokens
- * it spent.
+ * Reads a collection's output (Claude Code's stream-json, or codex's --json
+ * events): how many times it read its sources, what add_tasks answered, how
+ * the run ended and the tokens it spent.
  */
 export class CollectStream {
   reads = 0
@@ -116,20 +137,29 @@ export class CollectStream {
   ended?: { ok: boolean; text: string }
   usage?: TokenUsage
   private addCall?: string
+  private said?: string
 
-  constructor(private readonly sources: readonly SourceId[] = SOURCE_IDS) {}
+  constructor(
+    private readonly sources: readonly SourceId[] = SOURCE_IDS,
+    readonly cli: OwnCli = 'claude'
+  ) {}
 
   push(line: string): void {
-    let event: StreamEvent
+    if (this.cli === 'codex') this.pushCodex(line)
+    else this.pushClaude(line)
+  }
+
+  private pushClaude(line: string): void {
+    let event: ClaudeEvent
     try {
-      event = JSON.parse(line) as StreamEvent
+      event = JSON.parse(line) as ClaudeEvent
     } catch {
       return
     }
     if (event.type === 'system' && event.subtype === 'init') {
       this.missing = this.sources.filter((id) => {
         const server = event.mcp_servers?.find(
-          (entry) => entry.name === SOURCES[id].connector.server
+          (entry) => entry.name === SOURCES[id].connectors.claude.server
         )
         return !server || ['failed', 'needs-auth'].includes(server.status)
       })
@@ -148,38 +178,94 @@ export class CollectStream {
     for (const block of content as ContentBlock[]) {
       if (block.type === 'tool_use') {
         if (block.name && sourceOfTool(block.name)) this.reads += 1
-        if (block.name === ADD_TASKS) this.addCall = block.id
+        if (block.name === 'mcp__pacenote__add_tasks') this.addCall = block.id
       } else if (
         block.type === 'tool_result' &&
         block.tool_use_id === this.addCall
       ) {
-        const text = textOf(block.content)
-        if (block.is_error) {
-          this.addError = text
-          continue
-        }
-        try {
-          const body = JSON.parse(text) as {
-            added?: { confidence?: string }[]
-            skipped?: unknown[]
-          }
-          this.added = body.added ?? []
-          this.skipped = body.skipped?.length ?? 0
-        } catch {
-          this.addError = text
-        }
+        this.answered(textOf(block.content), Boolean(block.is_error))
       }
+    }
+  }
+
+  private pushCodex(line: string): void {
+    let event: CodexEvent
+    try {
+      event = JSON.parse(line) as CodexEvent
+    } catch {
+      return
+    }
+    if (event.type === 'turn.completed') {
+      this.ended = { ok: true, text: this.said ?? '' }
+      const usage = runUsage(codexLineToEvents(line))
+      if (usage) this.usage = usage
+      return
+    }
+    if (event.type === 'turn.failed' || event.type === 'error') {
+      this.ended = {
+        ok: false,
+        text: event.error?.message ?? event.message ?? 'codex turn failed',
+      }
+      return
+    }
+    const item = event.item
+    if (!item) return
+    if (item.type === 'agent_message' && item.text) this.said = item.text
+    if (item.type !== 'mcp_tool_call') return
+    if (
+      event.type === 'item.started' &&
+      item.server === SOURCES.slack.connectors.codex.server &&
+      item.tool &&
+      sourceOfTool(item.tool, 'codex')
+    )
+      this.reads += 1
+    if (
+      event.type === 'item.completed' &&
+      item.server === 'pacenote' &&
+      item.tool === 'add_tasks'
+    ) {
+      const error =
+        typeof item.error === 'string' ? item.error : item.error?.message
+      if (error) this.answered(error, true)
+      else this.answered(textOf(item.result?.content), false)
+    }
+  }
+
+  /** What add_tasks answered */
+  private answered(text: string, isError: boolean): void {
+    if (isError) {
+      this.addError = text
+      return
+    }
+    try {
+      const body = JSON.parse(text) as {
+        added?: { confidence?: string }[]
+        skipped?: unknown[]
+      }
+      this.added = body.added ?? []
+      this.skipped = body.skipped?.length ?? 0
+    } catch {
+      this.addError = text
     }
   }
 
   /**
    * How the collection ended, once the process is gone; stderr, for a run
-   * that stopped before its result
+   * that stopped before its result. unable says when the CLI could not
+   * collect at all (signed out, at its limit, no connector), so the other one
+   * may.
    */
-  outcome(at: string, fallback?: string, stderr = ''): CollectOutcome {
-    const spent = this.usage
-      ? { reads: this.reads, usage: this.usage }
-      : { reads: this.reads }
+  outcome(
+    at: string,
+    fallback?: string,
+    stderr = '',
+    unable?: Unable
+  ): CollectOutcome {
+    const spent = {
+      reads: this.reads,
+      by: this.cli,
+      ...(this.usage ? { usage: this.usage } : {}),
+    }
     if (this.added)
       return {
         at,
@@ -193,19 +279,40 @@ export class CollectStream {
     // on stderr when it stopped before one), there are no connectors at all.
     const said = this.ended ? (this.ended.ok ? '' : this.ended.text) : stderr
     if (!this.addError && fallback !== STOPPED && failureCause(said) === 'auth')
-      return { at, ok: false, error: SIGNED_OUT, signedOut: true, ...spent }
+      return {
+        at,
+        ok: false,
+        error: SIGNED_OUT[this.cli],
+        signedOut: true,
+        unable: 'auth',
+        ...spent,
+      }
+    // codex says nothing of its apps up front: a run that read nothing and
+    // ended had none.
+    const missing =
+      this.cli === 'codex' && this.ended?.ok && this.reads === 0
+        ? this.sources
+        : this.missing
     const failed =
       this.ended && !this.ended.ok ? firstLine(this.ended.text) : ''
+    const noSources =
+      missing.length && this.reads === 0
+        ? noConnector(this.cli, missing)
+        : undefined
     const error =
       this.addError ??
       fallback ??
       (failed || undefined) ??
-      (this.missing.length && this.reads === 0
-        ? noConnector(this.missing)
-        : undefined) ??
+      noSources ??
       (firstLine(this.ended?.text) ||
         'The collection stopped before it finished.')
-    return { at, ok: false, error, ...spent }
+    const why =
+      this.addError || fallback === STOPPED
+        ? undefined
+        : (unable ??
+          unableFrom(said) ??
+          (error === noSources ? 'connector' : undefined))
+    return { at, ok: false, error, ...(why ? { unable: why } : {}), ...spent }
   }
 }
 
@@ -223,22 +330,30 @@ function firstLine(text: string | undefined): string {
 /**
  * A collection's output as run history steps, keeping what is yours out: the
  * model's own words (they quote your messages) are left out, and so are what a
- * claude.ai connector's tools were asked and returned. Its tool calls stay
- * (which tool, when, how long); Pacenote's own tools keep their arguments and
- * answers.
+ * connector's tools were asked and returned. Its tool calls stay (which tool,
+ * when, how long); Pacenote's own tools keep their arguments and answers.
  */
 export class CollectionEvents {
   private readonly connectorCalls = new Set<string>()
 
+  constructor(private readonly cli: OwnCli = 'claude') {}
+
   from(line: string, at?: string): RunEvent[] {
     const kept: RunEvent[] = []
-    for (const event of claudeLineToEvents(line, at)) {
+    const events =
+      this.cli === 'codex'
+        ? codexLineToEvents(line, at)
+        : claudeLineToEvents(line, at)
+    for (const event of events) {
       if (event.kind === 'message' || event.kind === 'reasoning') continue
       if (event.kind !== 'tool') {
         kept.push(event)
         continue
       }
-      if (event.server.startsWith('claude_ai_'))
+      if (
+        event.server.startsWith('claude_ai_') ||
+        event.server === SOURCES.slack.connectors.codex.server
+      )
         this.connectorCalls.add(event.id)
       if (!this.connectorCalls.has(event.id)) {
         kept.push(event)
@@ -261,84 +376,109 @@ export class CollectionEvents {
 /** Where a collection's run goes, as it runs (the run history in the app) */
 export interface CollectionRecorder {
   event(event: RunEvent): void
-  finish(outcome: CollectOutcome): void
+  finish(outcome: CollectOutcome, attempts?: number): void
 }
 
 /**
- * A collection's run in the history: Claude Code on this Mac, started by
- * Collect now. It ends succeeded when add_tasks answered, interrupted when
- * stopped, failed otherwise.
+ * A collection's run in the history: a CLI on this Mac, started by Collect
+ * now. It ends succeeded when add_tasks answered, interrupted when stopped,
+ * failed otherwise; backend names the CLI that collected (or tried last).
  */
 export function recordCollection(
   history: Pick<HistoryStore, 'startCollection'>,
-  startedAt: Date
+  startedAt: Date,
+  cli: OwnCli = 'claude'
 ): CollectionRecorder {
   const run = history.startCollection(
-    { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+    { trigger: 'now', backend: { reasoner: cli, sandbox: 'host' } },
     startedAt
   )
   return {
     event: (event) => run.event(event),
-    finish: (outcome) =>
+    finish: (outcome, attempts = 1) =>
       run.finish(
         outcome.ok
           ? 'succeeded'
           : outcome.error === STOPPED
             ? 'interrupted'
             : 'failed',
-        outcome.ok
-          ? {
-              reads: outcome.reads,
-              found: {
-                added: outcome.added,
-                maybe: outcome.maybe,
-                skipped: outcome.skipped,
-              },
-            }
-          : { reads: outcome.reads, error: outcome.error },
+        {
+          reads: outcome.reads,
+          backend: { reasoner: outcome.by ?? cli, sandbox: 'host' },
+          attempts,
+          ...(outcome.switched ? { switched: outcome.switched } : {}),
+          ...(outcome.ok
+            ? {
+                found: {
+                  added: outcome.added,
+                  maybe: outcome.maybe,
+                  skipped: outcome.skipped,
+                },
+              }
+            : { error: outcome.error }),
+        },
         new Date(outcome.at)
       ),
   }
 }
 
+/** A line for the run history when a collection goes to the other CLI */
+const switchNote = (switched: Switch, to: OwnCli) =>
+  `${switchWords(switched)}${
+    switched.until
+      ? ` until ${new Date(switched.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+      : ''
+  }, so ${CLI_NAMES[to]} collected.`
+
 /**
- * Collect now on the Todo screen: runs one collection at a time in Claude
- * Code (collectCommand) and keeps its progress and how the last one ended, for
- * the screen to show. Each collection is recorded as a run as it goes.
+ * Collect now on the Todo screen: runs one collection at a time on the CLI
+ * that does Pacenote's own work, the other one when it cannot (own-ai.ts),
+ * and keeps its progress and how the last one ended, for the screen to show.
+ * Each collection is recorded as a run as it goes.
  */
 export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
   private child?: ChildProcess
   private current: TasksCollect = {}
   private cancelled = false
+  private readonly ai: OwnAi
 
   constructor(
     private readonly options: {
       launch: () => McpLaunch
       /**
-       * PATH from the login shell, so claude is found when the app starts from
-       * Finder
+       * PATH from the login shell, so the CLIs are found when the app starts
+       * from Finder
        */
       toolPath: () => string
-      /** Where Claude Code runs: the data folder, with no project settings */
+      /** Where the CLI runs: the data folder, with no project settings */
       cwd: string
+      /** Which CLI collects, and the other when it cannot */
+      ai?: OwnAi
+      /** The CLIs' commands (CLAUDE_BIN, CODEX_BIN) */
+      bins?: () => Partial<Bins>
+      /** Your codex model and reasoning effort */
+      codex?: () => CodexDefaults
       /** Starts the run that records a collection */
-      recorder?: (startedAt: Date) => CollectionRecorder
+      recorder?: (startedAt: Date, cli: OwnCli) => CollectionRecorder
       /** How the last one ended, from the history, so the screen has it */
       last?: CollectOutcome
-      /** For tests: the command in place of claude */
-      command?: [string, string[]]
+      /** For tests: the command in place of the CLI's */
+      command?: (cli: OwnCli) => [string, string[]]
       timeoutMs?: number
       now?: () => Date
     }
   ) {
     super()
+    this.ai =
+      options.ai ?? new OwnAi({ chosen: () => 'claude', fallback: () => false })
     // The history keeps the error alone
-    if (options.last)
+    const last = options.last
+    if (last)
       this.current = {
         last:
-          !options.last.ok && options.last.error === SIGNED_OUT
-            ? { ...options.last, signedOut: true }
-            : options.last,
+          !last.ok && Object.values(SIGNED_OUT).includes(last.error)
+            ? { ...last, signedOut: true }
+            : last,
       }
   }
 
@@ -346,47 +486,104 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     return this.current
   }
 
-  run(): Promise<CollectOutcome> {
-    if (this.child) {
+  async run(): Promise<CollectOutcome> {
+    if (this.child || this.current.running) {
       const running = this.current.running
-      return Promise.resolve({
+      return {
         at: running?.startedAt ?? this.now(),
         ok: false,
         error: 'A collection is already running.',
-      })
+      }
     }
     this.cancelled = false
-    const stream = new CollectStream()
     const startedAt = this.now()
     this.set({ last: this.current.last, running: { startedAt, reads: 0 } })
-    const steps = new CollectionEvents()
-    const recorder = this.keep(() =>
-      this.options.recorder?.(new Date(startedAt))
+    let recorder: CollectionRecorder | undefined
+    let attempts = 0
+    const ran = await this.ai.run(
+      (cli, switched) => {
+        attempts += 1
+        recorder ??= this.keep(() =>
+          this.options.recorder?.(new Date(startedAt), cli)
+        )
+        if (switched)
+          this.keep(() =>
+            recorder?.event({
+              kind: 'note',
+              at: this.now(),
+              text: switchNote(switched, cli),
+            })
+          )
+        return this.attempt(cli, startedAt, recorder, switched)
+      },
+      (outcome) =>
+        !outcome.ok && outcome.unable && !this.cancelled
+          ? { unable: outcome.unable, error: outcome.error }
+          : undefined
     )
+    // Only background work waits out a rest; this always runs.
+    const last: CollectOutcome =
+      'resting' in ran
+        ? { at: this.now(), ok: false, error: 'The collection did not start.' }
+        : {
+            ...ran.result,
+            by: ran.by,
+            ...(ran.switched ? { switched: ran.switched } : {}),
+          }
+    this.set({ last })
+    this.keep(() => recorder?.finish(last, attempts))
+    return last
+  }
 
+  /** One collection on a CLI, to its end */
+  private attempt(
+    cli: OwnCli,
+    startedAt: string,
+    recorder: CollectionRecorder | undefined,
+    switched?: Switch
+  ): Promise<CollectOutcome> {
+    const stream = new CollectStream(SOURCE_IDS, cli)
+    const steps = new CollectionEvents(cli)
+    this.set({
+      last: this.current.last,
+      running: {
+        startedAt,
+        reads: 0,
+        by: cli,
+        ...(switched ? { switched } : {}),
+      },
+    })
     return new Promise((resolve) => {
       let settled = false
       let buffer = ''
       let stderr = ''
-      const finish = (fallback?: string) => {
+      const finish = (fallback?: string, unable?: Unable) => {
         if (settled) return
         settled = true
         clearTimeout(timer)
         this.child?.kill('SIGTERM')
         this.child = undefined
-        const last = stream.outcome(this.now(), fallback, stderr)
-        this.set({ last })
-        this.keep(() => recorder?.finish(last))
-        resolve(last)
+        resolve(stream.outcome(this.now(), fallback, stderr, unable))
       }
+      const bin = this.options.bins?.()[cli]?.trim() || cli
       const [command, args] =
-        this.options.command ?? collectCommand(this.options.launch())
+        this.options.command?.(cli) ??
+        collectCommand(this.options.launch(), {
+          cli,
+          bin,
+          codex: this.options.codex?.(),
+        })
+      const input = collectInput(cli)
       const child = spawn(command, args, {
         cwd: this.options.cwd,
         env: { ...process.env, PATH: this.options.toolPath() },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       })
       this.child = child
+      if (input !== undefined) {
+        child.stdin?.on('error', () => undefined)
+        child.stdin?.end(input)
+      }
       const timeoutMs = this.options.timeoutMs ?? TIMEOUT_MS
       const timer = setTimeout(
         () =>
@@ -396,46 +593,45 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
         timeoutMs
       )
       child.on('error', (error) =>
-        finish(
-          (error as NodeJS.ErrnoException).code === 'ENOENT'
-            ? `Collecting needs Claude Code, signed in, with its ${sourceNames()} connector: claude is not on this Mac.`
-            : error.message
-        )
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+          ? finish(
+              `Collecting needs ${CLI_NAMES[cli]}, signed in, with its ${sourceNames()} connector: ${cli} is not on this Mac.`,
+              'missing'
+            )
+          : finish(error.message)
       )
-      child.stderr.on('data', (chunk: Buffer) => {
+      child.stderr?.on('data', (chunk: Buffer) => {
         stderr += chunk.toString('utf8')
       })
-      child.stdout.on('data', (chunk: Buffer) => {
+      const read = (line: string) => {
+        const before = stream.reads
+        stream.push(line)
+        if (recorder)
+          for (const step of steps.from(line, this.now()))
+            this.keep(() => recorder.event(step))
+        const running = this.current.running
+        if (stream.reads !== before && running)
+          this.set({
+            ...this.current,
+            running: { ...running, reads: stream.reads },
+          })
+      }
+      child.stdout?.on('data', (chunk: Buffer) => {
         buffer += chunk.toString('utf8')
         let end: number
         while ((end = buffer.indexOf('\n')) >= 0) {
-          const before = stream.reads
           const line = buffer.slice(0, end)
-          stream.push(line)
           buffer = buffer.slice(end + 1)
-          if (recorder)
-            for (const step of steps.from(line, this.now()))
-              this.keep(() => recorder.event(step))
-          const running = this.current.running
-          if (stream.reads !== before && running)
-            this.set({
-              ...this.current,
-              running: { ...running, reads: stream.reads },
-            })
+          read(line)
         }
       })
       child.on('close', (code) => {
-        if (buffer) {
-          stream.push(buffer)
-          if (recorder)
-            for (const step of steps.from(buffer, this.now()))
-              this.keep(() => recorder.event(step))
-        }
+        if (buffer) read(buffer)
         finish(
           this.cancelled
             ? STOPPED
             : code !== 0 && !stream.ended
-              ? firstLine(stderr) || `claude exited with code ${code}.`
+              ? firstLine(stderr) || `${cli} exited with code ${code}.`
               : undefined
         )
       })

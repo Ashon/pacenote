@@ -1,3 +1,4 @@
+import { CLI_NAMES } from '@src/tasks/own-ai'
 import { sourceOf } from '@src/tasks/sources'
 import type {
   DismissReason,
@@ -64,6 +65,7 @@ import {
 } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
+import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 
 /**
@@ -894,7 +896,15 @@ function TaskOpen({
                     ? 'Your reply'
                     : latestDraft.copiedAt
                       ? `Your reply, copied ${formatRelative(latestDraft.copiedAt)}`
-                      : `Your reply, drafted from the thread ${formatRelative(latestDraft.at)}`}
+                      : `Your reply, drafted from the thread ${latestDraft.by ? `by ${CLI_NAMES[latestDraft.by]} ` : ''}${formatRelative(latestDraft.at)}`}
+                  {latestDraft?.switched &&
+                    reply === undefined &&
+                    !latestDraft.copiedAt && (
+                      <span data-switch>
+                        {' '}
+                        · {switchLine(latestDraft.switched)}
+                      </span>
+                    )}
                 </label>
                 <textarea
                   id={replyId}

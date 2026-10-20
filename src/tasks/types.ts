@@ -9,6 +9,7 @@
  */
 
 import type { TokenUsage } from '../history/usage.js'
+import type { OwnCli, Switch, Unable } from './own-ai.js'
 import type { TaskOrigin } from './sources.js'
 
 /** asked: someone asked you; promised: you said you would */
@@ -244,14 +245,20 @@ export type CollectOutcome = (
       at: string
       ok: false
       error: string
-      /** Claude Code on this Mac needs signing in again */
+      /** The CLI that ran (by) needs signing in again on this Mac */
       signedOut?: boolean
+      /** Why the CLI could not collect at all, so the other one may */
+      unable?: Unable
     }
 ) & {
   /** Slack lookups it made */
   reads?: number
-  /** Tokens Claude Code reported for it */
+  /** Tokens the CLI reported for it */
   usage?: TokenUsage
+  /** The CLI that collected (or tried last) */
+  by?: OwnCli
+  /** The CLI chosen could not, so the other one did */
+  switched?: Switch
 }
 
 /**
@@ -271,7 +278,14 @@ export type CollectionRecord = CollectOutcome & {
  * reads so far), and how the last one ended
  */
 export interface TasksCollect {
-  running?: { startedAt: string; reads: number }
+  running?: {
+    startedAt: string
+    reads: number
+    /** The CLI collecting now */
+    by?: OwnCli
+    /** The CLI chosen could not, so this one took over */
+    switched?: Switch
+  }
   last?: CollectOutcome
 }
 
@@ -320,6 +334,10 @@ export type WorkEntry =
       text: string
       /** When you copied it and opened the thread */
       copiedAt?: string
+      /** The CLI that drafted it */
+      by?: OwnCli
+      /** The CLI chosen could not, so the other one drafted it */
+      switched?: Switch
     }
 
 /**

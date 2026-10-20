@@ -42,6 +42,9 @@ const SERVICES: Record<
 }
 
 /** A CLI that can answer: installed, signed in, new enough */
+const otherBackend = (backend: Backend): Backend =>
+  backend === 'claude' ? 'codex' : 'claude'
+
 export const cliReady = (check: CliCheck | undefined) =>
   Boolean(check?.installed && check.signedIn && !check.tooOld)
 
@@ -90,6 +93,8 @@ export function AiStep({
     setError(undefined)
     const result = await window.pacenoteDesktop?.settings.save({
       REASONER: choice,
+      // Pacenote's own work (Todo, Recap) runs with the same one at first.
+      TASKS_AI: choice,
       ...(model !== undefined ? { REASONER_MODEL: model || null } : {}),
       ...(timeout !== undefined
         ? { REASONER_TIMEOUT_SEC: timeout || null }
@@ -162,6 +167,13 @@ export function AiStep({
         Connectors and account settings stay in{' '}
         {choice ? SERVICES[choice].name : 'your AI service'}. Pacenote doesn't
         set them up or change them.
+        {choice && cliReady(cli?.claude) && cliReady(cli?.codex) && (
+          <>
+            {' '}
+            With both here, {SERVICES[otherBackend(choice)].name} takes over
+            Todo and Recap when {SERVICES[choice].name} is at its limit.
+          </>
+        )}
       </Note>
       <Collapsible>
         <CollapsibleTrigger className="group inline-flex items-center gap-1.5 text-body font-semibold text-muted-foreground hover:text-foreground">

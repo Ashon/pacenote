@@ -2,7 +2,8 @@
 // Stands in for `claude -p` in end-to-end tests (CLAUDE_BIN). It reads the
 // prompt the way claude does (plain text, or stream-json with image blocks),
 // records each call in $FAKE_CLAUDE_DIR/calls.jsonl, and answers by the first
-// rule in $FAKE_CLAUDE_DIR/script.json whose pattern matches the request:
+// rule in $FAKE_CLAUDE_DIR/script.json whose pattern matches the request
+// (a rule with cli "codex" is the fake codex's only):
 //   { "rules": [{ "match": "regex", "answer": "...", "delayMs": 0,
 //                 "fail": "message",
 //                 "tools": [{ "name": "mcp__ops__host_check", "input": {},
@@ -115,7 +116,10 @@ if (sessionAt >= 0 || resumeAt >= 0) {
 
 const stdin = readFileSync(0, 'utf8')
 
-let prompt = stdin
+// A prompt of an MCP server, given as -p /mcp__server__prompt with no stdin
+let prompt = stdin.trim()
+  ? stdin
+  : (args.find((arg) => arg.startsWith('/mcp__')) ?? '')
 let images = 0
 if (args.includes('--input-format')) {
   const line = JSON.parse(stdin.trim().split('\n')[0])
@@ -137,8 +141,10 @@ appendFileSync(
 const script = JSON.parse(readFileSync(path.join(dir, 'script.json'), 'utf8'))
 // A mention's request, or the whole prompt (a reply drafted from a task)
 const rule =
-  (script.rules ?? []).find((r) =>
-    new RegExp(r.match, 'i').test(request || prompt)
+  (script.rules ?? []).find(
+    (r) =>
+      (!r.cli || r.cli === 'claude') &&
+      new RegExp(r.match, 'i').test(request || prompt)
   ) ?? {}
 if (rule.delayMs) await setTimeout(rule.delayMs)
 

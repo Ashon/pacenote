@@ -17,6 +17,7 @@ import {
   MessageCircle,
   PenLine,
 } from 'lucide-react'
+import { CLI_NAMES, cliOrder, isOwnCli, type OwnCli } from '@src/tasks/own-ai'
 import { Fragment, useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,7 @@ import {
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { taskHash } from '@/lib/tasks'
+import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 
 const PERIODS: { value: RecapPeriod; label: string }[] = [
@@ -84,7 +86,8 @@ const go = (hash: string) => {
  * a standup (done, doing, next), a week what you did in each area and what
  * carries over, a month where it went and what changed. Each is counted from
  * your tasks, your own commits, your sessions and what you asked Pace; Write
- * it up has Claude Code sum it up in a few sentences, only when you click.
+ * it up has the AI chosen in Settings > Todo sum it up in a few sentences, only
+ * when you click.
  * Nothing is sent: it copies as a standup, an update or for Slack.
  */
 export function RecapPage({
@@ -314,8 +317,14 @@ function RecapBody({
               <WrittenText text={view.written.text} arrived={arrived} />
               <div className="flex items-center gap-2">
                 <span className="text-meta text-muted-foreground">
-                  Written by Claude Code from the lines below, with no tools ·{' '}
-                  {formatRelative(view.written.at)}
+                  Written by {writerName(view.written.by)} from the lines below,
+                  with no tools · {formatRelative(view.written.at)}
+                  {view.written.switched && (
+                    <span data-switch>
+                      {' '}
+                      · {switchLine(view.written.switched)}
+                    </span>
+                  )}
                 </span>
                 <Button size="xs" variant="ghost" onClick={onWriteAgain}>
                   Write again
@@ -340,8 +349,20 @@ function RecapBody({
   )
 }
 
-/** Where the written text will be, while Claude Code writes it */
+/** The CLI that wrote a recap, by name */
+const writerName = (by: string) => (isOwnCli(by) ? CLI_NAMES[by] : by)
+
+/**
+ * Where the written text will be, while the AI writes it: the one that goes
+ * first now (the other one while the chosen one rests)
+ */
 function WritingUp() {
+  const [writer, setWriter] = useState<OwnCli>()
+  useEffect(() => {
+    void window.pacenoteDesktop?.ai.now().then((now) => {
+      if (now) setWriter(cliOrder(now.chosen, now.fallback, now.state)[0])
+    })
+  }, [])
   return (
     <section
       aria-label="Writing it up"
@@ -351,7 +372,8 @@ function WritingUp() {
       <PaceSpinner writing />
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
         <span className="text-meta text-muted-foreground">
-          Claude Code is writing it up from the lines below
+          {writer ? CLI_NAMES[writer] : 'Your AI'} is writing it up from the
+          lines below
         </span>
         <span className="writing-line w-[92%]" />
         <span className="writing-line w-[64%]" />

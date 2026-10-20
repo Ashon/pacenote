@@ -32,10 +32,11 @@ Each is put in its area (from [Where you contribute](you.md)); what fits none is
 
 ## Write it up
 
-**Write it up** has Claude Code sum the recap up in a few sentences: two or three for a day, up to five for a month, in
-the language most of your task titles are in, area by area, the commits summed up into what the work was about. It runs
-only when you click, as `claude -p` with no tools, no MCP servers and none of your settings, on your Claude Code login,
-and is given only the recap's own lines. While it writes, the place the text will take shows Pace writing, and the
+**Write it up** has the AI chosen in Settings > Todo sum the recap up in a few sentences: two or three for a day, up to
+five for a month, in the language most of your task titles are in, area by area, the commits summed up into what the
+work was about. It runs only when you click, as `claude -p` with no tools, no MCP servers and none of your settings, or
+as `codex exec` with no apps, no MCP servers and a shell that reads nothing of yours, on your own login, and is given
+only the recap's own lines. The line under it names the one that wrote it. While it writes, the place the text will take shows Pace writing, and the
 text comes in there word by word. What it wrote is kept in `PACENOTE_DATA_DIR/recaps.json`, shown above the recap, and
 comes back with the period; **Write again** replaces it. The tokens each write-up spent are kept there too (90 days),
 written again or not, and the Overview's tokens per day count them as Recaps.

@@ -338,21 +338,27 @@ export async function resumeSession(
  * The script that signs Claude Code in again: claude auth login, which goes
  * on in the browser. The login stays Claude Code's; Pacenote never sees it.
  */
-export function signInScript(bin: string): string {
+export function signInScript(bin: string, tool: WorkTool = 'claude'): string {
   return [
     '#!/bin/zsh -l',
-    '# Written by Pacenote to sign Claude Code in again; safe to delete.',
-    `${shellQuote(bin)} auth login && echo 'Signed in. Collect again in Pacenote.'`,
+    `# Written by Pacenote to sign ${tool === 'codex' ? 'Codex' : 'Claude Code'} in again; safe to delete.`,
+    `${shellQuote(bin)} ${tool === 'codex' ? 'login' : 'auth login'} && echo 'Signed in. Collect again in Pacenote.'`,
     '',
   ].join('\n')
 }
 
-/** Opens claude auth login in the terminal, for a collection signed out */
-export async function signInClaude(options: HandoffOptions): Promise<void> {
+/**
+ * Opens claude auth login (or codex login) in the terminal, for Pacenote's own
+ * work signed out
+ */
+export async function signInCli(
+  options: HandoffOptions,
+  tool: WorkTool = 'claude'
+): Promise<void> {
   const now = options.now?.() ?? new Date()
   const dir = handoffDir(options.dataDir, now.getTime())
   const script = path.join(dir, `sign-in-${now.getTime()}.command`)
-  writeFileSync(script, signInScript(options.bin('claude')), { mode: 0o700 })
+  writeFileSync(script, signInScript(options.bin(tool), tool), { mode: 0o700 })
   chmodSync(script, 0o700)
   await (options.open ?? openInTerminal)(script, options.terminal())
 }

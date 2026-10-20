@@ -1,10 +1,13 @@
+import type { ReasonerId } from '../reasoners/ids.js'
+
 /**
- * Where your tasks come from: the connectors of your AI tool (Claude's Slack
- * connector, for now). The provider holds the access and does the reading;
- * Pacenote knows, for each source, only what keeps a collection safe and its
- * results in order: the connector's tools a collection may use (reading only),
- * those it never may, how to read the source's message links, and how a task
- * from it is keyed. A connector that is not here is not used.
+ * Where your tasks come from: the connectors of your AI tool (the Slack
+ * connector of Claude, or ChatGPT's Slack app for Codex). The provider holds
+ * the access and does the reading; Pacenote knows, for each source, only what
+ * keeps a collection safe and its results in order: the connector's tools a
+ * collection may use (reading only), those it never may, how to read the
+ * source's message links, and how a task from it is keyed. A connector that is
+ * not here is not used.
  */
 
 export const SOURCE_IDS = ['slack'] as const
@@ -20,12 +23,28 @@ export interface MessageRef {
   thread?: string
 }
 
+/**
+ * A source's connector in one CLI: the MCP server it shows as, its tools'
+ * prefix, and where the user connects it
+ */
+export interface Connector {
+  server: string
+  prefix: string
+  /** Where it is connected, as the user finds it */
+  where: string
+  /** codex: the app's id, the only app a collection turns on */
+  app?: string
+}
+
 export interface Source {
   id: SourceId
   /** As people name it: "Slack" */
   label: string
-  /** Its connector in Claude Code: the MCP server's name, its tools' prefix */
-  connector: { server: string; prefix: string }
+  /**
+   * Its connector in each CLI. Their read tools have the same names; codex's
+   * Slack app has more that write, which a collection never turns on.
+   */
+  connectors: Record<ReasonerId, Connector>
   /**
    * The connector's tools a collection may use, all reading only, each with
    * what it does as a person reads it (the run history's Lookups)
@@ -65,7 +84,21 @@ export const SOURCES: Record<SourceId, Source> = {
   slack: {
     id: 'slack',
     label: 'Slack',
-    connector: { server: 'claude.ai Slack', prefix: 'mcp__claude_ai_Slack__' },
+    connectors: {
+      claude: {
+        server: 'claude.ai Slack',
+        prefix: 'mcp__claude_ai_Slack__',
+        where: "claude.ai's Settings > Connectors",
+      },
+      // ChatGPT's Slack app, as codex's apps server (codex_apps) serves it:
+      // its tools are slack.<name>. The id is the app's in OpenAI's catalog.
+      codex: {
+        server: 'codex_apps',
+        prefix: 'slack.',
+        where: "ChatGPT's Settings > Apps",
+        app: 'asdk_app_69a1d78e929881919bba0dbda1f6436d',
+      },
+    },
     reads: {
       slack_search_public: 'Searched public messages',
       slack_search_public_and_private: 'Searched messages',
@@ -128,30 +161,40 @@ export function findMessage(
   return undefined
 }
 
-/** The tools a collection reading these sources may use, by full name */
+/**
+ * The tools a Claude Code collection reading these sources may use, by full
+ * name
+ */
 export const readTools = (ids: readonly SourceId[]): string[] =>
   ids.flatMap((id) => {
-    const { connector, reads } = SOURCES[id]
-    return Object.keys(reads).map((tool) => connector.prefix + tool)
+    const { connectors, reads } = SOURCES[id]
+    return Object.keys(reads).map((tool) => connectors.claude.prefix + tool)
   })
 
-/** Every source's tools that write, by full name: never allowed */
+/** Every source's tools that write in Claude Code, by full name: denied */
 export const writeTools = (): string[] =>
   SOURCE_IDS.flatMap((id) => {
-    const { connector, writes } = SOURCES[id]
-    return writes.map((tool) => connector.prefix + tool)
+    const { connectors, writes } = SOURCES[id]
+    return writes.map((tool) => connectors.claude.prefix + tool)
   })
 
-/** The source a connector's tool belongs to, by its full name */
-export const sourceOfTool = (tool: string): Source | undefined =>
+/** The source a connector's tool belongs to, by its name in the CLI */
+export const sourceOfTool = (
+  tool: string,
+  cli: ReasonerId = 'claude'
+): Source | undefined =>
   SOURCE_IDS.map((id) => SOURCES[id]).find((source) =>
-    tool.startsWith(source.connector.prefix)
+    tool.startsWith(source.connectors[cli].prefix)
   )
 
-/** What a connector's tool did, as a person reads it */
+/**
+ * What a connector's tool did, as a person reads it: by its name, or as codex
+ * names it (slack.slack_read_thread)
+ */
 export const lookupLabel = (tool: string): string | undefined => {
+  const name = tool.replace(/^[a-z]+\./, '')
   for (const id of SOURCE_IDS) {
-    const label = SOURCES[id].reads[tool]
+    const label = SOURCES[id].reads[name]
     if (label) return label
   }
   return undefined

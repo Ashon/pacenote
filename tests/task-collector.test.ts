@@ -5,7 +5,9 @@ import {
   SIGNED_OUT,
   TaskCollector,
 } from '../apps/desktop/src/task-collector.js'
+import { OwnAi } from '../apps/desktop/src/own-ai.js'
 import type { RunEvent } from '../src/history/types.js'
+import type { OwnCli } from '../src/tasks/own-ai.js'
 import { readTools, writeTools } from '../src/tasks/sources.js'
 import type { CollectOutcome } from '../src/tasks/types.js'
 
@@ -80,7 +82,7 @@ describe('collecting from the app with Claude Code', () => {
   })
 
   it('allows only the reads of the sources it collects from, and denies every write', () => {
-    const args = collectCommand(LAUNCH, [])[1]
+    const args = collectCommand(LAUNCH, { sources: [] })[1]
     const allowed = args.slice(
       args.indexOf('--allowedTools') + 1,
       args.indexOf('--disallowedTools')
@@ -126,6 +128,7 @@ describe('collecting from the app with Claude Code', () => {
       maybe: 1,
       skipped: 1,
       reads: 2,
+      by: 'claude',
       usage: {
         input: 1200,
         cacheRead: 30000,
@@ -170,8 +173,9 @@ describe('collecting from the app with Claude Code', () => {
     ))
       loggedOut.push(line)
     expect(loggedOut.outcome('T')).toMatchObject({
-      error: SIGNED_OUT,
+      error: SIGNED_OUT.claude,
       signedOut: true,
+      unable: 'auth',
     })
 
     const failed = new CollectStream()
@@ -182,6 +186,7 @@ describe('collecting from the app with Claude Code', () => {
       failed.push(line)
     expect(failed.outcome('T')).toMatchObject({
       error: 'API Error: 529 Overloaded',
+      unable: 'unavailable',
     })
   })
 
@@ -210,13 +215,14 @@ describe('collecting from the app with Claude Code', () => {
           finish: (outcome) => ended.push(outcome),
         }
       },
-      command: fake([
-        init(),
-        toolUse('2', 'mcp__claude_ai_Slack__slack_read_channel'),
-        toolUse('4', 'mcp__pacenote__add_tasks'),
-        toolResult('4', JSON.stringify({ added: [], skipped: [] })),
-        result('Nothing new.'),
-      ]),
+      command: () =>
+        fake([
+          init(),
+          toolUse('2', 'mcp__claude_ai_Slack__slack_read_channel'),
+          toolUse('4', 'mcp__pacenote__add_tasks'),
+          toolResult('4', JSON.stringify({ added: [], skipped: [] })),
+          result('Nothing new.'),
+        ]),
       now: () => new Date('2026-10-11T05:00:00Z'),
     })
     collector.on('change', (state) => changes.push(state))
@@ -224,6 +230,7 @@ describe('collecting from the app with Claude Code', () => {
     expect(collector.state.running).toEqual({
       startedAt: '2026-10-11T05:00:00.000Z',
       reads: 0,
+      by: 'claude',
     })
     expect(await collector.run()).toMatchObject({
       ok: false,
@@ -237,6 +244,7 @@ describe('collecting from the app with Claude Code', () => {
       maybe: 0,
       skipped: 0,
       reads: 1,
+      by: 'claude',
     })
     expect(collector.state).toEqual({ last })
     // One run for the collection, none for the one turned away: its steps
@@ -251,7 +259,11 @@ describe('collecting from the app with Claude Code', () => {
     expect(ended).toEqual([last])
     expect(changes).toContainEqual({
       last: undefined,
-      running: { startedAt: '2026-10-11T05:00:00.000Z', reads: 1 },
+      running: {
+        startedAt: '2026-10-11T05:00:00.000Z',
+        reads: 1,
+        by: 'claude',
+      },
     })
   })
 
@@ -269,9 +281,11 @@ describe('collecting from the app with Claude Code', () => {
     expect(expired.outcome('T')).toEqual({
       at: 'T',
       ok: false,
-      error: SIGNED_OUT,
+      error: SIGNED_OUT.claude,
       signedOut: true,
+      unable: 'auth',
       reads: 0,
+      by: 'claude',
     })
 
     // Stopped before its result: stderr says why
@@ -279,14 +293,15 @@ describe('collecting from the app with Claude Code', () => {
       launch: () => LAUNCH,
       toolPath: () => process.env.PATH ?? '',
       cwd: process.cwd(),
-      command: fake(
-        [],
-        "console.error('OAuth token has been revoked. Please run /login'); process.exit(1)"
-      ),
+      command: () =>
+        fake(
+          [],
+          "console.error('OAuth token has been revoked. Please run /login'); process.exit(1)"
+        ),
     })
     expect(await revoked.run()).toMatchObject({
       ok: false,
-      error: SIGNED_OUT,
+      error: SIGNED_OUT.claude,
       signedOut: true,
     })
 
@@ -327,7 +342,11 @@ describe('collecting from the app with Claude Code', () => {
       launch: () => LAUNCH,
       toolPath: () => '',
       cwd: process.cwd(),
-      last: { at: '2026-10-10T05:00:00.000Z', ok: false, error: SIGNED_OUT },
+      last: {
+        at: '2026-10-10T05:00:00.000Z',
+        ok: false,
+        error: SIGNED_OUT.claude,
+      },
     })
     expect(signedOut.state.last).toMatchObject({ signedOut: true })
   })
@@ -337,7 +356,7 @@ describe('collecting from the app with Claude Code', () => {
       launch: () => LAUNCH,
       toolPath: () => process.env.PATH ?? '',
       cwd: process.cwd(),
-      command: fake([init()], 'setInterval(() => {}, 1000)'),
+      command: () => fake([init()], 'setInterval(() => {}, 1000)'),
     })
     const stopped = slow.run()
     setTimeout(() => slow.cancel(), 200)
@@ -347,7 +366,7 @@ describe('collecting from the app with Claude Code', () => {
       launch: () => LAUNCH,
       toolPath: () => '/nonexistent',
       cwd: process.cwd(),
-      command: ['claude-not-here', []],
+      command: () => ['claude-not-here', []],
     })
     expect(await missing.run()).toMatchObject({
       ok: false,
@@ -358,12 +377,228 @@ describe('collecting from the app with Claude Code', () => {
       launch: () => LAUNCH,
       toolPath: () => process.env.PATH ?? '',
       cwd: process.cwd(),
-      command: fake([init()], 'setInterval(() => {}, 1000)'),
+      command: () => fake([init()], 'setInterval(() => {}, 1000)'),
       timeoutMs: 200,
     })
     expect(await timedOut.run()).toMatchObject({
       ok: false,
       error: expect.stringMatching(/did not finish/),
     })
+  })
+})
+
+// The shape of codex exec --json events (codex 0.163)
+const codexTool = (
+  id: string,
+  server: string,
+  tool: string,
+  result = '',
+  error?: string
+) => [
+  {
+    type: 'item.started',
+    item: { id, type: 'mcp_tool_call', server, tool, status: 'in_progress' },
+  },
+  {
+    type: 'item.completed',
+    item: {
+      id,
+      type: 'mcp_tool_call',
+      server,
+      tool,
+      status: error ? 'failed' : 'completed',
+      result: error ? null : { content: [{ type: 'text', text: result }] },
+      error: error ? { message: error } : null,
+    },
+  },
+]
+const codexDone = (text: string) => [
+  {
+    type: 'item.completed',
+    item: { id: 'answer', type: 'agent_message', text },
+  },
+  {
+    type: 'turn.completed',
+    usage: { input_tokens: 900, cached_input_tokens: 600, output_tokens: 50 },
+  },
+]
+
+describe('collecting with Codex', () => {
+  it("turns on only ChatGPT's Slack app, without the tools that change or delete, and only Pacenote's task tools", () => {
+    const [command, args] = collectCommand(LAUNCH, {
+      cli: 'codex',
+      bin: '/opt/codex',
+      codex: { model: 'gpt-5.5', reasoningEffort: 'high' },
+    })
+    expect(command).toBe('/opt/codex')
+    expect(args[0]).toBe('exec')
+    expect(args).not.toContain('--disable')
+    const config = args.flatMap((arg, i) => (args[i - 1] === '-c' ? [arg] : []))
+    const app = 'apps.asdk_app_69a1d78e929881919bba0dbda1f6436d'
+    expect(config).toEqual(
+      expect.arrayContaining([
+        'apps._default.enabled=false',
+        `${app}.enabled=true`,
+        `${app}.destructive_enabled=false`,
+        'approval_policy="never"',
+        `mcp_servers.pacenote.command=${JSON.stringify(LAUNCH.command)}`,
+        `mcp_servers.pacenote.args=${JSON.stringify(LAUNCH.args)}`,
+        'mcp_servers.pacenote.env={ELECTRON_RUN_AS_NODE="1"}',
+        'mcp_servers.pacenote.default_tools_approval_mode="approve"',
+        'model_reasoning_effort="high"',
+      ])
+    )
+    const tools = config.find((item) =>
+      item.startsWith('mcp_servers.pacenote.enabled_tools=')
+    )
+    expect(JSON.parse(tools!.split('=')[1]!)).toEqual(
+      expect.arrayContaining(['collect_context', 'add_tasks', 'update_task'])
+    )
+    // Your config.toml stays out; its shell reads only the platform's basics.
+    expect(args).toContain('--ignore-user-config')
+    expect(config).toContain(
+      'permissions.pacenote.filesystem={":minimal"="read"}'
+    )
+    expect(args[args.indexOf('--model') + 1]).toBe('gpt-5.5')
+    expect(args.at(-1)).toBe('-')
+  })
+
+  it('counts Slack reads, reads what add_tasks answered, and tells a run with no Slack app', () => {
+    const stream = new CollectStream(['slack'], 'codex')
+    for (const line of lines(
+      ...codexTool('1', 'pacenote', 'collect_context', '{}'),
+      ...codexTool('2', 'codex_apps', 'slack.slack_search_public'),
+      ...codexTool('3', 'codex_apps', 'slack.slack_read_thread'),
+      ...codexTool(
+        '4',
+        'pacenote',
+        'add_tasks',
+        JSON.stringify({ added: [{ confidence: 'sure' }], skipped: [] })
+      ),
+      ...codexDone('Added one task.')
+    ))
+      stream.push(line)
+    expect(stream.outcome('T')).toEqual({
+      at: 'T',
+      ok: true,
+      added: 1,
+      maybe: 0,
+      skipped: 0,
+      reads: 2,
+      by: 'codex',
+      usage: { input: 300, cacheRead: 600, cacheWrite: 0, output: 50 },
+    })
+
+    const noApp = new CollectStream(['slack'], 'codex')
+    for (const line of lines(
+      ...codexTool('1', 'pacenote', 'collect_context', '{}'),
+      ...codexDone('I have no Slack tools.')
+    ))
+      noApp.push(line)
+    expect(noApp.outcome('T')).toMatchObject({
+      ok: false,
+      error:
+        "Codex has no Slack connector. Connect Slack in ChatGPT's Settings > Apps, then collect again.",
+      unable: 'connector',
+    })
+
+    const limited = new CollectStream(['slack'], 'codex')
+    for (const line of lines(
+      { type: 'error', message: "You've hit your usage limit." },
+      {
+        type: 'turn.failed',
+        error: { message: "You've hit your usage limit." },
+      }
+    ))
+      limited.push(line)
+    expect(limited.outcome('T')).toMatchObject({
+      ok: false,
+      error: "You've hit your usage limit.",
+      unable: 'limit',
+    })
+  })
+
+  it('collects with Codex when Claude Code is at its usage limit, in the same run', async () => {
+    const fakeRun = (events: object[], exit = 0) =>
+      [
+        process.execPath,
+        [
+          '-e',
+          `for (const line of ${JSON.stringify(lines(...events))}) console.log(line); process.exit(${exit})`,
+        ],
+      ] as [string, string[]]
+    const now = new Date('2026-10-20T10:00:00')
+    const steps: RunEvent[] = []
+    const ended: { outcome: CollectOutcome; attempts?: number }[] = []
+    const started: OwnCli[] = []
+    const collector = new TaskCollector({
+      launch: () => LAUNCH,
+      toolPath: () => process.env.PATH ?? '',
+      cwd: process.cwd(),
+      ai: new OwnAi({
+        chosen: () => 'claude',
+        fallback: () => true,
+        now: () => now,
+      }),
+      recorder: (_, cli) => {
+        started.push(cli)
+        return {
+          event: (step) => steps.push(step),
+          finish: (outcome, attempts) => ended.push({ outcome, attempts }),
+        }
+      },
+      command: (cli) =>
+        cli === 'claude'
+          ? fakeRun(
+              [
+                init('connected'),
+                {
+                  type: 'result',
+                  subtype: 'success',
+                  is_error: true,
+                  result: 'Usage limit reached · resets 3pm',
+                },
+              ],
+              1
+            )
+          : fakeRun([
+              ...codexTool('1', 'codex_apps', 'slack.slack_read_thread'),
+              ...codexTool(
+                '2',
+                'pacenote',
+                'add_tasks',
+                JSON.stringify({ added: [{ confidence: 'sure' }] })
+              ),
+              ...codexDone('Added one task.'),
+            ]),
+      now: () => now,
+    })
+    const last = await collector.run()
+    const until = new Date('2026-10-20T15:00:00').toISOString()
+    expect(last).toMatchObject({
+      ok: true,
+      added: 1,
+      reads: 1,
+      by: 'codex',
+      switched: { from: 'claude', unable: 'limit', until },
+    })
+    // One run, started on Claude Code, with a note where Codex took over
+    expect(started).toEqual(['claude'])
+    expect(ended).toEqual([{ outcome: last, attempts: 2 }])
+    expect(steps).toContainEqual(
+      expect.objectContaining({
+        kind: 'note',
+        text: expect.stringMatching(
+          /^Claude Code was at its usage limit until .*, so Codex collected\.$/
+        ),
+      })
+    )
+    // The next one goes to Codex first while Claude Code rests.
+    const next = collector.run()
+    expect(collector.state.running).toMatchObject({
+      by: 'codex',
+      switched: { from: 'claude', unable: 'limit', until },
+    })
+    expect(await next).toMatchObject({ ok: true, by: 'codex' })
   })
 })

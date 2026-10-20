@@ -69,6 +69,7 @@ import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
+import { OwnAiStatus } from './own-ai-status'
 import { RepoFolders } from './repo-folders'
 import { SandboxSignIn } from './sandbox-sign-in'
 import { SlackYou } from './slack-you'
@@ -698,6 +699,14 @@ export function SettingsPage() {
     ),
     tasks: (
       <>
+        {card('ownWork', {
+          after: (
+            <OwnAiStatus
+              chosen={view.values.TASKS_AI === 'codex' ? 'codex' : 'claude'}
+              fallback={view.values.TASKS_AI_FALLBACK !== 'off'}
+            />
+          ),
+        })}
         {card('tasks', {
           after: valueOf('TASKS') === 'on' && (
             <>
@@ -1805,6 +1814,15 @@ function Control({
         />
       )
     case 'select':
+      if (field.segmented)
+        return (
+          <Segmented
+            label={field.label}
+            value={value || field.default || ''}
+            options={field.options ?? []}
+            onChange={onChange}
+          />
+        )
       return (
         <select
           value={value || field.default || ''}
@@ -1924,6 +1942,48 @@ function ThemePicker() {
         >
           <Icon className="size-3.5" />
           {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A few short options side by side, like the theme picker: the settings that
+ * pick one of two or three (where work runs, which terminal)
+ */
+function Segmented({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="flex rounded-lg bg-muted p-0.5"
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            'flex h-6 items-center rounded-md px-2.5 text-meta font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
+            value === option.value
+              ? 'bg-card text-foreground shadow-xs dark:bg-selected'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {option.label}
         </button>
       ))}
     </div>

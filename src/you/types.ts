@@ -1,4 +1,5 @@
 import type { WorkTool } from '../tasks/types.js'
+import type { Switch } from '../tasks/own-ai.js'
 
 /**
  * Your work identity: where you contribute (areas), how (roles), what is going
@@ -190,5 +191,8 @@ export interface RecapView {
 export interface Written {
   text: string
   at: string
+  /** The CLI that wrote it: claude or codex */
   by: string
+  /** The CLI chosen could not, so the other one wrote it */
+  switched?: Switch
 }

@@ -2,9 +2,28 @@
 
 Pacenote keeps a short list of what people ask of you in Slack, and what you said you would do, on the Todo screen, so
 you do not keep it in your head or scroll back for it. **Collect now** has Claude Code read Slack with the Slack connector
-of your claude.ai account, read only, and add the tasks through Pacenote's MCP server; Pacenote holds no Slack token for
-this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md), and
+of your claude.ai account (or Codex with ChatGPT's Slack app), read only, and add the tasks through Pacenote's MCP
+server; Pacenote holds no Slack token for this. It is off by default. The plan and the reasons behind it are in [the proposal](proposals/personal-tasks.md), and
 the pieces are drawn in [Architecture](architecture.md#your-tasks-and-ai-tools).
+
+## Which AI does the work
+
+Collect now, reply drafts, Looks done and Recap's Write it up run headless on this Mac, with your own login, on the AI
+chosen in Settings > Todo > Pacenote's own work: Claude Code or Codex.
+
+- **Claude Code** runs as `claude -p` with only project settings (none, in the data folder), Pacenote's task tools and
+  the read tools of your claude.ai Slack connector; the connector's tools that write are denied.
+- **Codex** runs as `codex exec` without your config.toml and rules, with only ChatGPT's Slack app turned on and its
+  tools that change or delete turned off. Its other tools that write need an approval it never gets
+  (`approval_policy="never"`), so they are refused. Its shell reads only the platform's basics.
+- **Switch when it can't** (on by default): at a usage limit, overloaded, signed out, not on this Mac or without its
+  Slack connector, the other one does the work in the same run, and the run, the Todo line, the draft and the recap say
+  so. One at its usage limit rests until the limit resets (the time its error gives, or an hour), so work goes to the
+  other one first; overloaded rests ten minutes. Looks done waits while both rest.
+- Settings shows each one: whether it is on this Mac and signed in, and until when it rests (`own-ai.json` in the data
+  folder keeps what each last did).
+
+Both must read the same Slack workspace: a task is keyed by its message, so collecting with either never adds it twice.
 
 ## Turning it on
 

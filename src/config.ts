@@ -219,6 +219,13 @@ export const EnvSchema = z.object({
   TASKS_PLAN_FIRST: z.enum(['on', 'off']).default('on'),
   TASKS_LINK_SESSIONS: z.enum(['on', 'off']).default('off'),
   TASKS_SUGGEST_DONE: z.enum(['on', 'off']).default('off'),
+  /**
+   * Pacenote's own work on this Mac (the desktop app): the CLI that collects,
+   * judges, writes recaps up and drafts replies, and whether the other one
+   * takes over when it cannot
+   */
+  TASKS_AI: z.enum(REASONER_IDS).default('claude'),
+  TASKS_AI_FALLBACK: z.enum(['on', 'off']).default('on'),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
@@ -326,6 +333,8 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS_PLAN_FIRST',
   'TASKS_LINK_SESSIONS',
   'TASKS_SUGGEST_DONE',
+  'TASKS_AI',
+  'TASKS_AI_FALLBACK',
 ])
 
 /**

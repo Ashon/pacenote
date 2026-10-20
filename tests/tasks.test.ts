@@ -306,12 +306,16 @@ describe('adding tasks from an AI tool', () => {
 
   it("keeps each source's reads and writes apart, and names its reads", () => {
     for (const id of SOURCE_IDS) {
-      const { reads, writes, connector } = SOURCES[id]
-      expect(connector.prefix).toMatch(/^mcp__claude_ai_\w+__$/)
+      const { reads, writes, connectors } = SOURCES[id]
+      expect(connectors.claude.prefix).toMatch(/^mcp__claude_ai_\w+__$/)
+      // codex's app: only it is turned on for a collection
+      expect(connectors.codex.app).toMatch(/^asdk_app_\w+$/)
       expect(Object.keys(reads).length).toBeGreaterThan(0)
       for (const tool of Object.keys(reads)) {
         expect(writes).not.toContain(tool)
         expect(lookupLabel(tool)).toBe(reads[tool])
+        // As codex names it
+        expect(lookupLabel(`${id}.${tool}`)).toBe(reads[tool])
       }
     }
   })

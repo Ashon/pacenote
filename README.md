@@ -47,10 +47,11 @@ and Pace can use your Todo: ask it to keep what a thread needs from you, list or
 
 ### Keep track of what is asked of you
 
-**Collect now** has Claude Code read Slack through your claude.ai Slack connector, read only, and lists what people
-asked of you and what you said you would do: by your @mention, the other names people call you, or a user group that
+**Collect now** has Claude Code (through your claude.ai Slack connector) or Codex (through ChatGPT's Slack app) read
+Slack, read only, and lists what people asked of you and what you said you would do: by your @mention, the other names people call you, or a user group that
 means you. Anything it is not sure about waits under Maybe instead of cluttering the list, a Maybe from a group asks once
-whether that group means you, and a message never becomes a task twice. Collecting is off until you turn it on.
+whether that group means you, and a message never becomes a task twice. Collecting is off until you turn it on. With
+both on your Mac, the other one takes over when the one you chose is at its usage limit.
 
 ### Pick up where you left off, in either tool
 
@@ -75,8 +76,8 @@ you did lately. Pacenote finds them on its own and shows them to you once; you o
 ### Recap your day, week and month
 
 **Recap** reads the same work at three distances: a day as a standup, a week by area with what carries over, a month by
-where it went. It counts your tasks and your own commits as they are, has Claude Code write it up in a few sentences
-only when you ask, and copies it as a standup or an update for you to post.
+where it went. It counts your tasks and your own commits as they are, has your AI write it up in a few sentences only
+when you ask, and copies it as a standup or an update for you to post.
 
 ### Share the history with your AI tools
 

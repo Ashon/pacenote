@@ -1,6 +1,13 @@
-import { execFile, spawn } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import type { CodexDefaults } from '../../../src/reasoners/codex.js'
+import {
+  CLI_NAMES,
+  unableFrom,
+  type OwnCli,
+  type Unable,
+} from '../../../src/tasks/own-ai.js'
 import { workFor } from '../../../src/tasks/work.js'
 import type {
   Proposal,
@@ -9,15 +16,17 @@ import type {
   WorkEntry,
   WorkFile,
 } from '../../../src/tasks/types.js'
+import { exitError, outputOf, plainCommand, runHeadless } from './headless.js'
 
 /**
  * Whether a task looks done once its session went quiet. Pacenote does not
  * wait for the session to say so: when the latest session linked to an open
- * task has been quiet a while, Claude Code, headless and with no tools at all,
- * reads the session's last turns (and the state of its branch's pull request,
- * through gh, read only) and says whether the work the task asks for is done,
- * how it ended and what is left. What it says waits on the task's row for you
- * to close it or not; a session is judged again only after it was active.
+ * task has been quiet a while, the CLI that does Pacenote's own work
+ * (own-ai.ts), headless and with no tools at all, reads the session's last
+ * turns (and the state of its branch's pull request, through gh, read only)
+ * and says whether the work the task asks for is done, how it ended and what
+ * is left. What it says waits on the task's row for you to close it or not; a
+ * session is judged again only after it was active.
  */
 
 type Session = Extract<WorkEntry, { kind: 'session' }>
@@ -125,41 +134,15 @@ export function judgePrompt(
   )
 }
 
-/** claude -p with no tools, no MCP servers and none of your settings */
-export function judgeCommand(bin: string): [string, string[]] {
-  return [
-    bin,
-    [
-      '-p',
-      '--setting-sources',
-      'project',
-      '--strict-mcp-config',
-      '--tools',
-      '',
-      '--no-session-persistence',
-      '--output-format',
-      'json',
-    ],
-  ]
-}
-
 export interface Judgement {
   done: boolean
   summary?: string
   left?: string[]
 }
 
-/** The judgement in Claude Code's json output; undefined when there is none */
-export function judgementFrom(stdout: string): Judgement | undefined {
-  let result: string
-  try {
-    const out = JSON.parse(stdout) as { result?: string; is_error?: boolean }
-    if (out.is_error || typeof out.result !== 'string') return undefined
-    result = out.result
-  } catch {
-    return undefined
-  }
-  const json = /\{[\s\S]*\}/.exec(result)?.[0]
+/** The judgement in the CLI's answer; undefined when there is none */
+export function judgementFrom(answer: string): Judgement | undefined {
+  const json = /\{[\s\S]*\}/.exec(answer)?.[0]
   if (!json) return undefined
   try {
     const value = JSON.parse(json) as Partial<Judgement>
@@ -183,39 +166,36 @@ export function judgementFrom(stdout: string): Judgement | undefined {
   }
 }
 
-/** Runs the judge; an error says why it could not */
-export function judge(options: {
+/**
+ * Runs the judge on a CLI with no tools; an error says why it could not, and
+ * unable whether the other CLI may judge instead
+ */
+export async function judge(options: {
+  cli: OwnCli
   bin: string
+  codex?: CodexDefaults
   toolPath: string
   cwd: string
   prompt: string
   timeoutMs?: number
-}): Promise<Judgement | { error: string }> {
-  const [command, args] = judgeCommand(options.bin)
-  return new Promise((resolve) => {
-    let stdout = ''
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: { ...process.env, PATH: options.toolPath },
-      stdio: ['pipe', 'pipe', 'ignore'],
-    })
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      resolve({ error: 'Claude Code did not answer in 2 minutes.' })
-    }, options.timeoutMs ?? TIMEOUT_MS)
-    child.on('error', (error) => {
-      clearTimeout(timer)
-      resolve({ error: error.message })
-    })
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
-    child.on('close', () => {
-      clearTimeout(timer)
-      resolve(
-        judgementFrom(stdout) ?? { error: 'Claude Code gave no judgement.' }
-      )
-    })
-    child.stdin.end(options.prompt)
+}): Promise<Judgement | { error: string; unable?: Unable }> {
+  const name = CLI_NAMES[options.cli]
+  const exit = await runHeadless({
+    command: plainCommand(options.cli, options.bin, options.codex),
+    input: options.prompt,
+    cwd: options.cwd,
+    toolPath: options.toolPath,
+    timeoutMs: options.timeoutMs ?? TIMEOUT_MS,
   })
+  const output = outputOf(options.cli, exit.stdout)
+  if (output && 'text' in output)
+    return judgementFrom(output.text) ?? { error: `${name} gave no judgement.` }
+  const error = exitError(options.cli, exit, output, {
+    slow: `${name} did not answer in 2 minutes.`,
+    nothing: `${name} gave no judgement.`,
+  })
+  const unable = exit.timedOut ? undefined : unableFrom(error)
+  return unable ? { error, unable } : { error }
 }
 
 const run = promisify(execFile)

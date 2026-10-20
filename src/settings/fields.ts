@@ -70,6 +70,7 @@ export type SettingGroup =
   | 'jira'
   | 'k8s'
   | 'ssh'
+  | 'ownWork'
   | 'tasks'
   | 'work'
   | 'history'
@@ -94,6 +95,8 @@ export interface SettingField {
    * Options with help are shown as a choice of cards instead of a drop-down.
    */
   options?: { value: string; label: string; help?: string }[]
+  /** A few short options side by side, in place of a drop-down */
+  segmented?: boolean
   /** Value used when left empty. No default if absent */
   default?: string
   placeholder?: string
@@ -228,10 +231,16 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     requires: ['OPS_SSH_USER', 'OPS_SSH_ALLOWED_CIDR', 'OPS_SSH_KEY'],
   },
   {
+    id: 'ownWork',
+    section: 'tasks',
+    label: "Pacenote's own work",
+    help: "Collect now, reply drafts, Looks done and Recap's Write it up run headless on this Mac, with your own login.",
+  },
+  {
     id: 'tasks',
     section: 'tasks',
     label: 'Gathering tasks',
-    help: 'Collect now on the Todo screen has Claude Code read Slack with its own Slack connector, read only, and keeps what people asked of you and what you said you would do. Pacenote holds no Slack token for this.',
+    help: 'Collect now on the Todo screen has your AI read Slack with its own Slack connector, read only, and keeps what people asked of you and what you said you would do. Pacenote holds no Slack token for this.',
   },
   {
     id: 'work',
@@ -687,6 +696,31 @@ export const SETTING_FIELDS: SettingField[] = [
     applies: 'app',
   },
   {
+    key: 'TASKS_AI',
+    path: 'tasks.ai.cli',
+    group: 'ownWork',
+    label: 'Run it with',
+    help: "Claude Code reads Slack through claude.ai's Slack connector, Codex through ChatGPT's Slack app.",
+    type: 'select',
+    segmented: true,
+    options: [
+      { value: 'claude', label: 'Claude Code' },
+      { value: 'codex', label: 'Codex' },
+    ],
+    default: 'claude',
+    applies: 'app',
+  },
+  {
+    key: 'TASKS_AI_FALLBACK',
+    path: 'tasks.ai.fallback',
+    group: 'ownWork',
+    label: "Switch when it can't",
+    help: 'At its usage limit, overloaded, signed out, or without its Slack connector, the other one does the work. One at its limit waits until the limit resets.',
+    type: 'toggle',
+    default: 'on',
+    applies: 'app',
+  },
+  {
     key: 'TASKS',
     path: 'tasks.enabled',
     group: 'tasks',
@@ -748,8 +782,9 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.openIn',
     group: 'work',
     label: 'Open code tasks in',
-    help: 'The button on a code task opens a session here, with the task.',
+    help: "The button on a code task opens your session here, with the task. Pacenote's own work runs with the AI chosen above.",
     type: 'select',
+    segmented: true,
     options: [
       { value: 'claude', label: 'Claude Code' },
       { value: 'codex', label: 'Codex' },
@@ -765,6 +800,7 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'Terminal',
     help: 'Where the session opens. Automatic picks the terminal you have open, else the one you used last.',
     type: 'select',
+    segmented: true,
     options: [
       { value: 'auto', label: 'Automatic' },
       { value: 'terminal', label: 'Terminal' },
@@ -802,7 +838,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.suggestDone',
     group: 'work',
     label: 'Say when a task looks done',
-    help: "When a task's latest session has been quiet for 10 minutes, Claude Code reads its last turns, with no tools, and the state of its pull request, and says on the task whether it looks done, how it ended and what is left. You close it or not. It uses your Claude Code login.",
+    help: "When a task's latest session has been quiet for 10 minutes, the AI chosen above reads its last turns, with no tools, and the state of its pull request, and says on the task whether it looks done, how it ended and what is left. You close it or not.",
     type: 'toggle',
     default: 'off',
     applies: 'app',

@@ -1,7 +1,9 @@
 import { newTokens } from '@history/usage'
+import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
 import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
 import {
+  ArrowRightLeft,
   ChevronRight,
   History,
   RefreshCw,
@@ -37,6 +39,7 @@ import {
 } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { useYou } from '@/lib/you'
+import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow } from './task-row'
 import {
@@ -644,19 +647,22 @@ function StatusLine({
 }
 
 /**
- * What the running collection is doing, or how the last one ended. Signed
- * out, it offers claude auth login in your terminal.
+ * What the running collection is doing, or how the last one ended, and which
+ * AI did it when the one chosen could not. Signed out, it offers that CLI's
+ * sign-in in your terminal. When the work goes to the other AI mid-run, only
+ * the words swap: Pace's mark keeps looking.
  */
 function CollectStatus({ collect }: { collect: TasksCollect }) {
   const { running, last } = collect
   // Why the terminal did not open, for the collection it was opened for
   const [signIn, setSignIn] = useState<{ at: string; error: string }>()
+  const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : 'Your AI')
   let text: string | undefined
   let spent: string | undefined
   if (running)
     text = running.reads
-      ? `Reading Slack, read only: ${running.reads} lookups so far.`
-      : 'Starting: Pacenote gives the collection its rules.'
+      ? `${name(running.by)} is reading Slack, read only: ${running.reads} lookups so far.`
+      : `Starting ${name(running.by)}: Pacenote gives the collection its rules.`
   else if (last?.ok) {
     const found = [
       last.added && `${last.added} ${last.added === 1 ? 'task' : 'tasks'}`,
@@ -667,45 +673,77 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
       : 'Nothing new to add.'
     if (last.skipped) text += ` ${last.skipped} left out by your settings.`
     if (last.usage)
-      spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups.`
+      spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups${last.by ? ` by ${CLI_NAMES[last.by]}` : ''}.`
   }
   if (!text && !last) return null
+  const switched = running ? running.switched : last?.switched
+  // Who to sign in again: the CLI that ran, or the one it took over from
+  const signOut: OwnCli | undefined = running
+    ? undefined
+    : last && !last.ok && last.signedOut
+      ? last.by
+      : last?.switched?.unable === 'auth'
+        ? last.switched.from
+        : undefined
   // Pace's mark looks around while a collection runs and eases into the logo
   // beside its result.
   return (
-    <p
-      className={cn(
-        'mt-1 flex items-center gap-2 text-copy',
-        last && !last.ok && !running
-          ? 'text-status-interrupted'
-          : 'text-muted-foreground'
-      )}
-    >
-      <PaceSpinner active={Boolean(running)} className="size-6" />
-      <span className={cn('min-w-0', running && 'text-shimmer')}>
-        {text ??
-          (last && !last.ok
-            ? signIn?.at === last.at
-              ? signIn.error
-              : last.error
-            : null)}
-        {spent && <span className="text-foreground/80"> {spent}</span>}
-      </span>
-      {!running && last && !last.ok && last.signedOut && (
-        <Button
-          size="xs"
-          variant="outline"
-          className="text-foreground"
-          onClick={async () => {
-            const opened = await window.pacenoteDesktop?.tasks.signIn()
-            if (opened?.error) setSignIn({ at: last.at, error: opened.error })
-          }}
+    <div data-collect-status>
+      <div
+        className={cn(
+          'mt-1 flex items-center gap-2 text-copy',
+          last && !last.ok && !running
+            ? 'text-status-interrupted'
+            : 'text-muted-foreground'
+        )}
+      >
+        <PaceSpinner active={Boolean(running)} className="size-6" />
+        <Swap
+          id={running ? `run:${running.by ?? ''}` : 'last'}
+          className={cn('min-w-0', running && 'text-shimmer')}
         >
-          <SquareTerminal aria-hidden="true" />
-          Sign in to Claude Code
-        </Button>
+          {text ??
+            (last && !last.ok
+              ? signIn?.at === last.at
+                ? signIn.error
+                : last.error
+              : null)}
+          {spent && <span className="text-foreground/80"> {spent}</span>}
+        </Swap>
+        {signOut && last && (
+          <Button
+            size="xs"
+            variant="outline"
+            className="text-foreground"
+            onClick={async () => {
+              const opened = await window.pacenoteDesktop?.tasks.signIn(signOut)
+              if (opened?.error) setSignIn({ at: last.at, error: opened.error })
+            }}
+          >
+            <SquareTerminal aria-hidden="true" />
+            Sign in to {CLI_NAMES[signOut]}
+          </Button>
+        )}
+      </div>
+      {switched && (
+        <Swap id={`switch:${switched.from}:${running ? 'run' : 'last'}`}>
+          <p
+            data-switch
+            className="flex items-center gap-2 pl-8 text-meta text-muted-foreground"
+          >
+            <ArrowRightLeft aria-hidden="true" className="size-3 shrink-0" />
+            <span className="min-w-0">
+              {switchLine(switched)}
+              {running
+                ? `, so ${name(running.by)} took over.`
+                : last?.ok
+                  ? `, so ${name(last.by)} collected.`
+                  : `, and ${name(last?.by)} could not either.`}
+            </span>
+          </p>
+        </Swap>
       )}
-    </p>
+    </div>
   )
 }
 
@@ -843,15 +881,16 @@ function Setup() {
   return (
     <div className="mt-2">
       <p className="text-copy text-muted-foreground">
-        Pacenote has Claude Code read Slack with its own Slack connector, and
-        keeps a short list here of what people asked of you and what you said
-        you would do. Pacenote holds no Slack token for this, and nothing is
-        posted anywhere.
+        Pacenote has your AI read Slack with its own Slack connector, and keeps
+        a short list here of what people asked of you and what you said you
+        would do. Pacenote holds no Slack token for this, and nothing is posted
+        anywhere.
       </p>
       <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
         <SetupPart title="What it needs">
-          Claude Code on this Mac, signed in, with the Slack connector of your
-          claude.ai account.
+          Claude Code or Codex on this Mac, signed in, with Slack connected to
+          your claude.ai account or ChatGPT. With both, one takes over when the
+          other is at its limit.
         </SetupPart>
         <SetupPart title="What is read">
           Messages that mention you, threads you took part in, and what you said

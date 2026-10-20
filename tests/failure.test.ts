@@ -23,6 +23,12 @@ describe('why a reasoner run failed', () => {
       ['claude run failed: Claude AI usage limit reached|1760000000', 'limit'],
       ["codex run failed: You've hit your usage limit.", 'limit'],
       ['claude run failed: API Error: 429 rate_limit_error', 'limit'],
+      ['Usage limit reached', 'limit'],
+      ['Fable limit reached', 'limit'],
+      ['You have reached your weekly usage limit', 'limit'],
+      ['{"type":"usage_limit_reached"}', 'limit'],
+      ['workspace_member_credits_depleted', 'limit'],
+      ['Context limit reached', 'other'],
       [
         'claude run failed: API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}',
         'unavailable',

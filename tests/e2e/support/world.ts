@@ -27,6 +27,8 @@ export interface ClaudeRule {
   tools?: { name: string; input?: unknown; result?: string }[]
   /** codex only: leaves a generated PNG, as codex does when it draws one */
   image?: boolean
+  /** Only this CLI follows the rule; both do without it */
+  cli?: 'claude' | 'codex'
 }
 
 export interface ClaudeCall {

@@ -145,7 +145,7 @@ import {
   resumeCommand,
   resumeSession,
   sessionFile,
-  signInClaude,
+  signInCli,
   startSession,
   terminalOf,
   type HandoffOptions,
@@ -154,6 +154,9 @@ import {
 import { KeepAwake } from './keep-awake.js'
 import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
+import { codexDefaults, type Bins } from './headless.js'
+import { OwnAi, refusalOf } from './own-ai.js'
+import { cliReadiness, type OwnAiView } from '../../../src/tasks/own-ai.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
 import { SandboxSignIn } from './sandbox-login.js'
@@ -418,7 +421,27 @@ function mcpLaunch() {
 /** Adds the MCP server to Claude Code and Codex, and checks they reach it */
 const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
 
-/** Collect now on the Todo screen: Claude Code reads Slack, read only */
+/**
+ * Pacenote's own work (Collect now, Looks done, Write it up, reply drafts):
+ * the CLI chosen in Settings > Todo, and the other one when it cannot
+ */
+const ownAi = new OwnAi({
+  dataDir,
+  chosen: () =>
+    settings.effectiveEnv().TASKS_AI === 'codex' ? 'codex' : 'claude',
+  fallback: () => settings.effectiveEnv().TASKS_AI_FALLBACK !== 'off',
+  onChange: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
+})
+/** The CLIs' commands on this Mac */
+const cliBins = (): Bins => {
+  const env = settings.effectiveEnv()
+  return {
+    claude: env.CLAUDE_BIN?.trim() || 'claude',
+    codex: env.CODEX_BIN?.trim() || 'codex',
+  }
+}
+
+/** Collect now on the Todo screen: the AI reads Slack, read only */
 const taskCollector = new TaskCollector({
   launch: () => {
     const { command, args, env } = mcpLaunch()
@@ -426,7 +449,10 @@ const taskCollector = new TaskCollector({
   },
   toolPath,
   cwd: dataDir,
-  recorder: (startedAt) => recordCollection(history, startedAt),
+  ai: ownAi,
+  bins: cliBins,
+  codex: () => codexDefaults(process.env),
+  recorder: (startedAt, cli) => recordCollection(history, startedAt, cli),
   last: latestCollection(dataDir, collectionRuns(90)),
 })
 
@@ -878,6 +904,7 @@ function registerBotIpc(): void {
     return {
       settings: current,
       collect: taskCollector.state,
+      ai: ownAi.now(),
       collections: recentCollections(dataDir, collectionRuns(7)),
       ...view,
       working: working(open),
@@ -1050,18 +1077,26 @@ function registerBotIpc(): void {
       const { view, commits } = counted
       if (view.areas.length === 0)
         return { error: 'There is nothing to write up yet.' }
-      const result = await writeRecap({
-        bin: env().CLAUDE_BIN?.trim() || 'claude',
-        toolPath: toolPath(),
-        cwd: dataDir,
-        prompt: recapPrompt(view, periodWords(view), commits),
-      })
-      // Spent whether it wrote or not, for the Overview's tokens
-      if (result.usage)
-        keepRecapSpend(dataDir, {
-          at: new Date().toISOString(),
-          usage: result.usage,
+      const prompt = recapPrompt(view, periodWords(view), commits)
+      const ran = await ownAi.run(async (cli) => {
+        const result = await writeRecap({
+          cli,
+          bin: cliBins()[cli],
+          codex: codexDefaults(process.env),
+          toolPath: toolPath(),
+          cwd: dataDir,
+          prompt,
         })
+        // Spent whether it wrote or not, for the Overview's tokens
+        if (result.usage)
+          keepRecapSpend(dataDir, {
+            at: new Date().toISOString(),
+            usage: result.usage,
+          })
+        return result
+      }, refusalOf)
+      if ('resting' in ran) return { error: 'Both AIs are resting.' }
+      const { result } = ran
       if ('error' in result) {
         log.warn(`Could not write up the recap of ${key}: ${result.error}`)
         return { error: result.error }
@@ -1069,7 +1104,8 @@ function registerBotIpc(): void {
       keepWritten(dataDir, which, key, {
         text: result.text,
         at: new Date().toISOString(),
-        by: 'claude',
+        by: ran.by,
+        ...(ran.switched ? { switched: ran.switched } : {}),
       })
       return { view: (await countRecapNow(which, key))?.view }
     }
@@ -1132,11 +1168,12 @@ function registerBotIpc(): void {
     terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
   })
-  // A collection signed out: claude auth login, in your terminal
-  ipcMain.handle('pacenote:tasks:sign-in', async (event) => {
+  // Pacenote's own work signed out: claude auth login (or codex login), in
+  // your terminal
+  ipcMain.handle('pacenote:tasks:sign-in', async (event, cli: unknown) => {
     if (!fromMainWindow(event)) return undefined
     try {
-      await signInClaude(handoff())
+      await signInCli(handoff(), cli === 'codex' ? 'codex' : 'claude')
       return {}
     } catch (error) {
       return { error: (error as Error).message }
@@ -1265,13 +1302,30 @@ function registerBotIpc(): void {
           entry.branch ?? sessionNow(entry).branch,
           toolPath()
         )
-        const result = items.length
-          ? await judge({
-              bin: env().CLAUDE_BIN?.trim() || 'claude',
-              toolPath: toolPath(),
-              cwd: dataDir,
-              prompt: judgePrompt(task, items, pr),
-            })
+        const ran = items.length
+          ? await ownAi.run(
+              (cli) =>
+                judge({
+                  cli,
+                  bin: cliBins()[cli],
+                  codex: codexDefaults(process.env),
+                  toolPath: toolPath(),
+                  cwd: dataDir,
+                  prompt: judgePrompt(task, items, pr),
+                }),
+              refusalOf,
+              { background: true }
+            )
+          : undefined
+        // Both at their limits: judged once one of them is back
+        if (ran && 'resting' in ran) {
+          log.info(
+            `Not judging whether ${task.id} looks done until ${ran.resting}: both AIs are resting.`
+          )
+          break
+        }
+        const result = ran
+          ? ran.result
           : { error: 'its session has no log on this Mac' }
         // Kept either way, so the same quiet is not judged again.
         if ('error' in result)
@@ -1532,25 +1586,35 @@ function registerBotIpc(): void {
     drafting.add(id)
     try {
       const { command, args, env: launchEnv } = mcpLaunch()
-      const draft = await draftReply({
-        bin: env().CLAUDE_BIN?.trim() || 'claude',
-        launch: {
-          command,
-          args,
-          env: { ...launchEnv, PACENOTE_MCP_FROM_APP: '1' },
-        },
-        toolPath: toolPath(),
-        cwd: dataDir,
-        task: detail.task,
-        context: detail.context,
-      })
-      if ('error' in draft) return draft
+      const ran = await ownAi.run(
+        (cli) =>
+          draftReply({
+            cli,
+            bin: cliBins()[cli],
+            codex: codexDefaults(process.env),
+            launch: {
+              command,
+              args,
+              env: { ...launchEnv, PACENOTE_MCP_FROM_APP: '1' },
+            },
+            toolPath: toolPath(),
+            cwd: dataDir,
+            task: detail.task,
+            context: detail.context,
+          }),
+        refusalOf
+      )
+      if ('resting' in ran) return { error: 'Both AIs are resting.' }
+      const draft = ran.result
+      if ('error' in draft) return { error: draft.error }
       const entry: WorkEntry = {
         kind: 'draft',
         id: randomUUID(),
         task: id,
         at: new Date().toISOString(),
         text: draft.text,
+        by: ran.by,
+        ...(ran.switched ? { switched: ran.switched } : {}),
       }
       addWork(dataDir, entry)
       return { entry }
@@ -1677,8 +1741,8 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:setup:save', (event, patch: unknown) =>
     fromMainWindow(event) ? setup.save(patch) : null
   )
-  ipcMain.handle('pacenote:setup:detect', async (event) => {
-    if (!fromMainWindow(event)) return null
+  /** Whether each CLI is on this Mac and signed in, as you would run it */
+  const detectClis = async () => {
     const env = settings.effectiveEnv()
     const runner = (command: string) => (args: string[]) =>
       runProcess(command, args, {
@@ -1695,8 +1759,37 @@ function registerBotIpc(): void {
       cli('claude', env.CLAUDE_BIN),
       cli('codex', env.CODEX_BIN),
     ])
-    return { cli: { claude, codex }, sandbox: { unsupported: vmUnsupported() } }
+    return { claude, codex }
+  }
+  ipcMain.handle('pacenote:setup:detect', async (event) => {
+    if (!fromMainWindow(event)) return null
+    return {
+      cli: await detectClis(),
+      sandbox: { unsupported: vmUnsupported() },
+    }
   })
+  // Which CLI does Pacenote's own work now, without checking them
+  ipcMain.handle('pacenote:ai:now', (event) =>
+    fromMainWindow(event) ? ownAi.now() : null
+  )
+  // Settings > Todo: the CLIs that do Pacenote's own work, each with whether
+  // it is here and signed in, and what it last did
+  ipcMain.handle(
+    'pacenote:ai:state',
+    async (event): Promise<OwnAiView | null> => {
+      if (!fromMainWindow(event)) return null
+      const clis = await detectClis()
+      return {
+        chosen: ownAi.chosen(),
+        fallback: ownAi.fallback(),
+        clis: {
+          claude: cliReadiness(clis.claude),
+          codex: cliReadiness(clis.codex),
+        },
+        state: ownAi.state(),
+      }
+    }
+  )
   ipcMain.handle('pacenote:setup:claim-start', (event) =>
     hubCall(event, () =>
       claimStep(async () => {

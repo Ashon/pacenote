@@ -13,7 +13,13 @@ const CAUSES: [FailureCause, RegExp][] = [
     'auth',
     /\b401\b|failed to authenticate|authentication_error|invalid (?:x-)?api[ -]key|oauth (?:access )?token (?:is invalid|has expired|has been revoked)|oauth session expired|oauth refresh token is no longer valid|not logged in|please (?:run \/login|log ?in)|run (?:\/login|claude auth login)|\bunauthorized\b|invalid_grant/i,
   ],
-  ['limit', /\b429\b|rate[ _]limit|usage limit|quota|credit balance/i],
+  // Claude Code also says "Usage limit reached", "Fable limit reached"
+  // (a model's own) and "your weekly usage limit"; codex "usage_limit_reached"
+  // and "credits_depleted". A context or size limit is not one.
+  [
+    'limit',
+    /\b429\b|rate[ _]limit|usage[ _]limit|\b(?!context\b|size\b|recursion\b|stack\b|depth\b)\w+ limit reached|quota|credit balance|credits_depleted/i,
+  ],
   [
     'setup',
     /no image \S+ in |is missing \(.*\): prepare first|pacenote-vm not found|executable not found/i,

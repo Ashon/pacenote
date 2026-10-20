@@ -21,6 +21,7 @@ import {
 } from 'playwright-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
+import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
@@ -1963,7 +1964,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
         new Date(Date.now() - 60_000)
       )
-      .finish('failed', { reads: 0, error: SIGNED_OUT })
+      .finish('failed', { reads: 0, error: SIGNED_OUT.claude })
     // The terminal is a stand-in that keeps what it was given to open
     const opened = path.join(root, 'opened.log')
     const opener = path.join(root, 'open-terminal')
@@ -1976,7 +1977,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
     // Todo says it is Claude Code on this Mac, and offers its sign-in.
     await page.evaluate("window.location.hash = '#/tasks'")
-    await page.getByText(SIGNED_OUT).first().waitFor()
+    await page.getByText(SIGNED_OUT.claude).first().waitFor()
     const signIn = page.getByRole('button', { name: 'Sign in to Claude Code' })
     await signIn.waitFor()
     await page.screenshot({
@@ -1992,6 +1993,156 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     )
     expect(script).toContain(`'${world.claudeBin}' auth login`)
   })
+
+  it("hands Pacenote's own work to Codex while Claude Code is at its usage limit, and says so in Todo and Settings", async () => {
+    // Claude Code is at its limit for everything; Codex collects through
+    // ChatGPT's Slack app and drafts.
+    world = await World.create([
+      { cli: 'claude', match: '.', fail: 'Usage limit reached · resets 3pm' },
+      {
+        cli: 'codex',
+        match: "Collect the user's tasks",
+        tools: [
+          { name: 'mcp__pacenote__collect_context', result: '{}' },
+          { name: 'mcp__codex_apps__slack.slack_search_public' },
+          { name: 'mcp__codex_apps__slack.slack_read_thread' },
+          {
+            name: 'mcp__pacenote__add_tasks',
+            result: JSON.stringify({
+              added: [{ id: 'C0OPS:1', confidence: 'sure' }],
+              skipped: [],
+            }),
+          },
+        ],
+        answer: 'Added one task.',
+      },
+      {
+        cli: 'codex',
+        match: 'Draft a reply',
+        answer: 'Hi hyun, webhooks retry up to 5 times.',
+      },
+    ])
+    const { home } = world
+    const [question] = addTasks(
+      home,
+      [
+        {
+          title: 'Answer hyun about the webhook retry limit',
+          asked_by: 'hyun',
+          where: '#ops',
+          link: `https://acme.slack.com/archives/C0OPS/p${Math.floor(Date.now() / 1000) - 3600}000100`,
+          confidence: 'sure',
+          action: 'reply',
+          summary: 'hyun asked how many times webhooks retry.',
+        },
+      ],
+      { settings: { on: true, dms: false, exclude: [] } }
+    ).added
+    const page = await launch(world, {
+      settings: ['TASKS=on', `CODEX_BIN=${world.codexBin}`],
+      // The app runs the fake CLIs for its own work itself.
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+
+    // Settings > Todo: Pacenote's own work runs with Claude Code, and Codex
+    // takes over when it can't. Both are here and signed in.
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    await page.getByRole('heading', { name: "Pacenote's own work" }).waitFor()
+    const runWith = page.getByRole('radiogroup', { name: 'Run it with' })
+    expect(
+      await runWith
+        .getByRole('radio', { name: 'Claude Code' })
+        .getAttribute('aria-checked')
+    ).toBe('true')
+    const status = page.locator('[data-own-ai]')
+    await status
+      .locator('[data-cli="claude"]')
+      .getByText('Ready. It does the work.')
+      .waitFor()
+    await status
+      .locator('[data-cli="codex"]')
+      .getByText("Ready to take over when Claude Code can't.")
+      .waitFor()
+    // Short choices sit side by side, as on the storyboard.
+    await page.getByRole('radiogroup', { name: 'Open code tasks in' }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/own-ai-settings.png'),
+    })
+
+    // Collect now: Claude Code is at its limit, so Codex collects, in the
+    // same run, and the line says who did and why.
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page.getByRole('button', { name: 'Collect now' }).click()
+    const collected = page.locator('[data-collect-status]')
+    await collected.getByText('Added 1 task.').waitFor({ timeout: 20_000 })
+    await collected
+      .getByText(/by Codex\./)
+      .first()
+      .waitFor()
+    const switched = await collected.locator('[data-switch]').textContent()
+    expect(switched).toMatch(
+      /^Claude Code was at its usage limit until (\w+ )?15:00, so Codex collected\.$/
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/own-ai-collected.png'),
+    })
+    const calls = world.claudeCalls()
+    const tried = calls.find((call) => call.args.includes('-p'))!
+    expect(tried.args).toContain('/mcp__pacenote__collect_tasks')
+    const collecting = calls.find(
+      (call) => call.cli === 'codex' && call.prompt.includes('Collect the user')
+    )!
+    // Only ChatGPT's Slack app, without what changes or deletes, and only
+    // Pacenote's task tools
+    expect(collecting.args).toContain('apps._default.enabled=false')
+    expect(
+      collecting.args.some((arg) => /destructive_enabled=false$/.test(arg))
+    ).toBe(true)
+    expect(
+      collecting.args.find((arg) =>
+        arg.startsWith('mcp_servers.pacenote.enabled_tools=')
+      )
+    ).toContain('add_tasks')
+
+    // One run in the history: collected by Codex, with where it took over
+    const [run] = new HistoryReader(home).collections(
+      new Date(Date.now() - 60_000)
+    )
+    expect(run).toMatchObject({
+      status: 'succeeded',
+      attempts: 2,
+      backend: { reasoner: 'codex', sandbox: 'host' },
+      switched: { from: 'claude', unable: 'limit' },
+    })
+
+    // While Claude Code rests, a reply is drafted by Codex at once.
+    const before = world.claudeCalls().filter((c) => !c.cli).length
+    const asked = page.locator(`[data-task-row="${question!.id}"]`)
+    await asked.getByRole('button', { name: 'Draft a reply' }).click()
+    const draft = asked.locator('textarea')
+    await eventually(
+      'the draft by Codex',
+      async () =>
+        (await draft.inputValue()) === 'Hi hyun, webhooks retry up to 5 times.'
+    )
+    await asked.getByText(/drafted from the thread by Codex/).waitFor()
+    expect(world.claudeCalls().filter((c) => !c.cli)).toHaveLength(before)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/own-ai-draft.png'),
+    })
+
+    // Settings > Todo: Claude Code rests until its limit resets.
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    await status
+      .locator('[data-cli="claude"]')
+      .getByText(
+        /^At its usage limit until (\w+ )?15:00\. Codex does the work until then\.$/
+      )
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/own-ai-resting.png'),
+    })
+  }, 120_000)
 
   it('shows where you contribute once after a collection, keeps your fixes, and opens an area from its task', async () => {
     world = await World.create([])

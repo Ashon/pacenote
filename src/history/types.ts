@@ -1,4 +1,5 @@
 import type { FailureCause } from '../mention/failure.js'
+import type { Switch } from '../tasks/own-ai.js'
 import type { MessengerId } from '../messengers/ids.js'
 import type { TokenUsage } from './usage.js'
 
@@ -154,6 +155,11 @@ export interface CollectionRunRecord {
   /** What add_tasks kept, once it answered */
   found?: { added: number; maybe: number; skipped: number }
   error?: string
+  /**
+   * The CLI chosen could not collect, so the other one did (backend names
+   * the one that did)
+   */
+  switched?: Switch
 }
 
 /** Any run in the history */

@@ -91,7 +91,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     // Collect now: Claude Code reads Slack, read only, in the main process
     collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
     stopCollect: () => ipcRenderer.invoke('pacenote:tasks:collect-stop'),
-    signIn: () => ipcRenderer.invoke('pacenote:tasks:sign-in'),
+    signIn: (cli?: 'claude' | 'codex') =>
+      ipcRenderer.invoke('pacenote:tasks:sign-in', cli),
     // A task's detail, and continuing it: in a terminal (Claude Code or
     // Codex), or with a reply drafted for you to send
     detail: (id: string) => ipcRenderer.invoke('pacenote:tasks:detail', id),
@@ -119,6 +120,11 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:copy-reply', id, text),
     sessionLog: (entryId: string) =>
       ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
+  },
+  // Pacenote's own work: the CLIs that do it, and what each last did
+  ai: {
+    state: () => ipcRenderer.invoke('pacenote:ai:state'),
+    now: () => ipcRenderer.invoke('pacenote:ai:now'),
   },
   // You: where you contribute, and your fixes to your areas
   you: {

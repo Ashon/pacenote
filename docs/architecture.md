@@ -38,8 +38,9 @@ answer once, with the 👀 still on the mention, and never posts an answer twice
 
 ## Your tasks and AI tools
 
-Todo keeps what people ask of you in Slack. **Collect now** has Claude Code, headless, read your Slack with the Slack
-connector of your claude.ai account, read only, and add the tasks through Pacenote's MCP server: Pacenote holds no Slack
+Todo keeps what people ask of you in Slack. **Collect now** has Claude Code or Codex, headless, read your Slack with the
+Slack connector of your claude.ai account or ChatGPT's Slack app, read only, and add the tasks through Pacenote's MCP
+server (the other one takes over when the one chosen cannot, [below](tasks.md#which-ai-does-the-work)): Pacenote holds no Slack
 token for your tasks, and Pace's answers never read as you. Each collection is a run in the run history, with its tool
 calls and tokens but not what Slack returned. The same server, started by Claude Code or Codex over stdio, gives them
 your tasks and, while you share it, the run history.

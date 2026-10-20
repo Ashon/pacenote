@@ -23,6 +23,7 @@ import type {
   SetupStep,
   SetupView,
 } from '@src/settings/setup'
+import type { OwnAiNow, OwnAiView, OwnCli } from '@src/tasks/own-ai'
 import type {
   CollectionRecord,
   CollectOutcome,
@@ -132,6 +133,8 @@ declare global {
                 cli: WorkTool
               }
               collect: TasksCollect
+              /** Pacenote's own work: the CLI chosen, and what each last did */
+              ai: OwnAiNow
               /** The last 7 days' collections, newest first */
               collections: CollectionRecord[]
               /** Each open task's latest session: its tool and last activity */
@@ -156,11 +159,16 @@ declare global {
           decision: Omit<TaskDecision, 'at'> | null
         ): Promise<void>
         leaveOut(label: string): Promise<SettingsIssue[]>
-        /** Runs a collection (Claude Code, Slack read only) and waits for it */
+        /**
+         * Runs a collection (the AI chosen, Slack read only) and waits for it
+         */
         collect(): Promise<CollectOutcome | undefined>
         stopCollect(): Promise<void>
-        /** Opens claude auth login in your terminal, for Collect now */
-        signIn(): Promise<{ error?: string } | undefined>
+        /**
+         * Opens claude auth login (or codex login) in your terminal, for
+         * Pacenote's own work
+         */
+        signIn(cli?: OwnCli): Promise<{ error?: string } | undefined>
         /** A task with what came before it and its work log */
         detail(id: string): Promise<TaskDetail | null>
         /** A task that looks done: close it with how it ended, or not yet */
@@ -212,6 +220,13 @@ declare global {
         sessionLog(
           entryId: string
         ): Promise<{ items?: SessionItem[]; error?: string } | undefined>
+      }
+      /** Pacenote's own work: the CLIs that do it (Settings > Todo) */
+      ai: {
+        /** Each CLI checked on this Mac, with what it last did */
+        state(): Promise<OwnAiView | null>
+        /** The CLI chosen and what each last did, without checking them */
+        now(): Promise<OwnAiNow | null>
       }
       /**
        * You (src/you): where you contribute, from your tasks and sessions.

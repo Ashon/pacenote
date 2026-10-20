@@ -1,20 +1,31 @@
-import { spawn } from 'node:child_process'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
 import { redactSecrets } from '../../../src/broker/redact.js'
-import { failureCause } from '../../../src/mention/failure.js'
-import { readTools, writeTools } from '../../../src/tasks/sources.js'
+import type { CodexDefaults } from '../../../src/reasoners/codex.js'
+import {
+  CLI_NAMES,
+  unableFrom,
+  type OwnCli,
+  type Unable,
+} from '../../../src/tasks/own-ai.js'
 import type { TaskContext, TaskView } from '../../../src/tasks/types.js'
+import {
+  connectorCommand,
+  exitError,
+  outputOf,
+  runHeadless,
+} from './headless.js'
 
 /**
- * A reply drafted for a task, for you to edit and send yourself: Claude Code,
- * headless, reads the task's thread with its Slack connector, read only, and
- * writes the reply in your voice. Nothing is posted: every tool that writes is
- * denied, and the draft only comes back here.
+ * A reply drafted for a task, for you to edit and send yourself: the CLI that
+ * does Pacenote's own work (own-ai.ts), headless, reads the task's thread with
+ * its Slack connector, read only, and writes the reply in your voice. Nothing
+ * is posted: every tool that writes is denied or never approved, and the draft
+ * only comes back here.
  */
 
 const TIMEOUT_MS = 3 * 60_000
 
-/** What Claude Code is asked: the task, what came before, and the rules */
+/** What the CLI is asked: the task, what came before, and the rules */
 export function draftPrompt(task: TaskView, context: TaskContext): string {
   const earlier = [
     ...context.thread.tasks,
@@ -53,105 +64,93 @@ export function draftPrompt(task: TaskView, context: TaskContext): string {
   )
 }
 
-/** claude -p with the Slack reads and nothing that writes */
+/** Pacenote's tools a draft may use: what came before the task */
+const DRAFT_TOOLS = ['task_context']
+
+/**
+ * The CLI headless, with the Slack reads and nothing that writes
+ * (headless.ts)
+ */
 export function draftCommand(
+  cli: OwnCli,
   bin: string,
-  launch: McpLaunch
+  launch: McpLaunch,
+  codex?: CodexDefaults
 ): [string, string[]] {
-  return [
-    bin,
-    [
-      '-p',
-      '--setting-sources',
-      'project',
-      '--mcp-config',
-      JSON.stringify({
-        mcpServers: { pacenote: { type: 'stdio', ...launch } },
-      }),
-      '--tools',
-      'ToolSearch',
-      '--permission-mode',
-      'default',
-      '--allowedTools',
-      'mcp__pacenote__task_context',
-      ...readTools(['slack']),
-      '--disallowedTools',
-      ...writeTools(),
-      '--no-session-persistence',
-      '--output-format',
-      'stream-json',
-      '--verbose',
-    ],
-  ]
+  return connectorCommand(cli, bin, {
+    launch,
+    tools: DRAFT_TOOLS,
+    sources: ['slack'],
+    codex,
+  })
 }
 
-/** The reply in Claude Code's stream-json output: its final result */
+/** How to sign a CLI in again, in a terminal */
+export const SIGN_IN: Record<OwnCli, string> = {
+  claude: 'Run claude in a terminal and sign in',
+  codex: 'Run codex login in a terminal',
+}
+
+/**
+ * The reply in the CLI's output (its final answer), or why there is none and
+ * whether the other CLI may draft it instead
+ */
 export function draftFrom(
+  cli: OwnCli,
   stdout: string
-): { text: string } | { error: string } {
-  for (const line of stdout.trim().split('\n').reverse()) {
-    let event: { type?: string; result?: string; is_error?: boolean }
-    try {
-      event = JSON.parse(line) as typeof event
-    } catch {
-      continue
+): { text: string } | { error: string; unable?: Unable } {
+  const name = CLI_NAMES[cli]
+  const output = outputOf(cli, stdout)
+  if (!output) return { error: `${name} stopped before it wrote a draft.` }
+  if ('text' in output) return { text: redactSecrets(output.text) }
+  const unable = unableFrom(output.error)
+  if (unable === 'auth')
+    return {
+      error: `${name} is not signed in. ${SIGN_IN[cli]}, then draft again.`,
+      unable,
     }
-    if (event.type !== 'result') continue
-    const text = (event.result ?? '').trim()
-    if (event.is_error || !text)
-      return {
-        error:
-          failureCause(text) === 'auth'
-            ? 'Claude Code is not signed in. Run claude in a terminal and sign in, then draft again.'
-            : text.split('\n')[0] || 'Claude Code wrote no draft.',
-      }
-    return { text: redactSecrets(text) }
-  }
-  return { error: 'Claude Code stopped before it wrote a draft.' }
+  const error = output.error.split('\n')[0] || `${name} wrote no draft.`
+  return unable ? { error, unable } : { error }
 }
 
 export async function draftReply(options: {
+  cli: OwnCli
   bin: string
+  codex?: CodexDefaults
   launch: McpLaunch
   toolPath: string
   cwd: string
   task: TaskView
   context: TaskContext
   timeoutMs?: number
-}): Promise<{ text: string } | { error: string }> {
-  const [command, args] = draftCommand(options.bin, options.launch)
-  return new Promise((resolve) => {
-    let stdout = ''
-    let stderr = ''
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: { ...process.env, PATH: options.toolPath },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      resolve({ error: 'The draft did not come in 3 minutes.' })
-    }, options.timeoutMs ?? TIMEOUT_MS)
-    child.on('error', (error) => {
-      clearTimeout(timer)
-      resolve({
-        error:
-          (error as NodeJS.ErrnoException).code === 'ENOENT'
-            ? 'Drafting needs Claude Code, signed in, with its Slack connector: claude is not on this Mac.'
-            : error.message,
-      })
-    })
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
-    child.on('close', () => {
-      clearTimeout(timer)
-      const draft = draftFrom(stdout)
-      resolve(
-        'error' in draft && !stdout.trim() && stderr.trim()
-          ? { error: stderr.trim().split('\n')[0]! }
-          : draft
-      )
-    })
-    child.stdin.end(draftPrompt(options.task, options.context))
+}): Promise<{ text: string } | { error: string; unable?: Unable }> {
+  const name = CLI_NAMES[options.cli]
+  const exit = await runHeadless({
+    command: draftCommand(
+      options.cli,
+      options.bin,
+      options.launch,
+      options.codex
+    ),
+    input: draftPrompt(options.task, options.context),
+    cwd: options.cwd,
+    toolPath: options.toolPath,
+    timeoutMs: options.timeoutMs ?? TIMEOUT_MS,
   })
+  if (exit.spawnError?.code === 'ENOENT')
+    return {
+      error: `Drafting needs ${name}, signed in, with its Slack connector: ${options.cli} is not on this Mac.`,
+      unable: 'missing',
+    }
+  if (exit.timedOut) return { error: 'The draft did not come in 3 minutes.' }
+  const draft = draftFrom(options.cli, exit.stdout)
+  if ('error' in draft && !exit.stdout.trim() && exit.stderr.trim()) {
+    const error = exitError(options.cli, exit, undefined, {
+      slow: '',
+      nothing: draft.error,
+    })
+    const unable = unableFrom(error)
+    return unable ? { error, unable } : { error }
+  }
+  return draft
 }

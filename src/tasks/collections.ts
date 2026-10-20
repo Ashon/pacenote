@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type { CollectionRunRecord } from '../history/types.js'
 import { runUsage } from '../history/usage.js'
+import { isOwnCli } from './own-ai.js'
 import { readJson } from './store.js'
 import type { CollectionRecord } from './types.js'
 
@@ -38,6 +39,8 @@ export function collectionRow(
     runId: run.id,
     reads: run.reads ?? 0,
     ...(usage ? { usage } : {}),
+    ...(isOwnCli(run.backend.reasoner) ? { by: run.backend.reasoner } : {}),
+    ...(run.switched ? { switched: run.switched } : {}),
   }
   return run.found
     ? { ...row, ok: true, ...run.found }

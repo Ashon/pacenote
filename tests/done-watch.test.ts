@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   dueForJudging,
-  judgeCommand,
   judgementFrom,
   judgePrompt,
 } from '../apps/desktop/src/done-watch.js'
+import { plainCommand } from '../apps/desktop/src/headless.js'
 import type {
   Proposal,
   TaskView,
@@ -93,7 +93,7 @@ describe('telling when a task looks done', () => {
   })
 
   it('asks Claude Code with no tools or MCP servers, about the task, its pull request and the end of its session', () => {
-    const [bin, args] = judgeCommand('claude')
+    const [bin, args] = plainCommand('claude', 'claude')
     expect(bin).toBe('claude')
     expect(args).toEqual(
       expect.arrayContaining([
@@ -127,29 +127,22 @@ describe('telling when a task looks done', () => {
   })
 
   it('reads the judgement out of the answer, and nothing out of an answer without one', () => {
-    const out = (result: string, extra = {}) =>
-      JSON.stringify({ type: 'result', is_error: false, result, ...extra })
     expect(
       judgementFrom(
-        out(
-          'Here it is:\n{"done": true, "summary": "Reviewed and merged.", "left": ["Add a test", 3, ""]}'
-        )
+        'Here it is:\n{"done": true, "summary": "Reviewed and merged.", "left": ["Add a test", 3, ""]}'
       )
     ).toEqual({
       done: true,
       summary: 'Reviewed and merged.',
       left: ['Add a test'],
     })
-    expect(judgementFrom(out('{"done": false}'))).toEqual({
+    expect(judgementFrom('{"done": false}')).toEqual({
       done: false,
       summary: undefined,
       left: undefined,
     })
-    expect(judgementFrom(out('I think it is done.'))).toBeUndefined()
-    expect(judgementFrom(out('{"done": "yes"}'))).toBeUndefined()
-    expect(
-      judgementFrom(out('{"done": true}', { is_error: true }))
-    ).toBeUndefined()
+    expect(judgementFrom('I think it is done.')).toBeUndefined()
+    expect(judgementFrom('{"done": "yes"}')).toBeUndefined()
     expect(judgementFrom('not json')).toBeUndefined()
   })
 

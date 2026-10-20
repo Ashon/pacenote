@@ -4,6 +4,7 @@ import {
   type CollectionRunRecord,
 } from '@history/types'
 import { newTokens, runUsage } from '@history/usage'
+import { CLI_NAMES, isOwnCli, UNABLE_WORDS } from '@src/tasks/own-ai'
 import type { TaskStatus } from '@src/tasks/types'
 import {
   CircleCheck,
@@ -37,6 +38,7 @@ import {
 import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
 import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
+import { switchLine } from './own-ai-status'
 import { CodeBlock } from './code-block'
 import { PacenoteMark } from './logo'
 import { Empty, Fact, UsageTip } from './run-facts'
@@ -149,15 +151,32 @@ function CollectionFacts({ run }: { run: CollectionRunRecord }) {
       />
       <Fact
         icon={<Cpu />}
-        label="Reasoner"
-        value={run.backend.reasoner}
-        hint={run.backend.sandbox === 'host' ? 'on your Mac' : undefined}
+        label="Collected by"
+        value={
+          isOwnCli(run.backend.reasoner)
+            ? CLI_NAMES[run.backend.reasoner]
+            : run.backend.reasoner
+        }
+        hint={
+          run.switched
+            ? `${CLI_NAMES[run.switched.from]} ${UNABLE_WORDS[run.switched.unable]}`
+            : run.backend.sandbox === 'host'
+              ? 'on your Mac'
+              : undefined
+        }
+        tip={run.switched && switchLine(run.switched)}
       />
       <Fact
         icon={<Plug />}
         label="Read Slack as"
         value={reads ? 'You' : '-'}
-        hint={reads ? "Claude's connector" : 'Nothing read'}
+        hint={
+          reads
+            ? run.backend.reasoner === 'codex'
+              ? "ChatGPT's Slack app"
+              : "Claude's connector"
+            : 'Nothing read'
+        }
       />
     </div>
   )

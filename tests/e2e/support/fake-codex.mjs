@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Stands in for `codex exec` in end-to-end tests (CODEX_BIN), by the same
-// rules as fake-claude.mjs ($FAKE_CLAUDE_DIR/script.json). It reads the prompt
-// from stdin as codex does (the instructions prepended to it), takes images
-// as --image=PATH files, records each call in $FAKE_CLAUDE_DIR/calls.jsonl
-// with cli "codex", and answers in codex's --json events: a tool call per
-// rule tool (mcp__server__tool as server and tool), the answer as an
+// rules as fake-claude.mjs ($FAKE_CLAUDE_DIR/script.json, a rule with cli
+// "claude" left to the fake claude). It reads the prompt from stdin as codex
+// does (the instructions prepended to it), takes images as --image=PATH
+// files, records each call in $FAKE_CLAUDE_DIR/calls.jsonl with cli "codex",
+// and answers in codex's --json events: a tool call per rule tool
+// (mcp__server__tool as server and tool), the answer as an
 // agent_message, and the tokens on turn.completed. A rule with "image" leaves
 // a generated PNG where codex keeps them ($CODEX_HOME or ~/.codex), and one
 // with "fail" ends the turn failed.
@@ -53,8 +54,10 @@ appendFileSync(
 
 const script = JSON.parse(readFileSync(path.join(dir, 'script.json'), 'utf8'))
 const rule =
-  (script.rules ?? []).find((r) =>
-    new RegExp(r.match, 'i').test(request || prompt)
+  (script.rules ?? []).find(
+    (r) =>
+      (!r.cli || r.cli === 'codex') &&
+      new RegExp(r.match, 'i').test(request || prompt)
   ) ?? {}
 if (rule.delayMs) await setTimeout(rule.delayMs)
 
