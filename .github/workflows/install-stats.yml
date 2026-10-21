@@ -1,0 +1,48 @@
+name: install stats
+
+# Once a day, how many install Pacenote, added as a line to installs.csv on the stats branch (scripts/install-stats.mjs):
+# Homebrew's own counts of new installs of the cask, which formulae.brew.sh keeps only as rolling 30, 90 and 365-day
+# totals, and the downloads of the release zips, which count upgrades too. Both are public numbers; the app reports
+# nothing.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-stats
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      # The first run starts the branch.
+      - name: add today's line to installs.csv
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" stats >/dev/null; then
+            git clone -q --branch stats --single-branch "https://github.com/${GITHUB_REPOSITORY}.git" stats
+          else
+            git init -q -b stats stats
+          fi
+          node scripts/install-stats.mjs stats/installs.csv
+          cd stats
+          git add installs.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "installs on $(date -u +%F)"
+          git push -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" stats
