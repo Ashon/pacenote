@@ -229,7 +229,7 @@ const NODES = {
   n5: {
     lane: 'pacenote',
     t: 5,
-    text: 'Next task, with how #482 ended',
+    text: 'On the Air, with #482',
     wide: 'above',
   },
   n6: { lane: 'codex', t: 6, text: 'Session in Codex' },

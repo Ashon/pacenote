@@ -88,18 +88,19 @@
       <section class="block" aria-labelledby="loop-title">
         <h2 id="loop-title">Every tool reports back to Pacenote</h2>
         <p>Asks come in from Slack threads, work happens in Claude Code or Codex, and each one tells Pacenote how it ended.
-          It all stays on your Mac as one history, so the next task starts with what came before, in either tool.</p>
+          It all stays as one history, on your Mac or on both of your Macs, so the next task starts with what came before,
+          in either tool, on either Mac.</p>
         <figure class="converge" data-converge>
           <div class="converge-stage" aria-hidden="true"></div>
           <p class="converge-caption" aria-hidden="true"></p>
-          <ol class="converge-list" aria-label="Two tasks, two tools, one history">
+          <ol class="converge-list" aria-label="Two tasks, two tools, two Macs, one history">
             <li>mina asks you in Slack, and the ask lands on your Todo.</li>
             <li>Pacenote hands it to a Claude Code session, with the thread.</li>
             <li>Claude Code tells Pacenote how it ended.</li>
             <li>Pacenote drafts the reply in the thread. You send it.</li>
-            <li>hyun asks in another thread, and that lands on your Todo too.</li>
-            <li>Pacenote hands it to Codex, with how mina's review ended.</li>
-            <li>Codex tells Pacenote how it ended. Two tools, one history.</li>
+            <li>Now on your MacBook Air, hyun asks in another thread. It lands on the same Todo.</li>
+            <li>Pacenote hands it to Codex there, with how mina's review ended.</li>
+            <li>Codex tells Pacenote how it ended. Two tools, two Macs, one history.</li>
           </ol>
         </figure>
       </section>
@@ -136,6 +137,25 @@
             <div class="av av-taskview" role="img"
               aria-label="A task in Todo: mina wants a review of PR #482 before Thursday. Last time, a related review was done in Claude Code with 2 comments; your Claude Code session started just now; Pace answered in the same thread yesterday. A button reads Continue in Claude Code.">
               <div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev open" aria-hidden="true"><use href="icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">Review the payment retry PR</span><span class="av-meta"><span>mina asked you · #payments · 2h ago</span><span class="av-badge due">Thursday</span><span class="av-badge area">Payments</span></span><span class="av-mono">acme/payments</span></div></div><div class="av-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#square-terminal"/></svg>Continue in Claude Code</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Done</span><span class="av-btn secondary">Dismiss</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg></span></div></div><div class="av-context"><div>mina wants a review of PR #482 before Thursday.</div><div class="av-kv"><span class="av-k">Last time</span><span class="av-v"><b>Review the retry config change</b><span class="av-muted">Done in Claude Code · 2 comments · Sun</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#square-terminal"/></svg></span><span class="av-k">Your work</span><span class="av-v"><b>Claude Code session</b><span class="av-muted">started just now</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#square-terminal"/></svg></span><span class="av-k">In this thread</span><span class="av-v"><b>any retry timeouts in payments-worker?</b><span class="av-muted">Pace · Yesterday</span></span><span></span></div><div class="av-show">Show less</div></div></div>
+            </div>
+          </figure>
+        </div>
+        <div class="row">
+          <div class="copy">
+            <h2>Pick up on your other Mac</h2>
+            <p>With Pacenote on two Macs, your Todo and how each task went are the same on both, and Pace answers on the
+              one you're using. Lock it, close the lid or step away, and Pace moves to the other one. Your Macs find each
+              other on your network, with no server in between.</p>
+            <a class="more" href="how-it-works/#macs">How your Macs hand over</a>
+          </div>
+          <figure class="shot">
+            <div class="av av-macs" role="img"
+              aria-label="Settings, Your Macs: following the Mac you're using is on. MacBook Air, this Mac, answers here with claude@vm; MacBook Pro, locked, stands by. The status bar says Pace moved here from MacBook Pro.">
+              <div class="av-macs-head"><b>Your Macs</b><span>Pace answers on the Mac you're using, and Todo is the same on both.</span></div>
+              <div class="av-macs-row"><span>Follow the Mac you're using</span><span class="av-switch on"></span></div>
+              <div class="av-mac"><svg class="av-i" aria-hidden="true"><use href="icons.svg#laptop"/></svg><div><b>MacBook Air<small>This Mac</small></b><span><i class="av-dot"></i>Answering here · claude@vm</span></div></div>
+              <div class="av-mac"><svg class="av-i" aria-hidden="true"><use href="icons.svg#laptop"/></svg><div><b>MacBook Pro</b><span><i class="av-dot idle"></i>Standing by · locked</span></div><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#ellipsis"/></svg></span></div>
+              <div class="av-status"><span class="ok"><span class="av-dot"></span>Pace: Connected</span><span class="moved"><svg class="av-i s12" aria-hidden="true"><use href="icons.svg#arrow-right-left"/></svg>Pace moved here from MacBook Pro</span></div>
             </div>
           </figure>
         </div>

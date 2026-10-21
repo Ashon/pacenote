@@ -53,6 +53,7 @@
             <li><a href="#sandbox">On your Mac or in a sandbox</a></li>
             <li><a href="#todo">Your Todo</a></li>
             <li><a href="#handoff">Handing a task to Claude Code or Codex</a></li>
+            <li><a href="#macs">Moving between your Macs</a></li>
             <li><a href="#teams">Teammates and the hub</a></li>
             <li><a href="#also">Also in Pacenote</a></li>
           </ol>
@@ -63,7 +64,7 @@
         <h2 id="loop-title">The loop</h2>
         <p>Work reaches you in Slack threads and gets done in Claude Code or Codex. Each keeps its own history, so you
           paste the thread again, explain it again, and hunt for where you stopped. Pacenote keeps each task's history
-          together on your Mac, whichever tool did the work.</p>
+          together on your Mac, whichever tool did the work, and on your other Mac too if you use two.</p>
         <ol class="track" aria-label="A task, from the ask to how it ended">
           <li><b>Asked</b><span>A Slack thread and its link</span></li>
           <li><b>On your list</b><span>Collected into Todo, with a summary</span></li>
@@ -160,6 +161,22 @@
             </div>
           </figure>
         </div>
+      </section>
+
+      <section class="block" id="macs" aria-labelledby="macs-title">
+        <h2 id="macs-title">Moving between your Macs</h2>
+        <p>With Pacenote on two Macs and your own Slack app, turn on Settings &gt; Macs on each. They find each other on
+          your network, or by address over Tailscale, and one of them holds Pace's connection to Slack: the one you're
+          using. Lock it, put it to sleep, close its lid or leave it for five minutes, and the other one takes over. Use
+          both, and Pace stays where it is. The next Mac connects before the last one lets go, so no mention is missed or
+          answered twice.</p>
+        <p>Your Todo, your decisions, the work log, recaps and areas are the same on both, merged directly between them
+          as they change. A session stays on the Mac it runs on, and the other one offers to start one of its own.</p>
+        <p>The Macs know each other by a key from the Slack app they share, and take connections only from your own
+          networks. A new Mac sets itself up from the one you have: click Add&nbsp;a&nbsp;Mac there, choose
+          Connect&nbsp;to&nbsp;your&nbsp;other&nbsp;Mac in the new one's setup, check that both show the same six digits,
+          and Allow.</p>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/macs.md">Your Macs<span aria-hidden="true"> ↗</span></a>
       </section>
 
       <section class="block" id="teams" aria-labelledby="teams-title">

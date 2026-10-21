@@ -98,6 +98,18 @@ body {
   line-height: 1.6;
 }
 
+/* Lines break where they read well: headings in even lines, and no word left
+   alone at the end of a paragraph */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
+}
+
 img {
   display: block;
   max-width: 100%;
@@ -1191,6 +1203,112 @@ code {
 }
 .av-taskview > .av-task {
   border-top: 0;
+}
+
+/* Your Macs: Settings > Macs as the app draws it, and the status bar under it */
+.av-macs {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+}
+.av-macs-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.av-macs-head b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.av-macs-head span,
+.av-mac span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.av-macs-row,
+.av-mac {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.av-macs-row > span:first-child {
+  flex: 1;
+}
+.av-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.av-switch.on {
+  background: var(--primary);
+}
+.av-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--card);
+}
+.av-switch.on::after {
+  left: 16px;
+}
+.av-mac > .av-i {
+  color: var(--muted-foreground);
+}
+.av-mac > div {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.av-mac b {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.av-mac small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.av-mac span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.av-mac .av-dot {
+  width: 6px;
+  height: 6px;
+}
+.av-mac .av-dot.idle {
+  background: var(--muted-foreground);
+  opacity: 0.5;
+}
+/* Kept on a phone too, unlike the window's: it says where Pace went */
+.av-macs .av-status {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 34px;
+  padding: 8px 20px;
+  row-gap: 4px;
+  background: var(--canvas);
+}
+.av-macs .av-status .moved {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 /* Motion controls: pause, play or replay an animation that runs by itself (WCAG 2.2.2) */

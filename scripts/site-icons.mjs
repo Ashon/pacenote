@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
  * tests/site.test.ts checks that every one it names is in the sprite.
  */
 const ICONS = [
+  'arrow-right-left',
   'at-sign',
   'bot',
   'calendar-check',
@@ -28,6 +29,7 @@ const ICONS = [
   'external-link',
   'folder-open',
   'history',
+  'laptop',
   'layout-dashboard',
   'list-checks',
   'message-square',
