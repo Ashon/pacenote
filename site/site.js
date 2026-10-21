@@ -1,8 +1,26 @@
-// Every page of pacenote.dev loads this: the copy buttons, the track's line,
-// and the two animations, "every tool reports back to Pacenote" on the home
-// page and "one answer, end to end" on How it works. They move only transform
-// and opacity (the compositor's properties, smooth at any refresh rate), run
-// only while on screen, can be paused, and hold still under reduced motion.
+// Every page of pacenote.dev loads this: the visit count, the copy buttons,
+// the track's line, and the two animations, "every tool reports back to
+// Pacenote" on the home page and "one answer, end to end" on How it works.
+// They move only transform and opacity (the compositor's properties, smooth
+// at any refresh rate), run only while on screen, can be paused, and hold
+// still under reduced motion.
+
+// Visits to pacenote.dev are counted with Google Analytics, as the Privacy
+// page says; a local preview of the site counts nothing, and the app has none.
+const ANALYTICS_ID = 'G-HSPB6E8SST'
+if (location.hostname === 'pacenote.dev') {
+  window.dataLayer = window.dataLayer || []
+  // gtag.js reads each call as an arguments object, not an array.
+  window.gtag = function () {
+    window.dataLayer.push(arguments)
+  }
+  window.gtag('js', new Date())
+  window.gtag('config', ANALYTICS_ID)
+  const tag = document.createElement('script')
+  tag.async = true
+  tag.src = `https://www.googletagmanager.com/gtag/js?id=${ANALYTICS_ID}`
+  document.head.append(tag)
+}
 
 // Copy the install command; the status line says so for screen readers too.
 for (const button of document.querySelectorAll('[data-copy]')) {
