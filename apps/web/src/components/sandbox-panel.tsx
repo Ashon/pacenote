@@ -6,7 +6,6 @@ import {
   type SandboxJob,
   type SandboxJobKind,
   type SandboxStatus,
-  type VmImageStatus,
 } from '@src/sandbox/types'
 import {
   CircleCheck,
@@ -27,7 +26,9 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { botControl, useSupervisor, type useSandbox } from '@/lib/desktop'
 import { formatDuration, formatRelative } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './sandbox-panel.text'
 
 type Sandbox = ReturnType<typeof useSandbox>
 
@@ -82,6 +83,7 @@ export function JobButton({
   /** The next step to take, rather than one to run again */
   primary?: boolean
 }) {
+  const t = useText(text)
   const { job, run } = sandbox
   const running = job?.state === 'running'
   return (
@@ -89,7 +91,7 @@ export function JobButton({
       size="xs"
       variant={primary ? 'default' : 'outline'}
       disabled={running}
-      title={`${SANDBOX_JOBS[kind].help} From the repository: pnpm ${SANDBOX_JOBS[kind].script}`}
+      title={t.jobTip(SANDBOX_JOBS[kind].help, SANDBOX_JOBS[kind].script)}
       onClick={() => run(kind)}
     >
       {running && job?.kind === kind && (
@@ -112,6 +114,7 @@ function Readiness({
   busyText: string
   needs: string
 }) {
+  const t = useText(text)
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       {busy ? (
@@ -119,7 +122,7 @@ function Readiness({
       ) : (
         <Dot ok={ready} warn />
       )}
-      {busy ? busyText : ready ? 'Ready' : needs}
+      {busy ? busyText : ready ? t.ready : needs}
     </span>
   )
 }
@@ -129,20 +132,20 @@ function Readiness({
  * sets it up, so it can be set up before it is chosen
  */
 export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
+  const t = useText(text)
   const { status, job } = sandbox
   const vm = status?.vm
-  if (!status) return <span className="text-muted-foreground">Checking</span>
+  if (!status)
+    return <span className="text-muted-foreground">{t.checking}</span>
   if (!vm) return null
   if (vm.unsupported)
-    return (
-      <span className="text-muted-foreground">Not available on this Mac</span>
-    )
+    return <span className="text-muted-foreground">{t.unsupported}</span>
   if (!vm.helper.ok)
     return (
       <span className="flex min-w-0 items-center gap-1.5">
         <Dot ok={false} />
         <span className="truncate" title={vm.helper.error}>
-          pacenote-vm did not answer
+          {t.helperDown}
         </span>
       </span>
     )
@@ -156,8 +159,8 @@ export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
       <Readiness
         busy={job?.state === 'running' && job.kind === 'vm'}
         ready={ready}
-        busyText="Setting up"
-        needs={outdated ? 'Update needed' : 'Needs setup'}
+        busyText={t.settingUp}
+        needs={outdated ? t.updateNeeded : t.needsSetup}
       />
       <span className="ml-auto">
         <JobButton sandbox={sandbox} kind="vm" primary={!ready} />
@@ -177,6 +180,7 @@ export function EnvironmentDetails({
   sandbox: Sandbox
   chosen: boolean
 }) {
+  const t = useText(text)
   const { status, loading, refresh } = sandbox
   const vm = status?.vm
   return (
@@ -186,8 +190,7 @@ export function EnvironmentDetails({
         <div className="mt-3 overflow-hidden rounded-lg bg-well">
           <div className="flex items-center gap-2 py-1 pr-1.5 pl-4 text-meta text-muted-foreground">
             <span className="min-w-0 flex-1">
-              Built-in sandbox on this Mac, checked{' '}
-              {formatRelative(status.checkedAt)}
+              {t.checked(formatRelative(status.checkedAt))}
             </span>
             <Button
               size="icon-sm"
@@ -195,46 +198,54 @@ export function EnvironmentDetails({
               className="size-6"
               onClick={refresh}
               disabled={loading}
-              aria-label="Check again"
-              title="Check again"
+              aria-label={t.checkAgain}
+              title={t.checkAgain}
             >
               <RefreshCw className={cn(loading && 'animate-spin')} />
             </Button>
           </div>
           <div className="divide-y divide-card border-t border-card">
             {vm.unsupported ? (
-              <Line label="This Mac">
+              <Line label={t.thisMac}>
                 <Dot ok={false} />
                 {vm.unsupported}
               </Line>
             ) : (
               <>
-                <Line label="Linux kernel">
+                <Line label={t.kernel}>
                   <Dot ok={vm.kernel} warn />
-                  {vm.kernel
-                    ? 'Ready'
-                    : 'Not downloaded yet (about 14 MB, once)'}
+                  {vm.kernel ? t.ready : t.kernelMissing}
                 </Line>
-                <Line label="Init filesystem">
+                <Line label={t.initfs}>
                   <Dot ok={vm.initfs} warn />
-                  {vm.initfs ? 'Ready' : 'Not prepared yet'}
+                  {vm.initfs ? t.ready : t.initfsMissing}
                 </Line>
-                <Line label="Reasoner image">
+                <Line label={t.reasonerImage}>
                   <Dot ok={Boolean(vm.image?.current)} warn />
                   {vm.image
-                    ? `Built ${formatRelative(vm.image.createdAt)} on ${vm.image.base}${forAnother(vm.image)}`
-                    : 'Not built yet'}
+                    ? t.builtOn(
+                        formatRelative(vm.image.createdAt),
+                        vm.image.base,
+                        !vm.image.current
+                      )
+                    : t.notBuilt}
                 </Line>
-                <Line label="Diagram image">
+                <Line label={t.diagramImage}>
                   <Dot ok={Boolean(vm.renderer?.current)} warn />
                   {vm.renderer
-                    ? `Built ${formatRelative(vm.renderer.createdAt)}${forAnother(vm.renderer)}`
-                    : 'Not built yet (with diagrams on, setup builds it)'}
+                    ? t.built(
+                        formatRelative(vm.renderer.createdAt),
+                        !vm.renderer.current
+                      )
+                    : t.diagramNotBuilt}
                 </Line>
                 {vm.broker && (
-                  <Line label="Broker image">
+                  <Line label={t.brokerImage}>
                     <Dot ok={vm.broker.current} warn />
-                    {`Built ${formatRelative(vm.broker.createdAt)}${forAnother(vm.broker)}`}
+                    {t.built(
+                      formatRelative(vm.broker.createdAt),
+                      !vm.broker.current
+                    )}
                   </Line>
                 )}
                 <Line label="pacenote-vm">
@@ -250,13 +261,6 @@ export function EnvironmentDetails({
       )}
     </>
   )
-}
-
-/** What a built image's line adds when another version of Pacenote built it */
-function forAnother(image: VmImageStatus): string {
-  return image.current
-    ? ''
-    : ', for another version of Pacenote: set up again to update it'
 }
 
 /** A check's result as a line: a credential, a file, a login */
@@ -291,12 +295,13 @@ export function LoginChecks({ sandbox }: { sandbox: Sandbox }) {
 /** The ops broker: what it has and still needs, and the job that prepares it */
 export function BrokerCard({ sandbox }: { sandbox: Sandbox }) {
   const { status, loading, refresh } = sandbox
+  const t = useText(text)
   const checks = status?.checks.filter((check) => !check.login) ?? []
   const kinds: SandboxJobKind[] = ['kubeconfig']
   return (
     <Card
-      title="Broker"
-      help="Runs the tools with your credentials, in a VM of its own that starts with Pace. Its settings and files apply when Pace restarts."
+      title={t.broker}
+      help={t.brokerHelp}
       action={
         <Button
           size="sm"
@@ -305,7 +310,7 @@ export function BrokerCard({ sandbox }: { sandbox: Sandbox }) {
           disabled={loading}
         >
           <RefreshCw className={cn(loading && 'animate-spin')} />
-          Refresh
+          {t.refresh}
         </Button>
       }
     >
@@ -354,6 +359,7 @@ export function PendingList({
   pending: PendingApply[]
   sandbox: Sandbox
 }) {
+  const t = useText(text)
   const supervisor = useSupervisor()
   const restart = () => {
     const live =
@@ -366,9 +372,7 @@ export function PendingList({
     <div className="flex items-start gap-3 bg-status-interrupted/8 px-4 py-3 text-meta">
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-status-interrupted" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-status-interrupted">
-          Restart Pace needed
-        </p>
+        <p className="font-medium text-status-interrupted">{t.restartNeeded}</p>
         <ul className="mt-0.5 text-muted-foreground">
           {pending.map((item) => (
             <li key={item.reason}>{item.reason}</li>
@@ -376,9 +380,7 @@ export function PendingList({
         </ul>
       </div>
       {supervisor?.phase === 'external' ? (
-        <span className="text-muted-foreground">
-          Restart Pace in the terminal yourself
-        </span>
+        <span className="text-muted-foreground">{t.restartInTerminal}</span>
       ) : (
         <Button
           size="xs"
@@ -386,7 +388,7 @@ export function PendingList({
           disabled={sandbox.job?.state === 'running' || !supervisor}
           onClick={restart}
         >
-          Restart Pace
+          {t.restart}
         </Button>
       )}
     </div>
@@ -395,6 +397,7 @@ export function PendingList({
 
 /** Edits the domains allowed for outbound access */
 export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
+  const t = useText(text)
   const status = sandbox.status
   const saved = status?.allowlist.domains ?? []
   const required = status?.allowlist.required ?? []
@@ -419,30 +422,18 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
         setIssues(found)
         if (found.length === 0) {
           setDraft(undefined)
-          setNotice('Saved. The next request uses it.')
+          setNotice(t.saved)
           sandbox.refresh()
         }
       })
   }
 
   return (
-    <Card
-      title="Allowed outbound domains"
-      help={
-        <>
-          Domains the reasoner sandbox can reach directly through the proxy.
-          Only HTTPS (443) and only exact name matches are allowed. The next
-          request uses the saved list.
-        </>
-      }
-    >
+    <Card title={t.allowlist} help={t.allowlistHelp}>
       <div className="space-y-3 px-4 py-3">
         <p className="flex items-start gap-1.5 rounded-lg bg-status-interrupted/10 px-3 py-2 text-meta text-status-interrupted">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
-          Opening a domain lets the reasoner sandbox send data there directly.
-          For internal systems that need tokens (GitHub etc.), connect them as
-          ops-broker tools instead of opening the domain. (The tokens stay out
-          of the sandbox)
+          {t.allowlistWarning}
         </p>
         <ul className="divide-y divide-card overflow-hidden rounded-lg bg-well">
           {domains.map((domain) => {
@@ -457,11 +448,11 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
                 {isRequired && (
                   <span className="flex items-center gap-1 rounded-sm bg-muted px-1.5 text-caption text-muted-foreground">
                     <Lock className="size-2.5" />
-                    Needed by reasoner CLI
+                    {t.required}
                   </span>
                 )}
                 {!saved.includes(domain) && (
-                  <span className="text-caption text-primary">Added</span>
+                  <span className="text-caption text-primary">{t.added}</span>
                 )}
                 {issue && (
                   <span className="text-status-failed">{issue.message}</span>
@@ -471,7 +462,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
                   variant="ghost"
                   className="ml-auto size-6"
                   disabled={isRequired}
-                  aria-label={`Remove ${domain}`}
+                  aria-label={t.remove(domain)}
                   onClick={() =>
                     setDraft(domains.filter((item) => item !== domain))
                   }
@@ -497,7 +488,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
             disabled={!input.trim()}
           >
             <Plus />
-            Add
+            {t.add}
           </Button>
           <div className="ml-auto flex items-center gap-1.5">
             {dirty && (
@@ -507,12 +498,12 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
                 onClick={() => (setDraft(undefined), setIssues([]))}
               >
                 <RotateCcw />
-                Revert
+                {t.revert}
               </Button>
             )}
             <Button size="sm" onClick={save} disabled={!dirty}>
               <Save />
-              Save
+              {t.save}
             </Button>
           </div>
         </div>
@@ -568,6 +559,7 @@ function JobOutput({
   job: SandboxJob
   outputRef: React.RefObject<HTMLDivElement | null>
 }) {
+  const t = useText(text)
   const elapsed =
     (job.finishedAt ? Date.parse(job.finishedAt) : Date.now()) -
     Date.parse(job.startedAt)
@@ -583,12 +575,11 @@ function JobOutput({
         )}
         <span className="font-medium">{SANDBOX_JOBS[job.kind].label}</span>
         <span className="text-muted-foreground">
-          {job.state === 'running'
-            ? 'running'
-            : job.state === 'succeeded'
-              ? 'succeeded'
-              : `failed (code ${job.exitCode ?? '?'})`}
-          , {formatDuration(elapsed)}
+          {t.jobState(
+            job.state,
+            String(job.exitCode ?? '?'),
+            formatDuration(elapsed)
+          )}
         </span>
       </div>
       <ScrollArea

@@ -1,6 +1,8 @@
 import path from 'node:path'
 import type { CollectionRunRecord } from '../history/types.js'
 import { runUsage } from '../history/usage.js'
+import { localized } from '../i18n/locale.js'
+import { text } from './collections.text.js'
 import { isOwnCli } from './own-ai.js'
 import { readJson } from './store.js'
 import type { CollectionRecord } from './types.js'
@@ -47,7 +49,7 @@ export function collectionRow(
     : {
         ...row,
         ok: false,
-        error: run.error ?? 'The collection stopped before it finished.',
+        error: run.error ?? localized(text).stopped,
       }
 }
 

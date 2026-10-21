@@ -1,4 +1,6 @@
+import { getLocale, localized, type Locale } from '../i18n/locale.js'
 import { failureCause } from '../mention/failure.js'
+import { text } from './own-ai.text.js'
 
 /**
  * Pacenote's own work on this Mac (Collect now, the looks done judge, Recap's
@@ -32,10 +34,11 @@ export const CLI_NAMES: Record<OwnCli, string> = {
 
 /**
  * What a CLI with no Slack connector here says when work needs one: opencode,
- * until Pacenote connects it to Slack
+ * until Pacenote connects it to Slack. In the app's language unless one is
+ * given (English for a run record).
  */
-export const NO_SLACK_YET = (cli: OwnCli) =>
-  `${CLI_NAMES[cli]} reads no Slack in Pacenote yet.`
+export const NO_SLACK_YET = (cli: OwnCli, locale: Locale = getLocale()) =>
+  localized(text, locale).noSlackYet(CLI_NAMES[cli])
 
 export const isOwnCli = (value: unknown): value is OwnCli =>
   OWN_CLIS.includes(value as OwnCli)
@@ -137,20 +140,26 @@ export interface Switch {
 }
 
 /** Why a CLI could not, as a line reads it: "at its usage limit" */
-export const UNABLE_WORDS: Record<Unable, string> = {
-  limit: 'at its usage limit',
-  unavailable: 'unavailable',
-  auth: 'signed out',
-  missing: 'not on this Mac',
-  connector: 'without its Slack connector',
-}
+export const unableWords = (
+  unable: Unable,
+  locale: Locale = getLocale()
+): string => localized(text, locale).unable[unable]
 
 /**
- * A switch as a line reads it: "Claude Code was at its usage limit". With
- * until, the time it rests to goes after it in the UI.
+ * A switch as a line reads it: "Claude Code was at its usage limit", and with
+ * until (the time it rests to, as the screen says it) "... until 14:00". In
+ * the app's language unless one is given (English for a run record).
  */
-export const switchWords = (switched: Switch): string =>
-  `${CLI_NAMES[switched.from]} was ${UNABLE_WORDS[switched.unable]}`
+export const switchWords = (
+  switched: Switch,
+  until?: string,
+  locale: Locale = getLocale()
+): string =>
+  localized(text, locale).switched(
+    CLI_NAMES[switched.from],
+    switched.unable,
+    until
+  )
 
 /** A CLI on this Mac, as Settings shows it */
 export interface CliReadiness {

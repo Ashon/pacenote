@@ -1,5 +1,7 @@
+import { localized } from '@src/i18n/locale'
 import type { MacsView, MacView } from '@src/macs/types'
 import { useEffect, useState } from 'react'
+import { text } from './macs.text'
 
 /**
  * Your Macs and where Pace answers (Settings > Macs, the status bar), from
@@ -20,7 +22,7 @@ export const macsControl = () => window.pacenoteDesktop?.macs
 
 /** Another of your Macs by its id, as you named it */
 export const macNamed = (view: MacsView | undefined, id: string): string =>
-  view?.macs.find((mac) => mac.id === id)?.name ?? 'your other Mac'
+  view?.macs.find((mac) => mac.id === id)?.name ?? localized(text).otherMac
 
 /**
  * Where Pace answers, when another of your Macs is in the picture: this Mac

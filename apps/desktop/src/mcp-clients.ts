@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { homedir } from 'node:os'
+import { localized } from '../../../src/i18n/locale.js'
 import {
   MCP_CLIENT_IDS,
   MCP_CLIENT_NAMES,
@@ -11,6 +12,7 @@ import {
   type McpClientStatus,
   type McpLaunch,
 } from '../../../src/history/mcp-clients.js'
+import { text } from './mcp-clients.text.js'
 
 export interface CommandResult {
   code: number | null
@@ -68,6 +70,7 @@ export class McpClients {
   }
 
   async check(id: McpClientId): Promise<McpClientStatus> {
+    const t = localized(text)
     const ours = this.ourLaunch()
     const status = (rest: Omit<McpClientStatus, 'id' | 'name'>) => ({
       id,
@@ -86,7 +89,7 @@ export class McpClients {
         ? status({ state: 'connected' })
         : status({
             state: 'failed',
-            error: found.issue ?? 'Claude Code could not connect to it.',
+            error: found.issue ?? t.claudeCouldNot,
           })
     }
 
@@ -102,21 +105,13 @@ export class McpClients {
         ? status({ state: 'absent' })
         : status({ state: 'failed', error: firstLine(result) })
     const found = parseCodexGet(result.stdout)
-    if (!found)
-      return status({
-        state: 'failed',
-        error: 'Could not read what Codex has.',
-      })
+    if (!found) return status({ state: 'failed', error: t.codexUnreadable })
     if (!found.launch || !sameLaunch(found.launch, ours))
       return status({
         state: 'elsewhere',
         command: found.launch?.command ?? found.url,
       })
-    if (!found.enabled)
-      return status({
-        state: 'failed',
-        error: 'It is turned off in ~/.codex/config.toml (enabled = false).',
-      })
+    if (!found.enabled) return status({ state: 'failed', error: t.codexOff })
     const probe = await this.probe(found.launch)
     return probe.ok
       ? status({ state: 'connected', tools: probe.tools })
@@ -129,8 +124,7 @@ export class McpClients {
     if (!launch.ready)
       return {
         ...(await this.check(id)),
-        error:
-          'The server is not built yet: run pnpm bundle in the repository.',
+        error: localized(text).notBuilt,
       }
     const ours = this.ourLaunch()
     let added: CommandResult
@@ -198,7 +192,7 @@ function firstLine(result: CommandResult): string {
     .split('\n')
     .map((line) => line.replace(/^error:\s*/i, '').trim())
     .filter(Boolean)
-  return lines[0] ?? `Exited with code ${result.code}`
+  return lines[0] ?? localized(text).exited(result.code)
 }
 
 function runCommand(
@@ -232,6 +226,7 @@ export function probeMcp(
   launch: McpLaunch,
   options: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}
 ): Promise<ProbeResult> {
+  const t = localized(text)
   return new Promise((resolve) => {
     let settled = false
     let stdout = ''
@@ -252,7 +247,7 @@ export function probeMcp(
       () =>
         finish({
           ok: false,
-          error: `The server did not answer in ${timeoutMs / 1000} seconds.`,
+          error: t.noAnswer(timeoutMs / 1000),
         }),
       timeoutMs
     )
@@ -263,9 +258,7 @@ export function probeMcp(
     child.on('exit', (code) =>
       finish({
         ok: false,
-        error:
-          stderr.trim().split('\n').at(-1) ||
-          `The server exited with code ${code}.`,
+        error: stderr.trim().split('\n').at(-1) || t.serverExited(code),
       })
     )
     child.stdin.on('error', () => undefined)
@@ -291,7 +284,7 @@ export function probeMcp(
         if (message.error)
           return finish({
             ok: false,
-            error: message.error.message ?? 'The server refused.',
+            error: message.error.message ?? t.refused,
           })
         if (message.id === 1) {
           send({ method: 'notifications/initialized' })

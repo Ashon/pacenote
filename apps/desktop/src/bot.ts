@@ -1,12 +1,6 @@
 import { execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import { ANSWER_HERE } from '../../../src/macs/types.js'
@@ -20,6 +14,9 @@ import {
   startFailureProblem,
 } from './bot-readiness.js'
 import type { SupervisorState } from '../../../src/runtime/types.js'
+import { getLocale, localized } from '../../../src/i18n/locale.js'
+import { text } from './bot.text.js'
+import { readPrefs, writePrefs } from './language.js'
 
 export type { SupervisorState }
 
@@ -128,10 +125,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   }
 
   setAutoStart(value: boolean): void {
-    writeFileSync(
-      this.prefsFile,
-      `${JSON.stringify({ autoStartBot: value }, null, 2)}\n`
-    )
+    writePrefs(this.prefsFile, { autoStartBot: value })
     this.set({ autoStart: value })
   }
 
@@ -175,7 +169,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       this.set({
         phase: 'idle',
         pid: undefined,
-        message: 'Stopped',
+        message: localized(text).stopped,
         restarts: 0,
       })
     }
@@ -184,7 +178,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     this.stopRequested = true
     this.set({
       phase: 'stopping',
-      message: 'Finishing active requests before stopping.',
+      message: localized(text).finishing,
     })
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -233,7 +227,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   private build(): Promise<boolean> {
     this.set({
       phase: 'building',
-      message: 'Building Pace (pnpm build)',
+      message: localized(text).building,
       output: [],
     })
     return new Promise((resolve) => {
@@ -253,7 +247,11 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
             .slice(-OUTPUT_LINES)
           if (err) {
             this.options.log(`bot build failed: ${err.message}`)
-            this.set({ phase: 'failed', message: 'The build failed.', output })
+            this.set({
+              phase: 'failed',
+              message: localized(text).buildFailed,
+              output,
+            })
             resolve(false)
             return
           }
@@ -283,6 +281,9 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     if (this.options.standby?.()) env.PACENOTE_STANDBY = '1'
     else delete env.PACENOTE_STANDBY
     env.NODE_ENV = 'production'
+    // Pace writes what the app shows of it (setup issues, problems) in the
+    // app's language.
+    env.PACENOTE_LOCALE = getLocale()
     return env
   }
 
@@ -323,7 +324,11 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     const uptime = Date.now() - this.childStartedAt
     this.options.log(`bot exited code=${code} uptime=${uptime}ms`)
     if (this.stopRequested || this.disposed) {
-      this.set({ phase: 'idle', pid: undefined, message: 'Stopped' })
+      this.set({
+        phase: 'idle',
+        pid: undefined,
+        message: localized(text).stopped,
+      })
       return
     }
     // Tokens Slack or the hub rejected are a setup problem, which another try
@@ -348,17 +353,14 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       /^\S+\s+(?:DEBUG|INFO|WARN|ERROR)\s+\[[^\]]*\]\s*/,
       ''
     )
+    const t = localized(text)
     this.set({
       pid: undefined,
       restarts: retry.failures,
       retryAt: Date.now() + retry.delayMs,
       ...(uptime < STARTED_MS
-        ? {
-            phase: 'failed',
-            message:
-              `Pace stopped right after starting (code ${code}). ${last}`.trim(),
-          }
-        : { phase: 'crashed', message: `Pace exited (code ${code}).` }),
+        ? { phase: 'failed', message: t.stoppedAtStart(code, last) }
+        : { phase: 'crashed', message: t.exited(code) }),
     })
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined
@@ -387,14 +389,13 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       this.set({
         phase: 'external',
         pid: externalPid,
-        message:
-          'Pace is running elsewhere, such as a terminal. Stop it there to manage it here.',
+        message: localized(text).runningElsewhere,
       })
     } else if (!externalPid && this.state.phase === 'external') {
       this.set({
         phase: 'idle',
         pid: undefined,
-        message: 'Pace stopped running elsewhere.',
+        message: localized(text).stoppedElsewhere,
       })
       if (this.state.autoStart) void this.start()
     }
@@ -414,13 +415,9 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   }
 
   private readSettings(): Settings {
-    try {
-      const parsed = JSON.parse(
-        readFileSync(this.prefsFile, 'utf8')
-      ) as Partial<Settings>
-      return { autoStartBot: parsed.autoStartBot ?? true }
-    } catch {
-      return { autoStartBot: true }
+    const { autoStartBot } = readPrefs(this.prefsFile)
+    return {
+      autoStartBot: typeof autoStartBot === 'boolean' ? autoStartBot : true,
     }
   }
 

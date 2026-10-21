@@ -1,4 +1,6 @@
+import { useText } from '@/lib/i18n'
 import { useSlackYou } from '@/lib/tasks'
+import { text } from './slack-you.text'
 
 /**
  * Who Collect now reads Slack as, under the names and groups that mean you:
@@ -6,6 +8,7 @@ import { useSlackYou } from '@/lib/tasks'
  * answers (owners: Pace's allowed members, when set)
  */
 export function SlackYou({ owners }: { owners: string[] }) {
+  const t = useText(text)
   const { data: you } = useSlackYou()
   if (you === undefined) return null
   const name = you ? (you.name ?? you.id) : undefined
@@ -13,21 +16,17 @@ export function SlackYou({ owners }: { owners: string[] }) {
     <div className="border-t border-border px-4 py-3 text-meta text-muted-foreground">
       {you ? (
         <p>
-          In Slack you are{' '}
-          <span className="font-medium text-foreground">{name}</span>
-          {you.realName && you.realName !== you.name && ` (${you.realName})`}
-          {you.team && ` in ${you.team}`}, as Collect now last looked you up.
+          {t.youAre(
+            <span className="font-medium text-foreground">{name}</span>,
+            you.realName !== you.name ? you.realName : undefined,
+            you.team
+          )}
         </p>
       ) : (
-        <p>
-          The next collection looks up who you are in Slack, so a request that
-          calls you by your name counts.
-        </p>
+        <p>{t.notYet}</p>
       )}
       {you && owners.length > 0 && !owners.includes(you.id) && (
-        <p className="mt-1 text-status-interrupted">
-          Collect now reads Slack as {name}, not as the account Pace answers.
-        </p>
+        <p className="mt-1 text-status-interrupted">{t.notPace(name)}</p>
       )}
     </div>
   )

@@ -5,6 +5,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
 import { isTimeZone, systemTimeZone } from './messengers/text.js'
+import { localized, LOCALES, type Locale } from './i18n/locale.js'
 import { defaultHome } from './settings/home.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
@@ -30,6 +31,7 @@ import { REQUIRED_DOMAINS } from './sandbox/allowlist.js'
 import { loginDir, signedIn } from './sandbox/vm-login.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 import { settingName } from './settings/settings-file.js'
+import { text } from './config.text.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
 /** Pace's own tools in a reasoner VM, through the run's door (vm-broker.ts) */
@@ -43,6 +45,17 @@ const OWN_TOOLS_URL = 'http://127.0.0.1:8080/pace/mcp'
 export function sandboxSetting(value: unknown): unknown {
   return value === 'docker' ? 'vm' : value
 }
+
+/**
+ * A rule's message, read when a value is checked rather than when the schema
+ * is built, so it is in the language of that moment
+ */
+const says = (rule: keyof (typeof text)['en']['rules']) => ({
+  error: () => localized(text).rules[rule],
+})
+
+/** zod's own messages in the language of the moment, for safeParse */
+const inLanguage = () => ({ error: localized(text).zodIssue })
 
 const csv = z
   .string()
@@ -60,11 +73,7 @@ const userIds = csv.pipe(
     z
       .string()
       .transform((id) => id.toUpperCase())
-      .pipe(
-        z
-          .string()
-          .regex(/^[UW][A-Z0-9]+$/, 'Must be a Slack user ID (U... or W...)')
-      )
+      .pipe(z.string().regex(/^[UW][A-Z0-9]+$/, says('slackUserId')))
   )
 )
 
@@ -78,11 +87,11 @@ export const EnvSchema = z.object({
   SLACK_CONNECTION: z.enum(['app', 'hub']).default('app'),
   SLACK_BOT_TOKEN: z
     .string()
-    .startsWith('xoxb-', 'Must be a bot token starting with xoxb-')
+    .startsWith('xoxb-', says('botTokenPrefix'))
     .optional(),
   SLACK_APP_TOKEN: z
     .string()
-    .startsWith('xapp-', 'Must be an app token starting with xapp-')
+    .startsWith('xapp-', says('appTokenPrefix'))
     .optional(),
   /**
    * Slack's Web API base for your own app. Defaults to slack.com; GovSlack, or
@@ -91,10 +100,7 @@ export const EnvSchema = z.object({
   SLACK_API_URL: z
     .string()
     .url()
-    .refine(
-      isSecureOrLocalUrl,
-      'Must be an https URL (http only for localhost)'
-    )
+    .refine(isSecureOrLocalUrl, says('secureUrl'))
     .optional(),
   /**
    * The team hub (docs/team-hub.md). https, or http only for a hub on this
@@ -103,10 +109,7 @@ export const EnvSchema = z.object({
   HUB_URL: z
     .string()
     .url()
-    .refine(
-      isSecureOrLocalUrl,
-      'Must be an https URL (http only for localhost)'
-    )
+    .refine(isSecureOrLocalUrl, says('secureUrl'))
     .optional(),
   /**
    * This desktop's token for the hub, set by pairing in Settings > Messengers >
@@ -114,10 +117,7 @@ export const EnvSchema = z.object({
    */
   HUB_TOKEN: z
     .string()
-    .regex(
-      /^[0-9a-f]{64}$/,
-      'Must be the token pairing stored (64 hex characters)'
-    )
+    .regex(/^[0-9a-f]{64}$/, says('hubTokenFormat'))
     .optional(),
   /**
    * Reconnects if no pong arrives within this time after the bot sends a ping.
@@ -140,8 +140,13 @@ export const EnvSchema = z.object({
   /** Times in thread context are shown in it; this Mac's time zone if unset */
   TIMEZONE: z
     .string()
-    .refine(isTimeZone, 'Must be a time zone name, such as Asia/Seoul or UTC')
+    .refine(isTimeZone, says('timeZone'))
     .default(systemTimeZone),
+  /**
+   * The language of what Pace writes itself in Slack (answers follow the
+   * thread)
+   */
+  NOTES_LANGUAGE: z.enum(LOCALES).default('en'),
 
   /**
    * You: the one Slack member Pace answers through your own Slack app. Pace
@@ -166,11 +171,11 @@ export const EnvSchema = z.object({
   ),
   SANDBOX_MEMORY: z
     .string()
-    .regex(/^\d+(\.\d+)?[bkmg]?$/i, 'Must be a size such as 2g or 1536m')
+    .regex(/^\d+(\.\d+)?[bkmg]?$/i, says('memorySize'))
     .default('2g'),
   SANDBOX_CPUS: z
     .string()
-    .regex(/^\d+(\.\d+)?$/, 'Must be a CPU count (e.g. 2, 1.5)')
+    .regex(/^\d+(\.\d+)?$/, says('cpuCount'))
     .default('2'),
   SANDBOX_CLAUDE_OAUTH_TOKEN: z.string().optional(),
   SANDBOX_ANTHROPIC_API_KEY: z.string().optional(),
@@ -261,6 +266,8 @@ export interface Config {
         hubToken: string
       }
   timezone: string
+  /** The language of what Pace writes itself in Slack */
+  notesLocale: Locale
   mention: {
     /**
      * The one person Pace answers: you, with your own Slack app. With the team
@@ -413,7 +420,7 @@ export class MissingSettingError extends SettingError {
  * returns problems per setting.
  */
 export function checkConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
-  const parsed = EnvSchema.safeParse(providedValues(env))
+  const parsed = EnvSchema.safeParse(providedValues(env), inLanguage())
   if (!parsed.success) {
     return parsed.error.issues.map((issue) => ({
       key: issue.path[0] === undefined ? undefined : String(issue.path[0]),
@@ -445,14 +452,15 @@ export function checkConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = EnvSchema.safeParse(providedValues(env))
+  const t = localized(text)
+  const parsed = EnvSchema.safeParse(providedValues(env), inLanguage())
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map(
         (issue) => `- ${settingName(String(issue.path[0]))}: ${issue.message}`
       )
       .join('\n')
-    throw new Error(`Some settings are invalid.\n${issues}`)
+    throw new Error(t.invalid(issues))
   }
   const e = parsed.data
 
@@ -460,10 +468,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     ? expandHome(e.MENTION_WORKSPACE)
     : undefined
   if (workspace && !isDirectory(workspace)) {
-    throw new SettingError(
-      'MENTION_WORKSPACE',
-      `The reference directory must be an absolute path to an existing folder: ${workspace}`
-    )
+    throw new SettingError('MENTION_WORKSPACE', t.referenceDir(workspace))
   }
 
   const slack = slackConnection(e)
@@ -471,22 +476,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // in a public channel drives it as you. Answering anyone else, or a whole
   // workspace, is not a setting.
   if (env.MENTION_ANYONE?.trim().toLowerCase() === 'on')
-    throw new SettingError(
-      'MENTION_ALLOWED_USERS',
-      'MENTION_ANYONE is gone: Pace answers only you. Remove it from the settings file.'
-    )
+    throw new SettingError('MENTION_ALLOWED_USERS', t.mentionAnyone)
   const owners = [...new Set(e.MENTION_ALLOWED_USERS)]
   if (slack.kind === 'app' && owners.length === 0)
     throw new MissingSettingError(
       'MENTION_ALLOWED_USERS',
-      'Say who you are: add your own Slack member ID (in Slack, your profile, then ⋮, Copy member ID). Pace answers only you.',
+      t.whoYouAre,
       'U0STANDIN'
     )
   if (slack.kind === 'app' && owners.length > 1)
-    throw new SettingError(
-      'MENTION_ALLOWED_USERS',
-      'Add one Slack member ID, your own: Pace answers only you. Teammates each run their own Pace through the team hub.'
-    )
+    throw new SettingError('MENTION_ALLOWED_USERS', t.oneMember)
 
   const dataDir = e.PACENOTE_DATA_DIR
     ? path.resolve(expandHome(e.PACENOTE_DATA_DIR))
@@ -495,6 +494,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     slack,
     timezone: e.TIMEZONE,
+    notesLocale: e.NOTES_LANGUAGE,
     mention: {
       ...(slack.kind === 'app' ? { owner: owners[0]! } : {}),
       workspace,
@@ -538,17 +538,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 }
 
 function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
+  const t = localized(text)
   if (e.SLACK_CONNECTION === 'hub') {
     if (!e.HUB_URL)
-      throw new MissingSettingError(
-        'HUB_URL',
-        'Connecting through the team hub needs the hub URL.',
-        'https://hub.invalid'
-      )
+      throw new MissingSettingError('HUB_URL', t.hubUrl, 'https://hub.invalid')
     if (!e.HUB_TOKEN)
       throw new MissingSettingError(
         'HUB_TOKEN',
-        'This desktop is not paired with the hub yet. Connect in Settings > Messengers > Slack.',
+        t.notPaired,
         '0000000000000000000000000000000000000000000000000000000000000000'
       )
     return {
@@ -560,13 +557,13 @@ function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
   if (!e.SLACK_BOT_TOKEN)
     throw new MissingSettingError(
       'SLACK_BOT_TOKEN',
-      'Your own Slack app needs its bot token.',
+      t.botToken,
       'xoxb-stand-in'
     )
   if (!e.SLACK_APP_TOKEN)
     throw new MissingSettingError(
       'SLACK_APP_TOKEN',
-      'Your own Slack app needs its app token.',
+      t.appToken,
       'xapp-stand-in'
     )
   return {
@@ -620,10 +617,7 @@ function buildReasonerConfig(
     // ops-broker uses SSH keys, a cluster read token, and the work directory.
     // It stays off without the sandbox; Pace answers only you either way.
     if (e.REASONER_SANDBOX === 'none') {
-      throw new SettingError(
-        'OPS_TOOLS',
-        'Ops tools need the built-in sandbox: set the run environment to the built-in sandbox.'
-      )
+      throw new SettingError('OPS_TOOLS', localized(text).opsNeedSandbox)
     }
     // The broker is relayed into each VM at this address (vm-broker.ts).
     base.mcpServers = [{ name: 'ops', url: 'http://127.0.0.1:8080/mcp' }]

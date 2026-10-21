@@ -15,9 +15,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import { useText } from '@/lib/i18n'
 import { useMcpChange, useMcpClients } from '@/lib/mcp-clients'
 import { cn } from '@/lib/utils'
+import { localized } from '@src/i18n/locale'
 import { CodeBlock } from './code-block'
+import { text } from './mcp-connections.text'
 
 /**
  * Pacenote's MCP server in Claude Code and Codex: whether each has it and
@@ -26,6 +29,7 @@ import { CodeBlock } from './code-block'
  * can then do.
  */
 export function McpConnections({ about }: { about: string }) {
+  const t = useText(text)
   const clients = useMcpClients()
   return (
     <div className="space-y-2 border-t border-border px-4 py-3">
@@ -38,7 +42,7 @@ export function McpConnections({ about }: { about: string }) {
           onClick={() => void clients.refetch()}
         >
           <RotateCw className={cn(clients.isFetching && 'animate-spin')} />
-          Check again
+          {t.checkAgain}
         </Button>
       </div>
       <McpClientRows />
@@ -49,13 +53,14 @@ export function McpConnections({ about }: { about: string }) {
 
 /** One row per tool: its state and the change it needs */
 export function McpClientRows({ className }: { className?: string }) {
+  const t = useText(text)
   const clients = useMcpClients()
   const { busy, change } = useMcpChange()
   if (!clients.data)
     return (
       <p className="flex items-center gap-2 py-1 text-meta text-muted-foreground">
         <LoaderCircle className="size-3.5 animate-spin" />
-        Checking Claude Code and Codex…
+        {t.checking}
       </p>
     )
   return (
@@ -63,7 +68,8 @@ export function McpClientRows({ className }: { className?: string }) {
       className={cn('divide-y divide-border rounded-lg bg-well/60', className)}
     >
       {clients.data.map((client) => {
-        const action = ACTION[client.state]
+        // Not installed: nothing to change here
+        const action = client.state === 'missing' ? undefined : client.state
         return (
           <li
             key={client.id}
@@ -87,16 +93,11 @@ export function McpClientRows({ className }: { className?: string }) {
             {action && (
               <Button
                 size="xs"
-                variant={action.remove ? 'ghost' : 'outline'}
+                variant={ACTION[action] === 'disconnect' ? 'ghost' : 'outline'}
                 disabled={busy !== undefined}
-                onClick={() =>
-                  void change(
-                    client.id,
-                    action.remove ? 'disconnect' : 'connect'
-                  )
-                }
+                onClick={() => void change(client.id, ACTION[action])}
               >
-                {action.label}
+                {t.action[action]}
               </Button>
             )}
           </li>
@@ -106,29 +107,30 @@ export function McpClientRows({ className }: { className?: string }) {
   )
 }
 
-const ACTION: Partial<
-  Record<McpClientStatus['state'], { label: string; remove?: boolean }>
+/** The change a tool's state calls for; its words are text.action */
+const ACTION: Record<
+  Exclude<McpClientStatus['state'], 'missing'>,
+  'connect' | 'disconnect'
 > = {
-  absent: { label: 'Add' },
-  elsewhere: { label: 'Use this app' },
-  failed: { label: 'Add again' },
-  connected: { label: 'Remove', remove: true },
+  absent: 'connect',
+  elsewhere: 'connect',
+  failed: 'connect',
+  connected: 'disconnect',
 }
 
 function describe(client: McpClientStatus): string {
+  const t = localized(text)
   switch (client.state) {
     case 'missing':
-      return 'Not installed on this Mac.'
+      return t.missing
     case 'absent':
-      return 'Pacenote is not added yet.'
+      return t.absent
     case 'elsewhere':
-      return 'Added, but it runs another Pacenote:'
+      return t.elsewhere
     case 'connected':
-      return client.tools
-        ? `Connected: ${client.tools.length} tools.`
-        : 'Connected.'
+      return client.tools ? t.connectedTools(client.tools.length) : t.connected
     case 'failed':
-      return 'Added, but it does not reach Pacenote.'
+      return t.failed
   }
 }
 
@@ -159,6 +161,7 @@ function StateIcon({
 
 /** The commands to add the server by hand, with this app's paths */
 function ByHand() {
+  const t = useText(text)
   const [open, setOpen] = useState(false)
   const [launch, setLaunch] =
     useState<
@@ -190,20 +193,18 @@ function ByHand() {
   return (
     <>
       {!launch.ready && (
-        <p className="text-meta text-status-interrupted">
-          The server is not built yet: run pnpm bundle in the repository.
-        </p>
+        <p className="text-meta text-status-interrupted">{t.notBuilt}</p>
       )}
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger className="flex items-center gap-1 text-meta text-muted-foreground hover:text-foreground">
           <ChevronRight
             className={cn('size-3.5 transition-transform', open && 'rotate-90')}
           />
-          Add it by hand
+          {t.byHand}
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-3 pt-2">
-          <CodeBlock label="Claude Code: run in a terminal" code={claude} />
-          <CodeBlock label="Codex: add to ~/.codex/config.toml" code={codex} />
+          <CodeBlock label={t.claudeByHand} code={claude} />
+          <CodeBlock label={t.codexByHand} code={codex} />
         </CollapsibleContent>
       </Collapsible>
     </>

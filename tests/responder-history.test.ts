@@ -906,3 +906,83 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(problems.at(-1)).toBeUndefined()
   })
 })
+
+describe("Pace's own words in its notes language", () => {
+  const korean = (
+    messenger: MemoryMessenger,
+    answer: () => Promise<string>,
+    onReasoner?: (problem: string | undefined) => void
+  ) =>
+    new MentionResponder({
+      config: loadConfig({
+        SLACK_BOT_TOKEN: 'xoxb-1',
+        SLACK_APP_TOKEN: 'xapp-1',
+        MENTION_ALLOWED_USERS: 'U1',
+        NOTES_LANGUAGE: 'ko',
+      }),
+      messengers: [messenger],
+      reasoner: {
+        backend: 'claude',
+        sandbox: 'host',
+        canReadFiles: false,
+        mcpServerNames: [],
+        complete: answer,
+      },
+      log: createLogger('error'),
+      extractPdfText: async () => '',
+      onReasoner,
+    })
+  const ask = (userId = 'u1'): Mention => ({
+    messenger: 'slack',
+    conversation: 'room-1',
+    message: `${Math.random()}`,
+    thread: 't1',
+    inThread: true,
+    userId,
+    text: 'hi',
+    files: [],
+  })
+
+  it('says an AI wrote the answer, and with what', () => {
+    expect(aiNote('claude', 'ko')).toBe('_Pace가 Claude Code로 작성한 AI 답변_')
+    expect(aiNote('codex', 'ko')).toBe('_Pace가 Codex로 작성한 AI 답변_')
+    expect(aiNote('claude')).toBe('_AI answer by Pace, with Claude Code_')
+  })
+
+  it('puts the line under the answer and its notes to the asker in Korean', async () => {
+    const messenger = new MemoryMessenger()
+    messenger.render = (markdown: string) => [markdown]
+    const bot = korean(messenger, async () => '정상이에요.')
+    await bot.handle(ask())
+    await bot.handle(ask('u2'))
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.notices).toEqual([
+      '작업하고 있어요... (`claude@host`)',
+      '저는 저를 쓰는 분에게만 답해요.',
+    ])
+    expect(messenger.posts).toEqual([
+      `정상이에요.\n\n${aiNote('claude', 'ko')}`,
+    ])
+  })
+
+  it("tells the asker why it failed in Korean, and the status in the app's language", async () => {
+    const messenger = new MarkingMessenger()
+    messenger.render = (markdown: string) => [markdown]
+    const problems: (string | undefined)[] = []
+    const bot = korean(
+      messenger,
+      async () => {
+        throw new Error('claude run failed: usage limit reached')
+      },
+      (problem) => problems.push(problem)
+    )
+    await bot.handle(ask())
+    expect(await bot.drain(5_000)).toBe(true)
+    expect(messenger.notices).toEqual([
+      '답변을 만들지 못했어요. 지금은 Claude 사용 한도에 도달했어요. 나중에 다시 시도해 주세요.',
+    ])
+    expect(problems).toEqual([
+      expect.stringMatching(/^claude reached its usage limit\..*\(last at /),
+    ])
+  })
+})

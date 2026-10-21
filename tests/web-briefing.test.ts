@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { briefLines } from '../apps/web/src/lib/briefing.js'
+import { setLocale } from '../src/i18n/locale.js'
 import type { RecapItem, RecapView } from '../src/you/types.js'
 
 const payments = { id: 'a1', name: 'Payments' }
@@ -26,6 +27,8 @@ const today = (day: NonNullable<RecapView['day']>): RecapView => ({
 })
 
 describe("the Overview's briefing", () => {
+  afterEach(() => setLocale('en'))
+
   it('says what is next, what you are on and what got done, each opening its place', () => {
     const view = today({
       done: [task('Ship retry backoff'), commit('fix: keep the key')],
@@ -87,5 +90,47 @@ describe("the Overview's briefing", () => {
       )
     ).toEqual([])
     expect(briefLines(null, 3)).toEqual([])
+  })
+
+  it('reads in Korean, counting with counter words', () => {
+    setLocale('ko')
+    const view = today({
+      done: [task('Ship retry backoff'), commit('a'), commit('b')],
+      doing: [task('Webhook limits'), task('Release notes')],
+      next: [task('Review PR #482'), task('Answer hyun')],
+    })
+    expect(briefLines(view, 3)).toEqual([
+      {
+        label: '다음',
+        text: 'Review PR #482',
+        note: '열린 할 일 2개 더',
+        opens: { task: 'T-Review PR #482' },
+      },
+      {
+        label: '하는 중',
+        text: 'Webhook limits',
+        note: '외 1개',
+        opens: { task: 'T-Webhook limits' },
+      },
+      {
+        label: '오늘 완료',
+        text: 'Payments에서 할 일 1개, 커밋 2개',
+        opens: 'recap',
+      },
+    ])
+    expect(
+      briefLines(
+        today({
+          yesterday: [
+            commit('a'),
+            { title: 'b', area: { id: 'a2', name: 'Docs' } },
+          ],
+          done: [],
+          doing: [],
+          next: [],
+        }),
+        undefined
+      )
+    ).toEqual([{ label: '어제', text: '커밋 2개', opens: 'recap' }])
   })
 })

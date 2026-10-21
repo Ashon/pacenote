@@ -1,6 +1,8 @@
 import type { AreaRole, AreaView, YouView } from '@src/you/types'
+import { localized } from '@src/i18n/locale'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { text } from './you.text'
 
 /**
  * You: where you contribute, from the desktop app (none on the dev server).
@@ -43,41 +45,26 @@ export function useFixYou() {
   }
 }
 
-/** A role as its chip says it */
-export const ROLE_LABEL: Record<AreaRole, string> = {
-  build: 'Builds',
-  review: 'Reviews',
-  answer: 'Answers',
-  'on-call': 'On call',
-}
-
-const ROLE_VERB: Record<AreaRole, string> = {
-  build: 'build',
-  review: 'review',
-  answer: 'answer',
-  'on-call': 'are on call',
+/** A role as its chip says it: Builds */
+export function roleLabel(role: AreaRole): string {
+  return localized(text).roles[role]
 }
 
 /** How you contribute to an area, in a sentence: "You build and review" */
 export function roleSentence(area: Pick<AreaView, 'roles'>): string {
-  const verbs = area.roles.map((role) => ROLE_VERB[role.role])
-  if (verbs.length === 0) return 'You work here'
-  const last = verbs.pop()!
-  return `You ${verbs.length ? `${verbs.join(', ')} and ${last}` : last}`
+  return localized(text).roleSentence(area.roles.map((role) => role.role))
 }
 
 /** Who Pacenote found you as: "ashon in Slack and Ashon on GitHub" */
 export function accountsSentence(
   accounts: YouView['accounts']
 ): string | undefined {
-  const parts = [
-    accounts.slack && `${accounts.slack.name} in Slack`,
-    accounts.github && `${accounts.github} on GitHub`,
-    accounts.git && `${accounts.git} in git`,
-  ].filter((part): part is string => Boolean(part))
-  if (parts.length === 0) return undefined
-  const last = parts.pop()!
-  return parts.length ? `${parts.join(', ')} and ${last}` : last
+  if (!accounts.slack && !accounts.github && !accounts.git) return undefined
+  return localized(text).accounts({
+    slack: accounts.slack?.name,
+    github: accounts.github,
+    git: accounts.git,
+  })
 }
 
 /** An area's key on its row, as the You screen links to it */

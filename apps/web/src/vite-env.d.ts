@@ -17,6 +17,7 @@ import type {
   SettingsView,
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
+import type { LanguagePreference, LanguageState } from '@/lib/i18n'
 import type {
   ClaimedUser,
   CliCheck,
@@ -46,6 +47,7 @@ import type { RecapPeriod, RecapView } from '@src/you/types'
 import type { McpClientId, McpClientStatus } from '@src/history/mcp-clients'
 import type {
   AllowlistIssue,
+  LoginResult,
   SandboxJob,
   SandboxJobKind,
   SandboxStatus,
@@ -69,6 +71,11 @@ declare global {
        * Runs from the repository (Pacenote Dev) rather than the installed app
        */
       dev?: boolean
+      /** The app's language: the one chosen in Settings, or macOS's */
+      language: {
+        initial: LanguageState
+        set(preference: LanguagePreference): Promise<LanguageState>
+      }
       /** Writes a screen's render error to the app's log */
       reportError(report: { message: string; stack?: string }): Promise<void>
       /** Diagnostics text for a bug report, secrets taken out */
@@ -360,9 +367,7 @@ declare global {
          * Signs the sandbox's CLI in, inside a VM: its link (and code) come
          * through onLoginPrompt, and it resolves once it signed in or stopped
          */
-        login(
-          cli: 'claude' | 'codex'
-        ): Promise<{ ok: true } | { ok: false; error: string }>
+        login(cli: 'claude' | 'codex'): Promise<LoginResult>
         /** Claude: the code its page showed */
         loginCode(code: string): Promise<void>
         cancelLogin(): Promise<void>

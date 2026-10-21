@@ -249,12 +249,11 @@ describe('recording a collection', () => {
         skipped: 0,
         reads: 5,
       })
-      recordCollection(history, at(2)).finish({
-        at: at(2).toISOString(),
-        ok: false,
-        error: 'Stopped.',
-        reads: 2,
-      })
+      recordCollection(history, at(2)).finish(
+        { at: at(2).toISOString(), ok: false, error: 'Stopped.', reads: 2 },
+        1,
+        true
+      )
       recordCollection(history, at(3)).finish({
         at: at(3).toISOString(),
         ok: false,

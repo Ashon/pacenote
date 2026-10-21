@@ -1,12 +1,15 @@
 import { FolderOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useText } from '@/lib/i18n'
+import { text } from './repo-folders.text'
 
 /**
  * Settings > Todo: each repository's folder on this Mac, where its code tasks
  * open. Set the first time a task needs one; changed or forgotten here.
  */
 export function RepoFolders() {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const [repos, setRepos] = useState<Record<string, string>>()
   const [error, setError] = useState<string>()
@@ -21,10 +24,7 @@ export function RepoFolders() {
     const check = await bridge.chooseFolder(repo)
     if (!check) return
     if (check.error || !check.matches) {
-      setError(
-        check.error ??
-          `${check.path} is not a checkout of ${repo}${check.remote ? ` (its remote is ${check.remote})` : ''}.`
-      )
+      setError(check.error ?? t.notCheckout(check.path, repo, check.remote))
       return
     }
     setRepos(await bridge.setRepo(repo, check.path))
@@ -32,14 +32,10 @@ export function RepoFolders() {
 
   return (
     <div className="px-4 pb-4">
-      <p className="text-row">Repository folders</p>
-      <p className="mt-0.5 text-meta text-muted-foreground">
-        Where each repository&apos;s code tasks open. Chosen the first time a
-        task needs one; Pacenote checks that the folder&apos;s git remote
-        matches.
-      </p>
+      <p className="text-row">{t.title}</p>
+      <p className="mt-0.5 text-meta text-muted-foreground">{t.help}</p>
       {names.length === 0 ? (
-        <p className="mt-2 text-meta text-muted-foreground">None yet.</p>
+        <p className="mt-2 text-meta text-muted-foreground">{t.none}</p>
       ) : (
         <ul className="mt-2.5 divide-y divide-card overflow-hidden rounded-lg bg-well">
           {names.map((repo) => (
@@ -56,7 +52,7 @@ export function RepoFolders() {
                 onClick={() => void change(repo)}
               >
                 <FolderOpen />
-                Change
+                {t.change}
               </Button>
               <Button
                 size="xs"
@@ -65,7 +61,7 @@ export function RepoFolders() {
                   void bridge.setRepo(repo, undefined).then(setRepos)
                 }
               >
-                Forget
+                {t.forget}
               </Button>
             </li>
           ))}

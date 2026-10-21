@@ -1,3 +1,6 @@
+import { localized, type Locale } from '../i18n/locale.js'
+import { text } from './failure.text.js'
+
 /**
  * Why a reasoner run failed, read from its error, so the asker hears what it
  * means and the operator what to fix, without the error itself (the
@@ -40,11 +43,10 @@ function service(backend: string): string {
 }
 
 /** "15 minutes", "90 seconds" */
-function duration(ms: number): string {
+function duration(ms: number, t: (typeof text)[Locale]): string {
   const seconds = Math.round(ms / 1000)
-  if (seconds < 120) return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`
-  const minutes = Math.round(seconds / 60)
-  return `${minutes} minutes`
+  if (seconds < 120) return t.seconds(seconds)
+  return t.minutes(Math.round(seconds / 60))
 }
 
 export interface FailureReplyOptions {
@@ -55,6 +57,8 @@ export interface FailureReplyOptions {
   own?: boolean
   /** How long a run may take (REASONER_TIMEOUT_SEC), said on a timeout */
   timeoutMs?: number
+  /** The language of Pace's own notes in Slack (NOTES_LANGUAGE). English */
+  locale?: Locale
 }
 
 /**
@@ -64,28 +68,23 @@ export interface FailureReplyOptions {
 export function failureReply(
   cause: FailureCause,
   backend: string,
-  { own = false, timeoutMs }: FailureReplyOptions = {}
+  { own = false, timeoutMs, locale = 'en' }: FailureReplyOptions = {}
 ): string {
+  const t = localized(text, locale)
   const name = service(backend)
   switch (cause) {
     case 'auth':
-      return own
-        ? `I couldn't produce an answer: my sign-in to ${name} on your Mac was rejected. Sign in again; Pacenote shows how.`
-        : `I couldn't produce an answer: my sign-in to ${name} was rejected. Whoever runs Pace needs to sign in again; Pacenote shows them how.`
+      return own ? t.reply.authOwn(name) : t.reply.auth(name)
     case 'limit':
-      return `I couldn't produce an answer: I've reached my ${name} usage limit for now. Please try again later.`
+      return t.reply.limit(name)
     case 'unavailable':
-      return `I couldn't produce an answer: ${name} is unavailable right now. Please try again in a few minutes.`
+      return t.reply.unavailable(name)
     case 'setup':
-      return own
-        ? "I couldn't produce an answer: something in my setup on your Mac isn't working. Pacenote shows what."
-        : "I couldn't produce an answer: something in my setup isn't working. Whoever runs Pace can see what in Pacenote."
+      return own ? t.reply.setupOwn : t.reply.setup
     case 'timeout':
-      return `I couldn't produce an answer: the request took ${timeoutMs ? `longer than ${duration(timeoutMs)}` : 'too long'}. A narrower question may help.`
+      return t.reply.timeout(timeoutMs ? duration(timeoutMs, t) : undefined)
     case 'other':
-      return own
-        ? "I couldn't produce an answer: something went wrong on my side. Pacenote on your Mac shows what."
-        : "I couldn't produce an answer: something went wrong on my side. Whoever runs Pace can see what in Pacenote."
+      return own ? t.reply.otherOwn : t.reply.other
   }
 }
 
@@ -101,42 +100,34 @@ export interface FailureAdvice {
   lasting: boolean
 }
 
+/** In the language of the app (or of the Pace process) when it is called */
 export function failureAdvice(
   cause: FailureCause,
   backend: string,
   sandbox: string
 ): FailureAdvice | undefined {
+  const t = localized(text).advice
   switch (cause) {
     case 'auth':
       if (sandbox === 'host')
         return {
-          text: `${backend}'s sign-in on this Mac was rejected. Sign in again in a terminal (${backend === 'codex' ? 'codex login' : 'claude, then /login'}).`,
+          text: t.authHost(backend, backend === 'codex'),
           lasting: true,
         }
       return {
-        text: `${backend}'s sign-in in the sandbox was rejected or is missing. Sign in to ${backend === 'codex' ? 'Codex' : 'Claude'} in Settings > Sandbox > Reasoner login, then restart Pace.`,
+        text: t.authSandbox(backend, backend === 'codex' ? 'Codex' : 'Claude'),
         route: '#/settings/sandbox',
         lasting: true,
       }
     case 'limit':
-      return {
-        text: `${backend} reached its usage limit. Pace answers again once the limit resets.`,
-        lasting: true,
-      }
+      return { text: t.limit(backend), lasting: true }
     case 'unavailable':
-      return {
-        text: `${backend}'s service was unavailable. This usually passes in a few minutes.`,
-        lasting: false,
-      }
+      return { text: t.unavailable(backend), lasting: false }
     case 'setup':
-      return {
-        text: 'Something Pace runs on failed: the built-in sandbox or the CLI. The Pace screen and Settings > Sandbox show what.',
-        route: '#/bot',
-        lasting: false,
-      }
+      return { text: t.setup, route: '#/bot', lasting: false }
     case 'timeout':
       return {
-        text: 'The run took longer than the reasoner timeout (Settings > Answers).',
+        text: t.timeout,
         route: '#/settings/answers',
         lasting: false,
       }

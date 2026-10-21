@@ -1,5 +1,6 @@
+import { localized } from '@src/i18n/locale'
 import { CLI_NAMES } from '@src/tasks/own-ai'
-import { sourceOf } from '@src/tasks/sources'
+import { LOCAL, sourceOf } from '@src/tasks/sources'
 import type {
   DismissReason,
   FolderCheck,
@@ -54,6 +55,7 @@ import { motionItem, useFlash, usePresence } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { macNamed, useMacs } from '@/lib/macs'
 import {
   taskDetailQuery,
@@ -68,6 +70,7 @@ import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
+import { text } from './task-row.text'
 
 /**
  * A task in the Todo list. Closed, it is what it is and its next step: one
@@ -82,32 +85,17 @@ import { PaceSpinner } from './pace-spinner'
  */
 
 const TOOL: Record<WorkTool, string> = { claude: 'Claude Code', codex: 'Codex' }
-/** The desktop app each tool's sessions can open in (Open sessions in) */
-const APP: Record<WorkTool, string> = {
-  claude: 'Claude app',
-  codex: 'Codex app',
-}
 /** A Codex session from the Codex app continues there; others in a terminal */
 const resumesInApp = (session: Session) =>
   !!session.app && session.tool === 'codex'
 const other = (tool: WorkTool): WorkTool =>
   tool === 'claude' ? 'codex' : 'claude'
 
-const DISMISS_REASONS: { reason: DismissReason; label: string }[] = [
-  { reason: 'not-mine', label: 'Not for me' },
-  { reason: 'done-already', label: 'Already done' },
-  { reason: 'not-worth-it', label: 'Not worth it' },
+const DISMISS_REASONS: DismissReason[] = [
+  'not-mine',
+  'done-already',
+  'not-worth-it',
 ]
-
-const SETTLED_LABEL: Record<string, string> = {
-  done: 'Done',
-  dismissed: 'Dismissed',
-  'not-mine': 'Dismissed: not for me',
-  'done-already': 'Dismissed: already done',
-  'not-worth-it': 'Dismissed: not worth it',
-  replied: 'Closed: you replied in the thread',
-  checked: 'Closed: marked with a check',
-}
 
 /** The AI tool that closed a task, by its MCP client name ("claude-code") */
 function closedBy(client: string | undefined): string | undefined {
@@ -134,32 +122,30 @@ function lastChange(task: TaskView): TaskUpdate | undefined {
   return (task.updates ?? []).filter((u) => u.changed.some(isNews)).slice(-1)[0]
 }
 
-const ACTION_WORD: Record<string, string> = {
-  code: 'a code task',
-  reply: 'a reply',
-  other: 'neither code nor a reply',
-}
-
-/** A change in words: "Due Thursday → Wednesday" */
+/**
+ * A change in words: "Due Thursday → Wednesday" (the due dates are the AI's
+ * words, as the thread had them)
+ */
 function changeWords(change: Change): string {
+  const t = localized(text)
   const { from, to } = change
   switch (change.field) {
     case 'due':
       return from && to
-        ? `Due ${from} → ${to}`
+        ? t.dueMoved(from, to)
         : to
-          ? `Due ${to}`
-          : `No longer due ${from}`
+          ? t.due(to)
+          : t.noLongerDue(from)
     case 'title':
-      return `Was \u201c${from}\u201d`
+      return t.wasTitle(from)
     case 'confidence':
-      return to === 'sure' ? 'Now a task, no longer a Maybe' : 'Now a Maybe'
+      return to === 'sure' ? t.nowSure : t.nowMaybe
     case 'repo':
-      return to ? `Repository ${to}` : 'No repository'
+      return to ? t.repo(to) : t.noRepo
     case 'action':
-      return `Now ${ACTION_WORD[to ?? ''] ?? to}`
+      return t.nowAction(t.actionWord[to ?? ''] ?? to)
     case 'summary':
-      return 'Summary updated'
+      return t.summaryUpdated
   }
 }
 
@@ -217,6 +203,7 @@ export function TaskRow({
   onToggle: () => void
   onDecide: (decision: TaskDecision) => void
 }) {
+  const t = useText(text)
   const client = useQueryClient()
   const act = useTaskWork(task.id)
   const proposed = useProposal(task.id)
@@ -254,8 +241,8 @@ export function TaskRow({
   const atWork = usePresence<HTMLSpanElement>(
     Boolean(live) && task.status === 'open'
   )
-  const liveTool = useRef('an AI tool')
-  if (live) liveTool.current = closedBy(live.by) ?? 'an AI tool'
+  const liveTool = useRef<string>(undefined)
+  if (live) liveTool.current = closedBy(live.by)
 
   // The note goes once a session of the task is at work after it.
   useEffect(() => {
@@ -293,27 +280,29 @@ export function TaskRow({
   const local = task.source.app === 'local'
   const who = local
     ? follows
-      ? `Left after \u201c${follows}\u201d`
-      : 'Kept from a session'
+      ? t.leftAfter(follows)
+      : t.keptFromSession
     : task.kind === 'promised'
-      ? 'You said you would'
+      ? t.promised
       : task.askedBy
-        ? `${task.askedBy} asked ${task.group ?? 'you'}`
+        ? t.askedBy(task.askedBy, task.group)
         : task.group
-          ? `Asked of ${task.group}`
+          ? t.askedOf(task.group)
           : undefined
   const source = sourceOf(task)
+  // This Mac is kept in English in the task, as AI tools read it too
+  const sourceLabel = local ? t.thisMac : source.label
   const by = closedBy(task.closed?.by)
   const settledLabel =
     task.status === 'closed'
       ? by
-        ? `Closed: done in ${by}`
+        ? t.closedIn(by)
         : task.closed?.why === 'resolved'
-          ? `Closed: settled in ${source.label}`
-          : SETTLED_LABEL[task.closed?.why ?? '']
+          ? t.settledIn(sourceLabel)
+          : t.settled[task.closed?.why ?? '']
       : task.status === 'dismissed'
-        ? SETTLED_LABEL[task.dismissReason ?? 'dismissed']
-        : SETTLED_LABEL[task.status]
+        ? t.settled[task.dismissReason ?? 'dismissed']
+        : t.settled[task.status]
   const settled = !['open', 'maybe'].includes(task.status)
   const change = settled ? undefined : lastChange(task)
   const recent =
@@ -325,20 +314,20 @@ export function TaskRow({
       ? []
       : [
           {
-            label: `Continue in ${TOOL[cli]}`,
+            label: t.continueIn(TOOL[cli]),
             icon: <SquareTerminal />,
             run: () => void continueIn(cli),
           },
         ]),
     {
-      label: `Continue in ${TOOL[other(cli)]}`,
+      label: t.continueIn(TOOL[other(cli)]),
       icon: <SquareTerminal />,
       run: () => void continueIn(other(cli)),
     },
     ...(folder
       ? [
           {
-            label: 'Continue in another folder',
+            label: t.continueElsewhere,
             icon: <FolderOpen />,
             run: () => {
               setError(undefined)
@@ -352,7 +341,7 @@ export function TaskRow({
       ? []
       : [
           {
-            label: 'Draft a reply',
+            label: t.draftReply,
             icon: <MessageSquare />,
             run: () => void draft(),
           },
@@ -397,7 +386,13 @@ export function TaskRow({
               </button>
             </CollapsibleTrigger>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
-              {[who, task.source.label, formatRelative(task.postedAt)]
+              {[
+                who,
+                local && task.source.label === LOCAL.label
+                  ? t.thisMac
+                  : task.source.label,
+                formatRelative(task.postedAt),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
               {task.due && !settled && (
@@ -416,7 +411,7 @@ export function TaskRow({
               {area && (
                 <a
                   href={areaHash(area.id)}
-                  title={`In ${area.name}, an area of your work`}
+                  title={t.inArea(area.name)}
                   className="rounded-full bg-muted px-2 py-px font-medium hover:text-foreground"
                 >
                   {area.name}
@@ -437,12 +432,12 @@ export function TaskRow({
                   className="motion-fade inline-flex items-center gap-1.5 font-medium text-status-running"
                 >
                   <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-                  Working in {liveTool.current}
+                  {t.workingIn(liveTool.current)}
                 </span>
               )}
               {working && task.status === 'open' && !atWork.mounted && (
                 <span
-                  title={`Last active in its ${TOOL[working.tool]} session`}
+                  title={t.lastActiveIn(TOOL[working.tool])}
                   className="inline-flex items-center gap-1"
                 >
                   <SquareTerminal aria-hidden="true" className="size-3" />
@@ -456,7 +451,7 @@ export function TaskRow({
                   title={proposal?.summary}
                   className="motion-fade rounded-full bg-primary/12 px-2 py-px font-medium text-primary"
                 >
-                  Looks done
+                  {t.looksDone}
                 </span>
               )}
               {recent && !open && (
@@ -464,7 +459,7 @@ export function TaskRow({
                   title={recent.why}
                   className="rounded-full bg-primary/12 px-2 py-px font-medium text-primary"
                 >
-                  Updated {formatRelative(recent.at)}
+                  {t.updated(formatRelative(recent.at))}
                 </span>
               )}
             </p>
@@ -474,14 +469,14 @@ export function TaskRow({
                 data-state={asking.state}
                 className="motion-fade mt-2 flex flex-wrap items-center gap-1.5"
                 role="group"
-                aria-label={`Whether ${askedGroup.current} means you`}
+                aria-label={t.groupAsk(askedGroup.current!)}
               >
                 <span className="mr-1 text-meta text-muted-foreground">
-                  Does {askedGroup.current} mean you?
+                  {t.groupMeansYou(askedGroup.current!)}
                 </span>
                 {[
-                  { label: 'It’s me', yours: true },
-                  { label: 'Not me', yours: false },
+                  { label: t.itsMe, yours: true },
+                  { label: t.notMe, yours: false },
                 ].map(({ label, yours }) => (
                   <Button
                     key={label}
@@ -502,16 +497,16 @@ export function TaskRow({
               <div
                 className="mt-2 flex flex-wrap items-center gap-1.5"
                 role="group"
-                aria-label="Why dismiss it"
+                aria-label={t.whyDismiss}
               >
-                {DISMISS_REASONS.map(({ reason, label }) => (
+                {DISMISS_REASONS.map((reason) => (
                   <Button
                     key={reason}
                     size="xs"
                     variant="outline"
                     onClick={() => onDecide({ status: 'dismissed', reason })}
                   >
-                    {label}
+                    {t.dismissReason[reason]}
                   </Button>
                 ))}
                 <Button
@@ -519,12 +514,12 @@ export function TaskRow({
                   variant="ghost"
                   onClick={() => onDecide({ status: 'dismissed' })}
                 >
-                  Just dismiss
+                  {t.justDismiss}
                 </Button>
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label="Keep it"
+                  aria-label={t.keepIt}
                   onClick={() => setDismissing(false)}
                 >
                   <X />
@@ -546,7 +541,7 @@ export function TaskRow({
                       onClick={() => void continueIn(cli)}
                     >
                       <SquareTerminal />
-                      Continue in {TOOL[cli]}
+                      {t.continueIn(TOOL[cli])}
                     </Button>
                   </OpensIn>
                 )}
@@ -558,26 +553,26 @@ export function TaskRow({
                     onClick={() => void draft()}
                   >
                     <MessageSquare />
-                    Draft a reply
+                    {t.draftReply}
                   </Button>
                 )}
                 <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
                   <CircleCheck />
-                  Done
+                  {t.done}
                 </Button>
                 <Button
                   size="sm"
                   variant="secondary"
                   onClick={() => setDismissing(true)}
                 >
-                  Dismiss
+                  {t.dismiss}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      aria-label="More for this task"
+                      aria-label={t.moreForTask}
                     >
                       <MoreHorizontal />
                     </Button>
@@ -596,14 +591,14 @@ export function TaskRow({
             {task.status === 'maybe' && !dismissing && (
               <>
                 <Button size="sm" onClick={() => onDecide({ status: 'kept' })}>
-                  Keep as a task
+                  {t.keepAsTask}
                 </Button>
                 <Button
                   size="sm"
                   variant="secondary"
                   onClick={() => setDismissing(true)}
                 >
-                  Dismiss
+                  {t.dismiss}
                 </Button>
               </>
             )}
@@ -616,7 +611,7 @@ export function TaskRow({
                 }
               >
                 <Undo2 />
-                Reopen
+                {t.reopen}
               </Button>
             )}
             {task.source.permalink && (
@@ -625,7 +620,7 @@ export function TaskRow({
                   href={task.source.permalink}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={`Open in ${source.label}`}
+                  aria-label={t.openIn(sourceLabel)}
                 >
                   <ExternalLink />
                 </a>
@@ -705,30 +700,31 @@ type Earlier = {
  * continue, then Pace in the thread, then the person's task), then the rest
  */
 function earlierOf(detail: TaskDetail): { last?: Earlier; rest: Earlier[] } {
+  const t = localized(text)
   const { context } = detail
   const lines: Earlier[] = [
     ...context.thread.tasks.map((task) => ({
       key: task.id,
       group: 'thread' as const,
-      label: 'In this thread',
+      label: t.inThread,
       task,
     })),
     ...context.thread.runs.map((run) => ({
       key: run.id,
       group: 'thread' as const,
-      label: 'In this thread',
+      label: t.inThread,
       run,
     })),
     ...(context.repo?.tasks ?? []).map((task) => ({
       key: task.id,
       group: 'repo' as const,
-      label: 'Same repo',
+      label: t.sameRepo,
       task,
     })),
     ...(context.person?.tasks ?? []).map((task) => ({
       key: task.id,
       group: 'person' as const,
-      label: `From ${context.person!.name}`,
+      label: t.fromPerson(context.person!.name),
       task,
     })),
   ]
@@ -772,6 +768,7 @@ function TaskOpen({
   /** Keeps a thing left after it as a task of its own */
   onKeep: (text: string) => void
 }) {
+  const t = useText(text)
   const detail = useTaskDetail(task.id).data
   const [all, setAll] = useState(false)
   const replyId = useId()
@@ -790,7 +787,7 @@ function TaskOpen({
     ...sessions.slice(1).map((session) => ({
       key: session.id,
       group: 'work' as const,
-      label: 'Your work',
+      label: t.yourWork,
       session,
     })),
     ...earlier.rest,
@@ -816,7 +813,7 @@ function TaskOpen({
           </p>
         )}
         {change && (
-          <Line label="Changed">
+          <Line label={t.changed}>
             <span
               title={change.changed.filter(isNews).map(changeWords).join(' · ')}
               className="select-text"
@@ -830,7 +827,7 @@ function TaskOpen({
         )}
         {!detail ? (
           <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
-            Looking for what came before.
+            {t.lookingEarlier}
           </p>
         ) : (
           <>
@@ -842,7 +839,7 @@ function TaskOpen({
               />
             )}
             {settled && (task.wrapUp || detail.outcome) && (
-              <Line label="Result">
+              <Line label={t.result}>
                 {task.wrapUp ? (
                   <>
                     <span className="max-w-[40rem] select-text">
@@ -861,7 +858,7 @@ function TaskOpen({
             )}
             {earlier.last && (
               <EarlierLine
-                line={{ ...earlier.last, label: 'Last time' }}
+                line={{ ...earlier.last, label: t.lastTime }}
                 taskId={task.id}
                 onResume={onResume}
                 onStartHere={onStartHere}
@@ -872,7 +869,7 @@ function TaskOpen({
                 line={{
                   key: sessions[0].id,
                   group: 'work',
-                  label: 'Your work',
+                  label: t.yourWork,
                   session: sessions[0],
                 }}
                 taskId={task.id}
@@ -900,12 +897,10 @@ function TaskOpen({
               ))}
             {!earlier.last && !sessions[0] && !suggested.length && (
               <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
-                Nothing earlier in this thread
-                {task.repo ? `, in ${task.repo}` : ''}
-                {task.askedBy && task.kind === 'asked'
-                  ? ` or from ${task.askedBy}`
-                  : ''}
-                .
+                {t.nothingEarlier(
+                  task.repo,
+                  task.kind === 'asked' ? task.askedBy : undefined
+                )}
               </p>
             )}
             {rest.length > 0 && (
@@ -916,7 +911,7 @@ function TaskOpen({
                 className="-ml-2 self-start text-primary"
                 onClick={() => setAll(!all)}
               >
-                {all ? 'Show less' : `${rest.length} more earlier`}
+                {all ? t.showLess : t.moreEarlier(rest.length)}
               </Button>
             )}
           </>
@@ -927,9 +922,7 @@ function TaskOpen({
             {drafting ? (
               <p className="flex items-center gap-2 text-body text-muted-foreground">
                 <PaceSpinner writing className="size-6" />
-                <span className="text-shimmer">
-                  Reading the thread, read only, to draft your reply.
-                </span>
+                <span className="text-shimmer">{t.draftingReply}</span>
               </p>
             ) : (
               <>
@@ -938,10 +931,13 @@ function TaskOpen({
                   className="text-meta text-muted-foreground"
                 >
                   {!latestDraft || reply !== undefined
-                    ? 'Your reply'
+                    ? t.yourReply
                     : latestDraft.copiedAt
-                      ? `Your reply, copied ${formatRelative(latestDraft.copiedAt)}`
-                      : `Your reply, drafted from the thread ${latestDraft.by ? `by ${CLI_NAMES[latestDraft.by]} ` : ''}${formatRelative(latestDraft.at)}`}
+                      ? t.replyCopied(formatRelative(latestDraft.copiedAt))
+                      : t.replyDrafted(
+                          formatRelative(latestDraft.at),
+                          latestDraft.by && CLI_NAMES[latestDraft.by]
+                        )}
                   {latestDraft?.switched &&
                     reply === undefined &&
                     !latestDraft.copiedAt && (
@@ -965,14 +961,14 @@ function TaskOpen({
                     disabled={!replyText.trim()}
                   >
                     <Copy />
-                    Copy and open thread
+                    {t.copyAndOpen}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={onDraft}>
                     <RotateCw />
-                    Draft again
+                    {t.draftAgain}
                   </Button>
                   <span className="ml-1 text-meta text-muted-foreground">
-                    Pacenote never sends it for you.
+                    {t.neverSends}
                   </span>
                 </div>
               </>
@@ -985,20 +981,18 @@ function TaskOpen({
         <div className="flex flex-col gap-2 rounded-xl bg-card-accent px-3.5 py-3">
           <p className="flex items-center gap-2 text-body font-semibold">
             <PaceSpinner className="size-5" />
-            {task.askedBy
-              ? `${task.askedBy} is still waiting in the thread`
-              : 'A reply is waiting to be sent'}
+            {task.askedBy ? t.stillWaiting(task.askedBy) : t.replyWaiting}
           </p>
           <p className="text-body text-foreground/80 select-text">
-            The session drafted a reply for you: &ldquo;{waiting}&rdquo;
+            {t.sessionDrafted(waiting)}
           </p>
           <div className="flex gap-1.5">
             <Button size="sm" onClick={() => onCopy(waiting)}>
               <Copy />
-              Copy and open thread
+              {t.copyAndOpen}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => onReply(waiting)}>
-              Edit it first
+              {t.editFirst}
             </Button>
           </div>
         </div>
@@ -1043,6 +1037,7 @@ function EarlierLine({
   onResume: (entryId: string) => void
   onStartHere?: (tool: WorkTool) => void
 }) {
+  const t = useText(text)
   const { task, run } = line
   const session = line.session ?? task?.session
   const macs = useMacs()
@@ -1054,13 +1049,17 @@ function EarlierLine({
       : undefined
   // The terminal icon of the row's own Continue button: it opens there too.
   // Its name is a tooltip at its left, clear of the lines' icons above.
-  const resume = session?.session
-    ? `Continue ${task ? 'its' : 'this'} session in ${resumesInApp(session) ? `the ${APP.codex}` : session.app ? 'your terminal' : TOOL[session.tool]}`
-    : ''
+  const resume = !session?.session
+    ? ''
+    : resumesInApp(session)
+      ? t.resumeInApp(Boolean(task), t.app.codex)
+      : session.app
+        ? t.resumeInTerminal(Boolean(task))
+        : t.resumeIn(Boolean(task), TOOL[session.tool])
   const action =
     elsewhere && session ? (
       <Tooltip
-        content={`It is on ${elsewhere}. Start a ${TOOL[session.tool]} session for the task on this Mac.`}
+        content={t.startHereTip(elsewhere, TOOL[session.tool])}
         side="left"
       >
         <Button
@@ -1070,7 +1069,7 @@ function EarlierLine({
           onClick={() => onStartHere?.(session.tool)}
         >
           <SquareTerminal />
-          Start here
+          {t.startHere}
         </Button>
       </Tooltip>
     ) : session?.session ? (
@@ -1088,8 +1087,8 @@ function EarlierLine({
     ) : line.session ? (
       <span className="text-meta text-muted-foreground">
         {line.session.app
-          ? 'Waiting for you to send it'
-          : `Waiting for ${TOOL[line.session.tool]} to start it`}
+          ? t.waitingToSend
+          : t.waitingToStart(TOOL[line.session.tool])}
       </span>
     ) : undefined
   const name = (text: string, href?: string, hint?: string) =>
@@ -1114,9 +1113,9 @@ function EarlierLine({
     return (
       <Line label={line.label}>
         {name(
-          run.request || 'A mention',
+          run.request || t.aMention,
           `#/runs/${encodeURIComponent(run.id)}`,
-          'Open the run'
+          t.openRun
         )}
         {quiet(`Pace · ${formatShortDay(run.at)}`)}
       </Line>
@@ -1124,7 +1123,7 @@ function EarlierLine({
   if (task)
     return (
       <Line label={line.label} actions={action}>
-        {name(task.title, log, 'Read its session')}
+        {name(task.title, log, t.readItsSession)}
         {/* How it ended, from its thread, on hover */}
         {quiet(
           [task.outcome, formatShortDay(task.postedAt)]
@@ -1138,15 +1137,15 @@ function EarlierLine({
   const own = line.session as Session
   return (
     <Line label={line.label} actions={action}>
-      {name(`${TOOL[own.tool]} session`, log, 'Read the session')}
+      {name(t.toolSession(TOOL[own.tool]), log, t.readSession)}
       {quiet(
         [
-          elsewhere && `On ${elsewhere}`,
-          own.app && `in the ${APP[own.tool]}`,
+          elsewhere && t.onMac(elsewhere),
+          own.app && t.inApp(t.app[own.tool]),
           own.branch,
           own.lastActiveAt
-            ? `last active ${formatRelative(own.lastActiveAt)}`
-            : `started ${formatRelative(own.startedAt)}`,
+            ? t.lastActive(formatRelative(own.lastActiveAt))
+            : t.started(formatRelative(own.startedAt)),
         ]
           .filter(Boolean)
           .join(' · '),
@@ -1159,15 +1158,16 @@ function EarlierLine({
 /** How a session you started yourself was known as the task's work */
 function foundHint(session: Session): string | undefined {
   if (!session.found) return undefined
+  const t = localized(text)
   switch (session.foundBy) {
     case 'link':
-      return "Found: what you typed has this task's Slack message"
+      return t.foundLink
     case 'branch':
-      return `Found: it worked on ${session.branch ?? 'the branch'}, where this task's work is`
+      return t.foundBranch(session.branch)
     case 'you':
-      return 'You said it is this task’s work'
+      return t.foundYou
     default:
-      return "Found: it used Pacenote's task tools for this task"
+      return t.foundTools
   }
 }
 
@@ -1191,35 +1191,35 @@ function LooksDone({
   onAnswer: (answer: 'close' | 'not-yet') => void
   onKeep: (text: string) => void
 }) {
+  const t = useText(text)
   const tool = TOOL[proposal.tool]
   return (
     <>
       <Line
-        label="Looks done"
+        label={t.looksDone}
         actions={
           <>
             <Button size="xs" onClick={() => onAnswer('close')}>
               <CircleCheck />
-              Close it
+              {t.closeIt}
             </Button>
             <Button
               size="xs"
               variant="ghost"
               onClick={() => onAnswer('not-yet')}
             >
-              Not yet
+              {t.notYet}
             </Button>
           </>
         }
       >
         <span className="max-w-[40rem] select-text">
-          {proposal.summary ?? `Its ${tool} session looks finished.`}
+          {proposal.summary ?? t.looksFinished(tool)}
         </span>
         <span className="text-meta text-muted-foreground">
           {[
-            `From its ${tool} session`,
-            proposal.pr &&
-              `#${proposal.pr.number} ${proposal.pr.state.toLowerCase()}`,
+            t.fromSession(tool),
+            proposal.pr && t.pr(proposal.pr.number, proposal.pr.state),
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -1228,10 +1228,10 @@ function LooksDone({
       {(proposal.left ?? []).map((item) => (
         <Line
           key={item}
-          label="Left"
+          label={t.left}
           actions={
             <Button size="xs" variant="outline" onClick={() => onKeep(item)}>
-              Keep as a task
+              {t.keepLeft}
             </Button>
           }
         >
@@ -1251,43 +1251,44 @@ function SuggestedLine({
   taskId: string
   onAnswer: (entryId: string, yes: boolean) => void
 }) {
+  const t = useText(text)
   return (
     <Line
-      label="Looks related"
+      label={t.looksRelated}
       actions={
         <>
           <Button
             size="xs"
             variant="outline"
-            aria-label="Link this session to the task"
+            aria-label={t.linkSession}
             onClick={() => onAnswer(suggestion.id, true)}
           >
-            Link
+            {t.link}
           </Button>
           <Button
             size="xs"
             variant="ghost"
-            aria-label="Not this task's session"
+            aria-label={t.notThisSession}
             onClick={() => onAnswer(suggestion.id, false)}
           >
-            Not it
+            {t.notIt}
           </Button>
         </>
       }
     >
       <a
         href={taskHash(taskId, `/log/${encodeURIComponent(suggestion.id)}`)}
-        title="Read the session"
+        title={t.readSession}
         className="font-semibold underline-offset-2 hover:underline"
       >
-        {TOOL[suggestion.tool]} session
+        {t.toolSession(TOOL[suggestion.tool])}
       </a>
       <span title={suggestion.cwd} className="text-meta text-muted-foreground">
         {[
-          `mentions ${suggestion.shares.join(', ')}`,
+          t.mentions(suggestion.shares),
           suggestion.lastActiveAt
-            ? `last active ${formatRelative(suggestion.lastActiveAt)}`
-            : `started ${formatRelative(suggestion.startedAt)}`,
+            ? t.lastActive(formatRelative(suggestion.lastActiveAt))
+            : t.started(formatRelative(suggestion.startedAt)),
         ].join(' · ')}
       </span>
     </Line>
@@ -1323,10 +1324,9 @@ function OpensIn({
   app?: WorkTool
   children: React.ReactElement
 }) {
-  const where = folder ? ` in ${tilde(folder)}` : ''
-  const content = app
-    ? `Opens ${app === 'claude' ? "the Claude app's Code tab" : `the ${APP.codex}`}${where} with the task written in. Send it there to start.`
-    : folder && `Opens in ${tilde(folder)}`
+  const t = useText(text)
+  const where = folder && tilde(folder)
+  const content = app ? t.opensApp(app, where) : where && t.opensIn(where)
   if (!content) return children
   return <Tooltip content={content}>{children}</Tooltip>
 }
@@ -1357,6 +1357,7 @@ function FolderDialog({
 }
 
 function FolderChoice({ task, tool, onOpen }: FolderProps) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const [found, setFound] = useState<FolderCheck[]>()
   const [chosen, setChosen] = useState<string>()
@@ -1382,32 +1383,25 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
     <>
       <div className="flex flex-col gap-1.5">
         <DialogTitle className="text-heading">
-          {task.repo
-            ? `Where is ${task.repo} on this Mac?`
-            : 'Where should the session open?'}
+          {task.repo ? t.whereIsRepo(task.repo) : t.whereToOpen}
         </DialogTitle>
         <DialogDescription className="text-body text-muted-foreground">
-          {TOOL[tool]} opens in this folder with the task.
-          {task.repo
-            ? ' Pacenote remembers it for this repository; change it in Settings > Todo.'
-            : ''}
+          {t.opensHere(TOOL[tool], Boolean(task.repo))}
         </DialogDescription>
       </div>
       <div
         role="radiogroup"
-        aria-label="Folder"
+        aria-label={t.folder}
         className="flex flex-col gap-2"
       >
         {found === undefined && (
           <p className="text-body text-muted-foreground">
-            {task.repo
-              ? `Looking for ${task.repo} on this Mac.`
-              : 'Looking for the folders you worked in.'}
+            {task.repo ? t.lookingForRepo(task.repo) : t.lookingForFolders}
           </p>
         )}
         {found?.length === 0 && task.repo && (
           <p className="text-body text-muted-foreground">
-            No checkout of {task.repo} found under your usual folders.
+            {t.noCheckout(task.repo)}
           </p>
         )}
         {found?.map((folder) => (
@@ -1444,18 +1438,14 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
                 {[
                   folder.error?.replace(/\.$/, '') ??
                     [
-                      folder.remote
-                        ? `Its remote is ${folder.remote}`
-                        : 'No remote',
-                      folder.changes
-                        ? `${folder.changes} changes not committed`
-                        : 'clean',
+                      folder.remote ? t.remote(folder.remote) : t.noRemote,
+                      folder.changes ? t.uncommitted(folder.changes) : t.clean,
                     ].join(' · '),
                   !folder.matches && !folder.error && task.repo
-                    ? `not ${task.repo}`
+                    ? t.notRepo(task.repo)
                     : undefined,
                   folder.usedAt
-                    ? `used ${formatRelative(folder.usedAt)}`
+                    ? t.used(formatRelative(folder.usedAt))
                     : undefined,
                 ]
                   .filter(Boolean)
@@ -1471,14 +1461,12 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
           onClick={() => void choose()}
         >
           <FolderOpen />
-          Choose another folder
+          {t.chooseFolder}
         </Button>
       </div>
       <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
-        {TOOL[tool]} runs as you, with your own permissions, and asks you before
-        it changes anything. Pacenote opens the session and hands it the task;
-        it runs no commands itself.
+        {t.runsAsYou(TOOL[tool])}
       </p>
       {error && (
         <p role="alert" className="text-copy text-status-failed">
@@ -1487,7 +1475,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
       )}
       <div className="flex justify-end gap-2">
         <DialogClose asChild>
-          <Button variant="secondary">Cancel</Button>
+          <Button variant="secondary">{t.cancel}</Button>
         </DialogClose>
         <Button
           disabled={!chosen || opening || !!chosenCheck?.error}
@@ -1498,7 +1486,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
           }}
         >
           <SquareTerminal />
-          Open {TOOL[tool]} here
+          {t.openHere(TOOL[tool])}
         </Button>
       </div>
     </>
@@ -1540,6 +1528,7 @@ function SessionLogPanel({
   entryId: string
   onClose: () => void
 }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const act = useTaskWork(taskId)
   const detail = useTaskDetail(taskId)
@@ -1550,7 +1539,7 @@ function SessionLogPanel({
     void bridge?.sessionLog(entryId).then((result) => setLog(result ?? {}))
   }, [bridge, entryId])
   const entry = found?.entry
-  const tool = entry ? TOOL[entry.tool] : 'The session'
+  const tool = entry ? TOOL[entry.tool] : t.theSession
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -1560,10 +1549,10 @@ function SessionLogPanel({
         className="w-[40rem] max-w-[calc(100vw-1rem)]"
       >
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
-          <DialogTitle className="text-section">Session log</DialogTitle>
+          <DialogTitle className="text-section">{t.sessionLog}</DialogTitle>
           <span className="flex-1" />
           <DialogClose asChild>
-            <Button size="icon-sm" variant="ghost" aria-label="Close the log">
+            <Button size="icon-sm" variant="ghost" aria-label={t.closeLog}>
               <X />
             </Button>
           </DialogClose>
@@ -1572,16 +1561,14 @@ function SessionLogPanel({
           <div className="flex flex-col gap-4 px-6 py-5">
             {!entry ? (
               <p className="text-copy text-muted-foreground">
-                {detail.isPending
-                  ? 'Finding the session.'
-                  : 'There is no such session.'}
+                {detail.isPending ? t.findingSession : t.noSession}
               </p>
             ) : (
               <>
                 <div className="flex flex-col gap-1">
                   <h2 className="text-heading">{found.title}</h2>
                   <p className="text-meta text-muted-foreground">
-                    {tool} session ·{' '}
+                    {t.toolSession(tool)} ·{' '}
                     <span className="font-mono">{entry.cwd}</span> ·{' '}
                     {formatDateTime(entry.startedAt)}
                   </p>
@@ -1593,8 +1580,9 @@ function SessionLogPanel({
                     disabled={!entry.session}
                   >
                     <SquareTerminal />
-                    Continue in{' '}
-                    {resumesInApp(entry) ? `the ${APP.codex}` : tool}
+                    {resumesInApp(entry)
+                      ? t.continueInApp(t.app.codex)
+                      : t.continueIn(tool)}
                   </Button>
                   {entry.session && (
                     <Button
@@ -1623,7 +1611,7 @@ function SessionLogPanel({
                 )}
                 {!log ? (
                   <p className="text-copy text-muted-foreground">
-                    Reading the session&apos;s log.
+                    {t.readingLog}
                   </p>
                 ) : log.error ? (
                   <p className="text-copy text-muted-foreground">{log.error}</p>
@@ -1653,7 +1641,7 @@ function SessionLogPanel({
                             )}
                             aria-hidden="true"
                           >
-                            {item.role === 'user' ? 'Y' : tool[0]}
+                            {item.role === 'user' ? t.youInitial : tool[0]}
                           </span>
                           <div
                             className={cn(
@@ -1664,7 +1652,7 @@ function SessionLogPanel({
                             )}
                           >
                             <p className="text-section">
-                              {item.role === 'user' ? 'You' : tool}
+                              {item.role === 'user' ? t.you : tool}
                               {item.at && (
                                 <span className="ml-2 text-caption text-muted-foreground">
                                   {formatDateTime(item.at)}
@@ -1682,9 +1670,7 @@ function SessionLogPanel({
                 )}
                 <p className="flex items-start gap-1.5 text-meta text-muted-foreground">
                   <MessagesSquare className="mt-px size-3.5 shrink-0" />
-                  Read from {tool}&apos;s own session log on this Mac when you
-                  opened it. Pacenote keeps only the session&apos;s id, folder
-                  and times.
+                  {t.readFrom(tool)}
                 </p>
               </>
             )}

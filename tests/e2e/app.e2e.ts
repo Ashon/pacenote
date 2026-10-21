@@ -94,6 +94,8 @@ function appEnv(
     PACENOTE_DATA_DIR: world.home,
     PACENOTE_DESKTOP_USER_DATA: path.join(world.root, 'user-data'),
     PACENOTE_DESKTOP_THEME: 'light',
+    // In English whatever this Mac's language (docs/i18n.md)
+    PACENOTE_DESKTOP_LANGUAGE: 'en',
     // Settings > Macs looks on the network only in its own test (macs.e2e.ts)
     PACENOTE_MACS_BONJOUR: 'off',
     PACENOTE_MACS_PORT: '0',
@@ -365,6 +367,37 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       'room for the traffic lights again',
       async () => (await toggleLeft()) === 84
     )
+  })
+
+  it("opens in macOS's language, and changes language from Settings at once", async () => {
+    world = await World.create([])
+    // macOS in Korean, as PACENOTE_DESKTOP_LANGUAGE stands in for it
+    const page = await launch(world, {
+      firstRun: true,
+      env: { PACENOTE_DESKTOP_LANGUAGE: 'ko' },
+    })
+    await page
+      .getByRole('heading', { name: '이미 쓰고 있는 AI 서비스는 무엇인가요?' })
+      .waitFor()
+    expect(await page.locator('html').getAttribute('lang')).toBe('ko')
+    await page.getByRole('button', { name: '나중에 마치기' }).click()
+    await page.getByText('Pace: 설정 필요').waitFor()
+
+    // Settings > General: English, at once and for the next start too
+    await page.evaluate("window.location.hash = '#/settings/general'")
+    const language = page.getByRole('radiogroup', { name: '언어' })
+    expect(
+      await language
+        .getByRole('radio', { name: '시스템' })
+        .getAttribute('aria-checked')
+    ).toBe('true')
+    await language.getByRole('radio', { name: 'English' }).click()
+    await page.getByRole('heading', { name: 'General' }).waitFor()
+    await page.getByText('Pace: Setup needed').waitFor()
+    expect(await page.locator('html').getAttribute('lang')).toBe('en')
+    expect(
+      JSON.parse(readFileSync(path.join(world.home, 'desktop.json'), 'utf8'))
+    ).toMatchObject({ language: 'en' })
   })
 
   it('sets Pace up from a first run: its own Slack app, "it\'s me", and the first answer', async () => {

@@ -20,18 +20,21 @@ import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { artifactUrl, useRun } from '@/lib/api'
 import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { CodeBlock } from './code-block'
 import { CollectionDetail } from './collection-detail'
 import { Empty, Fact, UsageTip } from './run-facts'
+import { text } from './run-detail.text'
 import { StatusBadge } from './status'
 import { Timeline } from './timeline'
 
 export function RunDetail({ id }: { id: string }) {
+  const t = useText(text)
   const { data: run, isError } = useRun(id)
   if (isError) {
     return (
       <p className="p-10 text-center text-copy text-muted-foreground">
-        Run not found.
+        {t.notFound}
       </p>
     )
   }
@@ -49,6 +52,7 @@ export function RunDetail({ id }: { id: string }) {
 }
 
 function MentionDetail({ run }: { run: RunRecord }) {
+  const t = useText(text)
   return (
     <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
       <RunHeader run={run} />
@@ -65,18 +69,18 @@ function MentionDetail({ run }: { run: RunRecord }) {
             {run.prompt ? (
               <>
                 <CodeBlock
-                  label="Instructions (system)"
+                  label={t.instructions}
                   code={run.prompt.system}
                   maxHeight="max-h-96"
                 />
                 <CodeBlock
-                  label="Input (thread context, request, attachments)"
+                  label={t.input}
                   code={run.prompt.user}
                   maxHeight="max-h-[60vh]"
                 />
               </>
             ) : (
-              <Empty>This run ended before the prompt was built.</Empty>
+              <Empty>{t.noPrompt}</Empty>
             )}
           </TabsContent>
           <TabsContent value="raw" className="select-text">
@@ -96,6 +100,7 @@ function MentionDetail({ run }: { run: RunRecord }) {
  * and its first exchange, each as tall as it will be
  */
 function RunDetailSkeleton() {
+  const t = useText(text)
   return (
     <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
       <header className="border-b bg-card/90 px-8 pt-6 pb-0">
@@ -110,16 +115,16 @@ function RunDetailSkeleton() {
           />
           <TabsList className="mt-4 mb-3">
             <TabsTrigger value="timeline" disabled>
-              Timeline
+              {t.tabs.timeline}
             </TabsTrigger>
             <TabsTrigger value="attachments" disabled>
-              Attachments
+              {t.tabs.attachments}
             </TabsTrigger>
             <TabsTrigger value="prompt" disabled>
-              Prompt
+              {t.tabs.prompt}
             </TabsTrigger>
             <TabsTrigger value="raw" disabled>
-              JSON
+              {t.tabs.raw}
             </TabsTrigger>
           </TabsList>
         </div>
@@ -176,6 +181,7 @@ function RunDetailSkeleton() {
  * summary card above the body (RunFacts).
  */
 function RunHeader({ run }: { run: RunRecord }) {
+  const t = useText(text)
   return (
     <header className="border-b bg-card/90 px-8 pt-6 pb-0 backdrop-blur">
       <div className="mx-auto max-w-3xl">
@@ -183,10 +189,10 @@ function RunHeader({ run }: { run: RunRecord }) {
           <StatusBadge status={run.status} />
           <Badge variant="secondary">
             <AtSign />
-            Mention
+            {t.mention}
           </Badge>
           {run.attempts > 1 && (
-            <Badge variant="secondary">{run.attempts} attempts</Badge>
+            <Badge variant="secondary">{t.attempts(run.attempts)}</Badge>
           )}
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate">{run.origin.conversationLabel}</span>
@@ -208,26 +214,26 @@ function RunHeader({ run }: { run: RunRecord }) {
             >
               <a href={run.origin.permalink} target="_blank" rel="noreferrer">
                 <ExternalLink />
-                View in {MESSENGER_NAMES[run.origin.messenger]}
+                {t.viewIn(MESSENGER_NAMES[run.origin.messenger])}
               </a>
             </Button>
           )}
         </div>
         <h1 className="mt-2.5 line-clamp-2 text-title leading-snug select-text">
-          {run.request || '(empty request)'}
+          {run.request || t.emptyRequest}
         </h1>
         <TabsList className="mt-4 mb-3">
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="timeline">{t.tabs.timeline}</TabsTrigger>
           <TabsTrigger value="attachments">
-            Attachments
+            {t.tabs.attachments}
             {run.attachments.length > 0 && (
               <span className="rounded-sm bg-muted px-1 text-caption tabular-nums">
                 {run.attachments.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="prompt">Prompt</TabsTrigger>
-          <TabsTrigger value="raw">JSON</TabsTrigger>
+          <TabsTrigger value="prompt">{t.tabs.prompt}</TabsTrigger>
+          <TabsTrigger value="raw">{t.tabs.raw}</TabsTrigger>
         </TabsList>
       </div>
     </header>
@@ -239,6 +245,7 @@ function RunHeader({ run }: { run: RunRecord }) {
  * Overview totals: one row of figures split by hairlines
  */
 function RunFacts({ run }: { run: RunRecord }) {
+  const t = useText(text)
   const usage = runUsage(run.events)
   const tools = run.events.filter(
     (e) => e.kind === 'tool' || e.kind === 'command'
@@ -249,21 +256,17 @@ function RunFacts({ run }: { run: RunRecord }) {
     <div className="mb-8 grid grid-cols-2 gap-y-4 border-b border-border pb-6 @min-[40rem]:grid-cols-4">
       <Fact
         icon={<Timer />}
-        label={run.status === 'running' ? 'Elapsed' : 'Duration'}
+        label={run.status === 'running' ? t.elapsed : t.duration}
         value={formatDuration(duration)}
       />
-      <Fact
-        icon={<Wrench />}
-        label="Tool calls"
-        value={`${tools} ${tools === 1 ? 'call' : 'calls'}`}
-      />
+      <Fact icon={<Wrench />} label={t.toolCalls} value={t.calls(tools)} />
       <Fact
         icon={<Coins />}
-        label="Tokens"
-        value={usage ? `${formatTokens(newTokens(usage))} new` : '-'}
+        label={t.tokens}
+        value={usage ? t.newTokens(formatTokens(newTokens(usage))) : '-'}
         hint={
           usage?.cacheRead
-            ? `+${formatTokens(usage.cacheRead)} from cache`
+            ? t.fromCache(formatTokens(usage.cacheRead))
             : undefined
         }
         tip={
@@ -277,7 +280,7 @@ function RunFacts({ run }: { run: RunRecord }) {
       />
       <Fact
         icon={<Cpu />}
-        label="Reasoner"
+        label={t.reasoner}
         value={`${run.backend.reasoner}@${run.backend.sandbox}`}
         hint={run.backend.model}
       />
@@ -286,18 +289,17 @@ function RunFacts({ run }: { run: RunRecord }) {
 }
 
 const ATTACHMENT_STATUS = {
-  read: { label: 'Read', className: 'text-status-succeeded' },
-  skipped: { label: 'Skipped', className: 'text-status-interrupted' },
-  failed: { label: 'Failed', className: 'text-status-failed' },
+  read: 'text-status-succeeded',
+  skipped: 'text-status-interrupted',
+  failed: 'text-status-failed',
 } as const
 
 function Attachments({ run }: { run: RunRecord }) {
-  if (run.attachments.length === 0)
-    return <Empty>This request has no attachments.</Empty>
+  const t = useText(text)
+  if (run.attachments.length === 0) return <Empty>{t.noAttachments}</Empty>
   return (
     <ul className="space-y-2">
       {run.attachments.map((item, i) => {
-        const status = ATTACHMENT_STATUS[item.status]
         const Icon =
           item.kind === 'image'
             ? ImageIcon
@@ -320,8 +322,8 @@ function Attachments({ run }: { run: RunRecord }) {
             <div className="min-w-0 flex-1 text-copy">
               <div className="flex items-center gap-2">
                 <span className="truncate font-medium">{item.name}</span>
-                <span className={`text-meta ${status.className}`}>
-                  {status.label}
+                <span className={`text-meta ${ATTACHMENT_STATUS[item.status]}`}>
+                  {t.attachment[item.status]}
                 </span>
               </div>
               {item.source && (

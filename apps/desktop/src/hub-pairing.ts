@@ -1,5 +1,6 @@
 import { hostname } from 'node:os'
 import { HubClient, newHubToken } from '../../../src/hub/client.js'
+import { localized } from '../../../src/i18n/locale.js'
 import type {
   PairConfirmResponse,
   PairStartResponse,
@@ -7,6 +8,7 @@ import type {
 } from '../../../src/hub/protocol.js'
 import type { SettingsIssue } from '../../../src/settings/fields.js'
 import type { SettingsStore } from './settings.js'
+import { text } from './hub-pairing.text.js'
 
 /**
  * Pairs this desktop with the team hub (docs/team-hub.md). The token is made
@@ -35,8 +37,8 @@ export class HubPairing {
     )
       throw new Error(
         /^http:\/\//.test(given)
-          ? "Use the hub's https:// address. Plain http works only for a hub on this Mac."
-          : "Enter the hub's address, starting with https://."
+          ? localized(text).useHttps
+          : localized(text).enterAddress
       )
     const hubUrl = given.replace(/\/+$/, '')
     const client = new HubClient(hubUrl, this.fetchImpl)
@@ -61,7 +63,7 @@ export class HubPairing {
    */
   async confirm(): Promise<PairConfirmResponse & { issues: SettingsIssue[] }> {
     const pending = this.pending
-    if (!pending) throw new Error('No pairing in progress. Connect again.')
+    if (!pending) throw new Error(localized(text).noPairing)
     const confirmed = await pending.client.pairConfirm(
       pending.pairingId,
       pending.token
@@ -96,15 +98,14 @@ export class HubPairing {
  * address, the network, or whoever runs the hub
  */
 export function pairStartFailure(url: string, error: string): string {
+  const t = localized(text)
   if (
     /fetch failed|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|getaddrinfo|certificate|self.signed/i.test(
       error
     )
   )
-    return `Couldn't reach a hub at ${url}. Check the address and your network.`
-  if (/\bHTTP (404|405)\b/.test(error))
-    return `No Pacenote hub answers at ${url}. Check the address with whoever runs it.`
-  if (/\bHTTP 5\d\d\b/.test(error))
-    return `The hub at ${url} had a problem (${error}). Try again in a moment, or tell whoever runs it.`
-  return `The hub at ${url} turned the pairing down: ${error}`
+    return t.unreachable(url)
+  if (/\bHTTP (404|405)\b/.test(error)) return t.noHub(url)
+  if (/\bHTTP 5\d\d\b/.test(error)) return t.hubProblem(url, error)
+  return t.turnedDown(url, error)
 }

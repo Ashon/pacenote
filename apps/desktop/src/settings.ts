@@ -1,4 +1,5 @@
 import { checkConfig } from '../../../src/config.js'
+import { localized } from '../../../src/i18n/locale.js'
 import { checkBrokerEnv } from '../../../src/sandbox/env.js'
 import {
   readSettingsText,
@@ -18,6 +19,7 @@ import {
   checkSlackTokens,
   type SlackCheckItem,
 } from '../../../src/messengers/slack/check.js'
+import { text } from './settings.text.js'
 
 const FIELDS = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
 
@@ -153,31 +155,29 @@ export class SettingsStore {
   private parseChanges(
     raw: unknown
   ): { changes: SettingsChanges } | { issues: SettingsIssue[] } {
+    const t = localized(text)
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return { issues: [{ message: 'The changes format is invalid.' }] }
+      return { issues: [{ message: t.badChanges }] }
     }
     const changes: SettingsChanges = {}
     const issues: SettingsIssue[] = []
     for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
       const field = FIELDS.get(key)
       if (!field) {
-        issues.push({
-          key,
-          message: 'This entry cannot be changed from the Settings screen.',
-        })
+        issues.push({ key, message: t.notOnScreen })
         continue
       }
       if (value !== null && typeof value !== 'string') {
-        issues.push({ key, message: 'The value format is invalid.' })
+        issues.push({ key, message: t.badValue })
         continue
       }
       const trimmed = value?.trim() ?? ''
       if (trimmed === '' && field.required) {
-        issues.push({ key, message: 'Cannot be empty.' })
+        issues.push({ key, message: t.empty })
         continue
       }
       if (trimmed.includes('\n')) {
-        issues.push({ key, message: 'Cannot contain line breaks.' })
+        issues.push({ key, message: t.lineBreaks })
         continue
       }
       changes[key] = trimmed === '' ? null : trimmed

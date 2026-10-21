@@ -1,4 +1,6 @@
 import type { BotStatusView, SupervisorState } from '@runtime/types'
+import { localized } from '@src/i18n/locale'
+import { text, type BotStateName } from './bot-state.text'
 
 export type BotTone = 'ok' | 'busy' | 'warn' | 'error' | 'off'
 
@@ -53,31 +55,36 @@ export function describeBot(
   view: BotStatusView | undefined,
   supervisor: SupervisorState | undefined
 ): { tone: BotTone; label: string } {
+  const t = localized(text)
+  const state = (tone: BotTone, name: BotStateName) => ({
+    tone,
+    label: t[name],
+  })
   const phase = supervisor?.phase
-  if (phase === 'building') return { tone: 'busy', label: 'Building' }
-  if (phase === 'stopping') return { tone: 'busy', label: 'Stopping' }
+  if (phase === 'building') return state('busy', 'building')
+  if (phase === 'stopping') return state('busy', 'stopping')
   // Missing settings are something to do, not an error: amber, and named for
   // what is needed.
-  if (phase === 'setup') return { tone: 'warn', label: 'Setup needed' }
-  if (phase === 'failed') return { tone: 'error', label: 'Failed to start' }
-  if (phase === 'crashed') return { tone: 'error', label: 'Crashed' }
+  if (phase === 'setup') return state('warn', 'setup')
+  if (phase === 'failed') return state('error', 'failed')
+  if (phase === 'crashed') return state('error', 'crashed')
   const status = view?.alive ? view.status : undefined
   if (!status) {
     return phase === 'starting'
-      ? { tone: 'busy', label: 'Starting' }
-      : { tone: 'off', label: 'Stopped' }
+      ? state('busy', 'starting')
+      : state('off', 'stopped')
   }
-  if (status.state === 'starting') return { tone: 'busy', label: 'Starting' }
-  if (status.state === 'stopping') return { tone: 'busy', label: 'Stopping' }
+  if (status.state === 'starting') return state('busy', 'starting')
+  if (status.state === 'stopping') return state('busy', 'stopping')
   // Another of your Macs answers (Settings > Macs)
-  if (status.standby) return { tone: 'off', label: 'Standing by' }
+  if (status.standby) return state('off', 'standingBy')
   switch (status.socket.state) {
     case 'connected':
-      return { tone: 'ok', label: 'Connected' }
+      return state('ok', 'connected')
     case 'connecting':
     case 'reconnecting':
-      return { tone: 'warn', label: 'Reconnecting' }
+      return state('warn', 'reconnecting')
     default:
-      return { tone: 'error', label: 'Disconnected' }
+      return state('error', 'disconnected')
   }
 }

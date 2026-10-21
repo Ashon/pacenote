@@ -4,7 +4,8 @@ import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { setLocale } from '../src/i18n/locale.js'
 import { registerTaskTools } from '../src/tasks/mcp.js'
 import type { TaskView } from '../src/tasks/types.js'
 import { addTasks, closeTask } from '../src/tasks/write.js'
@@ -282,6 +283,31 @@ describe('where you contribute', () => {
       { role: 'build', evidence: 'sessions here on 2 days of the last 30' },
     ])
     expect(views[3]!.lastActiveAt).toBe(iso(NOW - 41 * DAY))
+  })
+
+  describe('in Korean', () => {
+    afterEach(() => setLocale('en'))
+
+    it('says what shows each role, and how tasks ended', () => {
+      const { tasks, sessions } = work()
+      const signals = signalsOf(tasks, sessions, NOW)
+      const { records } = reconcile([], findAreas(signals), new Date(NOW))
+      setLocale('ko')
+      const [payments, infra, webhooks] = areaViews(records, signals, [], NOW)
+      expect(payments!.roles).toEqual([
+        { role: 'build', evidence: '최근 30일 중 3일 동안 여기서 작업했어요' },
+        { role: 'answer', evidence: 'mina, hyun 님이 5번 요청했어요' },
+      ])
+      expect(payments!.lately[0]!.outcome).toBe('완료')
+      expect(infra!.roles[1]!.evidence).toBe('@infra-oncall에서 2번 요청했어요')
+      expect(webhooks!.roles[0]!.evidence).toBe(
+        '최근 30일 중 2일 동안 여기서 작업했어요'
+      )
+      // English when asked for, as an AI tool reads it
+      expect(
+        areaViews(records, signals, [], NOW, 'en')[0]!.roles[1]!.evidence
+      ).toBe('mina and hyun asked you 5 times')
+    })
   })
 
   it('puts a task in its area by its repository, else its channel', () => {

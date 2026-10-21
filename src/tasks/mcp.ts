@@ -349,7 +349,7 @@ export function registerTaskTools(
             .map((task) => ({
               id: task.id,
               title: task.title,
-              outcome: outcomeOf(task, work),
+              outcome: outcomeOf(task, work, 'en'),
               settledAt: task.settledAt,
               summary: task.summary,
               link: task.source.permalink,
@@ -704,7 +704,7 @@ export function registerTaskTools(
         const work = readWork(options.dataDir).entries
         const [conversation, thread] = splitThread(view)
         const runs = options.runs?.(conversation, thread)
-        const context = taskContext(view, all, work, runs ?? [])
+        const context = taskContext(view, all, work, runs ?? [], 'en')
         const earlier = (
           tasks: ReturnType<typeof taskContext>['thread']['tasks']
         ) =>
@@ -738,7 +738,7 @@ export function registerTaskTools(
             reason: view.reason,
             link: view.source.permalink,
             status: view.status,
-            outcome: outcomeOf(view, work),
+            outcome: outcomeOf(view, work, 'en'),
             wrapUp: view.wrapUp?.text,
             // How the thread changed it since it was added
             changes: view.updates
@@ -864,10 +864,12 @@ export async function workSummary(
   options: Pick<TaskToolsOptions, 'dataDir' | 'home'>,
   audience?: Audience
 ) {
+  // Tool results are for AI tools: in English whatever the app's language
   const you = await countYou({
     dataDir: options.dataDir,
     home: options.home,
     audience,
+    locale: 'en',
   })
   const { slack, github } = you.accounts
   return {
@@ -917,6 +919,7 @@ export async function recapSummary(
     period,
     key: periodKey(period, day),
     audience,
+    locale: 'en',
   })
   if (!counted) throw new Error(`No ${period} for ${date}`)
   const { view, commits } = counted

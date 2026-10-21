@@ -25,13 +25,17 @@ import {
   previewArgs,
   stepDuration,
 } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { CodeBlock } from './code-block'
 import { PaceSpinner } from './pace-spinner'
 import { Markdown } from './markdown'
+import { text } from './timeline.text'
+import { recordText } from '@src/history/record-text'
 
 /** Shows the request -> steps -> reply -> outputs in order. */
 export function Timeline({ run }: { run: RunRecord }) {
+  const t = useText(text)
   const answer = run.answer?.trim()
   const working = run.status === 'running'
   // The last message is the same as the final reply, so it is left out of the
@@ -61,18 +65,12 @@ export function Timeline({ run }: { run: RunRecord }) {
       >
         <p className="text-copy leading-relaxed whitespace-pre-wrap">
           {run.request || (
-            <span className="text-muted-foreground">
-              (empty request: answered from the conversation context)
-            </span>
+            <span className="text-muted-foreground">{t.emptyRequest}</span>
           )}
         </p>
         {run.context.messages > 0 && (
           <p className="mt-1.5 text-caption text-muted-foreground">
-            {run.context.messages} thread{' '}
-            {run.context.messages === 1 ? 'message' : 'messages'}
-            {run.attachments.length > 0
-              ? `, ${run.attachments.length} ${run.attachments.length === 1 ? 'attachment' : 'attachments'}`
-              : ''}
+            {t.context(run.context.messages, run.attachments.length)}
           </p>
         )}
       </Bubble>
@@ -98,7 +96,7 @@ export function Timeline({ run }: { run: RunRecord }) {
           meta={
             working ? (
               <span className="text-shimmer font-medium text-status-running">
-                Working
+                {t.working}
               </span>
             ) : run.finishedAt ? (
               formatDateTime(run.finishedAt)
@@ -121,18 +119,15 @@ export function Timeline({ run }: { run: RunRecord }) {
               >
                 <img
                   src={artifactUrl(run.id, output.file)}
-                  alt={output.title}
+                  alt={recordText(output.title)}
                   className="max-h-80 w-full bg-white object-contain"
                 />
               </a>
               <figcaption className="border-t border-canvas px-3 py-1.5 text-meta text-muted-foreground">
-                {output.title}
-                {output.kind === 'diagram'
-                  ? ' (diagram block)'
-                  : ' (generated image)'}
+                {t.output(recordText(output.title), output.kind === 'diagram')}
               </figcaption>
               {output.source && (
-                <Disclosure label="Source" className="border-t border-canvas">
+                <Disclosure label={t.source} className="border-t border-canvas">
                   <CodeBlock
                     code={output.source}
                     className="m-2 mt-0"
@@ -150,10 +145,10 @@ export function Timeline({ run }: { run: RunRecord }) {
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-failed" />
           <div className="min-w-0">
             <p className="font-medium text-status-failed">
-              {run.status === 'interrupted' ? 'Interrupted' : 'Failed'}
+              {run.status === 'interrupted' ? t.interrupted : t.failed}
             </p>
             <p className="mt-0.5 font-mono text-meta break-words whitespace-pre-wrap text-muted-foreground">
-              {run.error}
+              {recordText(run.error)}
             </p>
             {run.cause && <Advice run={run} cause={run.cause} />}
           </div>
@@ -171,6 +166,7 @@ function Advice({
   run: RunRecord
   cause: NonNullable<RunRecord['cause']>
 }) {
+  const t = useText(text)
   const advice = failureAdvice(cause, run.backend.reasoner, run.backend.sandbox)
   if (!advice) return null
   return (
@@ -184,8 +180,8 @@ function Advice({
             className="font-medium text-primary underline-offset-2 hover:underline"
           >
             {advice.route.startsWith('#/settings')
-              ? 'Open Settings'
-              : 'Open Pace'}
+              ? t.openSettings
+              : t.openPace}
           </a>
         </>
       )}
@@ -256,6 +252,7 @@ function Disclosure({
 }
 
 function Step({ event }: { event: RunEvent }) {
+  const t = useText(text)
   switch (event.kind) {
     case 'tool':
     case 'command':
@@ -272,7 +269,7 @@ function Step({ event }: { event: RunEvent }) {
       return (
         <ExpandableRow
           icon={<Brain className="size-3.5 text-muted-foreground" />}
-          label="Thinking"
+          label={t.thinking}
           preview={event.text}
         >
           <p className="px-3 py-2 text-meta leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -284,7 +281,7 @@ function Step({ event }: { event: RunEvent }) {
       return (
         <div className="flex items-center gap-1.5 py-1 text-caption text-status-interrupted">
           <Info className="size-3.5 shrink-0" />
-          {event.text}
+          {recordText(event.text)}
           <span className="text-muted-foreground">{formatClock(event.at)}</span>
         </div>
       )
@@ -292,7 +289,7 @@ function Step({ event }: { event: RunEvent }) {
       return (
         <div className="flex items-start gap-1.5 py-1 text-meta text-status-failed">
           <TriangleAlert className="mt-px size-3.5 shrink-0" />
-          <span className="break-words">{event.message}</span>
+          <span className="break-words">{recordText(event.message)}</span>
         </div>
       )
     default:
@@ -305,6 +302,7 @@ function ToolStep({
 }: {
   event: Extract<RunEvent, { kind: 'tool' | 'command' }>
 }) {
+  const t = useText(text)
   const isTool = event.kind === 'tool'
   const preview = isTool ? previewArgs(event.arguments) : event.command
   const output = isTool ? (event.error ?? event.result) : event.output
@@ -345,14 +343,14 @@ function ToolStep({
       <div className="space-y-2 p-2">
         {isTool && event.arguments !== undefined && (
           <CodeBlock
-            label="Arguments"
+            label={t.arguments}
             code={JSON.stringify(event.arguments, null, 2)}
             maxHeight="max-h-52"
           />
         )}
         {!isTool && (
           <CodeBlock
-            label="Command"
+            label={t.command}
             code={event.command}
             maxHeight="max-h-40"
           />
@@ -361,16 +359,18 @@ function ToolStep({
           <CodeBlock
             label={
               failed
-                ? 'Error'
+                ? t.error
                 : isTool
-                  ? 'Result'
-                  : `Output${event.kind === 'command' && event.exitCode != null ? ` (exit code ${event.exitCode})` : ''}`
+                  ? t.result
+                  : t.commandOutput(
+                      event.kind === 'command' ? event.exitCode : undefined
+                    )
             }
             code={output}
           />
         ) : (
           event.status === 'running' && (
-            <p className="px-1 text-meta text-muted-foreground">Running...</p>
+            <p className="px-1 text-meta text-muted-foreground">{t.running}</p>
           )
         )}
       </div>

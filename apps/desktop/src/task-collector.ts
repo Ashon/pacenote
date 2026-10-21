@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
 import type { HistoryStore } from '../../../src/history/recorder.js'
 import type { RunEvent } from '../../../src/history/types.js'
+import { LOCALES, localized } from '../../../src/i18n/locale.js'
 import {
   claudeResultUsage,
   runUsage,
@@ -28,13 +29,13 @@ import {
 import {
   SOURCE_IDS,
   SOURCES,
-  sourceNames,
   sourceOfTool,
   type SourceId,
 } from '../../../src/tasks/sources.js'
 import type { CollectOutcome, TasksCollect } from '../../../src/tasks/types.js'
 import { connectorCommand, type Bins } from './headless.js'
 import { OwnAi } from './own-ai.js'
+import { text } from './task-collector.text.js'
 
 const TASK_TOOLS = [
   'collect_context',
@@ -45,20 +46,41 @@ const TASK_TOOLS = [
   'my_tasks',
 ]
 const TIMEOUT_MS = 10 * 60_000
+/** The sources' names, as people name them: "Slack" */
+const labels = (sources: readonly SourceId[] = SOURCE_IDS) =>
+  sources.map((id) => SOURCES[id].label)
+
 /** What to do when the sources' connectors are not in the CLI */
 const noConnector = (cli: ConnectorCli, sources: readonly SourceId[]) =>
-  `${CLI_NAMES[cli]} has no ${sourceNames(sources)} connector. Connect ${sourceNames(sources)} in ${SOURCES[sources[0] ?? 'slack'].connectors[cli].where}, then collect again.`
-const STOPPED = 'Stopped.'
+  localized(text).noConnector(
+    CLI_NAMES[cli],
+    labels(sources),
+    SOURCES[sources[0] ?? 'slack'].connectors[cli].where
+  )
+
+/**
+ * A collection stopped from the app: it ends so, whatever else it said, and
+ * is recorded as interrupted
+ */
+export const STOPPED = Symbol('stopped')
+
 /**
  * Collecting runs the CLI on this Mac, whichever one answers mentions, so it
- * may be signed out there while Pace answers.
+ * may be signed out there while Pace answers. In English, as the tests find
+ * it; the app says it in its language (text.signedOut).
  */
-export const SIGNED_OUT: Record<ConnectorCli, string> = {
-  claude:
-    'Claude Code on this Mac is signed out, and collecting reads Slack through it.',
-  codex:
-    'Codex on this Mac is signed out, and collecting reads Slack through it.',
-}
+export const SIGNED_OUT: Record<ConnectorCli, string> = text.en.signedOut
+
+/**
+ * Whether a collection from the history ended signed out: the history keeps
+ * the error alone, in the language the app was in then
+ */
+const endedSignedOut = (last: CollectOutcome): boolean =>
+  !last.ok &&
+  (last.unable === 'auth' ||
+    LOCALES.some((locale) =>
+      Object.values(text[locale].signedOut).includes(last.error)
+    ))
 
 /**
  * The command for one collection: the CLI, headless, running Pacenote's
@@ -138,6 +160,8 @@ export class CollectStream {
   addError?: string
   ended?: { ok: boolean; text: string }
   usage?: TokenUsage
+  /** It ended as stopped from the app, once its outcome is known */
+  stopped = false
   private addCall?: string
   private said?: string
 
@@ -253,16 +277,21 @@ export class CollectStream {
 
   /**
    * How the collection ended, once the process is gone; stderr, for a run
-   * that stopped before its result. unable says when the CLI could not
-   * collect at all (signed out, at its limit, no connector), so the other one
-   * may.
+   * that stopped before its result. fallback is why it ended, when it did not
+   * on its own (STOPPED: stopped from the app). unable says when the CLI could
+   * not collect at all (signed out, at its limit, no connector), so the other
+   * one may.
    */
   outcome(
     at: string,
-    fallback?: string,
+    fallback?: string | typeof STOPPED,
     stderr = '',
     unable?: Unable
   ): CollectOutcome {
+    const t = localized(text)
+    const stopped = fallback === STOPPED
+    const given = stopped ? t.stopped : fallback
+    this.stopped = stopped && !this.addError && !this.added
     const spent = {
       reads: this.reads,
       by: this.cli,
@@ -280,11 +309,11 @@ export class CollectStream {
     // Why the run itself failed comes first: signed out (in its result, or
     // on stderr when it stopped before one), there are no connectors at all.
     const said = this.ended ? (this.ended.ok ? '' : this.ended.text) : stderr
-    if (!this.addError && fallback !== STOPPED && failureCause(said) === 'auth')
+    if (!this.addError && !stopped && failureCause(said) === 'auth')
       return {
         at,
         ok: false,
-        error: SIGNED_OUT[this.cli],
+        error: t.signedOut[this.cli],
         signedOut: true,
         unable: 'auth',
         ...spent,
@@ -303,13 +332,12 @@ export class CollectStream {
         : undefined
     const error =
       this.addError ??
-      fallback ??
+      given ??
       (failed || undefined) ??
       noSources ??
-      (firstLine(this.ended?.text) ||
-        'The collection stopped before it finished.')
+      (firstLine(this.ended?.text) || t.unfinished)
     const why =
-      this.addError || fallback === STOPPED
+      this.addError || stopped
         ? undefined
         : (unable ??
           unableFrom(said) ??
@@ -378,7 +406,8 @@ export class CollectionEvents {
 /** Where a collection's run goes, as it runs (the run history in the app) */
 export interface CollectionRecorder {
   event(event: RunEvent): void
-  finish(outcome: CollectOutcome, attempts?: number): void
+  /** stopped: it was stopped from the app, and ended so */
+  finish(outcome: CollectOutcome, attempts?: number, stopped?: boolean): void
 }
 
 /**
@@ -397,13 +426,9 @@ export function recordCollection(
   )
   return {
     event: (event) => run.event(event),
-    finish: (outcome, attempts = 1) =>
+    finish: (outcome, attempts = 1, stopped = false) =>
       run.finish(
-        outcome.ok
-          ? 'succeeded'
-          : outcome.error === STOPPED
-            ? 'interrupted'
-            : 'failed',
+        outcome.ok ? 'succeeded' : stopped ? 'interrupted' : 'failed',
         {
           reads: outcome.reads,
           backend: { reasoner: outcome.by ?? cli, sandbox: 'host' },
@@ -417,7 +442,10 @@ export function recordCollection(
                   skipped: outcome.skipped,
                 },
               }
-            : { error: outcome.error }),
+            : {
+                error: outcome.error,
+                ...(outcome.unable ? { unable: outcome.unable } : {}),
+              }),
         },
         new Date(outcome.at)
       ),
@@ -430,7 +458,8 @@ const switchNote = (switched: Switch, to: OwnCli) => {
   const pad = (n: number) => String(n).padStart(2, '0')
   // 15:00, as the screens say it
   const until = at ? ` until ${pad(at.getHours())}:${pad(at.getMinutes())}` : ''
-  return `${switchWords(switched)}${until}, so ${CLI_NAMES[to]} collected.`
+  // Run records stay English (docs/i18n.md)
+  return `${switchWords(switched, undefined, 'en')}${until}, so ${CLI_NAMES[to]} collected.`
 }
 
 /**
@@ -443,6 +472,8 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
   private child?: ChildProcess
   private current: TasksCollect = {}
   private cancelled = false
+  /** The last attempt ended as stopped from the app */
+  private stopped = false
   private readonly ai: OwnAi
 
   constructor(
@@ -479,7 +510,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     if (last)
       this.current = {
         last:
-          !last.ok && Object.values(SIGNED_OUT).includes(last.error)
+          !last.ok && endedSignedOut(last)
             ? { ...last, signedOut: true }
             : last,
       }
@@ -495,10 +526,11 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       return {
         at: running?.startedAt ?? this.now(),
         ok: false,
-        error: 'A collection is already running.',
+        error: localized(text).running,
       }
     }
     this.cancelled = false
+    this.stopped = false
     const startedAt = this.now()
     this.set({ last: this.current.last, running: { startedAt, reads: 0 } })
     let recorder: CollectionRecorder | undefined
@@ -527,14 +559,14 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
     // Only background work waits out a rest; this always runs.
     const last: CollectOutcome =
       'resting' in ran
-        ? { at: this.now(), ok: false, error: 'The collection did not start.' }
+        ? { at: this.now(), ok: false, error: localized(text).notStarted }
         : {
             ...ran.result,
             by: ran.by,
             ...(ran.switched ? { switched: ran.switched } : {}),
           }
     this.set({ last })
-    this.keep(() => recorder?.finish(last, attempts))
+    this.keep(() => recorder?.finish(last, attempts, this.stopped))
     return last
   }
 
@@ -570,13 +602,15 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       let settled = false
       let buffer = ''
       let stderr = ''
-      const finish = (fallback?: string, unable?: Unable) => {
+      const finish = (fallback?: string | typeof STOPPED, unable?: Unable) => {
         if (settled) return
         settled = true
         clearTimeout(timer)
         this.child?.kill('SIGTERM')
         this.child = undefined
-        resolve(stream.outcome(this.now(), fallback, stderr, unable))
+        const outcome = stream.outcome(this.now(), fallback, stderr, unable)
+        this.stopped = stream.stopped
+        resolve(outcome)
       }
       const bin = this.options.bins?.()[cli]?.trim() || cli
       const [command, args] =
@@ -599,16 +633,13 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
       }
       const timeoutMs = this.options.timeoutMs ?? TIMEOUT_MS
       const timer = setTimeout(
-        () =>
-          finish(
-            `The collection did not finish in ${Math.round(timeoutMs / 60_000)} minutes.`
-          ),
+        () => finish(localized(text).slow(Math.round(timeoutMs / 60_000))),
         timeoutMs
       )
       child.on('error', (error) =>
         (error as NodeJS.ErrnoException).code === 'ENOENT'
           ? finish(
-              `Collecting needs ${CLI_NAMES[cli]}, signed in, with its ${sourceNames()} connector: ${cli} is not on this Mac.`,
+              localized(text).needsCli(CLI_NAMES[cli], labels(), cli),
               'missing'
             )
           : finish(error.message)
@@ -644,7 +675,7 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
           this.cancelled
             ? STOPPED
             : code !== 0 && !stream.ended
-              ? firstLine(stderr) || `${cli} exited with code ${code}.`
+              ? firstLine(stderr) || localized(text).exited(cli, code)
               : undefined
         )
       })

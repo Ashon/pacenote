@@ -89,6 +89,12 @@ describe("which CLI does Pacenote's own work", () => {
     expect(switchWords(first.switched)).toBe(
       'Claude Code was at its usage limit'
     )
+    expect(switchWords(first.switched, '15:00')).toBe(
+      'Claude Code was at its usage limit until 15:00'
+    )
+    expect(switchWords(first.switched, '15:00', 'ko')).toBe(
+      'Claude Code가 사용 한도에 도달했어요 (15:00까지)'
+    )
 
     // While Claude Code rests, work goes straight to Codex, saying why.
     calls.length = 0

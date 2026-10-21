@@ -14,6 +14,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { localized } from '../../../src/i18n/locale.js'
 import { TOOL_LABEL } from '../../../src/tasks/context.js'
 import { codexLogs, head } from '../../../src/tasks/folders.js'
 import type {
@@ -23,6 +24,7 @@ import type {
   WorkEntry,
   WorkTool,
 } from '../../../src/tasks/types.js'
+import { text } from './handoff.text.js'
 
 /**
  * Continuing a task where its work happens: Claude Code or Codex opened in a
@@ -261,9 +263,12 @@ export async function openInTerminal(
       run('open', ['-b', TERMINALS[which].bundle, file])
     await open(app).catch((error: Error) => {
       if (terminal === 'auto' && app !== 'terminal') return open('terminal')
+      const t = localized(text)
       throw new Error(
-        `${TERMINALS[app].name} did not open (${error.message.trim()}). ` +
-          'Choose another terminal in Settings > Todo.'
+        t.didNotOpen(
+          app === 'terminal' ? t.terminal : TERMINALS[app].name,
+          error.message.trim()
+        )
       )
     })
     return
@@ -340,12 +345,6 @@ export async function startSession(
 
 // ---------------------------------------------------------------------------
 // The desktop apps
-
-/** The desktop app each tool's sessions can open in */
-export const APP_NAME: Record<WorkTool, string> = {
-  claude: 'Claude app',
-  codex: 'Codex app',
-}
 
 /**
  * The longest prompt a link carries whole: the Claude app cuts its prompt near
@@ -425,17 +424,15 @@ export async function openSession(
 ): Promise<{ entry: Session; note?: string }> {
   if (options.openIn?.() !== 'app')
     return { entry: await startSession(options, task, context, tool, cwd) }
+  const t = localized(text)
   if (!options.hasApp?.(tool))
     return {
       entry: await startSession(options, task, context, tool, cwd),
-      note: `The ${APP_NAME[tool]} isn't on this Mac, so the session opened in your terminal.`,
+      note: t.noApp(tool),
     }
   return {
     entry: await startInApp(options, task, context, tool, cwd),
-    note:
-      tool === 'claude'
-        ? 'Opened in the Claude app with the task written in. Confirm the folder there, then send it.'
-        : 'Opened in the Codex app with the task written in. Send it there to start.',
+    note: tool === 'claude' ? t.openedInClaude : t.openedInCodex,
   }
 }
 
@@ -453,7 +450,7 @@ export async function resumeSession(
   options: HandoffOptions,
   entry: Session
 ): Promise<void> {
-  if (!entry.session) throw new Error('Its session has not been found yet.')
+  if (!entry.session) throw new Error(localized(text).notFoundYet)
   if (resumesInApp(options, entry))
     return (options.openLink ?? openLink)(codexThreadLink(entry.session))
   const now = options.now?.() ?? new Date()
@@ -476,12 +473,13 @@ export async function resumeSession(
 /**
  * The script that signs Claude Code in again: claude auth login, which goes
  * on in the browser. The login stays Claude Code's; Pacenote never sees it.
+ * What it says once signed in is in the app's language.
  */
 export function signInScript(bin: string, tool: WorkTool = 'claude'): string {
   return [
     '#!/bin/zsh -l',
     `# Written by Pacenote to sign ${tool === 'codex' ? 'Codex' : 'Claude Code'} in again; safe to delete.`,
-    `${shellQuote(bin)} ${tool === 'codex' ? 'login' : 'auth login'} && echo 'Signed in. Collect again in Pacenote.'`,
+    `${shellQuote(bin)} ${tool === 'codex' ? 'login' : 'auth login'} && echo ${shellQuote(localized(text).signedIn)}`,
     '',
   ].join('\n')
 }

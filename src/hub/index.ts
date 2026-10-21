@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     allowedUsers: config.allowedUsers,
     publicUrl: config.publicUrl,
     filesOrigin: slackFilesOrigin(config.apiUrl),
+    notesLocale: config.notesLocale,
     log,
   })
   app.event('app_mention', async ({ body }) => {

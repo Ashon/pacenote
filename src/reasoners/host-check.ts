@@ -1,8 +1,10 @@
 import { tmpdir } from 'node:os'
+import { localized } from '../i18n/locale.js'
 import { hostEnv } from '../sandbox/host.js'
 import { runProcess, type RunResult } from '../sandbox/process.js'
 import type { CliCheck } from '../settings/setup.js'
 import type { ReasonerId } from './ids.js'
+import { text } from './host-check.text.js'
 
 export type { CliCheck }
 
@@ -11,16 +13,6 @@ export type { CliCheck }
  * reference directory (codexArgs in codex.ts)
  */
 export const CODEX_MIN_VERSION = '0.138.0'
-
-const PRODUCTS: Record<ReasonerId, string> = {
-  claude: 'Claude Code',
-  codex: 'the Codex CLI',
-}
-
-const SIGN_IN: Record<ReasonerId, string> = {
-  claude: 'run claude in Terminal and sign in with /login',
-  codex: 'run codex login in Terminal',
-}
 
 /** Runs one CLI command the way an answer would, without its secrets */
 export type CliRunner = (args: string[]) => Promise<RunResult>
@@ -41,6 +33,7 @@ export async function checkCli(
       env: hostEnv(process.env),
     })
 ): Promise<CliCheck> {
+  const t = localized(text)
   let output: string
   try {
     output = (await run(['--version'])).stdout
@@ -51,8 +44,8 @@ export async function checkCli(
       signedIn: false,
       problems: [
         /not found/.test((err as Error).message)
-          ? `${backend} is not installed on this Mac, or not on its PATH: install ${PRODUCTS[backend]} and sign in, or choose the other reasoner in Settings > Answers.`
-          : `${backend} --version failed: ${(err as Error).message}`,
+          ? t.notInstalled(backend)
+          : t.versionFailed(backend, (err as Error).message),
       ],
     }
   }
@@ -62,15 +55,9 @@ export async function checkCli(
     backend === 'codex' &&
     version !== undefined &&
     olderThan(version, CODEX_MIN_VERSION)
-  if (tooOld)
-    problems.push(
-      `codex ${version} is too old: Pace needs ${CODEX_MIN_VERSION} or later, which keeps codex to the reference directory. Update codex (npm install -g @openai/codex, or brew upgrade codex).`
-    )
+  if (tooOld) problems.push(t.codexTooOld(version, CODEX_MIN_VERSION))
   const signed = await signedIn(backend, run)
-  if (!signed)
-    problems.push(
-      `${backend} is not signed in on this Mac: ${SIGN_IN[backend]}.`
-    )
+  if (!signed) problems.push(t.notSignedIn(backend))
   return {
     backend,
     installed: true,

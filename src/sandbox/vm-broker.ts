@@ -10,6 +10,8 @@ import { brokerExpected, loadBrokerEnv } from './env.js'
 import { prepareBrokerFiles } from './prepare.js'
 import type { Requester } from './runtime.js'
 import { jobHint } from './types.js'
+import { localized } from '../i18n/locale.js'
+import { text } from './vm-broker.text.js'
 import { brokerRuntimeDir } from '../settings/paths.js'
 
 /**
@@ -212,7 +214,7 @@ export class VmBroker {
         path.join(options.root, 'images', options.image, 'rootfs.ext4')
       )
     )
-      throw new Error(`The ops broker's image is not built: ${jobHint('vm')}.`)
+      throw new Error(localized(text).notBuilt(jobHint('vm')))
     const brokerEnv = loadBrokerEnv(options.env)
     await prepareBrokerFiles(brokerEnv, options.env, (line) =>
       options.log?.info(line)

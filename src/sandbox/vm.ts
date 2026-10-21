@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { arch, release, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { localized } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
 import { parseAllowlist } from './allowlist.js'
 import { EgressProxy, type Resolve } from './egress.js'
@@ -20,7 +21,8 @@ import {
   type OwnTools,
   type VmBrokerOptions,
 } from './vm-broker.js'
-import { IMAGE_RECIPES, imageCurrent } from './vm-images.js'
+import { imageCurrent, VM_IMAGE } from './vm-images.js'
+import { text } from './vm.text.js'
 
 /**
  * The reasoner sandbox built into Pacenote: each run is one process in a
@@ -100,7 +102,7 @@ export function vmUnsupported(
   const darwin = Number(kernel.split('.')[0])
   // Darwin 24 is macOS 15.
   if (platform !== 'darwin' || cpu !== 'arm64' || !(darwin >= 24))
-    return 'The built-in sandbox needs a Mac with Apple silicon and macOS 15 or later.'
+    return localized(text).unsupported
   return undefined
 }
 
@@ -270,7 +272,7 @@ export class VmSandbox implements Sandbox {
     const problems = vmProblems(await vmStatus({ bin, root, image }))
     if (!existsSync(this.options.allowlistFile))
       problems.push(
-        `The allowed domains list is missing (${this.options.allowlistFile}): ${jobHint('vm')}.`
+        localized(text).noAllowlist(this.options.allowlistFile, jobHint('vm'))
       )
     if (problems.length > 0) return problems
     const broker = await this.brokerProblem()
@@ -293,7 +295,10 @@ export class VmSandbox implements Sandbox {
       this.started = true
       return problems
     } catch (err) {
-      return [...problems, `A VM did not start: ${(err as Error).message}`]
+      return [
+        ...problems,
+        localized(text).vmDidNotStart((err as Error).message),
+      ]
     }
   }
 
@@ -316,7 +321,7 @@ export class VmSandbox implements Sandbox {
       })
     }
     await this.brokerStarting
-    return this.broker.problem && `Ops tools: ${this.broker.problem}`
+    return this.broker.problem && localized(text).opsTools(this.broker.problem)
   }
 
   /** Stops the broker's VM and the way out, at shutdown */
@@ -409,7 +414,10 @@ export async function vmStatus(
     const report = await readVmReport(options)
     status.helper.ok = report.version === VM_FORMAT
     if (!status.helper.ok)
-      status.helper.error = `pacenote-vm speaks version ${report.version}, Pacenote ${VM_FORMAT}.`
+      status.helper.error = localized(text).helperVersion(
+        report.version,
+        VM_FORMAT
+      )
     status.kernel = report.kernel === true
     status.initfs = report.initfs === true
     const built = (name: string): VmImageStatus | undefined => {
@@ -428,7 +436,9 @@ export async function vmStatus(
   } catch (err) {
     status.helper.error = existsSync(options.bin)
       ? (err as Error).message
-      : `pacenote-vm not found at ${options.bin}.`
+      : // English in every language: failureCause (mention/failure.ts) reads
+        // "pacenote-vm not found" as a setup failure.
+        `pacenote-vm not found at ${options.bin}.`
   }
   return status
 }
@@ -460,35 +470,22 @@ export async function vmOutdated(
     )
   })
   if (outdated.length === 0) return []
-  const names = outdated.map(
-    (name) => `the ${(IMAGE_RECIPES[name]?.title ?? name).toLowerCase()}`
-  )
-  const list =
-    names.length === 1
-      ? names[0]!
-      : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
-  const one = names.length === 1
-  return [
-    `${list[0]!.toUpperCase()}${list.slice(1)} ${one ? 'was' : 'were'} built for another version of Pacenote: ${jobHint('vm')} to update ${one ? 'it' : 'them'}.`,
-  ]
+  const t = localized(text)
+  return [t.outdated(outdated.map(t.image), jobHint('vm'))]
 }
 
 /**
- * What keeps the built-in sandbox from running, from its status: image names
- * the image asked for (status.image)
+ * What keeps the built-in sandbox from running, from its status: image is the
+ * name of the image asked for (status.image), VM_IMAGE or VM_RENDERER_IMAGE
  */
-export function vmProblems(
-  status: VmStatus,
-  image = 'the reasoner image'
-): string[] {
+export function vmProblems(status: VmStatus, image = VM_IMAGE): string[] {
+  const t = localized(text)
   if (status.unsupported) return [status.unsupported]
-  if (!status.helper.ok) return [status.helper.error ?? 'pacenote-vm failed.']
+  if (!status.helper.ok) return [status.helper.error ?? t.helperFailed]
   const missing = [
-    !status.kernel && 'the Linux kernel',
-    !status.initfs && 'the init filesystem',
-    !status.image && image,
-  ].filter(Boolean)
-  return missing.length > 0
-    ? [`The built-in sandbox lacks ${missing.join(', ')}: ${jobHint('vm')}.`]
-    : []
+    !status.kernel && t.kernel,
+    !status.initfs && t.initfs,
+    !status.image && t.image(image),
+  ].filter((part) => typeof part === 'string')
+  return missing.length > 0 ? [t.lacks(missing, jobHint('vm'))] : []
 }

@@ -15,8 +15,10 @@ import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
+import { useText } from '@/lib/i18n'
 import { allowedIds, useFromMac } from '@/lib/setup'
 import { cn } from '@/lib/utils'
+import { localized } from '@src/i18n/locale'
 import { PaceSpinner } from '../pace-spinner'
 import { SLACK_APP_URL } from '../slack-app-setup'
 import {
@@ -28,6 +30,7 @@ import {
   StepFrame,
   useWaited,
 } from './parts'
+import { text } from './slack-step.text'
 
 export type SlackPart = 'choose' | 'app' | 'me'
 type Connection = 'hub' | 'app'
@@ -127,6 +130,7 @@ function ChooseConnection({
   /** Set up from your other Mac: on to the review */
   onFromMac: (me: Me) => void
 }) {
+  const t = useText(text)
   const hub = window.pacenoteDesktop?.hub
   const mac = useFromMac()
   const [chosen, setChosen] = useState<Choice>()
@@ -159,15 +163,11 @@ function ChooseConnection({
         else if (res.status === 'bound')
           setPair({ step: 'bound', user: res.user })
         else if (res.status === 'expired')
-          setPair({
-            step: 'error',
-            message: 'The code expired before it came back. Get a new one.',
-            afterCode: true,
-          })
+          setPair({ step: 'error', message: t.codeExpired, afterCode: true })
       })
     }, 1_500)
     return () => clearInterval(timer)
-  }, [pair.step, hub])
+  }, [pair.step, hub, t])
   // Leaving cancels a pairing that was not confirmed.
   useEffect(() => () => void hub?.pairCancel(), [hub])
   // Leaving the step lets your other Mac go
@@ -227,57 +227,57 @@ function ChooseConnection({
             )
           }
         >
-          Continue
+          {t.continue}
         </Button>
       ) : mac.state.step === 'confirming' ? (
         <>
           <Button variant="ghost" onClick={() => mac.look()}>
-            Cancel
+            {t.cancel}
           </Button>
           <Button disabled>
             <LoaderCircle className="animate-spin" />
-            Waiting for {mac.state.name}
+            {t.waitingFor(mac.state.name)}
           </Button>
         </>
       ) : null
     ) : connection === 'app' ? (
-      <Button onClick={onApp}>Set up your own app</Button>
+      <Button onClick={onApp}>{t.setUpOwnApp}</Button>
     ) : pair.step === 'bound' || pair.step === 'confirming' ? null : asking ? (
       <>
         <Button variant="ghost" onClick={() => cancel()}>
-          Cancel
+          {t.cancel}
         </Button>
         <Button disabled>
           <LoaderCircle className="animate-spin" />
-          {pair.step === 'waiting' ? 'Waiting for Slack' : 'Getting a code'}
+          {pair.step === 'waiting' ? t.waitingForSlack : t.gettingCode}
         </Button>
       </>
     ) : pairedHere ? (
       <>
         <Button variant="ghost" onClick={start}>
-          Pair again
+          {t.pairAgain}
         </Button>
         <Button onClick={() => onPaired(pairedHere)}>
-          Continue as @{pairedHere.name}
+          {t.continueAs(pairedHere.name)}
         </Button>
       </>
     ) : (
       <Button onClick={start} disabled={!hubUrl.trim()}>
         {pair.step === 'error' && pair.afterCode
-          ? 'Get a new code'
-          : 'Get a pairing code'}
+          ? t.getNewCode
+          : t.getPairingCode}
       </Button>
     )
 
   return (
     <StepFrame
       step="slack"
-      title="Connect Pace to Slack"
-      lead="Pace answers when someone mentions it in a public channel of your workspace."
+      title={t.title}
+      lead={t.lead}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {primary}
@@ -286,7 +286,7 @@ function ChooseConnection({
     >
       <div
         role="radiogroup"
-        aria-label="How Pace reaches Slack"
+        aria-label={t.connectionLabel}
         className="grid grid-cols-1 gap-3"
       >
         <ChoiceCard
@@ -296,13 +296,10 @@ function ChooseConnection({
           onChoose={() => choose('hub')}
         >
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <b className="text-section">Join your team's hub</b>
-            <Chip tone="neutral">For teams</Chip>
+            <b className="text-section">{t.hubTitle}</b>
+            <Chip tone="neutral">{t.forTeams}</Chip>
           </span>
-          <span className="text-body text-muted-foreground">
-            Someone on your team runs a Pacenote hub. You pair this Mac once,
-            and the Slack tokens stay on the hub.
-          </span>
+          <span className="text-body text-muted-foreground">{t.hubWhat}</span>
         </ChoiceCard>
         <ChoiceCard
           name="connection"
@@ -310,11 +307,8 @@ function ChooseConnection({
           checked={connection === 'app'}
           onChoose={() => choose('app')}
         >
-          <b className="text-section">Use your own Slack app</b>
-          <span className="text-body text-muted-foreground">
-            Create an app from the Pacenote manifest and bring back two tokens.
-            Best when you're the only one using Pace.
-          </span>
+          <b className="text-section">{t.appCardTitle}</b>
+          <span className="text-body text-muted-foreground">{t.appWhat}</span>
         </ChoiceCard>
         <ChoiceCard
           name="connection"
@@ -323,13 +317,10 @@ function ChooseConnection({
           onChoose={() => choose('mac')}
         >
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <b className="text-section">Connect to your other Mac</b>
-            <Chip tone="neutral">Already set up</Chip>
+            <b className="text-section">{t.macTitle}</b>
+            <Chip tone="neutral">{t.alreadySetUp}</Chip>
           </span>
-          <span className="text-body text-muted-foreground">
-            Pacenote is set up on another of your Macs. Bring its Slack app and
-            who you are from there; nothing to create.
-          </span>
+          <span className="text-body text-muted-foreground">{t.macWhat}</span>
         </ChoiceCard>
       </div>
       <Collapsible open={connection === 'mac'}>
@@ -341,7 +332,7 @@ function ChooseConnection({
         <CollapsibleContent>
           <div className="flex flex-col gap-3 rounded-xl bg-well px-5 py-4">
             <label className="flex flex-col gap-1.5 text-body font-medium">
-              Hub address
+              {t.hubAddress}
               <Input
                 type="url"
                 value={hubUrl}
@@ -356,11 +347,7 @@ function ChooseConnection({
                   state={pair}
                   pairedHere={pairedHere}
                   onConfirm={confirm}
-                  onNotMe={() =>
-                    cancel(
-                      'Cancelled. If someone else sent your code, get a new one.'
-                    )
-                  }
+                  onNotMe={() => cancel(t.cancelledNotMe)}
                 />
               </Swap>
             </div>
@@ -379,6 +366,7 @@ const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
  * number to compare; and what came from it
  */
 function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
+  const t = useText(text)
   const [typing, setTyping] = useState(false)
   const [address, setAddress] = useState('')
   const { state } = mac
@@ -392,17 +380,15 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
         <>
           <b className="flex items-center gap-2 text-section">
             <CircleCheck className="size-4 text-status-succeeded" />
-            Connected to {state.name}
+            {t.connectedTo(state.name)}
           </b>
           <ul className="flex flex-col gap-1 text-body">
-            <li>Your Slack app</li>
-            {state.me && <li>Pace answers {state.me.name}</li>}
-            <li>Todo settings: your names, groups and channels left out</li>
-            <li>Follow the Mac you're using: on</li>
+            <li>{t.yourSlackApp}</li>
+            {state.me && <li>{t.paceAnswers(state.me.name)}</li>}
+            <li>{t.todoSettings}</li>
+            <li>{t.followMac}</li>
           </ul>
-          <p className="text-meta text-muted-foreground">
-            AI sign-in, the sandbox, ops tools and folders stay with each Mac.
-          </p>
+          <p className="text-meta text-muted-foreground">{t.stayWithEachMac}</p>
         </>
       ) : state.step === 'confirming' ? (
         <>
@@ -412,20 +398,14 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
           >
             {codeWords(state.code)}
           </p>
-          <p className="text-body">
-            Check that {state.name} shows the same number, then click Allow
-            there.
-          </p>
+          <p className="text-body">{t.sameNumber(state.name)}</p>
         </>
       ) : (
         <>
           <p className="text-body">
-            On your other Mac, open{' '}
-            <span className="font-semibold whitespace-nowrap">
-              Pacenote &gt; Settings &gt; Macs
-            </span>{' '}
-            and click{' '}
-            <span className="font-semibold whitespace-nowrap">Add a Mac</span>.
+            {t.openAddMac((name) => (
+              <span className="font-semibold whitespace-nowrap">{name}</span>
+            ))}
           </p>
           {state.step === 'error' ? (
             <p className="flex items-start gap-2 text-body text-status-failed">
@@ -436,8 +416,8 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
             <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
               {state.retrying
-                ? `Waiting for ${state.name}. Check that Add a Mac is open there.`
-                : `Connecting to ${state.name}…`}
+                ? t.macRetrying(state.name)
+                : t.macConnecting(state.name)}
             </p>
           ) : (
             <>
@@ -455,13 +435,13 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
                       size="sm"
                       onClick={() => mac.connect({ instance: found.instance })}
                     >
-                      Connect
+                      {t.connect}
                     </Button>
                   </div>
                 ))}
               <p className="flex items-center gap-2 text-meta text-muted-foreground">
                 <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-                Looking for it on this network…
+                {t.looking}
               </p>
             </>
           )}
@@ -472,7 +452,7 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
               className="self-start"
               onClick={() => mac.look()}
             >
-              Try again
+              {t.tryAgain}
             </Button>
           )}
           {typing ? (
@@ -485,14 +465,14 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
             >
               <Input
                 autoFocus
-                aria-label="Address of your other Mac"
-                placeholder="100.68.0.12 or macbook-pro.local"
+                aria-label={t.macAddressLabel}
+                placeholder={t.macAddressPlaceholder}
                 value={address}
                 onChange={(event) => setAddress(event.target.value)}
                 className="h-8 flex-1"
               />
               <Button size="sm" type="submit" disabled={!address.trim()}>
-                Connect
+                {t.connect}
               </Button>
             </form>
           ) : (
@@ -501,7 +481,7 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
               className="self-start text-meta text-muted-foreground hover:text-foreground hover:underline"
               onClick={() => setTyping(true)}
             >
-              Not on this network? Enter its address
+              {t.enterAddress}
             </button>
           )}
         </>
@@ -521,33 +501,30 @@ function PairBody({
   onConfirm: (user: HubUser) => void
   onNotMe: () => void
 }) {
+  const t = useText(text)
   switch (state.step) {
     case 'idle':
       return (
         <p className="text-body text-muted-foreground">
           {state.note ??
-            (pairedHere
-              ? `This Mac is paired with this hub as @${pairedHere.name}.`
-              : 'You get a code to send to Pace in Slack. Your mentions then come to this Mac.')}
+            (pairedHere ? t.pairedHere(pairedHere.name) : t.pairWhat)}
         </p>
       )
     case 'starting':
       return (
         <p className="flex items-center gap-2 text-body text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
-          Getting a code from the hub
+          {t.gettingCodeFromHub}
         </p>
       )
     case 'waiting':
       return (
         <div className="flex flex-col gap-2.5">
-          <p className="text-body">
-            In a channel Pace is in, send this. It expires in 10 minutes.
-          </p>
+          <p className="text-body">{t.sendThis}</p>
           <CommandLine text={`@Pace connect ${state.code}`} raised />
           <p className="flex items-center gap-2 text-meta text-muted-foreground">
             <PaceSpinner className="size-6" />
-            <span className="text-shimmer">Waiting for your mention</span>
+            <span className="text-shimmer">{t.waitingForMention}</span>
           </p>
         </div>
       )
@@ -556,7 +533,7 @@ function PairBody({
       return (
         <WhoSent
           user={state.user}
-          where="sent the code"
+          line={t.sentTheCode(state.user.name)}
           actions={
             <>
               <Button
@@ -564,7 +541,7 @@ function PairBody({
                 disabled={state.step === 'confirming'}
                 onClick={onNotMe}
               >
-                Not me
+                {t.notMe}
               </Button>
               <Button
                 disabled={state.step === 'confirming'}
@@ -573,7 +550,7 @@ function PairBody({
                 {state.step === 'confirming' && (
                   <LoaderCircle className="animate-spin" />
                 )}
-                Yes, that's me
+                {t.yesMe}
               </Button>
             </>
           }
@@ -595,16 +572,18 @@ function PairBody({
  */
 function WhoSent({
   user,
-  where,
+  line,
   said,
   actions,
 }: {
   user: { id: string; name: string; realName?: string }
-  where: string
+  /** What they did, under their name: "@ash sent the code" */
+  line: string
   /** What they wrote */
   said?: string
   actions: React.ReactNode
 }) {
+  const t = useText(text)
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3.5">
@@ -617,7 +596,7 @@ function WhoSent({
         <span className="flex min-w-0 flex-1 flex-col">
           <b className="truncate text-section">{user.realName ?? user.name}</b>
           <span className="truncate text-body text-muted-foreground">
-            @{user.name} {where}
+            {line}
           </span>
           {said && (
             <span className="truncate text-body text-foreground">"{said}"</span>
@@ -625,7 +604,7 @@ function WhoSent({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="flex-1 text-section">Is this you?</span>
+        <span className="flex-1 text-section">{t.isThisYou}</span>
         {actions}
       </div>
     </div>
@@ -637,72 +616,70 @@ function WhoSent({
  * where it goes instead
  */
 function tokenShape(kind: 'app' | 'bot', value: string): string | undefined {
+  const t = localized(text)
   const token = value.trim()
   if (!token) return undefined
   if (kind === 'app') {
     if (token.startsWith('xapp-')) return undefined
-    if (token.startsWith('xoxb-'))
-      return 'This is the bot token. It goes in the next field.'
-    return 'App-Level Tokens start with xapp-.'
+    if (token.startsWith('xoxb-')) return t.botTokenHere
+    return t.appTokenStart
   }
   if (token.startsWith('xoxb-')) return undefined
-  if (token.startsWith('xapp-'))
-    return 'This is the App-Level Token. It goes in the field above.'
-  if (token.startsWith('xoxp-'))
-    return 'This is a user token. Copy the Bot User OAuth Token, which starts with xoxb-.'
-  return 'Bot tokens start with xoxb-.'
+  if (token.startsWith('xapp-')) return t.appTokenHere
+  if (token.startsWith('xoxp-')) return t.userToken
+  return t.botTokenStart
 }
 
 /** What Slack's answer about a token means, and what to do about it */
-function slackProblem(kind: 'app' | 'bot', detail = ''): string {
+function slackProblem(
+  kind: 'app' | 'bot',
+  detail = '',
+  missing?: string[]
+): string {
+  const t = localized(text)
   if (/invalid_auth|not_authed|invalid_token/.test(detail))
-    return "Slack doesn't recognize this token. Copy it again from your app."
+    return t.notRecognized
   if (/token_revoked|token_expired/.test(detail))
-    return kind === 'app'
-      ? 'This token was revoked. Generate a new App-Level Token.'
-      : 'This token was revoked. Reinstall the app and copy the new bot token.'
-  if (/account_inactive/.test(detail))
-    return 'The app was removed from the workspace. Install it again and copy the new token.'
+    return kind === 'app' ? t.appRevoked : t.botRevoked
+  if (/account_inactive/.test(detail)) return t.appRemoved
   if (/not_allowed_token_type/.test(detail))
-    return kind === 'app'
-      ? "This isn't an App-Level Token. Those start with xapp-."
-      : "This isn't a bot token. Those start with xoxb-."
+    return kind === 'app' ? t.notAppToken : t.notBotToken
   if (
     /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|EAI_AGAIN|getaddrinfo/i.test(detail)
   )
-    return "Couldn't reach Slack. Check your network."
-  const missing = /^Missing: (.+)/.exec(detail)?.[1]
-  if (missing)
-    return `The app is missing permissions (${missing}). Create it from the manifest, or add them and reinstall it.`
-  return detail || 'Slack turned this token down.'
+    return t.unreachable
+  if (missing?.length) return t.missingScopes(missing.join(', '))
+  return detail || t.turnedDown
 }
 
 /** What the token check says about each token */
 function tokenStates(items: SlackCheckItem[] | undefined) {
-  const item = (label: string) => items?.find((each) => each.label === label)
-  const bot = item('Bot token')
-  const scopes = item('Bot scopes')
-  const same = item('Same app')
-  const socket = item('Socket Mode')
-  const tokens = item('Tokens')
-  const team = bot?.ok ? bot.detail?.split(' @ ')[1] : undefined
+  const t = localized(text)
+  const item = (id: SlackCheckItem['id']) =>
+    items?.find((each) => each.id === id)
+  const bot = item('botToken')
+  const scopes = item('botScopes')
+  const same = item('sameApp')
+  const socket = item('socketMode')
+  const tokens = item('tokens')
+  const team = bot?.ok ? bot.team : undefined
   return {
     app: socket
       ? socket.ok
-        ? { ok: true, text: 'Valid' }
+        ? { ok: true, text: t.valid }
         : { ok: false, text: slackProblem('app', socket.detail) }
       : undefined,
     bot: bot
       ? !bot.ok
         ? { ok: false, text: slackProblem('bot', bot.detail) }
         : scopes && !scopes.ok
-          ? { ok: false, text: slackProblem('bot', scopes.detail) }
-          : { ok: true, text: team ? `Valid · ${team}` : 'Valid' }
+          ? {
+              ok: false,
+              text: slackProblem('bot', scopes.detail, scopes.missing),
+            }
+          : { ok: true, text: team ? t.validIn(team) : t.valid }
       : undefined,
-    mismatch:
-      same && !same.ok
-        ? 'These tokens come from two different apps. Copy both from the same one.'
-        : undefined,
+    mismatch: same && !same.ok ? t.mismatch : undefined,
     missing: tokens && !tokens.ok ? tokens.detail : undefined,
     ready: Boolean(
       bot?.ok && scopes?.ok !== false && same?.ok !== false && socket?.ok
@@ -724,6 +701,7 @@ function AppTokens({
   onBack: () => void
   onDone: () => void
 }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.settings
   const secrets = settings.view?.secrets
   const [opened, setOpened] = useState(false)
@@ -808,13 +786,13 @@ function AppTokens({
   return (
     <StepFrame
       step="slack"
-      part="Your own Slack app"
-      title="Create your Slack app"
-      lead="Pacenote fills in the app's name and permissions. You create it in your workspace and bring back two tokens."
+      part={t.ownApp}
+      title={t.createAppTitle}
+      lead={t.appLead}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {error && <p className="text-body text-status-failed">{error}</p>}
@@ -825,7 +803,7 @@ function AppTokens({
             {(checking || saving) && haveApp && haveBot && (
               <LoaderCircle className="animate-spin" />
             )}
-            Connect Slack
+            {t.connectSlack}
           </Button>
         </>
       }
@@ -834,13 +812,12 @@ function AppTokens({
         <li className="flex items-center gap-3">
           <StepNumber n={1} className="self-start" />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <b className="text-section">Create the app</b>
+            <b className="text-section">{t.createApp}</b>
             <span className="text-body text-muted-foreground">
-              Opens Slack with the Pacenote manifest filled in. Pick your
-              workspace and choose Create.
+              {t.createAppWhat}
             </span>
           </span>
-          {opened && <Chip tone="ok">Opened in your browser</Chip>}
+          {opened && <Chip tone="ok">{t.opened}</Chip>}
           <Button variant="outline" asChild>
             <a
               href={SLACK_APP_URL}
@@ -849,40 +826,35 @@ function AppTokens({
               onClick={() => setOpened(true)}
             >
               <ExternalLink />
-              Create the Slack app
+              {t.createSlackApp}
             </a>
           </Button>
         </li>
         <TokenField
           n={2}
-          label="App-Level Token"
+          label={t.appToken}
           setting="SLACK_APP_TOKEN"
           hint={secrets?.SLACK_APP_TOKEN}
           value={appToken}
           onChange={setAppToken}
           placeholder="xapp-..."
-          where={
-            <>
-              In the app's Basic Information, under App-Level Tokens, choose
-              Generate Token and Scopes, add{' '}
-              <code className="rounded-sm bg-well px-1 font-mono text-meta">
-                connections:write
-              </code>
-              , and copy the token.
-            </>
-          }
+          where={t.appTokenWhere(
+            <code className="rounded-sm bg-well px-1 font-mono text-meta">
+              connections:write
+            </code>
+          )}
           state={shape.app ? { ok: false, text: shape.app } : states.app}
           checking={checking && haveApp && haveBot}
         />
         <TokenField
           n={3}
-          label="Bot token"
+          label={t.botToken}
           setting="SLACK_BOT_TOKEN"
           hint={secrets?.SLACK_BOT_TOKEN}
           value={botToken}
           onChange={setBotToken}
           placeholder="xoxb-..."
-          where="Under Install App, install it to your workspace, then copy the Bot User OAuth Token."
+          where={t.botTokenWhere}
           state={shape.bot ? { ok: false, text: shape.bot } : states.bot}
           checking={checking && haveApp && haveBot}
         />
@@ -897,22 +869,18 @@ function AppTokens({
         </p>
       )}
       <p className="text-body text-muted-foreground">
-        Made the app already? Its settings are in{' '}
-        <a
-          href={SLACK_APPS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-primary hover:underline"
-        >
-          your Slack apps
-        </a>
-        .
+        {t.madeAlready((label) => (
+          <a
+            href={SLACK_APPS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-primary hover:underline"
+          >
+            {label}
+          </a>
+        ))}
       </p>
-      <Note>
-        Does your workspace ask an admin to approve apps? Slack sends them the
-        request when you install. The tokens you enter here are kept, so you can
-        come back once it's approved.
-      </Note>
+      <Note>{t.adminApproval}</Note>
     </StepFrame>
   )
 }
@@ -953,6 +921,7 @@ function TokenField({
   state?: { ok: boolean; text: string }
   checking: boolean
 }) {
+  const t = useText(text)
   const problem = !checking && state && !state.ok ? state.text : undefined
   return (
     <li className="flex gap-3">
@@ -969,16 +938,14 @@ function TokenField({
             spellCheck={false}
             value={value}
             aria-invalid={problem ? true : undefined}
-            placeholder={
-              hint?.set ? `Saved (${hint.hint ?? '...'})` : placeholder
-            }
+            placeholder={hint?.set ? t.saved(hint.hint ?? '...') : placeholder}
             onChange={(e) => onChange(e.target.value)}
             className="font-mono"
           />
           {checking ? (
             <Chip tone="neutral">
               <LoaderCircle className="animate-spin" />
-              Checking
+              {t.checking}
             </Chip>
           ) : state?.ok ? (
             <Chip tone="ok" className="max-w-64">
@@ -987,7 +954,7 @@ function TokenField({
               </span>
             </Chip>
           ) : state ? (
-            <Chip tone="failed">Not valid</Chip>
+            <Chip tone="failed">{t.notValid}</Chip>
           ) : null}
         </span>
         {problem ? (
@@ -1017,6 +984,7 @@ function ItsMe({
   onBack: () => void
   onDone: (me: Me) => void
 }) {
+  const t = useText(text)
   const setup = window.pacenoteDesktop?.setup
   const [listening, setListening] = useState<
     | { state: 'starting' }
@@ -1072,18 +1040,18 @@ function ItsMe({
   return (
     <StepFrame
       step="slack"
-      part="Your own Slack app"
-      title="Show Pace it's you"
-      lead="Pace answers only you. Mention it once in Slack so it knows which account is yours."
+      part={t.ownApp}
+      title={t.itsMeTitle}
+      lead={t.itsMeLead}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {before && !claimed && (
             <Button onClick={() => onDone(before)}>
-              Continue as @{before.name}
+              {t.continueAs(before.name)}
             </Button>
           )}
         </>
@@ -1092,15 +1060,13 @@ function ItsMe({
       <ol className="flex flex-col gap-3">
         <li className="flex items-center gap-3">
           <StepNumber n={1} />
-          <span className="w-52 shrink-0 text-section">
-            Invite Pace to a public channel
-          </span>
+          <span className="w-52 shrink-0 text-section">{t.invite}</span>
           <CommandLine text="/invite @Pace" />
         </li>
         <li className="flex items-center gap-3">
           <StepNumber n={2} />
-          <span className="w-52 shrink-0 text-section">Mention it there</span>
-          <CommandLine text="@Pace it's me" />
+          <span className="w-52 shrink-0 text-section">{t.mentionThere}</span>
+          <CommandLine text={t.itsMe} />
         </li>
       </ol>
       <div
@@ -1126,13 +1092,13 @@ function ItsMe({
                 variant="outline"
                 onClick={() => setAttempt((n) => n + 1)}
               >
-                Try again
+                {t.tryAgain}
               </Button>
             </div>
           ) : claimed ? (
             <WhoSent
               user={claimed}
-              where={`mentioned Pace in ${claimed.channel} just now`}
+              line={t.mentionedIn(claimed.name, claimed.channel)}
               said={claimed.said}
               actions={
                 <>
@@ -1145,14 +1111,14 @@ function ItsMe({
                       setError(undefined)
                     }}
                   >
-                    Not me
+                    {t.notMe}
                   </Button>
                   <Button
                     disabled={confirming}
                     onClick={() => void confirm(claimed)}
                   >
                     {confirming && <LoaderCircle className="animate-spin" />}
-                    Yes, that's me
+                    {t.yesMe}
                   </Button>
                 </>
               }
@@ -1163,9 +1129,9 @@ function ItsMe({
               <span className="text-shimmer">
                 {listening.state === 'on'
                   ? notMe
-                    ? 'Waiting for your mention. Send it from your own account.'
-                    : 'Waiting for your mention'
-                  : 'Connecting to Slack'}
+                    ? t.waitingOwnAccount
+                    : t.waitingForMention
+                  : t.connectingToSlack}
               </span>
             </p>
           )}
@@ -1176,17 +1142,8 @@ function ItsMe({
           {error}
         </p>
       )}
-      {waited && (
-        <Hint>
-          Nothing yet? Check that Pace is in that channel, and pick Pace from
-          the list that opens as you type @Pace, so the message mentions it.
-        </Hint>
-      )}
-      <p className="text-body text-muted-foreground">
-        While this is open, Pace answers no one: it only notes who mentions it
-        and tells that person alone to confirm here. After that, it answers only
-        you.
-      </p>
+      {waited && <Hint>{t.itsMeHint}</Hint>}
+      <p className="text-body text-muted-foreground">{t.whileOpen}</p>
     </StepFrame>
   )
 }

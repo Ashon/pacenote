@@ -1,13 +1,20 @@
 import { redactSecrets } from '../../../src/broker/redact.js'
 import type { TokenUsage } from '../../../src/history/usage.js'
+import { localized } from '../../../src/i18n/locale.js'
 import type { CodexDefaults } from '../../../src/reasoners/codex.js'
 import {
   CLI_NAMES,
-  unableFrom,
   type OwnCli,
   type Unable,
 } from '../../../src/tasks/own-ai.js'
-import { exitError, outputOf, runPlain, type OpencodeRun } from './headless.js'
+import {
+  exitError,
+  exitUnable,
+  outputOf,
+  runPlain,
+  type OpencodeRun,
+} from './headless.js'
+import { text } from './recap-writer.text.js'
 
 /**
  * Write it up: the CLI that does Pacenote's own work (own-ai.ts) sums a recap
@@ -77,12 +84,13 @@ export async function writeRecap(options: {
   })
   const output = outputOf(options.cli, exit.stdout)
   const usage = output?.usage ? { usage: output.usage } : {}
-  const text = output && 'text' in output && writtenFrom(output.text)
-  if (text) return { text, ...usage }
+  const written = output && 'text' in output && writtenFrom(output.text)
+  if (written) return { text: written, ...usage }
+  const t = localized(text)
   const error = exitError(options.cli, exit, output, {
-    slow: `${name} did not answer in 2 minutes.`,
-    nothing: `${name} wrote nothing.`,
+    slow: t.slow(name),
+    nothing: t.nothing(name),
   })
-  const unable = exit.timedOut ? undefined : unableFrom(error)
+  const unable = exitUnable(exit, error)
   return { error, ...(unable ? { unable } : {}), ...usage }
 }

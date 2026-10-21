@@ -7,8 +7,10 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import { localized } from '../i18n/locale.js'
 import { migrateEnvValues, readEnvFile, readEnvValues } from './env-file.js'
 import { SETTING_FIELDS, type SettingField } from './fields.js'
+import { text as words } from './settings-file.text.js'
 
 /**
  * The settings file, settings.json: Pacenote's settings as one object, grouped
@@ -70,13 +72,11 @@ export function parseSettings(text: string): Json {
   try {
     parsed = JSON.parse(text)
   } catch (err) {
-    throw new Error(
-      `The settings file is not valid JSON: ${(err as Error).message}`,
-      { cause: err }
-    )
+    throw new Error(localized(words).notJson((err as Error).message), {
+      cause: err,
+    })
   }
-  if (!isObject(parsed))
-    throw new Error('The settings file must hold one object, in braces.')
+  if (!isObject(parsed)) throw new Error(localized(words).notObject)
   return parsed
 }
 

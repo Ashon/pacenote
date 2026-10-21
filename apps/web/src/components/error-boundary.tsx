@@ -1,7 +1,9 @@
 import { House, RotateCw } from 'lucide-react'
+import { localized } from '@src/i18n/locale'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { text } from './error-boundary.text'
 
 interface State {
   error?: Error
@@ -31,14 +33,12 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   render() {
     const { error } = this.state
     if (!error) return this.props.children
+    const t = localized(text)
     return (
       <div className="flex min-h-screen items-center justify-center bg-sidebar p-10">
         <div className="w-full max-w-md">
-          <h1 className="text-title">This screen stopped working</h1>
-          <p className="mt-1 text-copy text-muted-foreground">
-            Pace keeps answering. Reload to try again, or go back to Overview.
-            What broke is in the app's log: Pace &gt; Open logs folder.
-          </p>
+          <h1 className="text-title">{t.title}</h1>
+          <p className="mt-1 text-copy text-muted-foreground">{t.body}</p>
           <ScrollArea
             className="mt-4 rounded-lg bg-well"
             viewportClassName="max-h-48"
@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <div className="mt-4 flex gap-2">
             <Button size="sm" onClick={() => window.location.reload()}>
               <RotateCw />
-              Reload
+              {t.reload}
             </Button>
             <Button
               size="sm"
@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               }}
             >
               <House />
-              Back to Overview
+              {t.back}
             </Button>
           </div>
         </div>

@@ -1,4 +1,6 @@
+import { localized } from '../i18n/locale.js'
 import type { ReasonerId } from '../reasoners/ids.js'
+import { text, type ReadTool } from './sources.text.js'
 
 /**
  * Where your tasks come from: the connectors of your AI tool (the Slack
@@ -30,8 +32,8 @@ export interface MessageRef {
 export interface Connector {
   server: string
   prefix: string
-  /** Where it is connected, as the user finds it */
-  where: string
+  /** Where it is connected, as the user finds it, in the app's language */
+  readonly where: string
   /** codex: the app's id, the only app a collection turns on */
   app?: string
 }
@@ -46,10 +48,10 @@ export interface Source {
    */
   connectors: Record<ReasonerId, Connector>
   /**
-   * The connector's tools a collection may use, all reading only, each with
-   * what it does as a person reads it (the run history's Lookups)
+   * The connector's tools a collection may use, all reading only (what each
+   * does, as the run history's Lookups name it, is in sources.text.ts)
    */
-  reads: Record<string, string>
+  reads: readonly ReadTool[]
   /** The connector's tools that write: denied outright, whatever is allowed */
   writes: string[]
   /** The message one of its links points to; undefined for another link */
@@ -88,29 +90,33 @@ export const SOURCES: Record<SourceId, Source> = {
       claude: {
         server: 'claude.ai Slack',
         prefix: 'mcp__claude_ai_Slack__',
-        where: "claude.ai's Settings > Connectors",
+        get where() {
+          return localized(text).slackWhere.claude
+        },
       },
       // ChatGPT's Slack app, as codex's apps server (codex_apps) serves it:
       // its tools are slack.<name>. The id is the app's in OpenAI's catalog.
       codex: {
         server: 'codex_apps',
         prefix: 'slack.',
-        where: "ChatGPT's Settings > Apps",
+        get where() {
+          return localized(text).slackWhere.codex
+        },
         app: 'asdk_app_69a1d78e929881919bba0dbda1f6436d',
       },
     },
-    reads: {
-      slack_search_public: 'Searched public messages',
-      slack_search_public_and_private: 'Searched messages',
-      slack_search_channels: 'Looked up channels',
-      slack_search_users: 'Looked up people',
-      slack_read_channel: 'Read a channel',
-      slack_read_thread: 'Read a thread',
-      slack_get_reactions: 'Checked reactions',
-      slack_list_user_channels: 'Listed your channels',
-      slack_list_channel_members: 'Listed channel members',
-      slack_read_user_profile: 'Looked up a person',
-    },
+    reads: [
+      'slack_search_public',
+      'slack_search_public_and_private',
+      'slack_search_channels',
+      'slack_search_users',
+      'slack_read_channel',
+      'slack_read_thread',
+      'slack_get_reactions',
+      'slack_list_user_channels',
+      'slack_list_channel_members',
+      'slack_read_user_profile',
+    ],
     writes: [
       'slack_send_message',
       'slack_send_message_draft',
@@ -168,7 +174,7 @@ export function findMessage(
 export const readTools = (ids: readonly SourceId[]): string[] =>
   ids.flatMap((id) => {
     const { connectors, reads } = SOURCES[id]
-    return Object.keys(reads).map((tool) => connectors.claude.prefix + tool)
+    return reads.map((tool) => connectors.claude.prefix + tool)
   })
 
 /** Every source's tools that write in Claude Code, by full name: denied */
@@ -188,14 +194,13 @@ export const sourceOfTool = (
   )
 
 /**
- * What a connector's tool did, as a person reads it: by its name, or as codex
- * names it (slack.slack_read_thread)
+ * What a connector's tool did, as a person reads it in the app's language: by
+ * its name, or as codex names it (slack.slack_read_thread)
  */
 export const lookupLabel = (tool: string): string | undefined => {
   const name = tool.replace(/^[a-z]+\./, '')
-  for (const id of SOURCE_IDS) {
-    const label = SOURCES[id].reads[name]
-    if (label) return label
-  }
-  return undefined
+  const read = SOURCE_IDS.flatMap((id) => SOURCES[id].reads).find(
+    (each) => each === name
+  )
+  return read && localized(text).reads[read]
 }

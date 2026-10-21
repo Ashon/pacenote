@@ -1,5 +1,6 @@
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { localized } from '../../../src/i18n/locale.js'
 import type { CodexDefaults } from '../../../src/reasoners/codex.js'
 import {
   CLI_NAMES,
@@ -16,6 +17,7 @@ import {
   outputOf,
   runHeadless,
 } from './headless.js'
+import { text } from './drafter.text.js'
 
 /**
  * A reply drafted for a task, for you to edit and send yourself: the CLI that
@@ -87,12 +89,6 @@ export function draftCommand(
   })
 }
 
-/** How to sign a CLI in again, in a terminal */
-export const SIGN_IN: Record<ConnectorCli, string> = {
-  claude: 'Run claude in a terminal and sign in',
-  codex: 'Run codex login in a terminal',
-}
-
 /**
  * The reply in the CLI's output (its final answer), or why there is none and
  * whether the other CLI may draft it instead
@@ -101,17 +97,15 @@ export function draftFrom(
   cli: OwnCli,
   stdout: string
 ): { text: string } | { error: string; unable?: Unable } {
+  const t = localized(text)
   const name = CLI_NAMES[cli]
   const output = outputOf(cli, stdout)
-  if (!output) return { error: `${name} stopped before it wrote a draft.` }
+  if (!output) return { error: t.stoppedBefore(name) }
   if ('text' in output) return { text: redactSecrets(output.text) }
   const unable = unableFrom(output.error)
   if (unable === 'auth' && cli !== 'opencode')
-    return {
-      error: `${name} is not signed in. ${SIGN_IN[cli]}, then draft again.`,
-      unable,
-    }
-  const error = output.error.split('\n')[0] || `${name} wrote no draft.`
+    return { error: t.notSignedIn(name, cli), unable }
+  const error = output.error.split('\n')[0] || t.noDraft(name)
   return unable ? { error, unable } : { error }
 }
 
@@ -144,10 +138,10 @@ export async function draftReply(options: {
   })
   if (exit.spawnError?.code === 'ENOENT')
     return {
-      error: `Drafting needs ${name}, signed in, with its Slack connector: ${options.cli} is not on this Mac.`,
+      error: localized(text).needsCli(name, options.cli),
       unable: 'missing',
     }
-  if (exit.timedOut) return { error: 'The draft did not come in 3 minutes.' }
+  if (exit.timedOut) return { error: localized(text).slow }
   const draft = draftFrom(options.cli, exit.stdout)
   if ('error' in draft && !exit.stdout.trim() && exit.stderr.trim()) {
     const error = exitError(options.cli, exit, undefined, {

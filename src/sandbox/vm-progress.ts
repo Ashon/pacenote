@@ -1,4 +1,6 @@
+import { localized } from '../i18n/locale.js'
 import type { SandboxJob } from './types.js'
+import { text } from './vm-progress.text.js'
 
 /**
  * How far the built-in sandbox's setup has come, read from its job's output
@@ -22,34 +24,15 @@ export interface VmSetupProgress {
   fraction: number
 }
 
+/**
+ * The images' titles as the job's output says them (the lines read below), in
+ * English whatever the app's language
+ */
 export const PART_TITLES = {
   reasoner: 'Reasoner image',
   renderer: 'Diagram renderer image',
   broker: 'Ops broker image',
 } as const
-
-const LABELS: Record<SetupPart['id'], { label: string; doing: string }> = {
-  kernel: {
-    label: 'Linux kernel, downloaded and checked',
-    doing: 'Downloading the Linux kernel',
-  },
-  init: {
-    label: 'Start-up files for the VMs',
-    doing: 'Preparing the start-up files',
-  },
-  reasoner: {
-    label: 'The image answers run in',
-    doing: 'Building the image answers run in',
-  },
-  renderer: {
-    label: 'The image that draws diagrams',
-    doing: 'Building the image that draws diagrams',
-  },
-  broker: {
-    label: 'The image the ops tools run in',
-    doing: 'Building the image the ops tools run in',
-  },
-}
 
 /**
  * The parts and where each one is. The images set not to build (diagrams or
@@ -91,6 +74,7 @@ export function vmSetupProgress(
   if (broker.started || broker.done) steps.push({ id: 'broker', ...broker })
 
   const succeeded = job.state === 'succeeded'
+  const words = localized(text).parts
   const parts = steps.map(({ id, started, done }): SetupPart => {
     const state: SetupPartState =
       done || succeeded
@@ -100,7 +84,7 @@ export function vmSetupProgress(
             ? 'failed'
             : 'working'
           : 'waiting'
-    return { id, ...LABELS[id], state }
+    return { id, ...words[id], state }
   })
   const finished = parts.filter((part) => part.state === 'done').length
   return { parts, fraction: parts.length ? finished / parts.length : 0 }

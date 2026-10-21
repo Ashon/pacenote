@@ -13,26 +13,16 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSandbox } from './desktop'
 import type { FromMacState } from '@src/macs/types'
+import { localized } from '@src/i18n/locale'
+import { text } from './setup.text'
 
 export { SETUP_STEPS, type SetupStep }
 
-/** What each step is called, in the list and in "Next: ..." */
-export const STEP_LABELS: Record<SetupStep, string> = {
-  ai: 'AI service',
-  runtime: 'Where it runs',
-  slack: 'Slack',
-  review: 'Review',
-  answer: 'First answer',
-}
+/** What a step is called, in the list and in "Change ..." */
+export const stepLabel = (step: SetupStep) => localized(text).steps[step]
 
 /** "Next: ..." on the resume card, for the step it stopped before */
-export const STEP_NEXT: Record<SetupStep, string> = {
-  ai: 'choose the AI service Pace answers with',
-  runtime: 'choose where Pace works out answers',
-  slack: 'connect Slack',
-  review: 'review and start Pace',
-  answer: 'say hello to Pace in Slack',
-}
+export const stepNext = (step: SetupStep) => localized(text).next[step]
 
 export const stepIndex = (step: SetupStep) => SETUP_STEPS.indexOf(step)
 

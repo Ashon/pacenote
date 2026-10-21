@@ -1,5 +1,12 @@
 import type { MessengerId } from '../messengers/ids.js'
 import { systemTimeZone } from '../messengers/text.js'
+import {
+  getLocale,
+  LOCALE_NAMES,
+  LOCALES,
+  type Locale,
+} from '../i18n/locale.js'
+import { FIELDS_KO, GROUPS_KO, SECTIONS_KO } from './fields.ko.js'
 
 /**
  * Settings handled by the settings screen, each kept at its place in the
@@ -420,6 +427,17 @@ export const SETTING_FIELDS: SettingField[] = [
     help: "Used to show times in thread context. Left empty, it is this Mac's time zone.",
     type: 'text',
     default: systemTimeZone(),
+  },
+  {
+    key: 'NOTES_LANGUAGE',
+    path: 'answers.notesLanguage',
+    group: 'requests',
+    label: "Pace's own notes",
+    help: 'The language of what Pace writes itself: the line under each answer, notes only the asker sees, and replies when an answer fails. Answers follow the language of the conversation.',
+    type: 'select',
+    options: LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] })),
+    segmented: true,
+    default: 'en',
   },
   {
     key: 'MENTION_WORKSPACE',
@@ -971,4 +989,62 @@ export function shownFor(
   return typeof shownWhen.equals === 'string'
     ? value === shownWhen.equals
     : shownWhen.equals.includes(value)
+}
+
+/**
+ * The settings screen's words in the current language: SETTING_FIELDS,
+ * SETTING_GROUPS and SETTING_SECTIONS keep the English, and Korean comes from
+ * fields.ko.ts. Code that shows a field's words reads them from these; code
+ * that saves or checks settings keeps using the lists above.
+ */
+export function settingFields(locale: Locale = getLocale()): SettingField[] {
+  if (locale === 'en') return SETTING_FIELDS
+  return SETTING_FIELDS.map((field) => {
+    const words = FIELDS_KO[field.key]
+    if (!words) return field
+    return {
+      ...field,
+      label: words.label ?? field.label,
+      ...(field.help !== undefined ? { help: words.help ?? field.help } : {}),
+      ...(field.placeholder !== undefined
+        ? { placeholder: words.placeholder ?? field.placeholder }
+        : {}),
+      ...(field.options
+        ? {
+            options: field.options.map((option) => {
+              const said = words.options?.[option.value]
+              return {
+                ...option,
+                label: said?.label ?? option.label,
+                ...(option.help !== undefined
+                  ? { help: said?.help ?? option.help }
+                  : {}),
+              }
+            }),
+          }
+        : {}),
+    }
+  })
+}
+
+export function settingGroups(
+  locale: Locale = getLocale()
+): SettingGroupInfo[] {
+  if (locale === 'en') return SETTING_GROUPS
+  return SETTING_GROUPS.map((group) => ({ ...group, ...GROUPS_KO[group.id] }))
+}
+
+export function settingSections(
+  locale: Locale = getLocale()
+): typeof SETTING_SECTIONS {
+  if (locale === 'en') return SETTING_SECTIONS
+  return SETTING_SECTIONS.map((section) => ({
+    ...section,
+    ...SECTIONS_KO[section.id],
+  }))
+}
+
+/** A setting's name on the screen, by the key Pace reads it by */
+export function settingLabel(key: string): string {
+  return settingFields().find((field) => field.key === key)?.label ?? key
 }

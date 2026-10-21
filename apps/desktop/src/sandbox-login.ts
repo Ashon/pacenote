@@ -1,3 +1,4 @@
+import { localized } from '../../../src/i18n/locale.js'
 import { defaultVmBin } from '../../../src/sandbox/vm.js'
 import { VM_IMAGE } from '../../../src/sandbox/vm-images.js'
 import {
@@ -7,6 +8,7 @@ import {
   type LoginResult,
 } from '../../../src/sandbox/vm-login.js'
 import { vmRootPath } from '../../../src/settings/paths.js'
+import { text } from './sandbox-login.text.js'
 
 const isCli = (value: unknown): value is 'claude' | 'codex' =>
   value === 'claude' || value === 'codex'
@@ -28,9 +30,8 @@ export class SandboxSignIn {
   ) {}
 
   async run(cli: unknown): Promise<LoginResult> {
-    if (!isCli(cli)) return { ok: false, error: 'Unknown CLI.' }
-    if (this.current)
-      return { ok: false, error: 'A sign-in is already under way.' }
+    if (!isCli(cli)) return { ok: false, error: localized(text).unknownCli }
+    if (this.current) return { ok: false, error: localized(text).underWay }
     const { env } = this.options
     const login = new VmLogin({
       cli,

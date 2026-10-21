@@ -108,7 +108,8 @@ export function reopened(record: SetupRecord): SetupRecord {
 
 /**
  * The step that fixes what keeps Pace from starting: the settings it names,
- * or the words of its message when it names none
+ * or the words of its message when it names none (the glossary in
+ * docs/i18n.md keeps the Korean words these look for)
  */
 export function stepToFix(
   issues: readonly { key?: string }[] | undefined,
@@ -127,10 +128,16 @@ export function stepToFix(
     const found = step(key)
     if (found) return found
   }
-  if (/\b(slack|hub|token|who you are|member id)\b/i.test(message))
+  // In either language the app words it in (Korean keeps the product names)
+  if (
+    /\b(slack|hub|token|who you are|member id)\b|허브|토큰|멤버 ID/i.test(
+      message
+    )
+  )
     return 'slack'
-  if (/\b(sandbox|vm)\b/i.test(message)) return 'runtime'
-  if (/\b(claude|codex|sign(?:ed)?[- ]in|login)\b/i.test(message)) return 'ai'
+  if (/\b(sandbox|vm)\b|샌드박스/i.test(message)) return 'runtime'
+  if (/\b(claude|codex|sign(?:ed)?[- ]in|login)\b|로그인/i.test(message))
+    return 'ai'
   return undefined
 }
 

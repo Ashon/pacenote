@@ -7,6 +7,8 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import { localized } from '../i18n/locale.js'
+import { text } from './allowlist.text.js'
 import type { AllowlistIssue } from './types.js'
 
 export type { AllowlistIssue }
@@ -26,15 +28,13 @@ const HOSTNAME = new RegExp(`^(?=.{1,253}$)${LABEL}(\\.${LABEL})+$`)
  * a problem.
  */
 export function domainProblem(domain: string): string | undefined {
-  if (!domain) return 'The domain is empty.'
-  if (/[*?]/.test(domain))
-    return 'Wildcards are not allowed. Enter an exact host name.'
-  if (/^[a-z]+:\/\//i.test(domain) || domain.includes('/'))
-    return 'Enter only a host name, not a URL.'
-  if (domain.includes(':'))
-    return 'Do not include a port. (Only HTTPS 443 is allowed)'
-  if (/^\d+(\.\d+){3}$/.test(domain)) return 'IP addresses are not allowed.'
-  if (!HOSTNAME.test(domain)) return 'Not a valid host name.'
+  const t = localized(text)
+  if (!domain) return t.empty
+  if (/[*?]/.test(domain)) return t.wildcard
+  if (/^[a-z]+:\/\//i.test(domain) || domain.includes('/')) return t.url
+  if (domain.includes(':')) return t.port
+  if (/^\d+(\.\d+){3}$/.test(domain)) return t.ip
+  if (!HOSTNAME.test(domain)) return t.invalid
   return undefined
 }
 
@@ -94,7 +94,7 @@ export function checkAllowlist(
     if (!normalized.has(required)) {
       issues.push({
         domain: required,
-        message: `Required for ${reasoner} to work.`,
+        message: localized(text).required(reasoner),
       })
     }
   }

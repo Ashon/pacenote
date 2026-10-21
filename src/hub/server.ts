@@ -7,6 +7,7 @@ import {
 } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { type WebSocket, WebSocketServer } from 'ws'
+import { localized, type Locale } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
 import type { Pairings } from './pairing.js'
 import { Grants, type MentionEvent } from './policy.js'
@@ -23,6 +24,7 @@ import {
   PING,
   PONG,
 } from './protocol.js'
+import { text } from './server.text.js'
 import type { DesktopRecord, DesktopStore } from './store.js'
 
 /**
@@ -72,6 +74,8 @@ export interface HubOptions {
    * https://files.slack.com
    */
   filesOrigin?: string
+  /** The language of the hub's notes in Slack (HUB_NOTES_LANGUAGE). English */
+  notesLocale?: Locale
   log: Logger
 }
 
@@ -81,22 +85,6 @@ const UPLOAD_TTL_MS = 10 * 60_000
 const HEARTBEAT_MS = 30_000
 
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
-
-const NOTICES = {
-  notPaired:
-    "This Slack workspace answers through each member's own Pacenote desktop app, and yours is not connected yet. " +
-    'In Pacenote, open Settings > Messengers > Slack, choose the team hub and connect, then send me the code it shows.',
-  offline:
-    'Your Pacenote desktop is not connected to the hub right now. Open Pacenote on your computer and mention me again.',
-  notAllowed:
-    "You are not on the list of members who can use Pacenote here. Ask the hub's admin.",
-  paired: (label: string) =>
-    `Code accepted for "${label}". Confirm the pairing in your Pacenote app to finish.`,
-  unknownCode:
-    'That code is not valid or has expired. Start again in Pacenote (Settings > Messengers > Slack) for a new one.',
-  takenCode:
-    'Someone else already sent that code. Start again in Pacenote for a new one.',
-}
 
 /**
  * The hub server: pairing (HTTP), desktop connections (WebSocket /connect),
@@ -156,9 +144,10 @@ export class HubServer {
     const user = event?.user
     if (!event || !user) return
     const { slack, store, log } = this.options
-    const notice = (text: string) =>
+    const t = localized(text, this.options.notesLocale ?? 'en')
+    const notice = (message: string) =>
       slack
-        .postEphemeral(event.channel, user, text, event.thread_ts)
+        .postEphemeral(event.channel, user, message, event.thread_ts)
         .catch((err: unknown) =>
           log.warn(
             `Could not send a notice to ${user}: ${(err as Error).message}`
@@ -166,7 +155,7 @@ export class HubServer {
         )
     const allowed = this.options.allowedUsers ?? []
     if (allowed.length > 0 && !allowed.includes(user))
-      return notice(NOTICES.notAllowed)
+      return notice(t.notAllowed)
 
     const command = CONNECT_COMMAND.exec(event.text ?? '')
     if (command) {
@@ -176,17 +165,17 @@ export class HubServer {
       log.info(`Pairing code from ${name} (${user}): ${bound.result}`)
       return notice(
         bound.result === 'bound'
-          ? NOTICES.paired(bound.label)
+          ? t.paired(bound.label)
           : bound.result === 'taken'
-            ? NOTICES.takenCode
-            : NOTICES.unknownCode
+            ? t.takenCode
+            : t.unknownCode
       )
     }
 
     const desktop = store.byUser(user)
-    if (!desktop) return notice(NOTICES.notPaired)
+    if (!desktop) return notice(t.notPaired)
     const ws = this.sockets.get(desktop.id)
-    if (!ws || ws.readyState !== ws.OPEN) return notice(NOTICES.offline)
+    if (!ws || ws.readyState !== ws.OPEN) return notice(t.offline)
     this.grantsOf(desktop.id).add(event)
     send(ws, { type: 'event', body })
     log.info(

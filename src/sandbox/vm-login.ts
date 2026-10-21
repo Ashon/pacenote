@@ -9,10 +9,13 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { localized } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
 import { EgressProxy, type Resolve } from './egress.js'
 import { SANDBOX_PATHS, type Mount } from './runtime.js'
 import { vmRunArgs } from './vm.js'
+import type { LoginResult } from './types.js'
+import { text } from './vm-login.text.js'
 
 /**
  * The built-in sandbox's own sign-in to Claude Code or Codex. The CLI's own
@@ -168,7 +171,7 @@ const LOGIN_COMMAND: Record<LoginCli, { command: string; args: string[] }> = {
   codex: { command: 'codex', args: ['login', '--device-auth'] },
 }
 
-export type LoginResult = { ok: true } | { ok: false; error: string }
+export type { LoginResult }
 
 /**
  * One sign-in, in a VM of its own: start() runs the CLI's login and calls
@@ -246,7 +249,12 @@ export class VmLogin {
         child.on('close', (code) => {
           clearTimeout(timer)
           this.child = undefined
-          if (this.cancelled) resolve({ ok: false, error: 'Cancelled.' })
+          if (this.cancelled)
+            resolve({
+              ok: false,
+              error: localized(text).cancelled,
+              cancelled: true,
+            })
           else if (code === 0 && signedIn(root, cli)) resolve({ ok: true })
           else resolve({ ok: false, error: failure(output, code) })
         })
@@ -277,7 +285,6 @@ function failure(output: string, code: number | null): string {
     .map((line) => line.trim())
     .filter(Boolean)
     .at(-1)
-  return last
-    ? `The sign-in did not finish: ${last}`
-    : `The sign-in did not finish (exit code ${code ?? 'none'}).`
+  const t = localized(text)
+  return last ? t.notFinished(last) : t.notFinishedCode(code)
 }

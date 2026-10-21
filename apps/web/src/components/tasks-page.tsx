@@ -1,4 +1,5 @@
 import { newTokens } from '@history/usage'
+import { localized } from '@src/i18n/locale'
 import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
 import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
@@ -31,6 +32,7 @@ import {
   formatShortDay,
   formatTokens,
 } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import {
   taskHash,
   useCollect,
@@ -44,6 +46,7 @@ import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow } from './task-row'
+import { text } from './tasks-page.text'
 import {
   lastYourWork,
   rememberYourWork,
@@ -105,6 +108,7 @@ export function TasksPage({
   /** A session's log over the list */
   logEntry?: string
 }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const tasks = useTasks()
   // What AI tools are doing with your tasks now, over MCP
@@ -145,9 +149,7 @@ export function TasksPage({
   if (!bridge)
     return (
       <Page>
-        <p className="mt-6 text-copy text-muted-foreground">
-          Tasks are gathered by the desktop app.
-        </p>
+        <p className="mt-6 text-copy text-muted-foreground">{t.noDesktop}</p>
       </Page>
     )
   // Until the tasks come, and your areas (their card, shown once after a
@@ -253,17 +255,11 @@ export function TasksPage({
 
   return (
     <Page
-      meta={
-        <>
-          {open.length} open
-          {data.collectedAt &&
-            ` · collected ${formatRelative(data.collectedAt)}${
-              data.collect.last?.mac
-                ? ` on ${macNamed(macs, data.collect.last.mac)}`
-                : ''
-            }`}
-        </>
-      }
+      meta={t.meta(
+        open.length,
+        data.collectedAt && formatRelative(data.collectedAt),
+        data.collect.last?.mac && macNamed(macs, data.collect.last.mac)
+      )}
       action={
         <CollectButton
           running={Boolean(data.collect.running)}
@@ -280,18 +276,17 @@ export function TasksPage({
       {offer && (
         <Banner tone="note">
           <span className="flex-1">
-            You dismissed {offer.count} tasks from {offer.label} as not for you.
-            Leave {offer.label} out?
+            {t.leaveOutOffer(offer.count, offer.label)}
           </span>
           <Button size="xs" onClick={() => void bridge.leaveOut(offer.label)}>
-            Leave it out
+            {t.leaveOut}
           </Button>
           <Button
             size="xs"
             variant="ghost"
             onClick={() => decline(offer.conversation)}
           >
-            Not now
+            {t.notNow}
           </Button>
         </Banner>
       )}
@@ -322,8 +317,7 @@ export function TasksPage({
           />
           {tab === 'maybe' && (
             <p className="mt-3 text-meta text-muted-foreground">
-              Guesses Pace is not sure about. They stay out of the list until
-              you keep one.
+              {t.maybeNote}
             </p>
           )}
           <TaskList
@@ -368,17 +362,16 @@ export function TasksPage({
             <p className="border-t border-border py-8 text-copy text-muted-foreground">
               {tab === 'open'
                 ? data.collectedAt
-                  ? 'Nothing open. The next collection reads what is new since this one.'
-                  : 'Nothing yet. A first collection reads the last 7 days.'
+                  ? t.nothingOpen
+                  : t.nothingYet
                 : tab === 'maybe'
-                  ? 'No Maybes.'
-                  : 'Nothing settled in the last 14 days.'}
+                  ? t.noMaybes
+                  : t.nothingSettled}
             </p>
           )}
           {tab === 'done' && data.dismissRate !== undefined && (
             <p className="mt-4 text-meta text-muted-foreground">
-              You dismissed {Math.round(data.dismissRate * 100)}% of the tasks
-              you settled. Above about 30%, Pace is picking too loosely.
+              {t.dismissRate(Math.round(data.dismissRate * 100))}
             </p>
           )}
         </Swap>
@@ -407,16 +400,17 @@ function TaskTabs({
   onTab: (tab: Tab) => void
   counts?: { open: number; maybe: number }
 }) {
+  const t = useText(text)
   return (
     <Tabs value={tab} onValueChange={(value) => onTab(value as Tab)}>
       <TabsList className="mt-5">
         <TabsTrigger value="open">
-          Open {counts ? counts.open : <SkeletonWord />}
+          {t.tabOpen} {counts ? counts.open : <SkeletonWord />}
         </TabsTrigger>
         <TabsTrigger value="maybe">
-          Maybe {counts ? counts.maybe : <SkeletonWord />}
+          {t.tabMaybe} {counts ? counts.maybe : <SkeletonWord />}
         </TabsTrigger>
-        <TabsTrigger value="done">Done</TabsTrigger>
+        <TabsTrigger value="done">{t.tabDone}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -488,6 +482,7 @@ function TaskList({
  * belong. It slides in from above (pop) and stays in view as you scroll.
  */
 function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
+  const t = useText(text)
   const notice = usePresence<HTMLButtonElement>(count > 0)
   // Leaving, it still says how many it showed
   const said = useRef(count)
@@ -507,7 +502,7 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
           onClick={onShow}
           className="motion-pop -mt-[30px] h-7 rounded-full bg-primary px-3 text-meta font-semibold text-primary-foreground shadow-float outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          {said.current} new {said.current === 1 ? 'task' : 'tasks'}
+          {t.newTasks(said.current)}
         </button>
       )}
     </div>
@@ -523,11 +518,12 @@ function Page({
   action?: React.ReactNode
   children?: React.ReactNode
 }) {
+  const t = useText(text)
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         <header className="flex items-center gap-3">
-          <h1 className="text-title">Todo</h1>
+          <h1 className="text-title">{t.title}</h1>
           {meta && (
             <span className="text-copy text-muted-foreground">{meta}</span>
           )}
@@ -560,12 +556,13 @@ function CollectButton({
   /** Another of your Macs collecting now */
   elsewhere?: string
 }) {
+  const t = useText(text)
   const { collect, stop } = useCollect()
   if (elsewhere && !running)
     return (
       <Button size="sm" variant="secondary" disabled>
         <LoaderCircle className="animate-spin" />
-        Collecting on {elsewhere}
+        {t.collectingOn(elsewhere)}
       </Button>
     )
   if (running)
@@ -573,24 +570,24 @@ function CollectButton({
       <div className="flex items-center gap-1">
         {/* The status line under the title shows Pace at work. */}
         <Button size="sm" variant="secondary" disabled>
-          Collecting
+          {t.collecting}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void stop()}>
-          Stop
+          {t.stop}
         </Button>
       </div>
     )
   return (
     <Button size="sm" onClick={() => void collect()}>
       <RefreshCw />
-      Collect now
+      {t.collectNow}
     </Button>
   )
 }
 
 /** An AI tool's name, from its MCP client name ("claude-code") */
 function toolOf(client: string | undefined): string {
-  if (!client) return 'An AI tool'
+  if (!client) return localized(text).anAiTool
   if (/claude/i.test(client)) return 'Claude Code'
   if (/codex/i.test(client)) return 'Codex'
   return client
@@ -602,40 +599,40 @@ function liveLine(
   titleOf: (id: string) => string | undefined
 ): { key: string; text: string; active: boolean } | undefined {
   if (!live) return undefined
+  const t = localized(text)
   if (live.collecting) {
     const { by, since, added } = live.collecting
     return {
       key: `collect:${since}`,
       active: true,
-      text: `${toolOf(by)} is collecting your tasks${added ? `: ${added} found so far` : ''}.`,
+      text: t.liveCollecting(toolOf(by), added),
     }
   }
   const event = live.latest
   if (!event) return undefined
   const title = event.task ? titleOf(event.task) : undefined
-  const it = title ? `\u201c${title}\u201d` : 'a task'
   const tool = toolOf(event.by)
-  const text =
+  const line =
     event.kind === 'look'
-      ? `${tool} is working on ${it}.`
+      ? t.liveLook(tool, title)
       : event.kind === 'update'
-        ? `${tool} updated ${it}.`
+        ? t.liveUpdate(tool, title)
         : event.kind === 'close'
-          ? `${tool} closed ${it}.`
+          ? t.liveClose(tool, title)
           : event.kind === 'wrap-up'
-            ? `${tool} wrote how ${it} ended.`
+            ? t.liveWrapUp(tool, title)
             : event.kind === 'follow-up'
-              ? `${tool} kept ${it} for later.`
+              ? t.liveFollowUp(tool, title)
               : event.kind === 'add' && event.finished !== false
                 ? event.added
-                  ? `${tool} added ${event.added} ${event.added === 1 ? 'task' : 'tasks'}.`
-                  : `${tool} found nothing new to add.`
+                  ? t.liveAdded(tool, event.added)
+                  : t.liveNothing(tool)
                 : undefined
-  if (!text) return undefined
+  if (!line) return undefined
   return {
     key: `${event.kind}:${event.task ?? ''}:${event.at}`,
     active: event.kind === 'look',
-    text,
+    text: line,
   }
 }
 
@@ -684,33 +681,34 @@ function StatusLine({
  * the words swap: Pace's mark keeps looking.
  */
 function CollectStatus({ collect }: { collect: TasksCollect }) {
+  const t = useText(text)
   const { running, last, elsewhere } = collect
   const macs = useMacs()
   // Why the terminal did not open, for the collection it was opened for
   const [signIn, setSignIn] = useState<{ at: string; error: string }>()
-  const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : 'Your AI')
-  let text: string | undefined
+  const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : t.yourAi)
+  let status: string | undefined
   let spent: string | undefined
   if (running)
-    text = running.reads
-      ? `${name(running.by)} is reading Slack, read only: ${running.reads} lookups so far.`
-      : `Starting ${name(running.by)}: Pacenote gives the collection its rules.`
-  else if (elsewhere)
-    text = `Collecting on ${elsewhere.name}. Its tasks come here when it is done.`
+    status = running.reads
+      ? t.reading(name(running.by), running.reads)
+      : t.starting(name(running.by))
+  else if (elsewhere) status = t.elsewhere(elsewhere.name)
   else if (last?.ok) {
-    const found = [
-      last.added && `${last.added} ${last.added === 1 ? 'task' : 'tasks'}`,
-      last.maybe && `${last.maybe} ${last.maybe === 1 ? 'Maybe' : 'Maybes'}`,
-    ].filter(Boolean)
-    const where = last.mac ? ` on ${macNamed(macs, last.mac)}` : ''
-    text = found.length
-      ? `Added ${found.join(' and ')}${where}.`
-      : `Nothing new to add${where}.`
-    if (last.skipped) text += ` ${last.skipped} left out by your settings.`
+    status = t.collected(
+      last.added,
+      last.maybe,
+      last.mac && macNamed(macs, last.mac),
+      last.skipped
+    )
     if (last.usage)
-      spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups${last.by ? ` by ${CLI_NAMES[last.by]}` : ''}.`
+      spent = t.spent(
+        formatTokens(newTokens(last.usage)),
+        last.reads ?? 0,
+        last.by && CLI_NAMES[last.by]
+      )
   }
-  if (!text && !last) return null
+  if (!status && !last) return null
   const switched = running ? running.switched : last?.switched
   // Who to sign in again: the CLI that ran, or the one it took over from
   const signOut: OwnCli | undefined = running
@@ -740,7 +738,7 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
           id={running ? `run:${running.by ?? ''}` : 'last'}
           className={cn('min-w-0', running && 'text-shimmer')}
         >
-          {text ??
+          {status ??
             (last && !last.ok
               ? signIn?.at === last.at
                 ? signIn.error
@@ -759,7 +757,7 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
             }}
           >
             <SquareTerminal aria-hidden="true" />
-            Sign in to {CLI_NAMES[signOut]}
+            {t.signIn(CLI_NAMES[signOut])}
           </Button>
         )}
       </div>
@@ -771,12 +769,11 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
           >
             <ArrowRightLeft aria-hidden="true" className="size-3 shrink-0" />
             <span className="min-w-0">
-              {switchLine(switched)}
               {running
-                ? `, so ${name(running.by)} took over.`
+                ? t.tookOver(switchLine(switched), name(running.by))
                 : last?.ok
-                  ? `, so ${name(last.by)} collected.`
-                  : `, and ${name(last?.by)} could not either.`}
+                  ? t.collectedInstead(switchLine(switched), name(last.by))
+                  : t.couldNotEither(switchLine(switched), name(last?.by))}
             </span>
           </p>
         </Swap>
@@ -798,6 +795,7 @@ function RecentCollections({
 }: {
   collections: CollectionRecord[]
 }) {
+  const t = useText(text)
   if (!collections.length) return null
   const spent = collections.map((entry) =>
     entry.usage ? newTokens(entry.usage) : 0
@@ -812,12 +810,10 @@ function RecentCollections({
       <div className="flex items-center gap-2">
         <History className="size-4 shrink-0 text-primary" />
         <h2 id="collections-title" className="text-section">
-          Recent collections
+          {t.recent}
         </h2>
         <span className="ml-auto text-meta text-muted-foreground">
-          Last 7 days · {collections.length}{' '}
-          {collections.length === 1 ? 'collection' : 'collections'} ·{' '}
-          {formatTokens(total)} new
+          {t.recentSummary(collections.length, formatTokens(total))}
         </span>
       </div>
       <ul className="mt-4 text-body">
@@ -829,7 +825,7 @@ function RecentCollections({
                 {formatHourMinute(entry.startedAt)}
               </span>
               <span>
-                <Badge variant="outline">{TRIGGER_LABEL[entry.trigger]}</Badge>
+                <Badge variant="outline">{t.trigger[entry.trigger]}</Badge>
               </span>
               <span
                 title={collectionNote(entry)}
@@ -850,7 +846,9 @@ function RecentCollections({
                   )}
                 </span>
                 <span className="w-16 text-right font-medium tabular-nums">
-                  {spent[index] ? `${formatTokens(spent[index]!)} new` : '-'}
+                  {spent[index]
+                    ? t.newTokens(formatTokens(spent[index]!))
+                    : '-'}
                 </span>
               </span>
             </CollectionRow>
@@ -859,7 +857,7 @@ function RecentCollections({
       </ul>
       {collections.length > RECENT_SHOWN && (
         <p className="border-t border-border pt-2.5 text-meta text-muted-foreground">
-          {collections.length - RECENT_SHOWN} more in the last 7 days.
+          {t.moreRecent(collections.length - RECENT_SHOWN)}
         </p>
       )}
     </section>
@@ -877,6 +875,7 @@ function CollectionRow({
   entry: CollectionRecord
   children: React.ReactNode
 }) {
+  const t = useText(text)
   // Another Mac's run is in that Mac's history
   if (!entry.runId || entry.mac)
     return (
@@ -888,7 +887,7 @@ function CollectionRow({
   return (
     <a
       href={`#/runs/${entry.runId}`}
-      title="Open this collection's run"
+      title={t.openRun}
       className={cn(
         ROW,
         'group -mx-2 rounded-lg px-2 transition-colors hover:bg-selected/50'
@@ -900,53 +899,29 @@ function CollectionRow({
   )
 }
 
-const TRIGGER_LABEL: Record<CollectionRecord['trigger'], string> = {
-  now: 'Collect now',
-}
-
 /** "23 lookups · 2 tasks, 1 Maybe", or why it stopped */
 function collectionNote(entry: CollectionRecord): string {
   if (!entry.ok) return entry.error
-  const reads = entry.reads ?? 0
-  const found = [
-    entry.added && `${entry.added} ${entry.added === 1 ? 'task' : 'tasks'}`,
-    entry.maybe && `${entry.maybe} ${entry.maybe === 1 ? 'Maybe' : 'Maybes'}`,
-  ].filter(Boolean)
-  return `${reads} ${reads === 1 ? 'lookup' : 'lookups'} · ${found.length ? found.join(', ') : 'Nothing new'}`
+  return localized(text).note(entry.reads ?? 0, entry.added, entry.maybe)
 }
 
 /** How tasks are collected, and what it takes, before they are turned on */
 function Setup() {
+  const t = useText(text)
   return (
     <div className="mt-2">
-      <p className="text-copy text-muted-foreground">
-        Pacenote has your AI read Slack with its own Slack connector, and keeps
-        a short list here of what people asked of you and what you said you
-        would do. Pacenote holds no Slack token for this, and nothing is posted
-        anywhere.
-      </p>
+      <p className="text-copy text-muted-foreground">{t.setup}</p>
       <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
-        <SetupPart title="What it needs">
-          Claude Code or Codex on this Mac, signed in, with Slack connected to
-          your claude.ai account or ChatGPT. With both, one takes over when the
-          other is at its limit.
-        </SetupPart>
-        <SetupPart title="What is read">
-          Messages that mention you, threads you took part in, and what you said
-          you would do, since the last collection; DMs only if you count them.
-          Read only: the collection cannot post or react.
-        </SetupPart>
-        <SetupPart title="How to collect">
-          Collect now on this screen. Pacenote gives the collection its rules:
-          precision first, and anything unsure is a Maybe.
-        </SetupPart>
+        <SetupPart title={t.needsTitle}>{t.needs}</SetupPart>
+        <SetupPart title={t.readTitle}>{t.read}</SetupPart>
+        <SetupPart title={t.howTitle}>{t.how}</SetupPart>
       </div>
       <Button
         className="mt-6"
         onClick={() => (window.location.hash = '#/settings/tasks')}
       >
         <Settings />
-        Turn on in Settings
+        {t.turnOn}
       </Button>
     </div>
   )

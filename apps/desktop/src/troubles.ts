@@ -1,5 +1,7 @@
+import { localized } from '../../../src/i18n/locale.js'
 import { setupSettingsRoute } from '../../../src/settings/fields.js'
 import type { BotStatus, SupervisorState } from '../../../src/runtime/types.js'
+import { text } from './troubles.text.js'
 
 /**
  * Something about Pace you would want to know with the window closed: that it
@@ -27,6 +29,7 @@ export function currentTroubles(
   status: BotStatus | undefined,
   now = Date.now()
 ): Trouble[] {
+  const t = localized(text)
   const troubles: Trouble[] = []
   const phase = supervisor?.phase
   // Stopped on its own, until it runs again: the starts in between are part
@@ -38,10 +41,10 @@ export function currentTroubles(
   ) {
     troubles.push({
       key: 'exit',
-      title: 'Pace stopped',
+      title: t.stopped,
       body: [
         supervisor?.message,
-        supervisor?.retryAt !== undefined && 'Pacenote starts it again.',
+        supervisor?.retryAt !== undefined && t.startsAgain,
       ]
         .filter(Boolean)
         .join(' '),
@@ -51,8 +54,8 @@ export function currentTroubles(
   if (phase === 'setup') {
     troubles.push({
       key: 'setup',
-      title: 'Pace needs setup',
-      body: supervisor?.message ?? 'Some settings need fixing.',
+      title: t.needsSetup,
+      body: supervisor?.message ?? t.settingsToFix,
       route: setupSettingsRoute(supervisor?.issues),
     })
   }
@@ -66,17 +69,17 @@ export function currentTroubles(
   ) {
     troubles.push({
       key: 'socket',
-      title: 'Pace lost its connection to Slack',
-      body: 'New mentions wait until it reconnects.',
+      title: t.lostSlack,
+      body: t.mentionsWait,
       route: '#/bot',
     })
   }
   for (const problem of status.problems) {
-    const text = problemText(problem)
+    const said = problemText(problem)
     troubles.push({
-      key: `problem:${text}`,
-      title: 'Pace needs attention',
-      body: text,
+      key: `problem:${said}`,
+      title: t.needsAttention,
+      body: said,
       route: '#/bot',
     })
   }
@@ -84,11 +87,15 @@ export function currentTroubles(
 }
 
 /**
- * A problem without when it was last seen ("(last at 14:20)"), which changes
- * while the problem stays the same
+ * A problem without when it was last seen ("(last at 14:20)") or that it was
+ * found at startup, which change while the problem stays the same: in either
+ * language Pace words it in (src/index.text.ts, src/mention/responder.text.ts),
+ * and any closing parenthesis with a time in it.
  */
 function problemText(problem: string): string {
-  return problem.replace(/\s*\((?:last at|checked at)[^)]*\)$/, '')
+  return problem
+    .replace(/\s*\((?:last at|checked at|마지막:|시작할 때 확인함)[^)]*\)$/, '')
+    .replace(/\s*\([^()]*\b\d{1,2}:\d{2}\b[^()]*\)$/, '')
 }
 
 /** Troubles only a running bot can tell about, kept while none runs */

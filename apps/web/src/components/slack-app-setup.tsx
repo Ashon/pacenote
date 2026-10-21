@@ -1,6 +1,8 @@
 import { ExternalLink } from 'lucide-react'
 import manifest from '../../../../slack-app-manifest.yaml?raw'
 import { Button } from '@/components/ui/button'
+import { useText } from '@/lib/i18n'
+import { text } from './slack-app-setup.text'
 
 /**
  * Slack's link that opens app creation with Pacenote's manifest filled in
@@ -18,36 +20,27 @@ export const SLACK_APP_URL = `https://api.slack.com/apps?new_app=1&manifest_yaml
  * and the steps say where the two tokens come from.
  */
 export function SlackAppSetup() {
+  const t = useText(text)
   return (
     <div className="border-t border-border bg-well/60 px-4 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-row">No Slack app yet?</p>
+          <p className="text-row">{t.noAppYet}</p>
           <p className="mt-0.5 text-meta text-muted-foreground">
-            Slack opens with Pacenote's manifest filled in: choose your
-            workspace and create the app.
+            {t.opensWith}
           </p>
         </div>
         <Button size="sm" asChild>
           <a href={SLACK_APP_URL} target="_blank" rel="noreferrer">
             <ExternalLink />
-            Create the Slack app
+            {t.create}
           </a>
         </Button>
       </div>
       <ol className="mt-2.5 list-decimal space-y-1 pl-5 text-meta text-muted-foreground">
-        <li>
-          Basic Information &gt; App-Level Tokens: generate a token with the
-          connections:write scope. That is the App token.
-        </li>
-        <li>
-          Install App: install it to your workspace and copy the Bot User OAuth
-          Token. That is the Bot token.
-        </li>
-        <li>
-          Add your Slack member ID under Who can ask, save, and invite Pace to a
-          public channel with /invite @Pace.
-        </li>
+        <li>{t.appToken}</li>
+        <li>{t.botToken}</li>
+        <li>{t.memberId}</li>
       </ol>
     </div>
   )

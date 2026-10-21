@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { outcomeOf } from '../tasks/context.js'
+import { getLocale, localized, type Locale } from '../i18n/locale.js'
+import { outcomeFacts, outcomeWords } from '../tasks/context.js'
 import { readRepos } from '../tasks/folders.js'
 import { allTaskViews, readJson, writeJson } from '../tasks/store.js'
 import type { TaskView, WorkEntry } from '../tasks/types.js'
@@ -16,11 +17,13 @@ import {
   WINDOW_MS,
   type Audience,
 } from './areas.js'
+import { text } from './recap.text.js'
 import { sessionMarks, type SessionMark } from './sessions.js'
 import { RECAPS_FILE } from './spent.js'
 import { readYou } from './store.js'
 import type {
   AreaRecord,
+  Outcome,
   RecapArea,
   RecapItem,
   RecapPeriod,
@@ -232,7 +235,29 @@ const notYours = (task: TaskView) =>
   task.status === 'maybe' ||
   (task.status === 'dismissed' && task.dismissReason !== 'done-already')
 
-/** The record of a period, from your work */
+/**
+ * An open task's note: who asked and when it is due, or (later) that you kept
+ * it for later
+ */
+const openNote = (
+  t: (typeof text)['en'],
+  item: Pick<RecapItem, 'askedBy' | 'due'> & { later?: boolean }
+) =>
+  [
+    item.askedBy !== undefined
+      ? t.askedYou(item.askedBy)
+      : item.later
+        ? t.keptForLater
+        : undefined,
+    item.due ? t.due(item.due) : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+/**
+ * The record of a period, from your work; its words (notes, Elsewhere) in the
+ * app's language unless one is given (English for an AI tool)
+ */
 export function recapOf(input: {
   period: RecapPeriod
   key: string
@@ -245,9 +270,12 @@ export function recapOf(input: {
   runs?: readonly RunLine[]
   emails?: string[]
   written?: Written
+  locale?: Locale
 }): RecapView | undefined {
   const range = periodRange(input.period, input.key)
   if (!range) return undefined
+  const locale = input.locale ?? getLocale()
+  const t = localized(text, locale)
   const now = input.now ?? Date.now()
   const start = range.start.getTime()
   const end = range.end.getTime()
@@ -286,7 +314,7 @@ export function recapOf(input: {
     if (!found) {
       found = {
         ...(area ? { id: area.id } : {}),
-        name: area?.name ?? 'Elsewhere',
+        name: area?.name ?? t.elsewhere,
         done: 0,
         commits: 0,
         days: 0,
@@ -304,16 +332,46 @@ export function recapOf(input: {
     return found
   }
 
-  const doneItem = (task: TaskView, area: TaskArea | undefined): RecapItem => ({
-    title: task.title,
-    at: doneOf(task),
-    note:
+  const doneItem = (task: TaskView, area: TaskArea | undefined): RecapItem => {
+    const outcome: Outcome | undefined =
       task.status === 'dismissed'
-        ? 'Done already'
-        : outcomeOf(task, [...input.work]),
-    task: task.id,
-    ...(area ? { area } : {}),
-  })
+        ? { kind: 'done-already' }
+        : outcomeFacts(task, [...input.work])
+    return {
+      title: task.title,
+      at: doneOf(task),
+      note: outcomeWords(outcome, locale),
+      ...(outcome ? { outcome } : {}),
+      task: task.id,
+      ...(area ? { area } : {}),
+    }
+  }
+  /**
+   * An open task, with who asked and when it is due; later: say it was kept
+   * for later when it is from a session on this Mac
+   */
+  const openItem = (
+    task: TaskView,
+    area: TaskArea | undefined,
+    later = false
+  ): RecapItem => {
+    const asked = {
+      ...(task.kind === 'asked' && task.askedBy
+        ? { askedBy: task.askedBy }
+        : {}),
+      ...(task.due ? { due: task.due } : {}),
+    }
+    return {
+      title: task.title,
+      note: openNote(t, {
+        ...asked,
+        later: later && task.source.app === 'local',
+      }),
+      ...asked,
+      task: task.id,
+      ...(area ? { area } : {}),
+    }
+  }
   const doneTasks: RecapItem[] = []
   const people = new Map<string, number>()
   for (const task of input.tasks) {
@@ -339,19 +397,7 @@ export function recapOf(input: {
       : Date.parse(task.postedAt) < end &&
         (settled === undefined || settled >= end)
     if (openAtEnd && Date.parse(task.postedAt) < end)
-      bucket(area).carried.push({
-        title: task.title,
-        note: [
-          task.kind === 'asked' && task.askedBy
-            ? `${task.askedBy} asked you`
-            : undefined,
-          task.due ? `due ${task.due}` : undefined,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        task: task.id,
-        ...(area ? { area } : {}),
-      })
+      bucket(area).carried.push(openItem(task, area))
   }
   for (const session of input.sessions) {
     if (!session.repo) continue
@@ -390,13 +436,17 @@ export function recapOf(input: {
     const into = bucket(area)
     into.runs += 1
     // The latest run says what you were looking into.
-    if (!into.asked || Date.parse(line.at) > Date.parse(into.asked.at ?? ''))
+    if (!into.asked || Date.parse(line.at) > Date.parse(into.asked.at ?? '')) {
+      const request = line.request.split('\n')[0]!.slice(0, 100)
       into.asked = {
-        title: `Asked Pace: ${line.request.split('\n')[0]!.slice(0, 100)}`,
+        title: t.askedPace(request),
+        run: true,
+        request,
         at: line.at,
         note: line.label,
         ...(area ? { area } : {}),
       }
+    }
   }
 
   const shown = SHOWN[input.period]
@@ -489,7 +539,7 @@ export function recapOf(input: {
         .map(([repo, commits]) => {
           const area = asArea(byRepo(repo))
           return {
-            title: `${commits.length} ${commits.length === 1 ? 'commit' : 'commits'} in ${repo}`,
+            title: t.commitsIn(commits.length, repo),
             at: commits[0]!.at,
             note: commits
               .slice(0, 2)
@@ -525,26 +575,7 @@ export function recapOf(input: {
           entry.kind === 'session' &&
           (today(entry.startedAt) || (entry.resumedAt ?? []).some(today))
       )
-    const line = (task: TaskView, note?: string): RecapItem => {
-      const area = taskArea(areas, task)
-      return {
-        title: task.title,
-        note:
-          note ??
-          [
-            task.kind === 'asked' && task.askedBy
-              ? `${task.askedBy} asked you`
-              : task.source.app === 'local'
-                ? 'kept for later'
-                : undefined,
-            task.due ? `due ${task.due}` : undefined,
-          ]
-            .filter(Boolean)
-            .join(' · '),
-        task: task.id,
-        ...(area ? { area } : {}),
-      }
-    }
+    const line = (task: TaskView) => openItem(task, taskArea(areas, task), true)
     const doing = open.filter(workedToday)
     const next = open
       .filter((task) => !doing.includes(task))
@@ -634,7 +665,8 @@ export function keepWritten(
  * your areas (found now when none are kept yet, for the MCP server), your
  * sessions and commits (with a home), and Pace's runs when given. For an
  * audience (Pace in a channel), only what it may hear of, and not the recap
- * you wrote, which was written from all of it.
+ * you wrote, which was written from all of it. locale: the language of its
+ * words, the app's unless given (English for an AI tool).
  */
 export async function countRecap(options: {
   dataDir: string
@@ -644,6 +676,7 @@ export async function countRecap(options: {
   now?: number
   runs?: (since: Date) => RunLine[]
   audience?: Audience
+  locale?: Locale
 }): Promise<{ view: RecapView; commits: Commit[] } | undefined> {
   const now = options.now ?? Date.now()
   const key = options.key ?? periodKey(options.period, new Date(now))
@@ -705,6 +738,7 @@ export async function countRecap(options: {
     written: audience
       ? undefined
       : readWritten(dataDir)[`${options.period}:${key}`],
+    locale: options.locale,
   })
   return view && { view, commits }
 }
@@ -741,20 +775,26 @@ const COMMITS_GIVEN = 80
 
 /**
  * The prompt Write it up gives your CLI, with no tools: the period's lines,
- * and how to sum them up
+ * and how to sum them up. In English, whatever the language of the view's own
+ * words: Pacenote's words in it are put again in English from what the items
+ * hold (their outcome, who asked, the request).
  */
 export function recapPrompt(
   view: RecapView,
   label: string,
   commits: readonly Commit[]
 ): string {
+  const en = localized(text, 'en')
   const lines: string[] = []
+  const note = (words: string | undefined) => (words ? ` (${words})` : '')
   for (const area of view.areas) {
     lines.push(
-      `## ${area.name}: ${area.done} done, ${area.commits} commits, sessions on ${area.days} days, ${area.asks} new asks`
+      `## ${area.id === undefined ? en.elsewhere : area.name}: ${area.done} done, ${area.commits} commits, sessions on ${area.days} days, ${area.asks} new asks`
     )
     for (const item of area.items.filter((i) => i.task))
-      lines.push(`- Done: ${item.title}${item.note ? ` (${item.note})` : ''}`)
+      lines.push(
+        `- Done: ${item.title}${note(outcomeWords(item.outcome, 'en'))}`
+      )
     const subjects = commits
       .filter(
         (c) =>
@@ -765,14 +805,10 @@ export function recapPrompt(
       .slice(0, COMMITS_GIVEN)
       .map((c) => c.subject)
     for (const subject of subjects) lines.push(`- Commit: ${subject}`)
-    for (const item of area.items.filter(
-      (i) => !i.task && i.title.startsWith('Asked Pace')
-    ))
-      lines.push(`- ${item.title}`)
+    for (const item of area.items.filter((i) => i.run))
+      lines.push(`- ${en.askedPace(item.request ?? '')}`)
     for (const item of area.carried)
-      lines.push(
-        `- Still open: ${item.title}${item.note ? ` (${item.note})` : ''}`
-      )
+      lines.push(`- Still open: ${item.title}${note(openNote(en, item))}`)
   }
   return [
     `Write a recap of the user's work for ${label}, in ${SENTENCES[view.period]}, as plain text with no headings, lists or Markdown.`,

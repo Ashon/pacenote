@@ -1,7 +1,9 @@
 import { App, SocketModeReceiver } from '@slack/bolt'
+import { localized, type Locale } from '../../i18n/locale.js'
 import type { Logger } from '../../logger.js'
 import type { ClaimedUser } from '../../settings/setup.js'
 import { slackApiBase } from './api.js'
+import { text } from './claim.text.js'
 import { slackLogger } from './logger.js'
 
 export interface ClaimListener {
@@ -22,6 +24,8 @@ export async function listenForClaim(options: {
   apiUrl?: string
   log: Logger
   onMention: (user: ClaimedUser) => void
+  /** The language of Pace's own notes in Slack (NOTES_LANGUAGE). English */
+  notesLocale?: Locale
 }): Promise<ClaimListener> {
   const { log } = options
   const apiUrl = slackApiBase(options.apiUrl)
@@ -67,7 +71,7 @@ export async function listenForClaim(options: {
       .postEphemeral({
         channel: event.channel,
         user: event.user,
-        text: 'Got it. Confirm in Pacenote that this is you, and setup goes on.',
+        text: localized(text, options.notesLocale ?? 'en').confirm,
         thread_ts: event.thread_ts,
       })
       .catch((err: unknown) =>

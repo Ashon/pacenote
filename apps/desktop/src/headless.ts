@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { lastMessage } from '../../../src/history/events.js'
+import { getLocale, localized, type Locale } from '../../../src/i18n/locale.js'
 import type { McpLaunch } from '../../../src/history/mcp-clients.js'
 import type { RunEvent } from '../../../src/history/types.js'
 import {
@@ -18,8 +19,10 @@ import {
 } from '../../../src/reasoners/codex.js'
 import {
   CLI_NAMES,
+  unableFrom,
   type ConnectorCli,
   type OwnCli,
+  type Unable,
 } from '../../../src/tasks/own-ai.js'
 import {
   readTools,
@@ -27,6 +30,7 @@ import {
   writeTools,
   type SourceId,
 } from '../../../src/tasks/sources.js'
+import { text } from './headless.text.js'
 
 /**
  * How Pacenote's own work runs each CLI headless on this Mac, as you, outside
@@ -425,22 +429,35 @@ export function runHeadless(options: {
 
 /**
  * Why a headless run gave nothing, as one line: it is not on this Mac, it took
- * too long, what it said, or the first line of its stderr
+ * too long, what it said, or the first line of its stderr. Pacenote's own
+ * words are in locale, the app's language by default.
  */
 export function exitError(
   cli: OwnCli,
   exit: Exit,
   output: Output | undefined,
-  what: { slow: string; nothing: string }
+  what: { slow: string; nothing: string },
+  locale: Locale = getLocale()
 ): string {
   if (exit.spawnError)
     return exit.spawnError.code === 'ENOENT'
-      ? `${CLI_NAMES[cli]} is not on this Mac (${cli} executable not found).`
+      ? localized(text, locale).notOnMac(CLI_NAMES[cli], cli)
       : exit.spawnError.message
   if (exit.timedOut) return what.slow
   if (output && 'error' in output && output.error)
     return output.error.split('\n')[0]!
   return exit.stderr.trim().split('\n')[0] || what.nothing
+}
+
+/**
+ * Whether a headless run's error means its CLI could not do the work at all,
+ * so the other one may: not on this Mac, or what the CLI's own words say. A
+ * run that took too long is not.
+ */
+export function exitUnable(exit: Exit, error: string): Unable | undefined {
+  if (exit.timedOut) return undefined
+  if (exit.spawnError?.code === 'ENOENT') return 'missing'
+  return unableFrom(error)
 }
 
 /**

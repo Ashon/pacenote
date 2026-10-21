@@ -4,8 +4,9 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { configFingerprint, sandboxSetting } from '../config.js'
+import { localized } from '../i18n/locale.js'
 import { readBotStatus } from '../runtime/status.js'
-import { SETTING_FIELDS } from '../settings/fields.js'
+import { settingLabel } from '../settings/fields.js'
 import { readSettingsValues } from '../settings/settings-file.js'
 import {
   allowlistPath,
@@ -22,6 +23,7 @@ import { defaultVmBin, vmStatus } from './vm.js'
 import { signedIn } from './vm-login.js'
 import { VM_BROKER_IMAGE, VM_IMAGE, VM_RENDERER_IMAGE } from './vm-images.js'
 import type { PendingApply, SandboxCheck, SandboxStatus } from './types.js'
+import { text } from './status.text.js'
 
 /** Settings Pace has not picked up: they changed after it started */
 export function computePending(bot?: {
@@ -29,13 +31,9 @@ export function computePending(bot?: {
   expectedHash: string
 }): PendingApply[] {
   return bot?.configHash && bot.configHash !== bot.expectedHash
-    ? [{ reason: 'Settings changed after Pace started.' }]
+    ? [{ reason: localized(text).settingsChanged }]
     : []
 }
-
-/** A setting's name on the Settings screen */
-const labelOf = (key: string) =>
-  SETTING_FIELDS.find((field) => field.key === key)?.label ?? key
 
 type Run = (
   command: string,
@@ -69,7 +67,7 @@ export function commandRunner(env: NodeJS.ProcessEnv, cwd: string): Run {
 async function sandboxAuthor(
   values: NodeJS.ProcessEnv,
   run: Run
-): Promise<{ name: string; email: string; source: string }> {
+): Promise<{ name: string; email: string; source: 'settings' | 'global' }> {
   const fromGlobal = async (key: string) =>
     (await run('git', ['config', '--global', key])).stdout.trim()
   const name =
@@ -82,7 +80,7 @@ async function sandboxAuthor(
   return {
     name,
     email,
-    source: fromSettings ? 'Settings' : 'global git config',
+    source: fromSettings ? 'settings' : 'global',
   }
 }
 
@@ -112,6 +110,7 @@ export async function collectSandboxStatus(options: {
     credential: ClaudeCredential
   ) => Promise<CredentialState | undefined>
 }): Promise<SandboxStatus> {
+  const t = localized(text)
   const { sandboxDir, run } = options
   const home = options.home ?? homedir()
   const values: NodeJS.ProcessEnv = {
@@ -148,7 +147,7 @@ export async function collectSandboxStatus(options: {
   const fileCheck = (label: string, file: string): SandboxCheck =>
     existsSync(file)
       ? { label, ok: true, detail: file }
-      : { label, ok: false, detail: `Missing: ${file}` }
+      : { label, ok: false, detail: t.missingFile(file) }
   // The sandbox's own sign-in (vm-login.ts): whether the CLI's credentials
   // file is there, never what is in it
   const signed = signedIn(vmRootPath(options.env, home), reasoner)
@@ -156,35 +155,29 @@ export async function collectSandboxStatus(options: {
   if (isolated) {
     const name = reasoner === 'claude' ? 'Claude' : 'Codex'
     const check: SandboxCheck = {
-      label: `Sandbox ${reasoner} login`,
+      label: t.login(reasoner),
       login: true,
       ok: signed,
-      detail: signed
-        ? 'Signed in inside the sandbox'
-        : `Not signed in: Sign in to ${name} below`,
+      detail: signed ? t.signedIn : t.notSignedIn(name),
     }
     // As the config picks: the sign-in, a claude token set by hand, an API key
     const apiKey = values.SANDBOX_ANTHROPIC_API_KEY || undefined
     if (!signed && reasoner === 'claude' && values.SANDBOX_CLAUDE_OAUTH_TOKEN) {
       check.ok = true
-      check.detail =
-        'Uses the claude token set by hand: signing in to Claude below replaces it'
+      check.detail = t.usesToken
     } else if (!signed && reasoner === 'claude' && apiKey) {
       const state = await options.checkCredential?.({ apiKey })
       check.ok = state !== 'rejected'
-      check.detail =
-        state === 'rejected'
-          ? 'The Anthropic API key is rejected: sign in to Claude below, or set another key'
-          : 'Uses the Anthropic API key'
+      check.detail = state === 'rejected' ? t.keyRejected : t.usesKey
     }
     status.checks.push(check)
   }
   // Checks only configured features. For empty features the broker starts
   // without those tools. (Shown as off in the broker tools row)
   if (opsOn && expected.configured.ssh) {
-    status.checks.push(fileCheck('SSH key', expected.sshKey))
+    status.checks.push(fileCheck(t.sshKey, expected.sshKey))
     if (values.OPS_SSH_KNOWN_HOSTS?.trim())
-      status.checks.push(fileCheck('SSH known_hosts', expected.knownHosts))
+      status.checks.push(fileCheck(t.knownHosts, expected.knownHosts))
     let hostCount = 0
     try {
       hostCount = Object.keys(
@@ -197,25 +190,22 @@ export async function collectSandboxStatus(options: {
       values.OPS_SSH_INVENTORY_DIR?.trim() && values.OPS_SSH_INVENTORY?.trim()
     )
     status.checks.push({
-      label: 'Host list',
+      label: t.hostList,
       ok: hostCount > 0,
       detail:
         hostCount > 0
-          ? `${hostCount} host${hostCount === 1 ? '' : 's'} (${fromInventory ? 'rebuilt from the inventory when Pace starts' : 'hosts.json managed by hand'})`
+          ? t.hosts(hostCount, fromInventory)
           : fromInventory
-            ? 'None (built when Pace starts)'
-            : `None (set ${labelOf('OPS_SSH_INVENTORY')} in Settings, or write hosts.json by hand)`,
+            ? t.noHostsYet
+            : t.noHosts(settingLabel('OPS_SSH_INVENTORY')),
     })
   }
   if (opsOn) {
     const kubeSize = existsSync(kubeconfig) ? statSync(kubeconfig).size : 0
     status.checks.push({
-      label: 'k8s kubeconfig',
+      label: t.kubeconfig,
       ok: kubeSize > 0,
-      detail:
-        kubeSize > 0
-          ? 'Present'
-          : 'Empty (k8s tools off, rebuild kubeconfig needed)',
+      detail: kubeSize > 0 ? t.present : t.kubeconfigEmpty,
     })
     const jiraKeys = [
       'OPS_JIRA_URL',
@@ -226,12 +216,12 @@ export async function collectSandboxStatus(options: {
     if (jiraKeys.some((key) => values[key]?.trim())) {
       const missing = jiraKeys.filter((key) => !values[key]?.trim())
       status.checks.push({
-        label: 'Jira',
+        label: t.jira,
         ok: missing.length === 0,
         detail:
           missing.length === 0
             ? `${values.OPS_JIRA_URL} (${values.OPS_JIRA_PROJECTS}, ${values.OPS_JIRA_EMAIL})`
-            : `${missing.map(labelOf).join(', ')} required`,
+            : t.required(missing.map(settingLabel)),
       })
     }
     const gh = await run('gh', [
@@ -243,21 +233,18 @@ export async function collectSandboxStatus(options: {
     ])
     const account = /account (\S+)/.exec(gh.stdout + gh.stderr)?.[1]
     status.checks.push({
-      label: 'GitHub login (gh)',
+      label: t.github,
       ok: gh.code === 0,
-      detail:
-        gh.code === 0
-          ? `${account ?? 'Logged in'} (the token is passed when Pace starts)`
-          : 'gh auth login required',
+      detail: gh.code === 0 ? t.ghSignedIn(account) : t.ghSignedOut,
     })
     const author = await sandboxAuthor(values, run)
     status.checks.push({
-      label: 'PR commit author',
+      label: t.author,
       ok: Boolean(author.name && author.email),
       detail:
         author.name && author.email
-          ? `${author.name} <${author.email}> (${author.source})`
-          : 'The commit author name and email in Settings, or git config --global, required',
+          ? `${author.name} <${author.email}> (${t.authorFrom[author.source]})`
+          : t.noAuthor,
     })
   }
 

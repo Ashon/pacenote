@@ -12,8 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Swap } from '@/components/ui/motion'
 import { useRun, useRuns } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
+import { useText } from '@/lib/i18n'
 import { useMacs, whereAnswers } from '@/lib/macs'
 import { PaceSpinner } from '../pace-spinner'
+import { text } from './answer-step.text'
 import { Chip, CommandLine, Hint, Problem, StepFrame, useWaited } from './parts'
 
 /**
@@ -33,6 +35,7 @@ export function AnswerStep({
   /** Leaving for Overview, or a run */
   onLeave: (hash: string) => void
 }) {
+  const t = useText(text)
   const runs = useRuns({ kind: 'mention' })
   const since = record.answerSince ? Date.parse(record.answerSince) : 0
   const asked = [...(runs.data ?? [])]
@@ -58,16 +61,12 @@ export function AnswerStep({
   return (
     <StepFrame
       step="answer"
-      title={done ? 'Pace is set up' : 'Say hello to Pace in Slack'}
-      lead={
-        done
-          ? 'It answered in Slack, so the whole path works. Overview shows how it is doing from here.'
-          : 'Pace is running. Mention it once to see the whole path work, from Slack to the AI and back.'
-      }
+      title={done ? t.titleDone : t.title}
+      lead={done ? t.leadDone : t.lead}
       footer={
         <>
           <span className="flex-1" />
-          <Button onClick={() => onLeave('#/')}>Go to Overview</Button>
+          <Button onClick={() => onLeave('#/')}>{t.toOverview}</Button>
         </>
       }
     >
@@ -79,14 +78,14 @@ export function AnswerStep({
                 variant="outline"
                 onClick={() => void window.pacenoteDesktop?.bot.start()}
               >
-                Start Pace
+                {t.start}
               </Button>
             ) : undefined
           }
         >
           {phase === 'starting'
-            ? 'Pace is starting.'
-            : `Pace isn't running, so it can't answer yet.${supervisor?.message ? ` ${supervisor.message}` : ''}`}
+            ? t.starting
+            : t.notRunning(supervisor?.message)}
         </Problem>
       )}
       {where && (
@@ -96,20 +95,20 @@ export function AnswerStep({
         >
           <ArrowRightLeft className="size-4 shrink-0" />
           {where.here
-            ? `Pace moved here from ${macs?.moved?.from ?? record.fromMac?.name}: this Mac answers the hello.`
-            : `Moving here from ${where.other?.name ?? record.fromMac?.name}…`}
+            ? t.movedHere(macs?.moved?.from ?? record.fromMac?.name)
+            : t.movingHere(where.other?.name ?? record.fromMac?.name)}
         </p>
       )}
       {!done && (
         <div className="flex flex-col gap-2.5">
-          <b className="text-section">Ask it something in a channel it is in</b>
-          <CommandLine text="@Pace what can you help me with?" />
+          <b className="text-section">{t.askSomething}</b>
+          <CommandLine text={t.question} />
           <p className="text-body text-muted-foreground">
-            In another channel, invite it first with{' '}
-            <code className="rounded-sm bg-well px-1.5 font-mono text-meta">
-              /invite @Pace
-            </code>
-            .
+            {t.inviteFirst(
+              <code className="rounded-sm bg-well px-1.5 font-mono text-meta">
+                /invite @Pace
+              </code>
+            )}
           </p>
         </div>
       )}
@@ -123,9 +122,7 @@ export function AnswerStep({
           ) : (
             <p className="flex items-center gap-2.5 text-body text-muted-foreground">
               <PaceSpinner className="size-6" />
-              <span className="text-shimmer">
-                Waiting for your first mention
-              </span>
+              <span className="text-shimmer">{t.waiting}</span>
             </p>
           )}
         </Swap>
@@ -133,12 +130,7 @@ export function AnswerStep({
       {shown && shown.status !== 'running' && !answered && (
         <Failed run={shown} />
       )}
-      {waited && (
-        <Hint>
-          Nothing yet? If Pace said in Slack that it can't answer there, mention
-          it in a public channel it's in, as yourself.
-        </Hint>
-      )}
+      {waited && <Hint>{t.nothingYet}</Hint>}
     </StepFrame>
   )
 }
@@ -151,23 +143,24 @@ function Answer({
   run: RunSummary
   onLeave: (hash: string) => void
 }) {
+  const t = useText(text)
   return (
     <div className="flex flex-col gap-3">
       <span className="flex items-center gap-2.5">
         {run.status === 'running' ? (
           <Chip tone="working">
             <LoaderCircle className="animate-spin" />
-            Pace is answering
+            {t.answering}
           </Chip>
         ) : run.status === 'succeeded' ? (
           <Chip tone="ok">
             <CircleCheck />
-            First answer sent
+            {t.sent}
           </Chip>
         ) : (
           <Chip tone="failed">
             <CircleX />
-            It could not answer
+            {t.couldNot}
           </Chip>
         )}
       </span>
@@ -177,14 +170,14 @@ function Answer({
           <span className="text-body text-muted-foreground">
             {run.conversationLabel}
             {run.userName ? ` · @${run.userName}` : ''}
-            {run.status === 'succeeded' ? ' · answered in the thread' : ''}
+            {run.status === 'succeeded' ? t.inThread : ''}
           </span>
         </span>
         <Button
           variant="ghost"
           onClick={() => onLeave(`#/runs/${encodeURIComponent(run.id)}`)}
         >
-          Open the run
+          {t.openRun}
         </Button>
       </div>
     </div>
@@ -196,6 +189,7 @@ function Answer({
  * itself under Details, and that the next mention, once fixed, finishes setup
  */
 function Failed({ run }: { run: RunSummary }) {
+  const t = useText(text)
   const { data } = useRun(run.id)
   const record =
     data && data.kind !== 'collection' ? (data as RunRecord) : undefined
@@ -208,13 +202,6 @@ function Failed({ run }: { run: RunSummary }) {
       )
     : undefined
   const reason =
-    advice?.text ??
-    (run.status === 'interrupted'
-      ? 'Pace stopped before it answered.'
-      : "Pace couldn't produce an answer.")
-  return (
-    <Problem details={error || undefined}>
-      {reason} Fix it, then mention Pace again: its next answer finishes setup.
-    </Problem>
-  )
+    advice?.text ?? (run.status === 'interrupted' ? t.interrupted : t.noAnswer)
+  return <Problem details={error || undefined}>{t.failed(reason)}</Problem>
 }

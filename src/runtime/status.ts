@@ -8,6 +8,8 @@ import {
   writeFileSync,
 } from 'node:fs'
 import path from 'node:path'
+import { localized } from '../i18n/locale.js'
+import { text } from './status.text.js'
 import type { BotStatus, BotStatusView, SocketState } from './types.js'
 
 export const STATUS_FILE = 'bot.json'
@@ -106,10 +108,7 @@ export class BotAlreadyRunningError extends Error {
     readonly pid: number,
     managedBy: string
   ) {
-    super(
-      `Pace is already running (pid ${pid}, ${managedBy === 'desktop' ? 'desktop app' : 'terminal'}). ` +
-        'Running two with the same app token makes Slack split events between them, so only one runs.'
-    )
+    super(localized(text).alreadyRunning(pid, managedBy === 'desktop'))
   }
 }
 

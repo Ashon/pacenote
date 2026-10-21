@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setLocale } from '../src/i18n/locale.js'
 import {
+  formatDayGroup,
   formatDuration,
+  formatRelative,
   formatShortDay,
   formatTokens,
   formatWait,
@@ -88,5 +91,29 @@ describe('formatShortDay', () => {
     expect(formatShortDay(new Date(2026, 9, 9, 9).toISOString(), now)).toBe(
       'Fri'
     )
+  })
+})
+
+describe('in Korean', () => {
+  afterEach(() => setLocale('en'))
+
+  it('words days, waits and durations as Korean does', () => {
+    setLocale('ko')
+    const now = new Date(2026, 9, 11, 15)
+    expect(formatShortDay(new Date(2026, 9, 11, 9).toISOString(), now)).toBe(
+      '오늘'
+    )
+    expect(formatShortDay(new Date(2026, 9, 9, 9).toISOString(), now)).toBe(
+      '금요일'
+    )
+    expect(formatDayGroup(new Date(2026, 9, 6, 9).toISOString(), now)).toBe(
+      '10월 6일 (화)'
+    )
+    expect(formatWait(36 * 3_600_000)).toBe('1.5일')
+    expect(formatDuration(125_000)).toBe('2분 5초')
+    expect(formatDuration(12_340)).toBe('12.3초')
+    expect(
+      formatRelative(new Date(Date.now() - 5 * 60_000).toISOString())
+    ).toBe('5분 전')
   })
 })

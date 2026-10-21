@@ -46,7 +46,22 @@ import {
   moveEnvSettings,
   readSettingsValues,
 } from '../../../src/settings/settings-file.js'
-import { BotSupervisor, type SupervisorState } from './bot.js'
+import { BotSupervisor } from './bot.js'
+import {
+  getLocale,
+  isLocale,
+  localized,
+  setLocale,
+  type Locale,
+} from '../../../src/i18n/locale.js'
+import { setAppMenu } from './app-menu.js'
+import { text } from './main.text.js'
+import {
+  readLanguage,
+  resolveLanguage,
+  writePrefs,
+  type LanguageState,
+} from './language.js'
 import {
   currentTroubles,
   newTroubles,
@@ -236,6 +251,17 @@ const moved = (() => {
 const dataDir = resolveDataDir()
 securePrivateDir(dataDir)
 securePrivateFile(settingsFile)
+/** The app's own preferences: whether Pace starts with it, its language */
+const prefsFile = path.join(dataDir, 'desktop.json')
+/**
+ * The app's language: the one chosen in Settings, or macOS's. Its tray, menus,
+ * notifications and window follow it, and Pace is told it when it starts.
+ */
+let language: LanguageState = resolveLanguage(
+  readLanguage(prefsFile),
+  app.getPreferredSystemLanguages()
+)
+setLocale(language.locale)
 /**
  * The app's own log, kept beside Pace's in the data folder so the installed
  * app's messages are not lost with its console. Open logs folder shows both.
@@ -616,7 +642,7 @@ if (supervisor) {
         if (typeof value === 'string') values[key] = value
       }
       if (!values.SLACK_APP_TOKEN || !values.SLACK_BOT_TOKEN)
-        throw new Error(`${from.name} has no Slack app of its own to share.`)
+        throw new Error(localized(text).noSlackAppToShare(from.name))
       const issues = settings.save(values)
       if (issues.length > 0)
         throw new Error(issues.map((issue) => issue.message).join(' '))
@@ -743,40 +769,29 @@ function showMainWindow(route?: string): void {
   mainWindow.focus()
 }
 
-const PHASE_LABEL: Record<SupervisorState['phase'], string> = {
-  idle: 'Stopped',
-  setup: 'Setup needed',
-  failed: 'Failed to start',
-  building: 'Building',
-  starting: 'Starting',
-  running: 'Running',
-  stopping: 'Stopping',
-  crashed: 'Crashed',
-  external: 'Running in terminal',
-}
-
 function botSummary(): {
   label: string
   active: number
   status: BotStatus | undefined
 } {
+  const t = localized(text)
   const view = readBotStatus(dataDir)
   const status = view.alive ? view.status : undefined
   const phase = supervisor?.current.phase
-  let label = phase ? PHASE_LABEL[phase] : status ? 'Running' : 'Stopped'
-  if (supervisor?.current.retryAt !== undefined) label += ', starting again'
+  let label = t.phase[phase ?? (status ? 'running' : 'idle')]
+  if (supervisor?.current.retryAt !== undefined) label = t.retrying(label)
   if (status?.state === 'running' && status.standby) {
-    label = 'Standing by (another of your Macs answers)'
+    label = t.standingBy
   } else if (
     status?.state === 'running' &&
     status.socket.state !== 'connected'
   ) {
-    label = `Socket Mode ${status.socket.state === 'reconnecting' ? 'reconnecting' : 'disconnected'}`
+    label = t.socket(status.socket.state === 'reconnecting')
   } else if (
     status?.state === 'running' &&
     (phase === 'running' || phase === 'external')
   ) {
-    label = `Connected${phase === 'external' ? ' in terminal' : ''} (${status.reasoner ?? '?'})`
+    label = t.connected(phase === 'external', status.reasoner ?? '?')
   }
   return { label, active: status?.requests.active ?? 0, status }
 }
@@ -877,7 +892,8 @@ function updateTray(): void {
   ])
   if (key === lastTrayKey) return
   lastTrayKey = key
-  tray.setToolTip(`${appName} - Pace: ${summary.label}`)
+  const t = localized(text)
+  tray.setToolTip(t.tooltip(appName, summary.label))
   // Shows the number of active requests next to the menu bar icon. (macOS)
   // Dev runs say so next to the tray icon, since the installed Pacenote may sit
   // beside it.
@@ -901,22 +917,22 @@ function updateTray(): void {
   const controls: MenuItemConstructorOptions[] = supervisor
     ? [
         live
-          ? { label: 'Restart Pace', click: () => void supervisor.restart() }
+          ? { label: t.restart, click: () => void supervisor.restart() }
           : phase === 'setup'
             ? setup.view().open
               ? {
-                  label: 'Set up Pace...',
+                  label: t.setUp,
                   click: () => showMainWindow('#/setup'),
                 }
               : {
-                  label: 'Open Settings...',
+                  label: t.openSettings,
                   click: () =>
                     showMainWindow(
                       setupSettingsRoute(supervisor?.current.issues)
                     ),
                 }
             : {
-                label: 'Start Pace',
+                label: t.start,
                 enabled:
                   phase === 'idle' || phase === 'failed' || phase === 'crashed',
                 click: () => void supervisor.start(),
@@ -925,14 +941,14 @@ function updateTray(): void {
     : []
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: `Open ${appName}`, click: () => showMainWindow() },
+      { label: t.open(appName), click: () => showMainWindow() },
       { type: 'separator' },
-      { label: `Pace: ${summary.label}`, enabled: false },
+      { label: t.status(summary.label), enabled: false },
       ...notes.map((note) => ({ label: note, enabled: false })),
       ...(summary.active > 0
         ? [
             {
-              label: `${summary.active} active ${summary.active === 1 ? 'request' : 'requests'}`,
+              label: t.activeRequests(summary.active),
               enabled: false,
             },
           ]
@@ -942,12 +958,12 @@ function updateTray(): void {
       ...(update
         ? [
             {
-              label: `Pacenote ${update} is out...`,
+              label: t.updateOut(update),
               click: () => showMainWindow('#/settings/general'),
             },
           ]
         : []),
-      { label: `Quit ${appName}`, click: () => app.quit() },
+      { label: t.quit(appName), click: () => app.quit() },
     ])
   )
 }
@@ -1033,6 +1049,23 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:bot:auto-start', (event, value: unknown) => {
     if (fromMainWindow(event) && typeof value === 'boolean')
       supervisor?.setAutoStart(value)
+  })
+  // The language, for the window's first paint (asked before it renders)
+  ipcMain.on('pacenote:app:language', (event) => {
+    event.returnValue = language
+  })
+  // Settings > General: the app's language, applied at once to the window,
+  // the tray and the menus, and to Pace when it next starts
+  ipcMain.handle('pacenote:app:set-language', (event, value: unknown) => {
+    if (!fromMainWindow(event) || (value !== 'system' && !isLocale(value)))
+      return language
+    writePrefs(prefsFile, { language: value === 'system' ? undefined : value })
+    language = resolveLanguage(value, app.getPreferredSystemLanguages())
+    setLocale(language.locale)
+    setAppMenu(appName)
+    lastTrayKey = ''
+    updateTray()
+    return language
   })
   // Settings > Macs: your Macs, and where Pace answers
   ipcMain.handle('pacenote:macs:view', (event) =>
@@ -1186,7 +1219,7 @@ function registerBotIpc(): void {
     (event, value: unknown, yours: unknown) => {
       if (!fromMainWindow(event) || typeof value !== 'string') return {}
       const group = answerGroup(dataDir, value, yours === true)
-      if (!group) return { error: `${value} is not a user group.` }
+      if (!group) return { error: localized(text).notAGroup(value) }
       if (yours !== true) return {}
       const current = tasksSettings()
       if (!yourGroups(current).includes(group)) {
@@ -1207,13 +1240,15 @@ function registerBotIpc(): void {
   // (src/you). Counted at most every minute, in the background once there is
   // a count to show; a fix applies at once and is counted again with it.
   const YOU_EVERY_MS = 60_000
-  let you: { view: YouView; at: number } | undefined
+  // Worded in the app's language, so a count in another one is counted again
+  let you: { view: YouView; at: number; locale: Locale } | undefined
   let counting: Promise<YouView> | undefined
   const countYouNow = (): Promise<YouView> => {
     counting ??= (async () => {
       await checkAccounts(dataDir, toolPath()).catch(() => undefined)
+      const locale = getLocale()
       const view = await countYou({ dataDir, home: homedir(), keep: true })
-      you = { view, at: Date.now() }
+      you = { view, at: Date.now(), locale }
       return view
     })().finally(() => {
       counting = undefined
@@ -1222,7 +1257,7 @@ function registerBotIpc(): void {
   }
   ipcMain.handle('pacenote:you:get', (event) => {
     if (!fromMainWindow(event)) return null
-    if (!you) return countYouNow()
+    if (!you || you.locale !== getLocale()) return countYouNow()
     if (Date.now() - you.at > YOU_EVERY_MS) void countYouNow()
     return you.view
   })
@@ -1232,7 +1267,7 @@ function registerBotIpc(): void {
     await counting?.catch(() => undefined)
     return countYouNow()
   }
-  const text = (value: unknown) =>
+  const short = (value: unknown) =>
     typeof value === 'string' && value.length < 200 ? value : undefined
   ipcMain.handle('pacenote:you:confirm', (event) =>
     fromMainWindow(event)
@@ -1240,8 +1275,8 @@ function registerBotIpc(): void {
       : null
   )
   ipcMain.handle('pacenote:you:rename', (event, id: unknown, name: unknown) => {
-    const area = text(id)
-    const to = text(name)
+    const area = short(id)
+    const to = short(name)
     return fromMainWindow(event) && area && to
       ? fixYou((file) => renameArea(file, area, to))
       : null
@@ -1249,22 +1284,22 @@ function registerBotIpc(): void {
   ipcMain.handle(
     'pacenote:you:take-out',
     (event, id: unknown, part: unknown) => {
-      const area = text(id)
-      const key = text(part)
+      const area = short(id)
+      const key = short(part)
       return fromMainWindow(event) && area && key
         ? fixYou((file) => takeOut(file, area, key))
         : null
     }
   )
   ipcMain.handle('pacenote:you:merge', (event, id: unknown, into: unknown) => {
-    const area = text(id)
-    const target = text(into)
+    const area = short(id)
+    const target = short(into)
     return fromMainWindow(event) && area && target
       ? fixYou((file) => mergeAreas(file, area, target))
       : null
   })
   ipcMain.handle('pacenote:you:leave', (event, id: unknown, left: unknown) => {
-    const area = text(id)
+    const area = short(id)
     return fromMainWindow(event) && area
       ? fixYou((file) => leaveArea(file, area, left === true))
       : null
@@ -1298,7 +1333,10 @@ function registerBotIpc(): void {
       runs: recapRuns,
     })
     if (counted)
-      recaps.set(`${period}:${key}`, { view: counted.view, at: Date.now() })
+      recaps.set(`${getLocale()}:${period}:${key}`, {
+        view: counted.view,
+        at: Date.now(),
+      })
     return counted
   }
   ipcMain.handle(
@@ -1310,7 +1348,7 @@ function registerBotIpc(): void {
         typeof key === 'string' && periodRange(which, key)
           ? key
           : periodKey(which, new Date())
-      const kept = recaps.get(`${which}:${at}`)
+      const kept = recaps.get(`${getLocale()}:${which}:${at}`)
       if (kept && Date.now() - kept.at < RECAP_EVERY_MS) return kept.view
       return (await countRecapNow(which, at))?.view ?? null
     }
@@ -1318,14 +1356,14 @@ function registerBotIpc(): void {
   ipcMain.handle(
     'pacenote:recap:write',
     async (event, period: unknown, key: unknown) => {
+      const t = localized(text)
       const which = periodOf(period)
       if (!fromMainWindow(event) || !which || typeof key !== 'string')
-        return { error: 'Not a recap.' }
+        return { error: t.notARecap }
       const counted = await countRecapNow(which, key)
-      if (!counted) return { error: 'Not a recap.' }
+      if (!counted) return { error: t.notARecap }
       const { view, commits } = counted
-      if (view.areas.length === 0)
-        return { error: 'There is nothing to write up yet.' }
+      if (view.areas.length === 0) return { error: t.nothingToWriteUp }
       const prompt = recapPrompt(view, periodWords(view), commits)
       const ran = await ownAi.run(async (cli) => {
         const result = await writeRecap({
@@ -1345,7 +1383,7 @@ function registerBotIpc(): void {
           })
         return result
       }, refusalOf)
-      if ('resting' in ran) return { error: 'Both AIs are resting.' }
+      if ('resting' in ran) return { error: localized(text).bothResting }
       const { result } = ran
       if ('error' in result) {
         log.warn(`Could not write up the recap of ${key}: ${result.error}`)
@@ -1384,7 +1422,7 @@ function registerBotIpc(): void {
       return {
         at: new Date().toISOString(),
         ok: false,
-        error: 'Turn on Settings > Todo > Gather my tasks from Slack first.',
+        error: localized(text).tasksOff,
       }
     return taskCollector.run()
   })
@@ -1629,7 +1667,11 @@ function registerBotIpc(): void {
     }
     return rows
   }
-  const taskDetail = (id: string) => {
+  /**
+   * A task with what came before it, worded in the app's language for the
+   * window, or in English for a prompt (a session opened on it, a draft)
+   */
+  const taskDetail = (id: string, locale: Locale = getLocale()) => {
     const all = allTaskViews(dataDir)
     const task = all.find((t) => t.id === id)
     if (!task) return null
@@ -1659,12 +1701,13 @@ function registerBotIpc(): void {
       task,
       all,
       work,
-      reader.inThread(thread.slice(0, at), thread.slice(at + 1))
+      reader.inThread(thread.slice(0, at), thread.slice(at + 1)),
+      locale
     )
     return {
       task,
       context,
-      outcome: outcomeOf(task, work),
+      outcome: outcomeOf(task, work, locale),
       // A session on another of your Macs has its log there
       work: workFor(work, id).map((entry) =>
         entry.kind === 'session' && !entry.mac
@@ -1713,7 +1756,7 @@ function registerBotIpc(): void {
     (event, id: unknown, answer: unknown) => {
       if (!fromMainWindow(event) || typeof id !== 'string') return undefined
       const proposal = proposalOf(id)
-      if (!proposal) return { error: 'There is nothing to answer.' }
+      if (!proposal) return { error: localized(text).nothingToAnswer }
       if (answer === 'close') {
         // Done in its session; how it ended is the wrap-up, not a note too
         closeTask(dataDir, id, 'resolved', new Date(), {
@@ -1766,9 +1809,9 @@ function registerBotIpc(): void {
       if (!fromMainWindow(event) || !mainWindow) return undefined
       // Next to the folder you worked in last, where your checkouts are
       const [last] = recentFolders(homedir(), { leaveOut: [dataDir], limit: 1 })
+      const t = localized(text)
       const result = await dialog.showOpenDialog(mainWindow, {
-        title:
-          typeof repo === 'string' ? `Where is ${repo}?` : 'Choose a folder',
+        title: typeof repo === 'string' ? t.whereIs(repo) : t.chooseFolder,
         defaultPath: last ? path.dirname(last.path) : homedir(),
         properties: ['openDirectory'],
       })
@@ -1805,10 +1848,11 @@ function registerBotIpc(): void {
         tool?: unknown
         folder?: unknown
       }
-      const detail = taskDetail(id)
-      if (!detail) return { error: 'There is no such task.' }
+      const t = localized(text)
+      const detail = taskDetail(id, 'en')
+      if (!detail) return { error: t.noSuchTask }
       if (typeof folder !== 'string' || !folder)
-        return { error: 'Choose the folder to work in first.' }
+        return { error: t.chooseFolderFirst }
       try {
         if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
         const { entry, note } = await openSession(
@@ -1827,11 +1871,15 @@ function registerBotIpc(): void {
   )
   ipcMain.handle('pacenote:tasks:resume', async (event, entryId: unknown) => {
     if (!fromMainWindow(event)) return undefined
+    const t = localized(text)
     const entry = sessionEntry(entryId)
-    if (!entry) return { error: 'There is no such session.' }
+    if (!entry) return { error: t.noSuchSession }
     if (entry.mac)
       return {
-        error: `That session is on ${macs?.view().macs.find((mac) => mac.id === entry.mac)?.name ?? 'your other Mac'}. Start one here instead.`,
+        error: t.sessionElsewhere(
+          macs?.view().macs.find((mac) => mac.id === entry.mac)?.name ??
+            t.otherMac
+        ),
       }
     try {
       await resumeSession(handoff(), entry)
@@ -1851,9 +1899,10 @@ function registerBotIpc(): void {
   const drafting = new Set<string>()
   ipcMain.handle('pacenote:tasks:draft', async (event, id: unknown) => {
     if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-    const detail = taskDetail(id)
-    if (!detail) return { error: 'There is no such task.' }
-    if (drafting.has(id)) return { error: 'A draft is already being written.' }
+    const t = localized(text)
+    const detail = taskDetail(id, 'en')
+    if (!detail) return { error: t.noSuchTask }
+    if (drafting.has(id)) return { error: t.drafting }
     drafting.add(id)
     try {
       const { command, args, env: launchEnv } = mcpLaunch()
@@ -1875,7 +1924,7 @@ function registerBotIpc(): void {
           }),
         refusalOf
       )
-      if ('resting' in ran) return { error: 'Both AIs are resting.' }
+      if ('resting' in ran) return { error: t.bothResting }
       const draft = ran.result
       if ('error' in draft) return { error: draft.error }
       const entry: WorkEntry = {
@@ -1895,20 +1944,21 @@ function registerBotIpc(): void {
   })
   ipcMain.handle(
     'pacenote:tasks:copy-reply',
-    (event, id: unknown, text: unknown) => {
+    (event, id: unknown, reply: unknown) => {
       if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-      if (typeof text !== 'string' || !text.trim())
-        return { error: 'The reply is empty.' }
-      const task = allTaskViews(dataDir).find((t) => t.id === id)
-      if (!task) return { error: 'There is no such task.' }
-      clipboard.writeText(text)
+      const t = localized(text)
+      if (typeof reply !== 'string' || !reply.trim())
+        return { error: t.emptyReply }
+      const task = allTaskViews(dataDir).find((view) => view.id === id)
+      if (!task) return { error: t.noSuchTask }
+      clipboard.writeText(reply)
       const at = new Date().toISOString()
       const latest = workFor(readWork(dataDir).entries, id).find(
         (entry) => entry.kind === 'draft'
       )
       if (latest)
         updateWork(dataDir, latest.id, (e) =>
-          e.kind === 'draft' ? { ...e, text, copiedAt: at } : e
+          e.kind === 'draft' ? { ...e, text: reply, copiedAt: at } : e
         )
       else
         addWork(dataDir, {
@@ -1916,7 +1966,7 @@ function registerBotIpc(): void {
           id: randomUUID(),
           task: id,
           at,
-          text,
+          text: reply,
           copiedAt: at,
         })
       const link = task.source.permalink
@@ -1926,12 +1976,15 @@ function registerBotIpc(): void {
   )
   ipcMain.handle('pacenote:tasks:session-log', (event, entryId: unknown) => {
     if (!fromMainWindow(event)) return undefined
+    const t = localized(text)
     const entry = sessionEntry(entryId)
-    if (!entry) return { error: 'There is no such session.' }
+    if (!entry) return { error: t.noSuchSession }
     const file = sessionFile(homedir(), entry)
     if (!file)
       return {
-        error: `${entry.tool === 'claude' ? 'Claude Code' : 'Codex'} has no log of this session on this Mac.`,
+        error: t.noSessionLog(
+          entry.tool === 'claude' ? 'Claude Code' : 'Codex'
+        ),
       }
     try {
       return { items: readSessionLog(file, entry.tool) }
@@ -1980,7 +2033,7 @@ function registerBotIpc(): void {
     event: Electron.IpcMainInvokeEvent,
     run: () => Promise<T>
   ) => {
-    if (!fromMainWindow(event)) return { error: 'Not allowed.' }
+    if (!fromMainWindow(event)) return { error: localized(text).notAllowed }
     try {
       return await run()
     } catch (err) {
@@ -2101,11 +2154,9 @@ function registerBotIpc(): void {
         const appToken = env.SLACK_APP_TOKEN?.trim()
         const botToken = env.SLACK_BOT_TOKEN?.trim()
         if (!appToken || !botToken)
-          throw new Error('Connect your Slack app with both tokens first.')
+          throw new Error(localized(text).bothTokensFirst)
         if (supervisor?.current.phase === 'external')
-          throw new Error(
-            'Pace is running elsewhere, such as a terminal, and takes the mentions. Stop it there, then try again.'
-          )
+          throw new Error(localized(text).runningElsewhere)
         // Pace on the same app would take some of the mentions meanwhile.
         if (supervisor?.managing) {
           claimPaused = true
@@ -2115,6 +2166,11 @@ function registerBotIpc(): void {
           appToken,
           botToken,
           apiUrl: env.SLACK_API_URL,
+          // The reply is for you: in Pace's notes language once chosen, the
+          // app's until then
+          notesLocale: isLocale(env.NOTES_LANGUAGE)
+            ? env.NOTES_LANGUAGE
+            : getLocale(),
           log: log.child('setup'),
           onMention: (user) =>
             mainWindow?.webContents.send('pacenote:setup:claimed', user),
@@ -2132,7 +2188,7 @@ function registerBotIpc(): void {
           !/^[UW][A-Z0-9]+$/.test(user.id) ||
           typeof user.name !== 'string'
         )
-          throw new Error('That is not a Slack member.')
+          throw new Error(localized(text).notAMember)
         await stopClaim()
         // Pace answers only you, so this is the one it answers: saying it
         // again replaces the one before, and a wrong "Yes" is undone by the
@@ -2198,7 +2254,9 @@ function registerBotIpc(): void {
     fromMainWindow(event) ? (sandbox.job ?? null) : null
   )
   ipcMain.handle('pacenote:sandbox:run', (event, kind: unknown) =>
-    fromMainWindow(event) ? sandbox.run(kind) : { error: 'Denied' }
+    fromMainWindow(event)
+      ? sandbox.run(kind)
+      : { error: localized(text).denied }
   )
   ipcMain.handle(
     'pacenote:sandbox:save-allowlist',
@@ -2208,7 +2266,7 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:sandbox:login', (event, cli: unknown) =>
     fromMainWindow(event)
       ? sandboxSignIn.run(cli)
-      : { ok: false, error: 'Not allowed.' }
+      : { ok: false, error: localized(text).notAllowed }
   )
   ipcMain.handle('pacenote:sandbox:login-code', (event, code: unknown) => {
     if (fromMainWindow(event)) sandboxSignIn.submit(code)
@@ -2238,8 +2296,8 @@ function registerBotIpc(): void {
         mainWindow?.webContents.send(
           'pacenote:setup:claim-ended',
           state.phase === 'external'
-            ? 'Pace started running elsewhere, such as a terminal, and takes the mentions now. Stop it there, then try again.'
-            : 'Pace started, so setup stopped listening. Try again to stop Pace and listen.'
+            ? localized(text).startedElsewhere
+            : localized(text).startedHere
         )
       })
   })
@@ -2355,7 +2413,7 @@ async function waitForUrl(url: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
-  throw new Error(`Could not connect to ${url}.`)
+  throw new Error(localized(text).couldNotConnect(url))
 }
 
 async function capture(window: BrowserWindow, file: string): Promise<void> {
@@ -2399,7 +2457,7 @@ async function reportStartupError(error: unknown): Promise<void> {
     return
   }
   log.error(`Could not start: ${message}`)
-  dialog.showErrorBox(`${appName} could not start`, message)
+  dialog.showErrorBox(localized(text).couldNotStart(appName), message)
   app.quit()
 }
 
@@ -2416,6 +2474,7 @@ if (!app.requestSingleInstanceLock()) {
     .then(async () => {
       registerAppProtocol()
       registerBotIpc()
+      setAppMenu(appName)
       // Opened only to be told to quit (see before-quit): no tray, window or
       // Pace for the moment it lasts. Opened from a bundle already replaced:
       // straight on to the new version.
@@ -2485,7 +2544,8 @@ app.on('before-quit', (event) => {
   // 30 seconds)
   if (supervisor?.managing && !botStopped) {
     event.preventDefault()
-    tray?.setToolTip(`${appName} - Pace: Stopping`)
+    const t = localized(text)
+    tray?.setToolTip(t.tooltip(appName, t.phase.stopping))
     botStopping ??= supervisor
       .stop()
       .then(reopenIfReplaced)

@@ -1,11 +1,12 @@
 import type { RunStatus } from '@history/types'
 import { CircleCheck, CirclePause, CircleX, LoaderCircle } from 'lucide-react'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './status.text'
 
 export const STATUS_META: Record<
   RunStatus,
   {
-    label: string
     text: string
     bg: string
     dot: string
@@ -13,28 +14,24 @@ export const STATUS_META: Record<
   }
 > = {
   running: {
-    label: 'Running',
     text: 'text-status-running',
     bg: 'bg-status-running/12 border-status-running/30',
     dot: 'bg-status-running',
     Icon: LoaderCircle,
   },
   succeeded: {
-    label: 'Succeeded',
     text: 'text-status-succeeded',
     bg: 'bg-status-succeeded/10 border-status-succeeded/25',
     dot: 'bg-status-succeeded',
     Icon: CircleCheck,
   },
   failed: {
-    label: 'Failed',
     text: 'text-status-failed',
     bg: 'bg-status-failed/10 border-status-failed/30',
     dot: 'bg-status-failed',
     Icon: CircleX,
   },
   interrupted: {
-    label: 'Interrupted',
     text: 'text-status-interrupted',
     bg: 'bg-status-interrupted/10 border-status-interrupted/30',
     dot: 'bg-status-interrupted',
@@ -53,6 +50,7 @@ export function StatusMark({
   status: RunStatus
   className?: string
 }) {
+  const t = useText(text)
   const meta = STATUS_META[status]
   return (
     <span
@@ -70,12 +68,13 @@ export function StatusMark({
           className={cn('size-3.5', status === 'running' && 'animate-spin')}
         />
       )}
-      <span className="sr-only">{meta.label}</span>
+      <span className="sr-only">{t.status[status]}</span>
     </span>
   )
 }
 
 export function StatusBadge({ status }: { status: RunStatus }) {
+  const t = useText(text)
   const meta = STATUS_META[status]
   return (
     <span
@@ -88,7 +87,7 @@ export function StatusBadge({ status }: { status: RunStatus }) {
       <meta.Icon
         className={cn('size-3.5', status === 'running' && 'animate-spin')}
       />
-      {meta.label}
+      {t.status[status]}
     </span>
   )
 }

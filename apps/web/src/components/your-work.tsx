@@ -4,7 +4,9 @@ import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Swap, usePresence } from '@/components/ui/motion'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
+import { useText } from '@/lib/i18n'
 import { accountsSentence, partKey, roleSentence, useFixYou } from '@/lib/you'
+import { text } from './your-work.text'
 
 /** At most this many areas on the card; the rest are on the You screen */
 const SHOWN = 4
@@ -17,6 +19,7 @@ const SHOWN = 4
  * You screen keeps them after.
  */
 export function YourWork({ you }: { you: YouView | null | undefined }) {
+  const t = useText(text)
   const fix = useFixYou()
   const [fixing, setFixing] = useState(false)
   // Areas you said are not yours, kept on the card to take back
@@ -46,12 +49,10 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5">
         <h2 id="your-work" className="text-section">
-          This is your work, as Pacenote sees it
+          {t.title}
         </h2>
         <span className="text-meta text-muted-foreground">
-          {fixing
-            ? 'Change what is off. Everything else stays as it is.'
-            : 'From your last 30 days of tasks and sessions.'}
+          {fixing ? t.fixingHint : t.fromHint}
         </span>
       </div>
       <ul>
@@ -65,7 +66,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
             >
               {fixing && !left ? (
                 <input
-                  aria-label={`Name of ${area.name}`}
+                  aria-label={t.nameOf(area.name)}
                   defaultValue={area.name}
                   maxLength={60}
                   onBlur={(event) => {
@@ -92,7 +93,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
               <span className="flex min-w-0 flex-col">
                 {left ? (
                   <span className="text-meta text-muted-foreground">
-                    Not yours anymore. Its tasks stay where they are.
+                    {t.notYours}
                   </span>
                 ) : (
                   <>
@@ -109,7 +110,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                               size="icon-sm"
                               variant="ghost"
                               className="size-5 rounded-full"
-                              aria-label={`Take ${part.label} out of ${area.name}`}
+                              aria-label={t.takeOut(part.label, area.name)}
                               onClick={() =>
                                 void fix.takeOut(area.id, partKey(part))
                               }
@@ -140,15 +141,15 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
                     )
                   }}
                 >
-                  {left ? 'Undo' : 'Not mine'}
+                  {left ? t.undo : t.notMine}
                 </Button>
               ) : (
                 <span className="text-right text-meta text-muted-foreground">
                   {area.working
-                    ? 'Working on it now'
+                    ? t.workingNow
                     : area.now.length
-                      ? `${area.now.length} open`
-                      : 'Quiet lately'}
+                      ? t.open(area.now.length)
+                      : t.quiet}
                 </span>
               )}
             </li>
@@ -156,31 +157,29 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
         })}
       </ul>
       {accounts && (
-        <p className="text-meta text-muted-foreground">
-          Found you as {accounts}.
-        </p>
+        <p className="text-meta text-muted-foreground">{t.foundAs(accounts)}</p>
       )}
       <Swap id={fixing ? 'fixing' : 'asking'}>
         {fixing ? (
           <div className="flex flex-wrap items-center gap-2.5">
             <Button size="sm" onClick={() => void fix.confirm()}>
-              Done
+              {t.done}
             </Button>
             <span className="text-meta text-muted-foreground">
-              Rename, merge or take apart areas any time on the{' '}
-              <a href="#/you" className="text-primary hover:underline">
-                You
-              </a>{' '}
-              screen.
+              {t.fixLater((label) => (
+                <a href="#/you" className="text-primary hover:underline">
+                  {label}
+                </a>
+              ))}
             </span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5">
             <Button size="sm" onClick={() => void fix.confirm()}>
-              Looks right
+              {t.looksRight}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setFixing(true)}>
-              Fix something
+              {t.fixSomething}
             </Button>
           </div>
         )}

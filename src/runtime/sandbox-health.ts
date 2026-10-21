@@ -1,4 +1,6 @@
+import { localized } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
+import { text } from './sandbox-health.text.js'
 
 /**
  * The message the desktop app sends the bot (utilityProcess) when a sandbox job
@@ -55,7 +57,7 @@ export class SandboxHealth {
 
   private async run(): Promise<void> {
     const next = await this.verify().catch((err: unknown) => [
-      `${this.label} check failed: ${(err as Error).message}`,
+      localized(text).checkFailed(this.label, (err as Error).message),
     ])
     if (next.join('\n') === this.problems.join('\n')) return
     const before = this.problems

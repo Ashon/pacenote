@@ -12,6 +12,8 @@ import {
 } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import type { RawData, WebSocket } from 'ws'
+import { localized } from '../i18n/locale.js'
+import { text } from './channel.text.js'
 
 /**
  * The channel between two of your Macs, over a WebSocket on your network.
@@ -84,7 +86,10 @@ const same = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right)
 }
 
-/** A handshake that did not go through, and why */
+/**
+ * A handshake that did not go through, and why, in the app's language (as
+ * Settings > Macs and the setup show it)
+ */
 export class HandshakeError extends Error {}
 
 /** A channel the handshake opened: sealed messages, both ways */
@@ -228,22 +233,20 @@ class Incoming {
 
   /** The next frame as a hello, within the handshake's time */
   next<T = HelloMessage>(timeoutMs: number): Promise<T> {
+    const t = localized(text)
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiter = undefined
-        reject(new HandshakeError('The other Mac did not answer in time.'))
+        reject(new HandshakeError(t.noAnswer))
       }, timeoutMs)
       const take = (frame: Frame | undefined) => {
         clearTimeout(timer)
-        if (!frame)
-          return reject(
-            new HandshakeError('The other Mac closed the connection.')
-          )
+        if (!frame) return reject(new HandshakeError(t.closed))
         try {
           if (frame.binary) throw new Error('binary')
           resolve(JSON.parse(frame.data.toString('utf8')) as T)
         } catch {
-          reject(new HandshakeError('The other Mac said something unexpected.'))
+          reject(new HandshakeError(t.unexpected))
         }
       }
       const queued = this.queue.shift()
@@ -273,6 +276,7 @@ export async function dial(
   options: { key: Buffer; me: MacHello; timeoutMs?: number }
 ): Promise<MacChannel> {
   const { key, me } = options
+  const t = localized(text)
   const incoming = new Incoming(ws)
   const nonce = randomBytes(16).toString('base64')
   const answer = incoming.next(options.timeoutMs ?? HANDSHAKE_MS)
@@ -300,11 +304,11 @@ export async function dial(
     !same(hello.proof, proof(key, 'listener', dialer, hello))
   ) {
     ws.close()
-    throw new HandshakeError('The other Mac runs Pace with another Slack app.')
+    throw new HandshakeError(t.otherApp)
   }
   if (hello.id === me.id) {
     ws.close()
-    throw new HandshakeError('That is this Mac.')
+    throw new HandshakeError(t.thisMac)
   }
   ws.send(
     JSON.stringify({
@@ -334,6 +338,7 @@ export async function accept(
 ): Promise<MacChannel> {
   const { key, me } = options
   const timeoutMs = options.timeoutMs ?? HANDSHAKE_MS
+  const t = localized(text)
   const fail = (message: string) => {
     ws.close()
     return new HandshakeError(message)
@@ -349,10 +354,9 @@ export async function accept(
     typeof hello.id !== 'string' ||
     typeof hello.nonce !== 'string'
   )
-    throw fail('The other Mac said something unexpected.')
-  if (hello.group !== macsGroup(key))
-    throw fail('The other Mac runs Pace with another Slack app.')
-  if (hello.id === me.id) throw fail('That is this Mac.')
+    throw fail(t.unexpected)
+  if (hello.group !== macsGroup(key)) throw fail(t.otherApp)
+  if (hello.id === me.id) throw fail(t.thisMac)
   const nonce = randomBytes(16).toString('base64')
   const listener = { id: me.id, nonce }
   const confirmed = incoming.next(timeoutMs)
@@ -377,7 +381,7 @@ export async function accept(
     !second.proof ||
     !same(second.proof, proof(key, 'dialer', hello, listener))
   )
-    throw fail('The other Mac runs Pace with another Slack app.')
+    throw fail(t.otherApp)
   const keys = sessionKeys(key, hello.nonce, nonce)
   return new MacChannel(
     ws,
@@ -490,9 +494,7 @@ export async function setupDial(
   })
   if (!isSetupHello(peer)) {
     ws.close()
-    throw new HandshakeError(
-      'The other Mac is not waiting for a new Mac. Click Add a Mac there.'
-    )
+    throw new HandshakeError(localized(text).notWaiting)
   }
   const secrets = setupSecrets(privateKey, hello, peer, peer.key)
   return {
@@ -521,7 +523,7 @@ export async function setupAccept(
     })
   if (!isSetupHello(peer)) {
     ws.close()
-    throw new HandshakeError('The other Mac said something unexpected.')
+    throw new HandshakeError(localized(text).unexpected)
   }
   const { privateKey, key } = setupKeys()
   const hello: SetupHello = {

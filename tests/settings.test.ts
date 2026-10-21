@@ -369,6 +369,7 @@ describe('connection check', () => {
       fetchImpl
     )
     expect(items[1]).toEqual({
+      id: 'botScopes',
       label: 'Bot scopes',
       ok: true,
       detail: expect.stringContaining(

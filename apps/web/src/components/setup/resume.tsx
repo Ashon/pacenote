@@ -1,15 +1,17 @@
 import type { SetupView } from '@src/settings/setup'
 import { Button } from '@/components/ui/button'
 import { useSupervisor } from '@/lib/desktop'
+import { useText } from '@/lib/i18n'
 import {
   SETUP_STEPS,
-  STEP_NEXT,
   stepIndex,
+  stepNext,
   useSandboxSetup,
   useSettingsView,
 } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from '../logo'
+import { text } from './resume.text'
 import { preparingProblem } from './runtime-step'
 
 /**
@@ -24,6 +26,7 @@ export function ResumeSetup({
   /** Setting it up in Settings instead: setup is over */
   onFinish: () => void
 }) {
+  const t = useText(text)
   const done = stepIndex(view.record.step)
   return (
     <section
@@ -33,11 +36,10 @@ export function ResumeSetup({
       <PacenoteMark className="size-10 shrink-0" />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <b id="resume-setup" className="text-section">
-          Finish setting up Pace
+          {t.title}
         </b>
         <span className="text-body text-muted-foreground">
-          {done} of {SETUP_STEPS.length} steps done. Next:{' '}
-          {STEP_NEXT[view.record.step]}.
+          {t.progress(done, SETUP_STEPS.length, stepNext(view.record.step))}
         </span>
         <span aria-hidden="true" className="flex max-w-80 gap-1">
           {SETUP_STEPS.map((step, index) => (
@@ -53,14 +55,14 @@ export function ResumeSetup({
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1.5">
         <Button asChild>
-          <a href="#/setup">Resume setup</a>
+          <a href="#/setup">{t.resume}</a>
         </Button>
         <button
           type="button"
           onClick={onFinish}
           className="text-meta font-semibold text-primary hover:underline"
         >
-          Set it up in Settings instead
+          {t.inSettings}
         </button>
       </span>
     </section>
@@ -69,6 +71,7 @@ export function ResumeSetup({
 
 /** Where things stand while setup is unfinished, in place of the totals */
 export function SetupFacts() {
+  const t = useText(text)
   const supervisor = useSupervisor()
   const settings = useSettingsView()
   const sandbox = useSandboxSetup({
@@ -81,44 +84,42 @@ export function SetupFacts() {
   const running = supervisor?.phase === 'running'
   return (
     <section
-      aria-label="Where setup stands"
+      aria-label={t.factsLabel}
       className="mt-9 grid grid-cols-1 gap-y-6 @min-[40rem]:grid-cols-3 @min-[40rem]:divide-x @min-[40rem]:divide-border"
     >
       <Fact
         label="Pace"
-        value={running ? 'Running' : 'Not running yet'}
-        hint={running ? 'Answering mentions' : 'Starts when setup finishes'}
+        value={running ? t.running : t.notRunning}
+        hint={running ? t.answering : t.startsAfter}
       />
+      <Fact label={t.answers} value={t.noneYet} hint={t.answersHint} />
       <Fact
-        label="Answers"
-        value="None yet"
-        hint="Each answer and its steps show up in Runs"
-      />
-      <Fact
-        label="Built-in sandbox"
+        label={t.sandbox}
         value={
           !used
             ? unsupported
-              ? 'Not on this Mac'
-              : 'Not used'
+              ? t.notOnThisMac
+              : t.notUsed
             : sandbox.ready
-              ? 'Ready'
+              ? t.ready
               : sandbox.preparing
-                ? `Preparing, ${Math.round((sandbox.progress?.fraction ?? 0) * 100)}%`
+                ? t.preparing(
+                    Math.round((sandbox.progress?.fraction ?? 0) * 100)
+                  )
                 : stopped
-                  ? 'Preparing stopped'
-                  : 'Not prepared yet'
+                  ? t.preparingStopped
+                  : t.notPrepared
         }
         hint={
           !used
-            ? 'Pace runs directly on this Mac'
+            ? t.directly
             : sandbox.ready
-              ? 'Pace answers in it'
+              ? t.answersInIt
               : sandbox.preparing
-                ? 'Keeps going in the background'
+                ? t.background
                 : stopped
-                  ? 'Try again in setup, under Where it runs'
-                  : 'Prepares once you resume setup'
+                  ? t.tryAgain
+                  : t.preparesOnResume
         }
         accent={used && sandbox.preparing}
       />

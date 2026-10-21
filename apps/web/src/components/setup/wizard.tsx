@@ -1,10 +1,11 @@
 import { Check, LogOut } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Swap, useIndicator } from '@/components/ui/motion'
+import { useText } from '@/lib/i18n'
 import {
   SETUP_STEPS,
-  STEP_LABELS,
   stepIndex,
+  stepLabel,
   useDetect,
   useSandboxSetup,
   useSettingsView,
@@ -20,6 +21,7 @@ import { AnswerStep } from './answer-step'
 import { ReviewStep } from './review-step'
 import { preparingProblem, RuntimeStep } from './runtime-step'
 import { SlackStep, type SlackPart } from './slack-step'
+import { text } from './wizard.text'
 
 /** Below this window width the step list keeps only its numbers */
 const COMPACT_BELOW = 880
@@ -32,6 +34,7 @@ const COMPACT_BELOW = 880
  * so it can be left at any point and picked up from Overview.
  */
 export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
+  const t = useText(text)
   const setup = useSetup()
   const detect = useDetect()
   const settings = useSettingsView()
@@ -174,11 +177,11 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
           isMac && 'pl-[72px]'
         )}
       >
-        Set up Pace
+        {t.title}
       </header>
       <div className="flex min-h-0 flex-1">
         <nav
-          aria-label="Setup steps"
+          aria-label={t.stepsLabel}
           className={cn(
             'motion-layout flex shrink-0 flex-col pb-4',
             compact ? 'w-16 px-2' : 'w-56 px-3'
@@ -241,12 +244,12 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                       compact && 'sr-only'
                     )}
                   >
-                    {STEP_LABELS[each]}
+                    {stepLabel(each)}
                     {preparing && (
                       <span className="flex items-center gap-1.5 text-caption font-semibold text-status-running">
                         <span
                           role="progressbar"
-                          aria-label="Preparing the built-in sandbox"
+                          aria-label={t.preparingLabel}
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={Math.round(
@@ -264,12 +267,12 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                             }}
                           />
                         </span>
-                        Preparing
+                        {t.preparing}
                       </span>
                     )}
                     {stopped && (
                       <span className="text-caption font-semibold text-status-failed">
-                        Preparing stopped
+                        {t.preparingStopped}
                       </span>
                     )}
                   </span>
@@ -294,7 +297,7 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
                       type="button"
                       className={className}
                       disabled={locked}
-                      title={compact ? STEP_LABELS[each] : undefined}
+                      title={compact ? stepLabel(each) : undefined}
                       onClick={() => go(each)}
                     >
                       {inner}
@@ -312,15 +315,15 @@ export function SetupWizard({ onLeave }: { onLeave: (hash: string) => void }) {
               <button
                 type="button"
                 onClick={() => onLeave('#/')}
-                aria-label={compact ? 'Finish later' : undefined}
-                title={compact ? 'Finish later' : undefined}
+                aria-label={compact ? t.finishLater : undefined}
+                title={compact ? t.finishLater : undefined}
                 className="flex items-center gap-2 self-start text-body font-semibold text-primary hover:underline"
               >
-                {compact ? <LogOut className="size-4" /> : 'Finish later'}
+                {compact ? <LogOut className="size-4" /> : t.finishLater}
               </button>
               {!compact && (
                 <span className="text-meta text-muted-foreground">
-                  Your choices are saved. Pick up from Overview.
+                  {t.saved}
                 </span>
               )}
             </div>

@@ -23,16 +23,18 @@ import {
   SkeletonWord,
 } from '@/components/ui/skeleton'
 import { formatRelative, formatShortDay } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import {
   accountsSentence,
   areaHash,
   partKey,
-  ROLE_LABEL,
+  roleLabel,
   useFixYou,
   useYou,
 } from '@/lib/you'
 import { taskHash } from '@/lib/tasks'
+import { text } from './you-page.text'
 
 const TOOL = { claude: 'Claude Code', codex: 'Codex' } as const
 
@@ -49,6 +51,7 @@ const go = (hash: string) => {
  * not yours anymore.
  */
 export function YouPage({ openId }: { openId?: string }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.you
   const you = useYou()
   const fix = useFixYou()
@@ -61,9 +64,7 @@ export function YouPage({ openId }: { openId?: string }) {
   if (!bridge)
     return (
       <Page>
-        <p className="mt-6 text-copy text-muted-foreground">
-          Your areas are counted by the desktop app.
-        </p>
+        <p className="mt-6 text-copy text-muted-foreground">{t.desktopOnly}</p>
       </Page>
     )
   const data = you.data
@@ -107,14 +108,7 @@ export function YouPage({ openId }: { openId?: string }) {
 
   return (
     <Page
-      meta={
-        data.areas.length > 0 && (
-          <>
-            {active.length} {active.length === 1 ? 'area' : 'areas'}
-            {resting.length > 0 && ` · ${resting.length} resting`}
-          </>
-        )
-      }
+      meta={data.areas.length > 0 && t.areas(active.length, resting.length)}
     >
       <Intro key="intro" />
       {notice.mounted && (
@@ -123,9 +117,7 @@ export function YouPage({ openId }: { openId?: string }) {
           data-state={notice.state}
           className="motion-fade mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy"
         >
-          <span className="flex-1">
-            {said.current?.name} is not listed as yours anymore.
-          </span>
+          <span className="flex-1">{t.notYours(said.current?.name ?? '')}</span>
           <Button
             size="xs"
             variant="ghost"
@@ -134,12 +126,12 @@ export function YouPage({ openId }: { openId?: string }) {
               setLeft(undefined)
             }}
           >
-            Undo
+            {t.undo}
           </Button>
           <Button
             size="icon-sm"
             variant="ghost"
-            aria-label="Close"
+            aria-label={t.close}
             onClick={() => setLeft(undefined)}
           >
             <X />
@@ -153,8 +145,7 @@ export function YouPage({ openId }: { openId?: string }) {
       >
         {data.areas.length === 0 ? (
           <p className="mt-5 border-t border-border py-8 text-copy text-muted-foreground">
-            Nothing yet. Your areas show up once you have tasks here, or work in
-            a repository with Claude Code or Codex.
+            {t.empty}
           </p>
         ) : (
           <ul className="mt-5">{active.map(row)}</ul>
@@ -162,9 +153,11 @@ export function YouPage({ openId }: { openId?: string }) {
         {resting.length > 0 && (
           <>
             <div className="mt-6 flex items-baseline gap-2.5 border-t border-border pt-4">
-              <h2 className="text-section text-muted-foreground">Resting</h2>
+              <h2 className="text-section text-muted-foreground">
+                {t.resting}
+              </h2>
               <span className="text-meta text-muted-foreground">
-                Nothing for 4 weeks. They come back when work does.
+                {t.restingHint}
               </span>
             </div>
             <ul className="mt-1">{resting.map(row)}</ul>
@@ -172,7 +165,7 @@ export function YouPage({ openId }: { openId?: string }) {
         )}
         {accounts && data.areas.length > 0 && (
           <p className="mt-5 border-t border-border pt-4 text-meta text-muted-foreground">
-            Kept as {accounts}.
+            {t.keptAs(accounts)}
           </p>
         )}
       </Placeholder>
@@ -180,12 +173,10 @@ export function YouPage({ openId }: { openId?: string }) {
   )
 }
 
-const Intro = () => (
-  <p className="mt-1.5 text-body text-muted-foreground">
-    Where you contribute and what is going on in each, from your tasks and your
-    Claude Code and Codex sessions.
-  </p>
-)
+function Intro() {
+  const t = useText(text)
+  return <p className="mt-1.5 text-body text-muted-foreground">{t.intro}</p>
+}
 
 /** How many areas there were last time: the skeleton's rows */
 const AREAS_KEY = 'pacenote.you.rows'
@@ -263,6 +254,7 @@ function AreaRow({
   onMerge: (into: string) => void
   onLeave: () => void
 }) {
+  const t = useText(text)
   const [renaming, setRenaming] = useState(false)
   const [merging, setMerging] = useState(false)
   const row = useRef<HTMLLIElement>(null)
@@ -319,7 +311,7 @@ function AreaRow({
                   title={role.evidence}
                   className="rounded-full bg-muted px-2 py-px text-caption text-foreground/80"
                 >
-                  {ROLE_LABEL[role.role]}
+                  {roleLabel(role.role)}
                 </span>
               ))}
             </div>
@@ -330,24 +322,22 @@ function AreaRow({
               {area.working && (
                 <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
                   <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-                  Working in {TOOL[area.working.tool]}
+                  {t.workingIn(TOOL[area.working.tool])}
                 </span>
               )}
               {resting ? (
                 <span>
                   {area.lastActiveAt
-                    ? `Last worked ${formatShortDay(area.lastActiveAt)}`
-                    : 'Nothing lately'}
+                    ? t.lastWorked(formatShortDay(area.lastActiveAt))
+                    : t.nothingLately}
                 </span>
               ) : (
                 <span>
-                  {open_ === 0
-                    ? 'Nothing open'
-                    : `${open_} open ${open_ === 1 ? 'task' : 'tasks'}`}
+                  {open_ === 0 ? t.nothingOpenShort : t.openTasks(open_)}
                 </span>
               )}
               {area.people.length > 0 && !resting && (
-                <span>{names(area.people)} ask you most</span>
+                <span>{t.askYouMost(area.people)}</span>
               )}
             </p>
           </div>
@@ -358,14 +348,14 @@ function AreaRow({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={`More for ${area.name}`}
+                  aria-label={t.moreFor(area.name)}
                 >
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setRenaming(true)}>
-                  Rename
+                  {t.rename}
                 </DropdownMenuItem>
                 {others.length > 0 && (
                   <DropdownMenuItem
@@ -374,12 +364,12 @@ function AreaRow({
                       if (!open) onToggle()
                     }}
                   >
-                    Merge into another area
+                    {t.mergeIntoAnother}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={onLeave}>
-                  Not mine anymore
+                  {t.notMine}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -389,7 +379,7 @@ function AreaRow({
           <div className="flex flex-col gap-2 pt-2.5 pl-6">
             <div className="flex flex-col gap-0.5 rounded-xl bg-well px-3.5 py-3">
               {merging && (
-                <Line label="Merge into">
+                <Line label={t.mergeInto}>
                   {others.map((other) => (
                     <Button
                       key={other.id}
@@ -405,15 +395,13 @@ function AreaRow({
                     variant="ghost"
                     onClick={() => setMerging(false)}
                   >
-                    Cancel
+                    {t.cancel}
                   </Button>
                 </Line>
               )}
-              <Line label="Roles">
+              <Line label={t.roles}>
                 {area.roles.length === 0 ? (
-                  <span className="text-muted-foreground">
-                    Not enough work here yet to tell.
-                  </span>
+                  <span className="text-muted-foreground">{t.notEnough}</span>
                 ) : (
                   area.roles.map((role) => (
                     <span
@@ -421,7 +409,7 @@ function AreaRow({
                       className="inline-flex items-center gap-2 pr-2"
                     >
                       <span className="rounded-full bg-card px-2 py-px text-caption">
-                        {ROLE_LABEL[role.role]}
+                        {roleLabel(role.role)}
                       </span>
                       <span className="text-meta text-muted-foreground">
                         {role.evidence}
@@ -430,9 +418,9 @@ function AreaRow({
                   ))
                 )}
               </Line>
-              <Line label="Now">
+              <Line label={t.now}>
                 {area.now.length === 0 ? (
-                  <span className="text-muted-foreground">Nothing open.</span>
+                  <span className="text-muted-foreground">{t.nothingOpen}</span>
                 ) : (
                   <span className="flex flex-col gap-1">
                     {area.now.map((task) => (
@@ -445,8 +433,8 @@ function AreaRow({
                         </a>
                         <span className="text-meta text-muted-foreground">
                           {[
-                            task.askedBy && `${task.askedBy} asked you`,
-                            task.due && `due ${task.due}`,
+                            task.askedBy && t.askedYou(task.askedBy),
+                            task.due && t.due(task.due),
                           ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -456,11 +444,9 @@ function AreaRow({
                   </span>
                 )}
               </Line>
-              <Line label="Lately">
+              <Line label={t.lately}>
                 {area.lately.length === 0 ? (
-                  <span className="text-muted-foreground">
-                    Nothing done here in the last 30 days.
-                  </span>
+                  <span className="text-muted-foreground">{t.nothingDone}</span>
                 ) : (
                   <span className="flex flex-col gap-1">
                     {area.lately.map((task) => (
@@ -478,13 +464,13 @@ function AreaRow({
                       className="text-meta text-primary hover:underline"
                     >
                       {area.latelyMore > 0
-                        ? `and ${area.latelyMore} more in 30 days, in Recap`
-                        : 'This week in Recap'}
+                        ? t.moreInRecap(area.latelyMore)
+                        : t.thisWeekInRecap}
                     </a>
                   </span>
                 )}
               </Line>
-              <Line label="Made of">
+              <Line label={t.madeOf}>
                 {area.parts.map((part) => (
                   <span
                     key={partKey(part)}
@@ -496,7 +482,7 @@ function AreaRow({
                         size="icon-sm"
                         variant="ghost"
                         className="size-5 rounded-full"
-                        aria-label={`Take ${part.label} out of ${area.name}`}
+                        aria-label={t.takeOut(part.label, area.name)}
                         onClick={() => onTakeOut(partKey(part))}
                       >
                         <X />
@@ -523,6 +509,7 @@ function Rename({
   name: string
   onDone: (name: string | undefined) => void
 }) {
+  const t = useText(text)
   const [value, setValue] = useState(name)
   const done = useRef(false)
   const finish = (next: string | undefined) => {
@@ -532,7 +519,7 @@ function Rename({
   }
   return (
     <input
-      aria-label="Area name"
+      aria-label={t.areaName}
       autoFocus
       value={value}
       maxLength={60}
@@ -549,13 +536,14 @@ function Rename({
 
 /** An area's work each week, the last 8, in the brand's bars */
 function Bars({ weeks, faded }: { weeks: number[]; faded: boolean }) {
+  const t = useText(text)
   const top = Math.max(1, ...weeks)
   const total = weeks.reduce((sum, n) => sum + n, 0)
   return (
     <span
       role="img"
-      aria-label={`${total} tasks and sessions over 8 weeks`}
-      title="Tasks and sessions each week, the last 8 weeks"
+      aria-label={t.weeks(total)}
+      title={t.weeksTitle}
       className={cn('flex h-8 items-end gap-[3px]', faded && 'opacity-45')}
     >
       {weeks.map((n, i) => (
@@ -589,11 +577,6 @@ function Line({
   )
 }
 
-const names = (list: string[]) =>
-  list.length <= 1
-    ? (list[0] ?? '')
-    : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`
-
 function Page({
   meta,
   children,
@@ -601,11 +584,12 @@ function Page({
   meta?: React.ReactNode
   children?: React.ReactNode
 }) {
+  const t = useText(text)
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         <header className="flex items-center gap-3">
-          <h1 className="text-title">You</h1>
+          <h1 className="text-title">{t.title}</h1>
           {meta && (
             <span className="text-copy text-muted-foreground">{meta}</span>
           )}

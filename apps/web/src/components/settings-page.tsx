@@ -1,8 +1,11 @@
 import {
   SETTING_FIELDS,
-  SETTING_GROUPS,
   SETTING_SECTIONS,
+  settingFields,
+  settingGroups,
+  settingLabel,
   settingSectionOf,
+  settingSections,
   shownFor,
   type SettingField,
   type SettingGroup,
@@ -74,10 +77,12 @@ import {
   useUpdate,
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
+import { useLanguage, useText, type LanguagePreference } from '@/lib/i18n'
 import { macsControl, useMacs } from '@/lib/macs'
 import type { AddingView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { isLocale, LOCALE_NAMES, LOCALES, localized } from '@src/i18n/locale'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
 import { OwnAiStatus } from './own-ai-status'
@@ -95,6 +100,7 @@ import {
   PendingList,
   VmFooter,
 } from './sandbox-panel'
+import { text } from './settings-page.text'
 
 const bridge = () => window.pacenoteDesktop?.settings
 
@@ -104,52 +110,47 @@ const bridge = () => window.pacenoteDesktop?.settings
  */
 type Section = SettingSection | 'general' | 'macs'
 
-const SECTION_ICON: Record<SettingSection, LucideIcon> = {
+const SECTION_ICON: Record<Section, LucideIcon> = {
   messengers: MessagesSquare,
   answers: Sparkles,
   sandbox: Box,
   ops: Wrench,
   tasks: ListChecks,
   logs: History,
+  general: SlidersHorizontal,
+  macs: Laptop,
 }
 
-const SECTION_INFO: Record<
-  Section,
-  { label: string; help: string; icon: LucideIcon }
-> = {
-  ...(Object.fromEntries(
-    SETTING_SECTIONS.map((info) => [
-      info.id,
-      { label: info.label, help: info.help, icon: SECTION_ICON[info.id] },
-    ])
-  ) as Record<
-    SettingSection,
-    { label: string; help: string; icon: LucideIcon }
-  >),
-  general: {
-    label: 'General',
-    help: 'Preferences for this app, and where Pacenote keeps its settings and run history.',
-    icon: SlidersHorizontal,
-  },
-  macs: {
-    label: 'Macs',
-    help: 'Where Pace answers when you use more than one Mac.',
-    icon: Laptop,
-  },
+/** A section's name, help and icon, in the app's language */
+function sectionInfo(section: Section): {
+  label: string
+  help: string
+  icon: LucideIcon
+} {
+  const t = localized(text)
+  const words =
+    section === 'general' || section === 'macs'
+      ? t.sections[section]
+      : settingSections().find((info) => info.id === section)!
+  return { label: words.label, help: words.help, icon: SECTION_ICON[section] }
 }
 
 /**
  * The app's own preferences first, then the bot's settings (as macOS lists
  * General first)
  */
-const NAV: { label: string; items: Section[] }[] = [
-  { label: 'App', items: ['general', 'macs'] },
-  { label: 'Pace', items: SETTING_SECTIONS.map((info) => info.id) },
+const NAV: { group: 'app' | 'pace'; items: Section[] }[] = [
+  { group: 'app', items: ['general', 'macs'] },
+  { group: 'pace', items: SETTING_SECTIONS.map((info) => info.id) },
 ]
 
-const GROUP = Object.fromEntries(
-  SETTING_GROUPS.map((info) => [info.id, info])
-) as Record<SettingGroup, SettingGroupInfo>
+/** The groups' words in the app's language, by id */
+const groupsById = () =>
+  Object.fromEntries(settingGroups().map((info) => [info.id, info])) as Record<
+    SettingGroup,
+    SettingGroupInfo
+  >
+/** The fields as saved and checked (their words are English) */
 const FIELD = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
 /** What your own Slack app needs before the bot can start */
 const SLACK_APP_TOKENS = ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN']
@@ -163,7 +164,7 @@ const SLACK_APP_TOKENS = ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN']
 function readSection(): Section {
   const id = /^#\/settings\/([a-z]+)/.exec(window.location.hash)?.[1]
   if (id === 'slack') return 'messengers'
-  return id && id in SECTION_INFO ? (id as Section) : 'general'
+  return id && id in SECTION_ICON ? (id as Section) : 'general'
 }
 
 function useSection(): [Section, (section: Section) => void] {
@@ -189,6 +190,7 @@ interface Hint {
  * and saved together from the bar at the bottom.
  */
 export function SettingsPage() {
+  const t = useText(text)
   const settings = bridge()
   const supervisor = useSupervisor()
   const loginItem = useLoginItem()
@@ -251,7 +253,7 @@ export function SettingsPage() {
   if (!settings) {
     return (
       <p className="p-10 text-center text-copy text-muted-foreground">
-        Settings can be changed in the desktop app.
+        {t.desktopOnly}
       </p>
     )
   }
@@ -351,13 +353,13 @@ export function SettingsPage() {
                 tone: 'ok',
                 text: restarted
                   ? botLive
-                    ? 'Saved and restarted Pace.'
-                    : 'Saved and started Pace.'
-                  : 'Saved.',
+                    ? t.savedRestarted
+                    : t.savedStarted
+                  : t.saved,
               }
             : {
                 tone: 'warn',
-                text: 'Saved. Restart Pace to apply.',
+                text: t.savedRestart,
                 restart: Boolean(supervisor),
               }
         )
@@ -380,7 +382,7 @@ export function SettingsPage() {
         edit(field.key, false)
         load()
         sandbox.refresh()
-        const label = field.label.charAt(0).toLowerCase() + field.label.slice(1)
+        const label = settingLabel(field.key)
         // Your own Slack app needs both tokens before the bot can start.
         const other = SLACK_APP_TOKENS.includes(field.key)
           ? SLACK_APP_TOKENS.find(
@@ -396,16 +398,16 @@ export function SettingsPage() {
           other
             ? {
                 tone: 'ok',
-                text: `Saved the ${label}. Enter the ${FIELD.get(other)?.label.toLowerCase()} next.`,
+                text: t.savedEnterNext(label, settingLabel(other)),
               }
             : askers
               ? {
                   tone: 'ok',
-                  text: `Saved the ${label}. Next, add your Slack member ID under Who can ask.`,
+                  text: t.savedAddMemberId(label, groupsById().access.label),
                 }
               : {
                   tone: 'warn',
-                  text: `Saved the ${label}. ${botLive ? 'Restart' : 'Start'} Pace to use it.`,
+                  text: t.savedStartToUse(label, botLive),
                   restart: true,
                 }
         )
@@ -437,6 +439,7 @@ export function SettingsPage() {
     Object.keys(changes).filter((key) => settingSectionOf(key) === id).length
   const sectionIssues = (id: Section) =>
     issues.filter((issue) => settingSectionOf(issue.key) === id).length
+  const groups = groupsById()
   const builtIn = valueOf('REASONER_SANDBOX') === 'vm'
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
@@ -450,15 +453,15 @@ export function SettingsPage() {
   /** How each messenger is connected, beside its heading */
   const messengerChips: Record<MessengerId, React.ReactNode> = {
     slack: slackReady ? (
-      <Chip tone="ok">{hubMode ? 'Team hub' : 'Your own app'}</Chip>
+      <Chip tone="ok">{hubMode ? t.teamHub : t.ownApp}</Chip>
     ) : (
-      <Chip tone="warn">{hubMode ? 'Not paired' : 'Not connected'}</Chip>
+      <Chip tone="warn">{hubMode ? t.notPaired : t.notConnected}</Chip>
     ),
   }
   const hints: Partial<Record<Section, Hint>> = {
     // Short enough to sit beside "Messengers"; the Slack heading says what is
     // missing.
-    messengers: slackReady ? undefined : { tone: 'warn', text: 'Set up' },
+    messengers: slackReady ? undefined : { tone: 'warn', text: t.hintSetUp },
     sandbox: builtIn
       ? vmStatus &&
         (vmStatus.unsupported ||
@@ -466,15 +469,15 @@ export function SettingsPage() {
           !vmStatus.kernel ||
           !vmStatus.initfs ||
           !vmStatus.image)
-        ? { tone: 'warn', text: 'Set up' }
+        ? { tone: 'warn', text: t.hintSetUp }
         : (vmStatus?.outdated ?? []).length > 0
-          ? { tone: 'warn', text: 'Update' }
+          ? { tone: 'warn', text: t.hintUpdate }
           : undefined
-      : { tone: 'muted', text: 'Off' },
+      : { tone: 'muted', text: t.hintOff },
     ops: !opsOn
-      ? { tone: 'muted', text: 'Off' }
+      ? { tone: 'muted', text: t.hintOff }
       : !opsReady
-        ? { tone: 'warn', text: 'Needs setup' }
+        ? { tone: 'warn', text: t.hintNeedsSetup }
         : undefined,
   }
 
@@ -521,14 +524,15 @@ export function SettingsPage() {
       'info' | 'fields' | 'row'
     > = {}
   ) => {
-    const fields = SETTING_FIELDS.filter(
+    // Their words in the app's language; keys and values as saved
+    const fields = settingFields().filter(
       (field) => field.group === id && shown(field)
     )
     if (fields.length === 0 && !extra.children && !extra.after) return null
     return (
       <GroupCard
         key={id}
-        info={GROUP[id]}
+        info={groups[id]}
         fields={fields}
         row={row}
         {...extra}
@@ -537,7 +541,7 @@ export function SettingsPage() {
   }
   /** An ops integration's card, with whether its fields turn it on */
   const integration = (id: SettingGroup) => {
-    const requires = GROUP[id].requires ?? []
+    const requires = groups[id].requires ?? []
     const missing = requires.filter((key) => !isSet(key))
     const state =
       missing.length === 0
@@ -551,7 +555,7 @@ export function SettingsPage() {
           state={state}
           title={
             state === 'partial'
-              ? `Still needed: ${missing.map((key) => FIELD.get(key)?.label ?? key).join(', ')}`
+              ? t.stillNeeded(missing.map(settingLabel))
               : undefined
           }
         />
@@ -578,7 +582,7 @@ export function SettingsPage() {
               ) : (
                 <PlugZap />
               )}
-              Check connection
+              {t.checkConnection}
             </Button>
           ),
           children:
@@ -606,10 +610,7 @@ export function SettingsPage() {
               onDisconnected={() => {
                 setCheck(undefined)
                 load()
-                setNotice({
-                  tone: 'ok',
-                  text: 'Disconnected this desktop from the hub.',
-                })
+                setNotice({ tone: 'ok', text: t.hubDisconnected })
               }}
             />
           ) : !isSet('SLACK_APP_TOKEN') || !isSet('SLACK_BOT_TOKEN') ? (
@@ -660,7 +661,7 @@ export function SettingsPage() {
                     sandbox.refresh()
                     setNotice({
                       tone: 'warn',
-                      text: 'Signed in inside the sandbox. Restart Pace to use it.',
+                      text: t.sandboxSignedIn,
                       restart: true,
                     })
                   }}
@@ -679,25 +680,29 @@ export function SettingsPage() {
               items={[
                 {
                   ok: builtIn,
-                  label: 'The built-in sandbox',
-                  detail: builtIn
-                    ? 'Requests run in the built-in sandbox, and the broker in a VM of its own.'
-                    : 'Choose the built-in sandbox as the run environment.',
+                  label: t.builtInSandbox,
+                  detail: builtIn ? t.builtInOn : t.builtInOff,
                   action: builtIn
                     ? undefined
-                    : { label: 'Open Sandbox', section: 'sandbox' },
+                    : {
+                        label: t.openSection(sectionInfo('sandbox').label),
+                        section: 'sandbox',
+                      },
                 },
                 {
                   ok: hubMode || isSet('MENTION_ALLOWED_USERS'),
-                  label: 'Only you can ask',
+                  label: t.onlyYou,
                   detail:
                     hubMode || isSet('MENTION_ALLOWED_USERS')
-                      ? 'Pace answers only you, so the tools act only for you.'
-                      : 'Add your Slack member ID, since the tools use your credentials.',
+                      ? t.onlyYouOn
+                      : t.onlyYouOff,
                   action:
                     hubMode || isSet('MENTION_ALLOWED_USERS')
                       ? undefined
-                      : { label: 'Open Messengers', section: 'messengers' },
+                      : {
+                          label: t.openSection(sectionInfo('messengers').label),
+                          section: 'messengers',
+                        },
                 },
               ]}
               onOpen={go}
@@ -707,10 +712,7 @@ export function SettingsPage() {
         {builtIn && sandbox.available && opsOn && (
           <BrokerCard sandbox={sandbox} />
         )}
-        <SubHeading
-          title="Integrations"
-          help={`Each one turns on once its fields are filled in. Changes apply when Pace restarts, as its broker's VM starts with it.${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`}
-        />
+        <SubHeading title={t.integrations} help={t.integrationsHelp(opsOn)} />
         {integration('files')}
         {integration('github')}
         {integration('jira')}
@@ -743,7 +745,7 @@ export function SettingsPage() {
                         .filter(Boolean)
                 }
               />
-              <McpConnections about="To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this." />
+              <McpConnections about={t.mcpTasks} />
             </>
           ),
         })}
@@ -756,7 +758,7 @@ export function SettingsPage() {
       <>
         {card('history', {
           after: valueOf('HISTORY_SHARE') === 'on' && (
-            <McpConnections about="Claude Code and Codex read the history through Pacenote's MCP server: recent runs, a search, and one run with its steps and answer." />
+            <McpConnections about={t.mcpHistory} />
           ),
         })}
         {card('logs')}
@@ -766,25 +768,25 @@ export function SettingsPage() {
     general: (
       <>
         <section className="surface-group">
-          <CardHeader
-            title="App"
-            help="Stored with the run history, not in the settings file."
-          />
+          <CardHeader title={t.app} help={t.appHelp} />
           <div className="divide-y divide-border">
-            <Row label="Theme" help="System follows the macOS appearance.">
+            <Row label={t.theme} help={t.themeHelp}>
               <ThemePicker />
+            </Row>
+            <Row label={t.language} help={t.languageHelp}>
+              <LanguagePicker />
             </Row>
             {loginItem.state && (
               <Row
-                label="Open Pacenote when you log in"
+                label={t.openAtLogin}
                 help={
                   loginItem.state.available
-                    ? 'It opens in the menu bar, without a window. macOS keeps this in Login Items.'
-                    : 'Only the installed Pacenote can open at login.'
+                    ? t.openAtLoginHelp
+                    : t.openAtLoginInstalled
                 }
                 warning={
                   loginItem.state.needsApproval
-                    ? 'macOS is waiting for you to allow Pacenote in System Settings > General > Login Items.'
+                    ? t.openAtLoginApproval
                     : undefined
                 }
               >
@@ -795,7 +797,7 @@ export function SettingsPage() {
                       variant="outline"
                       onClick={loginItem.openSystemSettings}
                     >
-                      Open Login Items
+                      {t.openLoginItems}
                     </Button>
                   )}
                   <Switch
@@ -807,10 +809,7 @@ export function SettingsPage() {
               </Row>
             )}
             {supervisor && (
-              <Row
-                label="Start Pace when the app opens"
-                help="When off, start Pace from its screen or the menu bar."
-              >
+              <Row label={t.autoStart} help={t.autoStartHelp}>
                 <Switch
                   checked={supervisor.autoStart}
                   onChange={(value) => void botControl()?.setAutoStart(value)}
@@ -822,33 +821,23 @@ export function SettingsPage() {
         <UpdatesCard update={update} />
         <HelpCard />
         <section className="surface-group">
-          <CardHeader
-            title="Files"
-            help="Pace reads its settings from a file outside the repository. Runs from the app and the terminal share it."
-          />
+          <CardHeader title={t.files} help={t.filesHelp} />
           <div className="divide-y divide-border">
             <Row
-              label="Settings file"
-              help={
-                view.exists
-                  ? 'Everything under Pace is saved here.'
-                  : "Does not exist yet. Saving any of Pace's settings creates it."
-              }
+              label={t.settingsFile}
+              help={view.exists ? t.settingsFileHere : t.settingsFileMissing}
               issue={view.problem}
             >
               <PathControl
                 path={view.file}
-                label="Show in Finder"
+                label={t.showInFinder}
                 onOpen={() => void settings.revealFile()}
               />
             </Row>
-            <Row
-              label="Run history folder"
-              help="To move it, change it in the settings file and relaunch the app."
-            >
+            <Row label={t.historyFolder} help={t.historyFolderHelp}>
               <PathControl
                 path={view.dataDir}
-                label="Open"
+                label={t.open}
                 onOpen={() => void settings.openDataDir()}
               />
             </Row>
@@ -900,11 +889,11 @@ export function SettingsPage() {
                       void (botLive ? control?.restart() : control?.start())
                       setNotice({
                         tone: 'ok',
-                        text: botLive ? 'Restarting Pace.' : 'Starting Pace.',
+                        text: botLive ? t.restarting : t.starting,
                       })
                     }}
                   >
-                    {botLive ? 'Restart now' : 'Start Pace'}
+                    {botLive ? t.restartNow : t.startPace}
                   </Button>
                 )}
               </div>
@@ -920,9 +909,7 @@ export function SettingsPage() {
         {changeCount > 0 && (
           <footer className="shrink-0 border-t bg-canvas/95 px-8 py-3 backdrop-blur @max-[36rem]/content:px-4">
             <div className="flex max-w-3xl flex-wrap items-center gap-2">
-              <span className="text-row">
-                {changeCount} unsaved {changeCount === 1 ? 'change' : 'changes'}
-              </span>
+              <span className="text-row">{t.unsavedChanges(changeCount)}</span>
               {issues.length > 0 && (
                 <button
                   type="button"
@@ -933,9 +920,9 @@ export function SettingsPage() {
                   <TriangleAlert className="size-3.5 shrink-0" />
                   <span className="truncate">
                     {offscreenIssues[0]?.message ??
-                      `${issues.length} ${issues.length === 1 ? 'issue' : 'issues'} to fix`}
+                      t.issuesToFix(issues.length)}
                     {issueSection && issueSection !== section
-                      ? ` (${SECTION_INFO[issueSection].label})`
+                      ? ` (${sectionInfo(issueSection).label})`
                       : ''}
                   </span>
                 </button>
@@ -948,7 +935,7 @@ export function SettingsPage() {
                   disabled={saving}
                 >
                   <RotateCcw />
-                  Revert
+                  {t.revert}
                 </Button>
                 <Button
                   variant="outline"
@@ -957,7 +944,7 @@ export function SettingsPage() {
                   disabled={saving || issues.length > 0}
                 >
                   <Save />
-                  Save
+                  {t.save}
                 </Button>
                 {canRestart && (
                   <Button
@@ -970,7 +957,7 @@ export function SettingsPage() {
                     ) : (
                       <Save />
                     )}
-                    {botLive ? 'Save and restart Pace' : 'Save and start Pace'}
+                    {botLive ? t.saveRestart : t.saveStart}
                   </Button>
                 )}
               </div>
@@ -996,24 +983,25 @@ function SettingsNav({
   issues?: (section: Section) => number
   hints?: Partial<Record<Section, Hint>>
 }) {
+  const t = useText(text)
   return (
     <nav
-      aria-label="Settings sections"
+      aria-label={t.navLabel}
       className="flex w-56 shrink-0 flex-col gap-4 border-r border-sidebar-border px-2.5 py-5 @max-[44rem]/settings:w-14 @max-[44rem]/settings:px-2"
     >
       <h1 className="px-2.5 text-heading @max-[44rem]/settings:sr-only">
-        Settings
+        {t.title}
       </h1>
       {NAV.map((group) => (
-        <div key={group.label} className="space-y-0.5">
+        <div key={group.group} className="space-y-0.5">
           <p className="px-2.5 pb-1 text-caption text-muted-foreground/80 @max-[44rem]/settings:sr-only">
-            {group.label}
+            {t.nav[group.group]}
           </p>
           {group.items.map((id) => (
             <NavItem
               key={id}
-              icon={SECTION_INFO[id].icon}
-              label={SECTION_INFO[id].label}
+              icon={SECTION_ICON[id]}
+              label={sectionInfo(id).label}
               active={section === id}
               changes={changes(id)}
               issues={issues(id)}
@@ -1028,12 +1016,11 @@ function SettingsNav({
 }
 
 function SectionTitle({ section }: { section: Section }) {
+  const { label, help } = sectionInfo(section)
   return (
     <header>
-      <h2 className="text-title">{SECTION_INFO[section].label}</h2>
-      <p className="mt-1 text-copy text-muted-foreground">
-        {SECTION_INFO[section].help}
-      </p>
+      <h2 className="text-title">{label}</h2>
+      <p className="mt-1 text-copy text-muted-foreground">{help}</p>
     </header>
   )
 }
@@ -1087,6 +1074,7 @@ function NavItem({
   hint?: Hint
   onClick: () => void
 }) {
+  const t = useText(text)
   return (
     <button
       type="button"
@@ -1124,12 +1112,12 @@ function NavItem({
         {issues > 0 ? (
           <span
             className="size-1.5 shrink-0 rounded-full bg-status-failed"
-            title={`${issues} ${issues === 1 ? 'issue' : 'issues'} to fix`}
+            title={t.issuesToFix(issues)}
           />
         ) : changes > 0 ? (
           <span
             className="shrink-0 rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
-            title={`${changes} unsaved ${changes === 1 ? 'change' : 'changes'}`}
+            title={t.unsavedChanges(changes)}
           >
             {changes}
           </span>
@@ -1251,15 +1239,9 @@ function GroupCard({
 }
 
 const STATE_CHIP = {
-  on: {
-    label: 'On',
-    className: 'bg-status-succeeded/12 text-status-succeeded',
-  },
-  partial: {
-    label: 'Incomplete',
-    className: 'bg-status-interrupted/12 text-status-interrupted',
-  },
-  off: { label: 'Off', className: 'bg-muted text-muted-foreground' },
+  on: 'bg-status-succeeded/12 text-status-succeeded',
+  partial: 'bg-status-interrupted/12 text-status-interrupted',
+  off: 'bg-muted text-muted-foreground',
 }
 
 const CHIP_TONE = {
@@ -1293,21 +1275,22 @@ function StateChip({
   state: keyof typeof STATE_CHIP
   title?: string
 }) {
+  const t = useText(text)
   return (
     <span
       title={title}
       className={cn(
         'rounded-sm px-1.5 text-caption leading-4',
-        STATE_CHIP[state].className
+        STATE_CHIP[state]
       )}
     >
-      {STATE_CHIP[state].label}
+      {t.state[state]}
     </span>
   )
 }
 
 function credentialsHelp(reasoner: string): string {
-  return `${reasoner} signs in inside the sandbox and keeps its login there, separate from your ${reasoner} login on this Mac.`
+  return localized(text).credentialsHelp(reasoner)
 }
 
 type PairState =
@@ -1335,6 +1318,7 @@ function HubPairing({
   onPaired: (notice: string) => void
   onDisconnected: () => void
 }) {
+  const t = useText(text)
   const hub = window.pacenoteDesktop?.hub
   const [state, setState] = useState<PairState>({ step: 'idle' })
   const [busy, setBusy] = useState(false)
@@ -1347,14 +1331,11 @@ function HubPairing({
         else if (res.status === 'bound')
           setState({ step: 'bound', user: res.user })
         else if (res.status === 'expired')
-          setState({
-            step: 'error',
-            message: 'The code expired. Connect again for a new one.',
-          })
+          setState({ step: 'error', message: t.codeExpired })
       })
     }, 2_000)
     return () => clearInterval(timer)
-  }, [state.step, hub])
+  }, [state.step, hub, t])
   // Leaving the screen cancels a pairing that was not confirmed.
   useEffect(() => () => void hub?.pairCancel(), [hub])
 
@@ -1385,9 +1366,7 @@ function HubPairing({
           message: res.issues.map((i) => i.message).join(' '),
         })
       setState({ step: 'idle' })
-      onPaired(
-        `Paired with the hub as ${res.user.name} @ ${res.team.name}.${res.started ? ' Started Pace.' : ''}`
-      )
+      onPaired(t.pairedWith(res.user.name, res.team.name, res.started))
     })
   }
   const disconnect = () => {
@@ -1407,10 +1386,7 @@ function HubPairing({
         return paired ? (
           <div className="flex items-center gap-3">
             <CircleCheck className="size-4 shrink-0 text-status-succeeded" />
-            <p className="min-w-0 flex-1 text-copy">
-              This desktop is paired with the hub. Use Check connection to see
-              as whom.
-            </p>
+            <p className="min-w-0 flex-1 text-copy">{t.hubPaired}</p>
             <Button
               size="sm"
               variant="outline"
@@ -1418,21 +1394,20 @@ function HubPairing({
               disabled={busy}
             >
               {busy && <LoaderCircle className="animate-spin" />}
-              Disconnect
+              {t.disconnect}
             </Button>
           </div>
         ) : (
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-row">Pair this desktop</p>
+              <p className="text-row">{t.pairTitle}</p>
               <p className="mt-0.5 text-meta text-muted-foreground">
-                {state.note ??
-                  'You get a code to send to Pace in Slack. Mentions you make then come to this desktop.'}
+                {state.note ?? t.pairHelp}
               </p>
             </div>
             <Button size="sm" onClick={start} disabled={!hubUrl}>
               <Plug />
-              Connect
+              {t.connect}
             </Button>
           </div>
         )
@@ -1440,29 +1415,28 @@ function HubPairing({
         return (
           <p className="flex items-center gap-2 text-copy text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" />
-            Getting a code from the hub
+            {t.gettingCode}
           </p>
         )
       case 'waiting':
         return (
           <div className="space-y-2.5">
-            <p className="text-copy">
-              In Slack, mention Pace with this code in any channel it is in:
-            </p>
+            <p className="text-copy">{t.mentionWithCode}</p>
             <div className="flex items-center gap-3">
               <code className="rounded-lg bg-card px-3 py-2 font-mono text-heading tracking-wide shadow-xs select-all">
                 @Pace connect {state.code}
               </code>
               <Button size="sm" variant="ghost" onClick={() => cancel()}>
-                Cancel
+                {t.cancel}
               </Button>
             </div>
             {/* Pace itself is watching Slack for the mention. */}
             <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <PaceSpinner className="size-6" />
               <span>
-                <span className="text-shimmer">Waiting for the code.</span> It
-                expires in 10 minutes.
+                {t.waitingCode((words) => (
+                  <span className="text-shimmer">{words}</span>
+                ))}
               </span>
             </p>
           </div>
@@ -1472,23 +1446,22 @@ function HubPairing({
         return (
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-copy">
-              <b>{state.user.name}</b>{' '}
-              <span className="font-mono text-meta text-muted-foreground">
-                ({state.user.id})
-              </span>{' '}
-              sent the code. Is this your Slack account?
+              {t.sentCode(
+                <>
+                  <b>{state.user.name}</b>{' '}
+                  <span className="font-mono text-meta text-muted-foreground">
+                    ({state.user.id})
+                  </span>
+                </>
+              )}
             </p>
             <Button
               size="sm"
               variant="ghost"
               disabled={state.step === 'confirming'}
-              onClick={() =>
-                cancel(
-                  'Cancelled. If someone else sent your code, connect again to get a new one.'
-                )
-              }
+              onClick={() => cancel(t.pairCancelled)}
             >
-              No
+              {t.no}
             </Button>
             <Button
               size="sm"
@@ -1498,7 +1471,7 @@ function HubPairing({
               {state.step === 'confirming' && (
                 <LoaderCircle className="animate-spin" />
               )}
-              Yes, pair
+              {t.yesPair}
             </Button>
           </div>
         )
@@ -1514,7 +1487,7 @@ function HubPairing({
               variant="outline"
               onClick={() => setState({ step: 'idle' })}
             >
-              Try again
+              {t.tryAgain}
             </Button>
           </div>
         )
@@ -1626,6 +1599,7 @@ function FieldRow({
   onSave: () => void
   saving: boolean
 }) {
+  const t = useText(text)
   const overridden = view.overridden.includes(field.key)
   const label = (
     <span className="flex items-center gap-1.5">
@@ -1633,14 +1607,12 @@ function FieldRow({
       {changed && (
         <span
           className="size-1.5 rounded-full bg-primary"
-          aria-label="Changed"
+          aria-label={t.changed}
         />
       )}
     </span>
   )
-  const warning = overridden
-    ? 'Pacenote was started with its own value for this, which wins over the one saved here.'
-    : undefined
+  const warning = overridden ? t.overridden : undefined
   // Options that explain themselves are laid out as cards; the card's title
   // names the choice.
   if (field.type === 'select' && field.options?.some((option) => option.help)) {
@@ -1781,6 +1753,7 @@ function Control({
   onSave: () => void
   saving: boolean
 }) {
+  const t = useText(text)
   switch (field.type) {
     case 'secret': {
       const secret = view.secrets[field.key]
@@ -1789,14 +1762,17 @@ function Control({
           <div className="flex items-center gap-2">
             <span
               className={cn(
-                'font-mono text-meta',
-                secret?.set ? 'text-foreground' : 'text-muted-foreground'
+                'text-meta',
+                // The key's last characters are code; "Not set" is words.
+                secret?.set
+                  ? 'font-mono text-foreground'
+                  : 'text-muted-foreground'
               )}
             >
-              {secret?.set ? secret.hint : 'Not set'}
+              {secret?.set ? secret.hint : t.notSet}
             </span>
             <Button size="xs" variant="outline" onClick={() => onEdit(true)}>
-              {secret?.set ? 'Change' : 'Enter'}
+              {secret?.set ? t.change : t.enter}
             </Button>
           </div>
         )
@@ -1823,10 +1799,10 @@ function Control({
             className="h-7 font-mono text-meta"
           />
           <Button size="xs" onClick={onSave} disabled={!value.trim() || saving}>
-            Save
+            {t.save}
           </Button>
           <Button size="xs" variant="ghost" onClick={() => onEdit(false)}>
-            Cancel
+            {t.cancel}
           </Button>
         </div>
       )
@@ -1868,7 +1844,7 @@ function Control({
           inputMode={field.type === 'number' ? 'numeric' : undefined}
           placeholder={
             field.placeholder ??
-            (field.default ? `Default ${field.default}` : 'Not set')
+            (field.default ? t.defaultValue(field.default) : t.notSet)
           }
           onChange={(e) => onChange(e.target.value)}
           className={cn(
@@ -1926,6 +1902,7 @@ function Row({
  * Mac, and what opens when it is not
  */
 function AppsHere() {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const [apps, setApps] = useState<Record<'claude' | 'codex', boolean> | null>()
   useEffect(() => {
@@ -1943,11 +1920,9 @@ function AppsHere() {
             )}
           />
           <span>
-            {tool === 'claude' ? 'Claude app' : 'Codex app'}
+            {t.apps[tool]}
             <span className="text-muted-foreground">
-              {apps[tool]
-                ? ' · on this Mac'
-                : ' · not on this Mac, so your terminal opens instead'}
+              {apps[tool] ? t.appHere : t.appMissing}
             </span>
           </span>
         </li>
@@ -1972,10 +1947,10 @@ function RowNotes({ warning, issue }: { warning?: string; issue?: string }) {
   )
 }
 
-const THEMES: { mode: ThemeMode; label: string; icon: typeof Monitor }[] = [
-  { mode: 'system', label: 'System', icon: Monitor },
-  { mode: 'light', label: 'Light', icon: Sun },
-  { mode: 'dark', label: 'Dark', icon: Moon },
+const THEMES: { mode: ThemeMode; icon: typeof Monitor }[] = [
+  { mode: 'system', icon: Monitor },
+  { mode: 'light', icon: Sun },
+  { mode: 'dark', icon: Moon },
 ]
 
 /**
@@ -1983,14 +1958,15 @@ const THEMES: { mode: ThemeMode; label: string; icon: typeof Monitor }[] = [
  * filter.
  */
 function ThemePicker() {
+  const t = useText(text)
   const { mode, setMode } = useTheme()
   return (
     <div
       role="radiogroup"
-      aria-label="Theme"
+      aria-label={t.theme}
       className="flex rounded-lg bg-muted p-0.5"
     >
-      {THEMES.map(({ mode: value, label, icon: Icon }) => (
+      {THEMES.map(({ mode: value, icon: Icon }) => (
         <button
           key={value}
           type="button"
@@ -2005,10 +1981,37 @@ function ThemePicker() {
           )}
         >
           <Icon className="size-3.5" />
-          {label}
+          {t.themes[value]}
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * System / English / 한국어: each language by its own name, in either
+ * language. System follows macOS.
+ */
+function LanguagePicker() {
+  const t = useText(text)
+  const { preference, setPreference } = useLanguage()
+  return (
+    <Segmented
+      label={t.language}
+      value={preference}
+      options={[
+        { value: 'system', label: t.languageSystem },
+        ...LOCALES.map((locale) => ({
+          value: locale,
+          label: LOCALE_NAMES[locale],
+          lang: locale,
+        })),
+      ]}
+      onChange={(value) => {
+        const next: LanguagePreference = isLocale(value) ? value : 'system'
+        void setPreference(next)
+      }}
+    />
   )
 }
 
@@ -2024,7 +2027,8 @@ function Segmented({
 }: {
   label: string
   value: string
-  options: { value: string; label: string }[]
+  /** lang: an option written in a language of its own (a language's name) */
+  options: { value: string; label: string; lang?: string }[]
   onChange: (value: string) => void
 }) {
   return (
@@ -2037,6 +2041,7 @@ function Segmented({
         <button
           key={option.value}
           type="button"
+          lang={option.lang}
           role="radio"
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
@@ -2065,33 +2070,27 @@ function Segmented({
  * (src/macs), and you can add one on another network by its address.
  */
 function MacsSection() {
+  const t = useText(text)
   const view = useMacs()
   const control = macsControl()
   const [adding, setAdding] = useState(false)
   const [address, setAddress] = useState('')
   const [addIssue, setAddIssue] = useState<string>()
   if (!view) return <SectionSkeleton />
-  const header = (
-    <CardHeader
-      title="Your Macs"
-      help="Pace answers on the Mac you're using. Pacenote on your other Mac, set up with the same Slack app, joins in on this network by itself, and Todo is the same on both."
-    />
-  )
+  const header = <CardHeader title={t.yourMacs} help={t.yourMacsHelp} />
   if (!view.available)
     return (
       <section className="surface-group" data-macs="unavailable">
         {header}
         <p className="px-4 py-3 text-meta text-muted-foreground">
-          Your Macs follow you only with your own Slack app (Settings &gt;
-          Messengers). With your team's hub, Pace answers on one Mac per person:
-          pair a new Mac with the hub instead, and Pace moves there.
+          {t.macsUnavailable}
         </p>
       </section>
     )
   const others = view.macs.filter((mac) => !mac.here)
   const add = () =>
     void control?.addAddress(address).then((ok) => {
-      if (!ok) return setAddIssue('Enter a name or address, like 100.68.0.12.')
+      if (!ok) return setAddIssue(t.addressIssue)
       setAddress('')
       setAddIssue(undefined)
       setAdding(false)
@@ -2100,14 +2099,7 @@ function MacsSection() {
     <section className="surface-group" data-macs={view.follow ? 'on' : 'off'}>
       {header}
       <div className="divide-y divide-border">
-        <Row
-          label="Follow the Mac you're using"
-          help={
-            view.follow
-              ? 'Pace moves to the Mac you use when you lock, sleep or leave the other one for 5 minutes. Off, Pace answers on this Mac as on a Mac of its own.'
-              : 'Turn it on here and on your other Mac. macOS asks once whether Pacenote may look on your local network.'
-          }
-        >
+        <Row label={t.follow} help={view.follow ? t.followOn : t.followOff}>
           <Switch
             checked={view.follow}
             onChange={(on) => void control?.follow(on)}
@@ -2116,17 +2108,14 @@ function MacsSection() {
         {view.adding ? (
           <AddingPanel adding={view.adding} />
         ) : (
-          <Row
-            label="Add a Mac"
-            help="Set up Pacenote on a new Mac from this one: its Slack app and who you are come from here."
-          >
+          <Row label={t.addMac} help={t.addMacHelp}>
             <Button
               size="xs"
               variant="outline"
               onClick={() => void control?.addStart()}
             >
               <Laptop />
-              Add a Mac
+              {t.addMac}
             </Button>
           </Row>
         )}
@@ -2139,15 +2128,14 @@ function MacsSection() {
               <div className="flex items-center gap-3 px-4 py-3">
                 <TriangleAlert className="size-4 shrink-0 text-status-interrupted" />
                 <p className="min-w-0 flex-1 text-meta text-muted-foreground">
-                  Pacenote can't look on this network. Turn on Local Network for
-                  Pacenote in System Settings &gt; Privacy &amp; Security.
+                  {t.networkBlocked}
                 </p>
                 <Button
                   size="xs"
                   variant="outline"
                   onClick={() => void control?.openPrivacy()}
                 >
-                  Open System Settings
+                  {t.openSystemSettings}
                 </Button>
               </div>
             ) : (
@@ -2157,7 +2145,7 @@ function MacsSection() {
                   data-macs-looking
                 >
                   <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-                  Looking for your other Mac on this network…
+                  {t.lookingForMac}
                 </p>
               )
             )}
@@ -2173,7 +2161,7 @@ function MacsSection() {
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    aria-label={`Remove ${entry}`}
+                    aria-label={t.removeAddress(entry)}
                     onClick={() => void control?.removeAddress(entry)}
                   >
                     <X />
@@ -2190,14 +2178,14 @@ function MacsSection() {
                 >
                   <Input
                     autoFocus
-                    aria-label="Address of your other Mac"
-                    placeholder="100.68.0.12 or macbook-air.local"
+                    aria-label={t.addressLabel}
+                    placeholder={t.addressPlaceholder}
                     value={address}
                     onChange={(event) => setAddress(event.target.value)}
                     className="h-8 flex-1"
                   />
                   <Button size="sm" type="submit" disabled={!address.trim()}>
-                    Add
+                    {t.add}
                   </Button>
                   <Button
                     size="sm"
@@ -2208,7 +2196,7 @@ function MacsSection() {
                       setAddIssue(undefined)
                     }}
                   >
-                    Cancel
+                    {t.cancel}
                   </Button>
                 </form>
               ) : (
@@ -2217,7 +2205,7 @@ function MacsSection() {
                   className="text-meta text-muted-foreground hover:text-foreground hover:underline"
                   onClick={() => setAdding(true)}
                 >
-                  Add by address
+                  {t.addByAddress}
                 </button>
               )}
               {addIssue && (
@@ -2225,7 +2213,7 @@ function MacsSection() {
               )}
               {adding && (
                 <p className="text-meta text-muted-foreground">
-                  For a Mac on another network, such as over Tailscale.
+                  {t.addressHelp}
                 </p>
               )}
             </div>
@@ -2244,6 +2232,7 @@ const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
  * the number, then Allow), and how it ended
  */
 function AddingPanel({ adding }: { adding: AddingView }) {
+  const t = useText(text)
   const control = macsControl()
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
@@ -2262,10 +2251,10 @@ function AddingPanel({ adding }: { adding: AddingView }) {
         )}
         <p className="min-w-0 flex-1 text-body">
           {kind === 'sent'
-            ? `${name ?? 'Your new Mac'} is set up. Pace follows the Mac you're using.`
+            ? t.macSetUp(name)
             : kind === 'declined'
-              ? 'Cancelled. Nothing was sent.'
-              : 'Stopped waiting. Nothing was sent.'}
+              ? t.addDeclined
+              : t.addExpired}
         </p>
         {kind === 'expired' && (
           <Button
@@ -2273,11 +2262,11 @@ function AddingPanel({ adding }: { adding: AddingView }) {
             variant="outline"
             onClick={() => void control?.addStart()}
           >
-            Try again
+            {t.tryAgain}
           </Button>
         )}
         <Button size="xs" onClick={() => void control?.addClose()}>
-          {kind === 'sent' ? 'Done' : 'Close'}
+          {kind === 'sent' ? t.done : t.close}
         </Button>
       </div>
     )
@@ -2286,32 +2275,27 @@ function AddingPanel({ adding }: { adding: AddingView }) {
     const { name, code } = adding.request
     return (
       <div className="flex flex-col gap-3 px-4 py-4" data-adding="request">
-        <b className="text-section">{name} wants to set up from this Mac.</b>
+        <b className="text-section">{t.wantsSetUp(name)}</b>
         <p
           className="text-number tracking-[0.2em] tabular-nums select-text"
           data-code
         >
           {codeWords(code)}
         </p>
-        <p className="text-body text-muted-foreground">
-          Do both Macs show this number?
-        </p>
+        <p className="text-body text-muted-foreground">{t.sameNumber}</p>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => void control?.addAllow()}>
-            Allow
+            {t.allow}
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={() => void control?.addDecline()}
           >
-            Not this one
+            {t.notThisOne}
           </Button>
         </div>
-        <p className="text-meta text-muted-foreground">
-          Sends your Slack app, who Pace answers and Todo's collection settings.
-          Not your AI sign-in, the sandbox, ops tools or folders.
-        </p>
+        <p className="text-meta text-muted-foreground">{t.whatIsSent}</p>
       </div>
     )
   }
@@ -2322,29 +2306,25 @@ function AddingPanel({ adding }: { adding: AddingView }) {
   return (
     <div className="flex flex-col gap-2 px-4 py-4" data-adding="waiting">
       <div className="flex items-center gap-3">
-        <b className="min-w-0 flex-1 text-section">Add a Mac</b>
+        <b className="min-w-0 flex-1 text-section">{t.addMac}</b>
         <Button
           size="xs"
           variant="ghost"
           onClick={() => void control?.addStop()}
         >
-          Stop
+          {t.stop}
         </Button>
       </div>
       <p className="text-body text-pretty">
-        Open Pacenote on the new Mac and choose{' '}
-        <span className="font-semibold whitespace-nowrap">
-          Connect to your other Mac
-        </span>{' '}
-        at the Slack step.
+        {t.openOnNewMac((words) => (
+          <span className="font-semibold whitespace-nowrap">{words}</span>
+        ))}
       </p>
       <p className="flex items-center gap-2 text-meta text-muted-foreground">
         <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-        Waiting for it on this network… {clock} left
+        {t.waitingOnNetwork(clock)}
       </p>
-      <p className="text-meta text-muted-foreground">
-        This Mac shows itself on your network only while it waits.
-      </p>
+      <p className="text-meta text-muted-foreground">{t.shownWhileWaiting}</p>
     </div>
   )
 }
@@ -2358,22 +2338,24 @@ const MAC_DOT: Record<MacView['status'], string> = {
 
 /** What a Mac is doing, in a few words */
 export function macWords(mac: MacView): string {
-  if (mac.notReady) return "Pace isn't running there"
+  const t = localized(text)
+  if (mac.notReady) return t.paceNotRunning
   switch (mac.status) {
     case 'answering':
-      return mac.here ? 'Answering here' : 'Answering'
+      return mac.here ? t.answeringHere : t.answering
     case 'moving':
-      return 'Moving…'
+      return t.moving
     case 'standing-by':
-      return mac.asleep ? 'Asleep' : 'Standing by'
+      return mac.asleep ? t.asleep : t.standingBy
     case 'out-of-reach':
       return mac.lastSeen
-        ? `Out of reach · seen ${formatRelative(mac.lastSeen)}`
-        : 'Out of reach'
+        ? t.outOfReachSeen(formatRelative(mac.lastSeen))
+        : t.outOfReach
   }
 }
 
 function MacRow({ mac }: { mac: MacView }) {
+  const t = useText(text)
   return (
     <div
       className="flex items-center gap-3 px-4 py-3"
@@ -2386,7 +2368,7 @@ function MacRow({ mac }: { mac: MacView }) {
           <span className="truncate">{mac.name}</span>
           {mac.here && (
             <span className="shrink-0 text-caption text-muted-foreground">
-              This Mac
+              {t.thisMac}
             </span>
           )}
         </div>
@@ -2410,7 +2392,7 @@ function MacRow({ mac }: { mac: MacView }) {
           variant="outline"
           onClick={() => void macsControl()?.answerHere()}
         >
-          Answer here
+          {t.answerHere}
         </Button>
       )}
       {!mac.here && (
@@ -2419,7 +2401,7 @@ function MacRow({ mac }: { mac: MacView }) {
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label={`More for ${mac.name}`}
+              aria-label={t.moreFor(mac.name)}
             >
               <MoreHorizontal />
             </Button>
@@ -2428,7 +2410,7 @@ function MacRow({ mac }: { mac: MacView }) {
             <DropdownMenuItem
               onSelect={() => void macsControl()?.ignore(mac.id)}
             >
-              Stop following to this Mac
+              {t.stopFollowing}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -2438,6 +2420,7 @@ function MacRow({ mac }: { mac: MacView }) {
 }
 
 function HelpCard() {
+  const t = useText(text)
   const diagnostics = window.pacenoteDesktop?.diagnostics
   const [copied, setCopied] = useState<'yes' | 'failed'>()
   if (!diagnostics) return null
@@ -2450,18 +2433,16 @@ function HelpCard() {
       )
   return (
     <section className="surface-group">
-      <CardHeader title="Help" />
+      <CardHeader title={t.help} />
       <div className="divide-y divide-border">
         <Row
-          label="Diagnostics"
-          help="Versions, Pace's status, the settings without their secrets, and the latest logs, to paste into a bug report. The logs can name channels and people, so read it before you share it."
-          warning={
-            copied === 'failed' ? 'Could not copy the diagnostics.' : undefined
-          }
+          label={t.diagnostics}
+          help={t.diagnosticsHelp}
+          warning={copied === 'failed' ? t.copyFailed : undefined}
         >
           <Button size="xs" variant="outline" onClick={copy}>
             {copied === 'yes' ? <Check /> : <Copy />}
-            {copied === 'yes' ? 'Copied' : 'Copy diagnostics'}
+            {copied === 'yes' ? t.copied : t.copyDiagnostics}
           </Button>
         </Row>
       </div>
@@ -2477,29 +2458,27 @@ const BREW_UPGRADE = 'brew upgrade --cask pacenote'
  * tells; Homebrew installs it, quitting the app first and reopening it.
  */
 function UpdatesCard({ update }: { update: UpdateState | undefined }) {
+  const t = useText(text)
   const { version } = __PACENOTE_BUILD__
   const latest = update?.latest
   return (
     <section className="surface-group">
-      <CardHeader
-        title="Updates"
-        help="Pacenote looks for a new release twice a day. Homebrew installs it."
-      />
+      <CardHeader title={t.updates} help={t.updatesHelp} />
       <div className="divide-y divide-border">
         <Row
           label={
             update?.available && latest
-              ? `Pacenote ${latest.version} is out`
+              ? t.newVersion(latest.version)
               : `Pacenote ${version}`
           }
           help={
             !update
-              ? 'Only the installed Pacenote looks for updates.'
+              ? t.installedOnly
               : update.available
-                ? `You have ${update.current}. Run this in Terminal; it quits Pacenote, updates it and opens it again. Pace finishes or resumes what it was answering.`
+                ? t.howToUpdate(update.current)
                 : update.checkedAt
-                  ? `Up to date. Checked ${formatRelative(update.checkedAt)}.`
-                  : 'Not checked yet.'
+                  ? t.upToDate(formatRelative(update.checkedAt))
+                  : t.notChecked
           }
         >
           {update?.available && latest ? (
@@ -2514,7 +2493,7 @@ function UpdatesCard({ update }: { update: UpdateState | undefined }) {
                   variant="outline"
                   onClick={() => window.open(latest.url, '_blank')}
                 >
-                  Release notes
+                  {t.releaseNotes}
                 </Button>
               )}
             </div>
@@ -2566,6 +2545,7 @@ function Advanced({
   bordered: boolean
   children: React.ReactNode
 }) {
+  const t = useText(text)
   const [open, setOpen] = useState(false)
   return (
     <Collapsible
@@ -2577,7 +2557,7 @@ function Advanced({
         <ChevronRight
           className={cn('size-3.5 transition-transform', open && 'rotate-90')}
         />
-        Advanced ({count})
+        {t.advanced(count)}
       </CollapsibleTrigger>
       <CollapsibleContent className="divide-y divide-border border-t border-border">
         {children}

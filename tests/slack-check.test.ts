@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import type { WebClient } from '@slack/web-api'
 import { describe, expect, it } from 'vitest'
+import { setLocale } from '../src/i18n/locale.js'
 import { createLogger } from '../src/logger.js'
 import type { Directory } from '../src/messengers/slack/directory.js'
 import { SlackMessenger } from '../src/messengers/slack/messenger.js'
@@ -114,5 +115,38 @@ describe('reactions:write as a limit in the status', () => {
     })
     expect(await slack.mark(mention, 'working')).toBe(false)
     expect(slack.limits).toEqual([expect.stringContaining('Updating the hub')])
+  })
+
+  it("words the limit in the app's language when read", async () => {
+    const slack = messenger(async () => {
+      throw slackError('method_not_allowed_by_hub')
+    })
+    expect(await slack.mark(mention, 'working')).toBe(false)
+    setLocale('ko')
+    try {
+      expect(slack.limits).toEqual([
+        expect.stringContaining('팀 허브가 이모지 반응을 전달하지 않아서'),
+      ])
+    } finally {
+      setLocale('en')
+    }
+    expect(slack.limits).toEqual([expect.stringContaining('Updating the hub')])
+  })
+
+  it("refuses private conversations in Pace's notes language", async () => {
+    const venue = (notesLocale?: 'en' | 'ko') =>
+      new SlackMessenger({
+        client: {} as WebClient,
+        directory: {
+          channel: async () => ({ id: 'D1', label: 'dm', isPublic: false }),
+        } as unknown as Directory,
+        botUserId: 'U0PACE',
+        files: { token: 'xoxb-1' },
+        owner: () => 'U0ME',
+        log: createLogger('error'),
+        notesLocale,
+      }).venue(mention)
+    expect((await venue()).refusal).toBe('I only answer in public channels.')
+    expect((await venue('ko')).refusal).toBe('저는 공개 채널에서만 답해요.')
   })
 })

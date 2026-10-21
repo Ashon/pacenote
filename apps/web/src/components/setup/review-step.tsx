@@ -6,15 +6,17 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { useSupervisor } from '@/lib/desktop'
+import { useText } from '@/lib/i18n'
 import {
   allowedIds,
-  STEP_LABELS,
+  stepLabel,
   type Detected,
   type SetupStep,
   type useSandboxSetup,
 } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { Chip, Problem, StepFrame } from './parts'
+import { text } from './review-step.text'
 import { preparingProblem, SandboxLogin } from './runtime-step'
 
 const SERVICE = { claude: 'Claude', codex: 'ChatGPT' } as const
@@ -49,6 +51,7 @@ export function ReviewStep({
   /** Starting or not: the other steps wait meanwhile */
   onBusy: (busy: boolean) => void
 }) {
+  const t = useText(text)
   const values = settings.view?.values
   const backend = values?.REASONER === 'codex' ? 'codex' : 'claude'
   const vm = values?.REASONER_SANDBOX === 'vm'
@@ -75,11 +78,7 @@ export function ReviewStep({
     setStarting('starting')
     const bot = window.pacenoteDesktop?.bot
     const now = await bot?.state()
-    if (now?.phase === 'external')
-      return setStarting({
-        error:
-          'Pace is already running elsewhere, such as a terminal. Stop it there, then start it here.',
-      })
+    if (now?.phase === 'external') return setStarting({ error: t.elsewhere })
     if (now?.phase === 'running' || now?.phase === 'starting')
       await bot?.restart()
     else await bot?.start()
@@ -100,9 +99,9 @@ export function ReviewStep({
     ) {
       const message =
         state.phase === 'external'
-          ? 'Pace is already running elsewhere, such as a terminal. Stop it there, then start it here.'
+          ? t.elsewhere
           : state.phase === 'idle' || !state.message
-            ? 'Pace did not start. Try again.'
+            ? t.didNotStart
             : state.message
       const step = stepToFix(state.issues, state.message)
       const allowlist = state.issues?.some(
@@ -126,13 +125,12 @@ export function ReviewStep({
     )
     if (vm && kicked.current && sandbox.error?.kind === 'vm')
       setStarting({
-        error: `The built-in sandbox couldn't start preparing. ${sandbox.error.message}`,
+        error: t.sandboxCouldNotStart(sandbox.error.message),
         step: 'runtime',
       })
     else if (vm && fresh && job?.state === 'failed')
       setStarting({
-        error:
-          'Preparing the built-in sandbox stopped, so Pace has nothing to answer in yet.',
+        error: t.sandboxStopped,
         step: 'runtime',
       })
     else if (!vm || sandbox.ready || (fresh && job?.state === 'succeeded'))
@@ -185,17 +183,17 @@ export function ReviewStep({
   const owner = !hub && allowed.length === 1 ? allowed[0] : undefined
   const unknown = !hub && !owner
   const blocked = needsLogin
-    ? `Sign the sandbox in to ${backend === 'codex' ? 'Codex' : 'Claude'} first`
+    ? t.signInFirst(backend === 'codex' ? 'Codex' : 'Claude')
     : unknown
-      ? 'Say who you are first'
+      ? t.sayWhoFirst
       : undefined
   const stopped = typeof starting === 'object' ? starting : undefined
 
   return (
     <StepFrame
       step="review"
-      title="Review and start Pace"
-      lead="Check who can ask and what Pace can use. Everything here can be changed later in Settings."
+      title={t.title}
+      lead={t.lead}
       footer={
         <>
           <Button
@@ -203,7 +201,7 @@ export function ReviewStep({
             disabled={busy}
             onClick={() => onChange('slack')}
           >
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {blocked && !busy && (
@@ -215,14 +213,14 @@ export function ReviewStep({
           >
             {busy && <LoaderCircle className="animate-spin" />}
             {starting === 'waiting' && waitingForSandbox
-              ? `Waiting for the sandbox, ${percent}%`
+              ? t.waitingForSandbox(percent)
               : busy
-                ? 'Starting Pace'
+                ? t.startingPace
                 : stopped
-                  ? 'Try again'
+                  ? t.tryAgain
                   : waitingForSandbox
-                    ? 'Start once the sandbox is ready'
-                    : 'Start Pace'}
+                    ? t.startOnceReady
+                    : t.start}
           </Button>
         </>
       }
@@ -235,7 +233,7 @@ export function ReviewStep({
                 variant="outline"
                 onClick={() => onChange(stopped.step!, stopped.part)}
               >
-                Change {STEP_LABELS[stopped.step]}
+                {t.changeStep(stepLabel(stopped.step))}
               </Button>
             )
           }
@@ -248,7 +246,7 @@ export function ReviewStep({
           details={background.details}
           action={
             <Button variant="outline" onClick={() => sandbox.run('vm')}>
-              Try again
+              {t.tryAgain}
             </Button>
           }
         >
@@ -272,32 +270,28 @@ export function ReviewStep({
           className="flex flex-col gap-1.5 rounded-xl bg-well px-5 py-4"
           data-from-mac-review
         >
-          <b className="text-section">From {record.fromMac.name}</b>
+          <b className="text-section">{t.fromMac(record.fromMac.name)}</b>
           <span className="text-body text-muted-foreground">
-            Your Slack app, who Pace answers and how Todo collects. The AI and
-            where it runs are this Mac's own, chosen in the steps before.
+            {t.fromMacWhat}
           </span>
           <span className="text-meta text-muted-foreground">
-            Your Macs: Pace follows the Mac you're using. When you start Pace
-            here, it moves to this Mac.
+            {t.fromMacFollows}
           </span>
         </section>
       )}
       <section className="flex flex-col gap-2.5 rounded-xl bg-well px-5 py-4">
-        <b className="text-section">Who can ask Pace</b>
+        <b className="text-section">{t.whoCanAsk}</b>
         <span className="flex flex-wrap items-center gap-2">
           {unknown ? (
             <span className="text-body text-status-failed">
-              {allowed.length > 1
-                ? 'Pace answers only you now, and the settings name more than one person.'
-                : "Pace doesn't know who you are yet."}{' '}
+              {allowed.length > 1 ? t.moreThanOne : t.unknown}{' '}
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => onChange('slack', 'me')}
                 className="font-semibold text-primary hover:underline"
               >
-                Show Pace it's you
+                {t.showItsYou}
               </button>
             </span>
           ) : (
@@ -309,53 +303,50 @@ export function ReviewStep({
                 id={hub ? undefined : owner}
               />
               <span className="text-body text-muted-foreground">
-                Only you. Teammates each pair a Pace of their own through your
-                team's hub.
+                {t.onlyYou}
               </span>
             </>
           )}
         </span>
         <span className="flex items-center gap-2 text-body text-muted-foreground">
           <Lock className="size-3.5 shrink-0" />
-          Pace answers only in public channels. Private channels and direct
-          messages are refused.
+          {t.publicOnly}
         </span>
       </section>
 
       <dl className="flex flex-col rounded-xl ring-1 ring-border">
         <Row
-          label="AI service"
+          label={t.aiService}
           onChange={busy ? undefined : () => onChange('ai')}
         >
-          {SERVICE[backend]}
-          {cli && (cli.signedIn ? ', signed in' : ', not signed in')}
+          {t.serviceState(SERVICE[backend], cli?.signedIn)}
         </Row>
         <Row
-          label="Runs in"
+          label={t.runsIn}
           onChange={busy ? undefined : () => onChange('runtime')}
         >
           {vm ? (
             <>
-              Built-in sandbox
+              {t.sandbox}
               {sandbox.ready || sandbox.job?.state === 'succeeded' ? (
                 <Chip tone="ok" className="ml-2">
-                  Ready
+                  {t.ready}
                 </Chip>
               ) : sandbox.preparing ? (
                 <Chip tone="working" className="ml-2">
-                  Preparing, {percent}%
+                  {t.preparing(percent)}
                 </Chip>
               ) : background ? (
                 <Chip tone="failed" className="ml-2">
-                  Stopped
+                  {t.stopped}
                 </Chip>
               ) : null}
             </>
           ) : (
             <>
-              This Mac
+              {t.thisMac}
               <Chip tone="warn" className="ml-2">
-                No isolation
+                {t.noIsolation}
               </Chip>
             </>
           )}
@@ -364,22 +355,17 @@ export function ReviewStep({
           label="Slack"
           onChange={busy ? undefined : () => onChange('slack')}
         >
-          {hub
-            ? `Through the hub at ${values?.HUB_URL ?? ''}`
-            : 'Your own Slack app'}
+          {hub ? t.throughHub(values?.HUB_URL ?? '') : t.ownApp}
         </Row>
         {vm && (
-          <Row label="Diagrams">
+          <Row label={t.diagrams}>
             <span className="flex flex-1 items-center gap-3">
-              <span className="flex-1">
-                Mermaid and chart blocks in answers become images, made in the
-                sandbox
-              </span>
+              <span className="flex-1">{t.diagramsWhat}</span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={diagramsOn}
-                aria-label="Diagrams"
+                aria-label={t.diagrams}
                 disabled={busy}
                 onClick={() => setDiagrams(!diagramsOn)}
                 className={cn(
@@ -397,18 +383,16 @@ export function ReviewStep({
             </span>
           </Row>
         )}
-        <Row label="Ops tools">
-          <span className="text-muted-foreground">
-            Off. GitHub, Jira, Kubernetes and SSH are in Settings when you need
-            them.
-          </span>
+        <Row label={t.opsTools}>
+          <span className="text-muted-foreground">{t.opsOff}</span>
         </Row>
-        <Row label="Run history">
+        <Row label={t.runHistory}>
           <span className="text-muted-foreground">
-            Kept on this Mac, in{' '}
-            <PathText
-              path={homePath(settings.view?.dataDir ?? '~/.pacenote')}
-            />
+            {t.keptIn(
+              <PathText
+                path={homePath(settings.view?.dataDir ?? '~/.pacenote')}
+              />
+            )}
           </span>
         </Row>
       </dl>
@@ -439,9 +423,10 @@ const homePath = (dir: string) => dir.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
 /** You, the one who may ask: by the name Slack showed, or your member ID */
 function Person({ name, id }: { name?: string; id?: string }) {
+  const t = useText(text)
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-copy ring-1 ring-border">
-      You
+      {t.you}
       {name ? (
         <span className="text-body text-muted-foreground">@{name}</span>
       ) : (
@@ -464,6 +449,7 @@ function Row({
   onChange?: () => void
   children: React.ReactNode
 }) {
+  const t = useText(text)
   return (
     <div className="flex min-h-12 items-center gap-4 border-b border-border px-5 py-2.5 text-copy last:border-b-0">
       <dt className="w-28 shrink-0 font-semibold text-muted-foreground">
@@ -476,7 +462,7 @@ function Row({
           onClick={onChange}
           className="text-body font-semibold text-primary hover:underline"
         >
-          Change
+          {t.change}
         </button>
       )}
     </div>

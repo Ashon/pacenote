@@ -310,13 +310,15 @@ describe('adding tasks from an AI tool', () => {
       expect(connectors.claude.prefix).toMatch(/^mcp__claude_ai_\w+__$/)
       // codex's app: only it is turned on for a collection
       expect(connectors.codex.app).toMatch(/^asdk_app_\w+$/)
-      expect(Object.keys(reads).length).toBeGreaterThan(0)
-      for (const tool of Object.keys(reads)) {
+      expect(reads.length).toBeGreaterThan(0)
+      for (const tool of reads) {
         expect(writes).not.toContain(tool)
-        expect(lookupLabel(tool)).toBe(reads[tool])
+        expect(lookupLabel(tool)).toMatch(/^[A-Z]\w+ /)
         // As codex names it
-        expect(lookupLabel(`${id}.${tool}`)).toBe(reads[tool])
+        expect(lookupLabel(`${id}.${tool}`)).toBe(lookupLabel(tool))
       }
+      expect(lookupLabel('slack_read_thread')).toBe('Read a thread')
+      expect(lookupLabel(`${id}.slack_send_message`)).toBeUndefined()
     }
   })
 

@@ -4,7 +4,9 @@ import { Fragment } from 'react'
 import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatNumber } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './run-facts.text'
 
 /** Parts both run details use: a figure in the facts row, and empty tabs */
 export function Fact({
@@ -53,12 +55,13 @@ export function UsageTip({
   /** The reasoner reports cache writes (claude does, codex does not) */
   cacheWrite: boolean
 }) {
+  const t = useText(text)
   const total = totalTokens(usage)
   const rows: [string, string][] = [
-    ['New input', formatNumber(usage.input)],
-    ['Cache read', formatNumber(usage.cacheRead)],
-    ['Cache write', cacheWrite ? formatNumber(usage.cacheWrite) : '-'],
-    ['Output', formatNumber(usage.output)],
+    [t.newInput, formatNumber(usage.input)],
+    [t.cacheRead, formatNumber(usage.cacheRead)],
+    [t.cacheWrite, cacheWrite ? formatNumber(usage.cacheWrite) : '-'],
+    [t.output, formatNumber(usage.output)],
   ]
   return (
     <div className="w-48 tabular-nums">
@@ -78,14 +81,14 @@ export function UsageTip({
         ))}
       </div>
       <div className="mt-1.5 flex justify-between border-t border-background/15 pt-1.5 opacity-65">
-        <span>{formatNumber(total)} in total</span>
+        <span>{t.total(formatNumber(total))}</span>
         {total > 0 && (
-          <span>{Math.round((usage.cacheRead / total) * 100)}% cached</span>
+          <span>{t.cached(Math.round((usage.cacheRead / total) * 100))}</span>
         )}
       </div>
       {usage.costUsd !== undefined && usage.costUsd > 0 && (
         <div className="mt-0.5 opacity-65">
-          ${usage.costUsd.toFixed(3)} at API prices
+          {t.apiPrice(usage.costUsd.toFixed(3))}
         </div>
       )}
     </div>

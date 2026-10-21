@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import type { Locale } from '../i18n/locale.js'
 import { allTaskViews, readJson, readTasks, writeJson } from '../tasks/store.js'
 import { readWork } from '../tasks/work.js'
 import {
@@ -45,7 +46,8 @@ export function changeYou(
  * You, counted from your tasks and your sessions on this Mac (with a home):
  * the areas kept, with any your work adds, and what is going on in each.
  * keep: write the areas it adds (the desktop app); the MCP server only reads.
- * audience: count only what it may hear of (Pace in a channel).
+ * audience: count only what it may hear of (Pace in a channel). locale: the
+ * language of its words, the app's unless given (English for an AI tool).
  */
 export async function countYou(options: {
   dataDir: string
@@ -53,6 +55,7 @@ export async function countYou(options: {
   keep?: boolean
   audience?: Audience
   now?: number
+  locale?: Locale
 }): Promise<YouView> {
   const { dataDir } = options
   const now = options.now ?? Date.now()
@@ -80,7 +83,8 @@ export async function countYou(options: {
     areasFor(file.areas, audience),
     signals,
     readWork(dataDir).entries,
-    now
+    now,
+    options.locale
   )
   const slack = readTasks(dataDir).you
   return {

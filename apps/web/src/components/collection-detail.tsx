@@ -1,10 +1,6 @@
-import {
-  collectionTitle,
-  TRIGGER_LABEL,
-  type CollectionRunRecord,
-} from '@history/types'
+import { collectionTitle, type CollectionRunRecord } from '@history/types'
 import { newTokens, runUsage } from '@history/usage'
-import { CLI_NAMES, isOwnCli, UNABLE_WORDS } from '@src/tasks/own-ai'
+import { CLI_NAMES, isOwnCli, unableWords } from '@src/tasks/own-ai'
 import type { TaskStatus } from '@src/tasks/types'
 import {
   CircleCheck,
@@ -36,13 +32,16 @@ import {
   type LookupGroup,
 } from '@history/collection-steps'
 import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
+import { useLocale, useText } from '@/lib/i18n'
 import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { switchLine } from './own-ai-status'
 import { CodeBlock } from './code-block'
+import { text } from './collection-detail.text'
 import { PacenoteMark } from './logo'
 import { Empty, Fact, UsageTip } from './run-facts'
 import { StatusBadge } from './status'
+import { recordText } from '@src/history/record-text'
 
 /**
  * A task collection's run. No chat bubbles: how it started, what it did to
@@ -50,6 +49,8 @@ import { StatusBadge } from './status'
  * the Slack connector returned is not in the record, so it is not shown.
  */
 export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
+  const t = useText(text)
+  const locale = useLocale()
   const lookups = lookupGroups(run)
   return (
     <Tabs defaultValue="result" className="flex h-full min-h-0 flex-col">
@@ -59,10 +60,10 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
             <StatusBadge status={run.status} />
             <Badge variant="secondary">
               <ListChecks />
-              Task collection
+              {t.taskCollection}
             </Badge>
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">{TRIGGER_LABEL[run.trigger]}</span>
+              <span className="truncate">{t.trigger[run.trigger]}</span>
               <span className="text-muted-foreground/60">·</span>
               <span className="shrink-0 tabular-nums">
                 {formatDateTime(run.startedAt)}
@@ -76,22 +77,22 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
             >
               <a href="#/tasks">
                 <ListChecks />
-                Open Todo
+                {t.openTodo}
               </a>
             </Button>
           </div>
           <h1 className="mt-2.5 line-clamp-2 text-title leading-snug select-text">
-            {collectionTitle(run)}
+            {collectionTitle(run, locale)}
           </h1>
           <TabsList className="mt-4 mb-3">
-            <TabsTrigger value="result">Result</TabsTrigger>
+            <TabsTrigger value="result">{t.tabResult}</TabsTrigger>
             <TabsTrigger value="lookups">
-              Lookups
+              {t.tabLookups}
               <span className="rounded-sm bg-muted px-1 text-caption tabular-nums">
                 {run.reads ?? 0}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="rules">Rules</TabsTrigger>
+            <TabsTrigger value="rules">{t.tabRules}</TabsTrigger>
             <TabsTrigger value="raw">JSON</TabsTrigger>
           </TabsList>
         </div>
@@ -122,6 +123,7 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
 
 /** Duration, lookups, tokens, the reasoner, and how it read Slack */
 function CollectionFacts({ run }: { run: CollectionRunRecord }) {
+  const t = useText(text)
   const usage = runUsage(run.events)
   const duration = run.durationMs ?? Date.now() - Date.parse(run.startedAt)
   const reads = run.reads ?? 0
@@ -129,29 +131,29 @@ function CollectionFacts({ run }: { run: CollectionRunRecord }) {
     <div className="mb-8 grid grid-cols-2 gap-y-4 border-b border-border pb-6 @min-[40rem]:grid-cols-5">
       <Fact
         icon={<Timer />}
-        label={run.status === 'running' ? 'Elapsed' : 'Duration'}
+        label={run.status === 'running' ? t.elapsed : t.duration}
         value={formatDuration(duration)}
       />
       <Fact
         icon={<Search />}
-        label="Lookups"
+        label={t.lookups}
         value={String(reads)}
-        hint="in Slack, read only"
+        hint={t.lookupsHint}
       />
       <Fact
         icon={<Coins />}
-        label="Tokens"
-        value={usage ? `${formatTokens(newTokens(usage))} new` : '-'}
+        label={t.tokens}
+        value={usage ? t.newTokens(formatTokens(newTokens(usage))) : '-'}
         hint={
           usage?.cacheRead
-            ? `+${formatTokens(usage.cacheRead)} from cache`
+            ? t.fromCache(formatTokens(usage.cacheRead))
             : undefined
         }
         tip={usage && <UsageTip usage={usage} cacheWrite />}
       />
       <Fact
         icon={<Cpu />}
-        label="Collected by"
+        label={t.collectedBy}
         value={
           isOwnCli(run.backend.reasoner)
             ? CLI_NAMES[run.backend.reasoner]
@@ -159,35 +161,36 @@ function CollectionFacts({ run }: { run: CollectionRunRecord }) {
         }
         hint={
           run.switched
-            ? `${CLI_NAMES[run.switched.from]} ${UNABLE_WORDS[run.switched.unable]}`
+            ? `${CLI_NAMES[run.switched.from]} ${unableWords(run.switched.unable)}`
             : run.backend.sandbox === 'host'
-              ? 'on your Mac'
+              ? t.onYourMac
               : undefined
         }
         tip={run.switched && switchLine(run.switched)}
       />
       <Fact
         icon={<Plug />}
-        label="Read Slack as"
-        value={reads ? 'You' : '-'}
+        label={t.readSlackAs}
+        value={reads ? t.you : '-'}
         hint={
           reads
             ? run.backend.reasoner === 'codex'
-              ? "ChatGPT's Slack app"
-              : "Claude's connector"
-            : 'Nothing read'
+              ? t.chatGptApp
+              : t.claudeConnector
+            : t.nothingRead
         }
       />
     </div>
   )
 }
 
-const STATE: Record<TaskStatus, { label: string; className: string }> = {
-  open: { label: 'Open', className: 'text-primary' },
-  maybe: { label: 'Maybe', className: 'text-muted-foreground' },
-  done: { label: 'Done', className: 'text-muted-foreground' },
-  dismissed: { label: 'Dismissed', className: 'text-muted-foreground' },
-  closed: { label: 'Closed', className: 'text-muted-foreground' },
+/** Where a task is now, by its color; its words are in text */
+const STATE: Record<TaskStatus, string> = {
+  open: 'text-primary',
+  maybe: 'text-muted-foreground',
+  done: 'text-muted-foreground',
+  dismissed: 'text-muted-foreground',
+  closed: 'text-muted-foreground',
 }
 
 /**
@@ -195,10 +198,11 @@ const STATE: Record<TaskStatus, { label: string; className: string }> = {
  * task is now
  */
 function Result({ run }: { run: CollectionRunRecord }) {
+  const t = useText(text)
   const tasks = useTasks().data?.tasks ?? []
   const now = new Map(tasks.map((task) => [task.id, task.status]))
   if (run.status === 'running')
-    return <Empty>Collecting: {run.reads ?? 0} lookups so far.</Empty>
+    return <Empty>{t.collecting(run.reads ?? 0)}</Empty>
   if (!run.found) return <Stopped run={run} />
   const { added, closed, updated, wrapped, skipped } = collectionResult(run)
   if (
@@ -208,31 +212,22 @@ function Result({ run }: { run: CollectionRunRecord }) {
     !wrapped.length &&
     !skipped.length
   )
-    return (
-      <p className="text-copy text-muted-foreground">
-        Nothing new to add, and no open task changed or closed.
-      </p>
-    )
+    return <p className="text-copy text-muted-foreground">{t.nothingNew}</p>
   const maybes = added.filter((task) => task.confidence === 'maybe').length
   return (
     <div className="space-y-7">
       {added.length > 0 && (
         <Section
           icon={<ListPlus className="text-primary" />}
-          title="Added"
-          meta={[
-            `${added.length - maybes} ${added.length - maybes === 1 ? 'task' : 'tasks'}`,
-            maybes ? `${maybes} ${maybes === 1 ? 'Maybe' : 'Maybes'}` : '',
-          ]
-            .filter(Boolean)
-            .join(', ')}
+          title={t.added}
+          meta={t.addedMeta(added.length - maybes, maybes)}
         >
           {added.map((task) => (
             <TaskRow
               key={task.id}
               id={task.id}
               title={task.title}
-              meta={task.confidence === 'maybe' ? 'Maybe' : undefined}
+              meta={task.confidence === 'maybe' ? t.maybe : undefined}
               state={now.get(task.id)}
             />
           ))}
@@ -241,15 +236,15 @@ function Result({ run }: { run: CollectionRunRecord }) {
       {closed.length > 0 && (
         <Section
           icon={<CircleCheck className="text-primary" />}
-          title="Closed"
-          meta={`${closed.length} ${closed.length === 1 ? 'task' : 'tasks'}`}
+          title={t.closed}
+          meta={t.tasks(closed.length)}
         >
           {closed.map((task) => (
             <TaskRow
               key={task.id}
               id={task.id}
               title={task.title}
-              meta={[WHY[task.why] ?? task.why, task.wrapUp]
+              meta={[t.why[task.why] ?? task.why, task.wrapUp]
                 .filter(Boolean)
                 .join(' · ')}
               state={now.get(task.id)}
@@ -260,8 +255,8 @@ function Result({ run }: { run: CollectionRunRecord }) {
       {updated.length > 0 && (
         <Section
           icon={<PencilLine className="text-primary" />}
-          title="Updated"
-          meta={`${updated.length} ${updated.length === 1 ? 'task' : 'tasks'}`}
+          title={t.updated}
+          meta={t.tasks(updated.length)}
         >
           {updated.map((task, index) => (
             <TaskRow
@@ -277,8 +272,8 @@ function Result({ run }: { run: CollectionRunRecord }) {
       {wrapped.length > 0 && (
         <Section
           icon={<ClipboardCheck className="text-primary" />}
-          title="Wrapped up"
-          meta={`${wrapped.length} ${wrapped.length === 1 ? 'task' : 'tasks'}`}
+          title={t.wrappedUp}
+          meta={t.tasks(wrapped.length)}
         >
           {wrapped.map((task) => (
             <TaskRow
@@ -294,27 +289,21 @@ function Result({ run }: { run: CollectionRunRecord }) {
       {skipped.length > 0 && (
         <Section
           icon={<EyeOff className="text-muted-foreground" />}
-          title="Left out by your settings"
-          meta={`${skipped.length} ${skipped.length === 1 ? 'message' : 'messages'}`}
+          title={t.leftOut}
+          meta={t.messages(skipped.length)}
         >
           {skipped.map((item, index) => (
             <li
               key={`${item.link ?? ''}-${index}`}
               className="border-t border-border py-3 text-body text-muted-foreground"
             >
-              {item.why ?? 'Left out in Settings > Todo'}
+              {item.why ?? t.leftOutInSettings}
             </li>
           ))}
         </Section>
       )}
     </div>
   )
-}
-
-const WHY: Record<string, string> = {
-  replied: 'You replied in its thread',
-  checked: 'Its message got a check mark',
-  resolved: 'Settled another way',
 }
 
 function Section({
@@ -351,6 +340,7 @@ function TaskRow({
   meta?: string
   state?: TaskStatus
 }) {
+  const t = useText(text)
   return (
     <li className="flex items-start gap-4 border-t border-border py-3">
       <div className="min-w-0 flex-1">
@@ -363,8 +353,8 @@ function TaskRow({
         {meta && <p className="mt-1 text-meta text-muted-foreground">{meta}</p>}
       </div>
       {state && (
-        <span className={cn('shrink-0 text-meta', STATE[state].className)}>
-          {STATE[state].label}
+        <span className={cn('shrink-0 text-meta', STATE[state])}>
+          {t.state[state]}
         </span>
       )}
     </li>
@@ -373,30 +363,29 @@ function TaskRow({
 
 /** A collection that did not finish: why, and what to do about it */
 function Stopped({ run }: { run: CollectionRunRecord }) {
-  const connector = /slack connector/i.test(run.error ?? '')
+  const t = useText(text)
+  // Records from before unable was kept say so only in their (English) words
+  const connector =
+    run.unable === 'connector' || /slack connector/i.test(run.error ?? '')
   return (
     <div className="space-y-5">
       <div className="flex gap-2 rounded-xl bg-status-failed/10 px-4 py-3 text-copy">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-status-failed" />
         <div className="min-w-0">
           <p className="font-medium text-status-failed">
-            {run.status === 'interrupted' ? 'Stopped' : 'Could not finish'}
+            {run.status === 'interrupted' ? t.stopped : t.couldNotFinish}
           </p>
           <p className="mt-0.5 text-copy break-words">
-            {run.error ?? 'The collection stopped before it finished.'}
+            {run.error ? recordText(run.error) : t.stoppedEarly}
           </p>
           {connector && (
             <p className="mt-1.5 text-meta text-muted-foreground">
-              A collection reads Slack as you, through your AI tool&apos;s
-              connector. Pace&apos;s own Slack connection answers mentions and
-              is not used here.
+              {t.connectorNote}
             </p>
           )}
         </div>
       </div>
-      <p className="text-copy text-muted-foreground">
-        Nothing was added or closed.
-      </p>
+      <p className="text-copy text-muted-foreground">{t.nothingChanged}</p>
     </div>
   )
 }
@@ -409,15 +398,17 @@ function Lookups({
   run: CollectionRunRecord
   groups: LookupGroup[]
 }) {
-  if (!groups.length) return <Empty>This collection made no lookups.</Empty>
+  const t = useText(text)
+  if (!groups.length) return <Empty>{t.noLookups}</Empty>
   return (
     <div>
       <p className="mb-3 text-body text-muted-foreground">
-        {run.reads ?? 0} lookups in Slack
-        {run.durationMs !== undefined
-          ? ` in ${formatDuration(run.durationMs)}`
-          : ''}
-        . Pacenote&apos;s own tools gave the rules and took the tasks.
+        {t.lookupsIntro(
+          run.reads ?? 0,
+          run.durationMs !== undefined
+            ? formatDuration(run.durationMs)
+            : undefined
+        )}
       </p>
       <ol>
         {groups.map((group, index) => (
@@ -444,7 +435,7 @@ function Lookups({
                 </span>
                 {group.failed > 0 && (
                   <span className="text-caption text-status-failed">
-                    {group.failed} failed
+                    {t.failed(group.failed)}
                   </span>
                 )}
               </span>
@@ -464,8 +455,7 @@ function Lookups({
       </ol>
       <p className="mt-4 flex items-start gap-2 rounded-xl bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
-        What Slack returned is not kept: it is your messages. The record keeps
-        which tool ran, when and for how long.
+        {t.notKept}
       </p>
     </div>
   )
@@ -482,8 +472,9 @@ function LookupIcon({ group }: { group: LookupGroup }) {
 
 /** What collect_context gave it: the rules, since when, DMs, channels out */
 function Rules({ run }: { run: CollectionRunRecord }) {
+  const t = useText(text)
   const { rules } = collectionResult(run)
-  if (!rules) return <Empty>This collection did not get the rules.</Empty>
+  if (!rules) return <Empty>{t.noRules}</Empty>
   let shown = rules
   try {
     shown = JSON.stringify(JSON.parse(rules), null, 2)
@@ -491,10 +482,6 @@ function Rules({ run }: { run: CollectionRunRecord }) {
     // Cut at the record's length: shown as it is.
   }
   return (
-    <CodeBlock
-      label="What Pacenote gave it (collect_context)"
-      code={shown}
-      maxHeight="max-h-[70vh]"
-    />
+    <CodeBlock label={t.rulesLabel} code={shown} maxHeight="max-h-[70vh]" />
   )
 }

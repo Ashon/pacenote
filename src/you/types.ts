@@ -93,6 +93,17 @@ export interface YouView {
   at: string
 }
 
+/**
+ * How a task ended, or where it stands, before it is put in words
+ * (src/tasks/context.ts): done-already is for the screens that count a task
+ * dismissed as done already as your work
+ */
+export type Outcome =
+  | { kind: 'done-in'; by: string; note?: string }
+  | { kind: 'done'; tool?: WorkTool }
+  | { kind: 'replied' | 'checked' | 'settled' | 'dismissed' | 'done-already' }
+  | { kind: 'worked'; tool: WorkTool }
+
 /** The area a task is in, for its row */
 export interface TaskArea {
   id: string
@@ -119,6 +130,17 @@ export interface RecapItem {
   note?: string
   /** The task it is, to open it */
   task?: string
+  /** A request to Pace (a run), rather than a task or a commit */
+  run?: true
+  // What the title and note are worded from, so a prompt can word them in
+  // English whatever the screen's language
+  /** A run's request, its first line */
+  request?: string
+  /** A task done: how it ended */
+  outcome?: Outcome
+  /** An open task: who asked, and when it is due (the AI's words) */
+  askedBy?: string
+  due?: string
   area?: TaskArea
 }
 

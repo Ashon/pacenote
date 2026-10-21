@@ -2,12 +2,15 @@ import { CircleAlert, CircleCheck, Download, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { useText } from '@/lib/i18n'
 import type { Detected, useSandboxSetup } from '@/lib/setup'
 import { cn } from '@/lib/utils'
+import { localized } from '@src/i18n/locale'
 import type { SettingsView } from '@src/settings/fields'
 import type { SetupPart } from '@src/sandbox/vm-progress'
 import { SandboxSignIn } from '../sandbox-sign-in'
 import { ChoiceCard, Chip, Note, Problem, StepFrame } from './parts'
+import { text } from './runtime-step.text'
 
 type Runtime = 'vm' | 'none'
 
@@ -18,12 +21,13 @@ type Runtime = 'vm' | 'none'
 export function preparingProblem(
   sandbox: ReturnType<typeof useSandboxSetup>
 ): { text: string; details?: string } | undefined {
+  const t = localized(text)
   if (sandbox.error?.kind === 'vm' && !sandbox.preparing)
-    return { text: `Preparing couldn't start. ${sandbox.error.message}` }
+    return { text: t.couldNotStart(sandbox.error.message) }
   if (sandbox.job?.state !== 'failed' || sandbox.ready) return undefined
   const part = sandbox.progress?.parts.find((each) => each.state === 'failed')
   return {
-    text: `Preparing stopped${part ? ` at "${part.label}"` : ''}. Check your network and that the disk has about 1.5 GB free, then try again.`,
+    text: t.stopped(part?.label),
     details: sandbox.job.output.slice(-12).join('\n'),
   }
 }
@@ -51,6 +55,7 @@ export function RuntimeStep({
   onBack: () => void
   onDone: () => void
 }) {
+  const t = useText(text)
   const unsupported = detected?.sandbox.unsupported
   const backend =
     settings.view?.values.REASONER === 'codex' ? 'codex' : 'claude'
@@ -98,32 +103,26 @@ export function RuntimeStep({
   return (
     <StepFrame
       step="runtime"
-      title="Where should Pace work out answers?"
-      lead="Pace answers messages other people write. Choose how much of this Mac it can see while it works."
+      title={t.title}
+      lead={t.lead}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {error && <p className="text-body text-status-failed">{error}</p>}
           <Button onClick={() => void use()} disabled={saving}>
             {saving && <LoaderCircle className="animate-spin" />}
-            {runtime === 'vm'
-              ? 'Use the built-in sandbox'
-              : 'Run directly on this Mac'}
+            {runtime === 'vm' ? t.useSandbox : t.runDirectly}
           </Button>
         </>
       }
     >
-      {unsupported && (
-        <Note>
-          {unsupported} For now Pace can only run directly on this Mac.
-        </Note>
-      )}
+      {unsupported && <Note>{t.unsupported(unsupported)}</Note>}
       <div
         role="radiogroup"
-        aria-label="Where Pace runs"
+        aria-label={t.runtimeLabel}
         className="grid grid-cols-1 gap-3 @min-[34rem]:grid-cols-2"
       >
         <ChoiceCard
@@ -134,22 +133,17 @@ export function RuntimeStep({
           onChoose={() => setChosen('vm')}
         >
           <span className="flex items-center gap-2">
-            <b className="text-section">Built-in sandbox</b>
+            <b className="text-section">{t.sandbox}</b>
             {unsupported ? (
-              <Chip tone="neutral">Not on this Mac</Chip>
+              <Chip tone="neutral">{t.notOnThisMac}</Chip>
             ) : (
-              <Chip tone="accent">Recommended</Chip>
+              <Chip tone="accent">{t.recommended}</Chip>
             )}
           </span>
-          <Point good>A small Linux VM per request, removed after</Point>
+          <Point good>{t.vmPerRequest}</Point>
+          <Point good>{backend === 'codex' ? t.noFilesCodex : t.noFiles}</Point>
           <Point good>
-            {backend === 'codex'
-              ? "Can't see your files, only your codex login"
-              : "Can't see your files or your logins"}
-          </Point>
-          <Point good>
-            Reaches only {backend === 'codex' ? 'ChatGPT' : 'Claude'} and the
-            sites you allow
+            {t.reachesOnly(backend === 'codex' ? 'ChatGPT' : 'Claude')}
           </Point>
         </ChoiceCard>
         <ChoiceCard
@@ -158,12 +152,10 @@ export function RuntimeStep({
           checked={runtime === 'none'}
           onChoose={() => setChosen('none')}
         >
-          <b className="text-section">Directly on this Mac</b>
-          <Point>Nothing to install or prepare</Point>
-          <Point warn>
-            Uses your own login and can read the files you point it to
-          </Point>
-          <Point warn>No isolation, so diagrams and tools stay off</Point>
+          <b className="text-section">{t.directly}</b>
+          <Point>{t.nothingToInstall}</Point>
+          <Point warn>{t.ownLogin}</Point>
+          <Point warn>{t.noIsolation}</Point>
         </ChoiceCard>
       </div>
       {runtime === 'vm' && (
@@ -173,7 +165,7 @@ export function RuntimeStep({
               details={problem.details}
               action={
                 <Button variant="outline" onClick={() => sandbox.run('vm')}>
-                  Try again
+                  {t.tryAgain}
                 </Button>
               }
             >
@@ -182,29 +174,16 @@ export function RuntimeStep({
           )}
           <p className="flex items-start gap-2.5 text-body text-muted-foreground">
             <Download className="mt-px size-4 shrink-0" />
-            {sandbox.ready ? (
-              <span>
-                <b className="font-semibold text-foreground">Ready:</b> it was
-                prepared on this Mac already.
-              </span>
-            ) : sandbox.preparing ? (
-              <span>
-                <b className="font-semibold text-foreground">
-                  Already preparing,{' '}
-                  {Math.round((sandbox.progress?.fraction ?? 0) * 100)}%:
-                </b>{' '}
-                it started when setup opened, and carries on while you connect
-                Slack. About 300 MB to download, 1.5 GB of disk.
-              </span>
-            ) : (
-              <span>
-                <b className="font-semibold text-foreground">
-                  First time only:
-                </b>{' '}
-                downloads about 300 MB and uses about 1.5 GB of disk. It
-                prepares in the background while you connect Slack.
-              </span>
-            )}
+            <span>
+              {sandbox.ready
+                ? t.ready(bold)
+                : sandbox.preparing
+                  ? t.alreadyPreparing(
+                      bold,
+                      Math.round((sandbox.progress?.fraction ?? 0) * 100)
+                    )
+                  : t.firstTime(bold)}
+            </span>
           </p>
           <SandboxLogin
             cli={backend}
@@ -221,6 +200,11 @@ export function RuntimeStep({
     </StepFrame>
   )
 }
+
+/** The lead-in of a line, in bold */
+const bold = (text: string) => (
+  <b className="font-semibold text-foreground">{text}</b>
+)
 
 function Point({
   good,
@@ -268,24 +252,22 @@ export function SandboxLogin({
   /** Pace cannot answer without it: said beside its name */
   required?: boolean
 }) {
+  const t = useText(text)
   const name = cli === 'claude' ? 'Claude' : 'Codex'
   return (
     <div className="flex flex-col gap-2 rounded-xl px-4 py-3.5 ring-1 ring-border">
       <span className="flex flex-wrap items-center gap-2">
-        <b className="text-section">The sandbox needs its own {name} sign-in</b>
-        {required && !signedIn && <Chip tone="warn">Required</Chip>}
+        <b className="text-section">{t.ownSignIn(name)}</b>
+        {required && !signedIn && <Chip tone="warn">{t.required}</Chip>}
         {signedIn && (
           <Chip tone="ok">
             <CircleCheck />
-            Signed in
+            {t.signedIn}
           </Chip>
         )}
       </span>
       {later && !signedIn && (
-        <span className="text-body text-muted-foreground">
-          Pace needs it to answer from the sandbox. Sign in now, or before Pace
-          starts.
-        </span>
+        <span className="text-body text-muted-foreground">{t.signInLater}</span>
       )}
       <SandboxSignIn
         cli={cli}
@@ -297,14 +279,15 @@ export function SandboxLogin({
   )
 }
 
-const PART_CHIP: Record<
+/** How each part's state looks; its words are in the text */
+const PART_TONE: Record<
   SetupPart['state'],
-  { tone: 'ok' | 'working' | 'failed' | 'neutral'; text: string }
+  'ok' | 'working' | 'failed' | 'neutral'
 > = {
-  done: { tone: 'ok', text: 'Ready' },
-  working: { tone: 'working', text: 'Working' },
-  failed: { tone: 'failed', text: 'Failed' },
-  waiting: { tone: 'neutral', text: 'Next' },
+  done: 'ok',
+  working: 'working',
+  failed: 'failed',
+  waiting: 'neutral',
 }
 
 /** 2b. The sandbox being prepared, which setup need not wait for */
@@ -319,6 +302,7 @@ function Preparing({
   onDone: () => void
   retry: () => void
 }) {
+  const t = useText(text)
   const progress = sandbox.progress
   const problem = preparingProblem(sandbox)
   const failed = Boolean(problem)
@@ -328,23 +312,23 @@ function Preparing({
   return (
     <StepFrame
       step="runtime"
-      title="Preparing the built-in sandbox"
-      lead="The first time takes a few minutes. You don't have to wait here: keep going with setup, and this carries on in the background."
+      title={t.preparingTitle}
+      lead={t.preparingLead}
       footer={
         <>
           <Button variant="ghost" onClick={onBack}>
-            Back
+            {t.back}
           </Button>
           <span className="flex-1" />
           {failed ? (
             <>
               <Button variant="ghost" onClick={onDone}>
-                Continue setup
+                {t.continueSetup}
               </Button>
-              <Button onClick={retry}>Try again</Button>
+              <Button onClick={retry}>{t.tryAgain}</Button>
             </>
           ) : (
-            <Button onClick={onDone}>Continue setup</Button>
+            <Button onClick={onDone}>{t.continueSetup}</Button>
           )}
         </>
       }
@@ -352,16 +336,16 @@ function Preparing({
       <div className="flex flex-col gap-2.5 rounded-xl bg-well px-5 py-4">
         <span aria-live="polite" className="text-section">
           {failed
-            ? 'Preparing stopped'
+            ? t.preparingStopped
             : done
-              ? 'The built-in sandbox is ready'
+              ? t.isReady
               : working
                 ? `${working.doing}…`
-                : 'Starting…'}
+                : t.starting}
         </span>
         <div
           role="progressbar"
-          aria-label="Preparing the built-in sandbox"
+          aria-label={t.preparingTitle}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
@@ -375,10 +359,7 @@ function Preparing({
             style={{ width: `${Math.max(percent, 4)}%` }}
           />
         </div>
-        <span className="text-meta text-muted-foreground">
-          Done once. After this, each request starts its sandbox in about a
-          second.
-        </span>
+        <span className="text-meta text-muted-foreground">{t.doneOnce}</span>
       </div>
       <ul className="flex flex-col">
         {progress?.parts.map((part) => (
@@ -395,20 +376,17 @@ function Preparing({
             >
               {part.label}
             </span>
-            <Chip tone={PART_CHIP[part.state].tone}>
+            <Chip tone={PART_TONE[part.state]}>
               {part.state === 'working' && (
                 <LoaderCircle className="animate-spin" />
               )}
-              {PART_CHIP[part.state].text}
+              {t.parts[part.state]}
             </Chip>
           </li>
         ))}
       </ul>
       {problem && <Problem details={problem.details}>{problem.text}</Problem>}
-      <Note>
-        Quitting Pacenote pauses this, and it picks up where it stopped next
-        time.
-      </Note>
+      <Note>{t.quitPauses}</Note>
     </StepFrame>
   )
 }

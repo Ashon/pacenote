@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LOCALES, type Locale } from '../i18n/locale.js'
 import { isSecureOrLocalUrl, slackApiBase } from '../messengers/slack/api.js'
 import type { LogLevel } from '../logger.js'
 
@@ -53,6 +54,8 @@ const HubEnvSchema = z.object({
   HUB_PUBLIC_URL: z.string().url().optional(),
   /** Members who may pair and use the hub. Empty: everyone in the workspace */
   HUB_ALLOWED_USERS: userIds,
+  /** The language of the notes the hub posts in Slack: en, ko */
+  HUB_NOTES_LANGUAGE: z.enum(LOCALES).default('en'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
 
@@ -66,6 +69,8 @@ export interface HubConfig {
   dataDir: string
   publicUrl?: string
   allowedUsers: string[]
+  /** The language of the notes the hub posts in Slack */
+  notesLocale: Locale
   logLevel: LogLevel
 }
 
@@ -92,6 +97,7 @@ export function loadHubConfig(env: NodeJS.ProcessEnv): HubConfig {
     dataDir: e.HUB_DATA_DIR,
     publicUrl: e.HUB_PUBLIC_URL,
     allowedUsers: e.HUB_ALLOWED_USERS,
+    notesLocale: e.HUB_NOTES_LANGUAGE,
     logLevel: e.LOG_LEVEL,
   }
 }

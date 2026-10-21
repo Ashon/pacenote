@@ -7,6 +7,13 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   platform: process.platform,
   // Runs from the repository (Pacenote Dev), as opposed to the installed app.
   dev: process.argv.includes('--pacenote-dev'),
+  // The app's language: the one chosen in Settings, or macOS's. Read before
+  // the first paint, so the window opens in it.
+  language: {
+    initial: ipcRenderer.sendSync('pacenote:app:language') as unknown,
+    set: (preference: string) =>
+      ipcRenderer.invoke('pacenote:app:set-language', preference),
+  },
   // The error screen tells the app's log what broke.
   reportError: (report: { message: string; stack?: string }) =>
     ipcRenderer.invoke('pacenote:app:report-error', report),

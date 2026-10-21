@@ -131,6 +131,6 @@ process.stdin.once('data', (chunk) => {
       image: 'reasoner',
     })
     const result = await login.start(() => login.cancel())
-    expect(result).toEqual({ ok: false, error: 'Cancelled.' })
+    expect(result).toEqual({ ok: false, error: 'Cancelled.', cancelled: true })
   })
 })

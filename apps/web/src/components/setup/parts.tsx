@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useText } from '@/lib/i18n'
 import { SETUP_STEPS, type SetupStep } from '@/lib/setup'
 import { cn } from '@/lib/utils'
+import { text as partsText } from './parts.text'
 
 /**
  * One step of setup: which step it is, the question, a line on why it
@@ -28,6 +30,7 @@ export function StepFrame({
   children: React.ReactNode
   footer: React.ReactNode
 }) {
+  const t = useText(partsText)
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => heading.current?.focus({ preventScroll: true }), [])
   return (
@@ -37,7 +40,7 @@ export function StepFrame({
             of a paragraph, and a title or lead in even lines. */}
         <div className="@container mx-auto max-w-3xl px-10 pt-9 pb-8 text-pretty">
           <p className="text-body font-semibold text-primary">
-            Step {SETUP_STEPS.indexOf(step) + 1} of {SETUP_STEPS.length}
+            {t.stepOf(SETUP_STEPS.indexOf(step) + 1, SETUP_STEPS.length)}
             {part && ` · ${part}`}
           </p>
           <h1
@@ -144,6 +147,7 @@ export function CommandLine({
   /** On a well already: set off from it */
   raised?: boolean
 }) {
+  const t = useText(partsText)
   const [copied, setCopied] = useState(false)
   useEffect(() => {
     if (!copied) return
@@ -163,13 +167,13 @@ export function CommandLine({
       <Button
         size="sm"
         variant="outline"
-        aria-label={`Copy ${text}`}
+        aria-label={t.copyLabel(text)}
         onClick={() =>
           void navigator.clipboard.writeText(text).then(() => setCopied(true))
         }
       >
         {copied ? <Check /> : <Copy />}
-        {copied ? 'Copied' : 'Copy'}
+        {copied ? t.copied : t.copy}
       </Button>
     </span>
   )
@@ -198,6 +202,7 @@ export function Problem({
   action?: React.ReactNode
   details?: string
 }) {
+  const t = useText(partsText)
   return (
     <div
       role="alert"
@@ -211,7 +216,7 @@ export function Problem({
       {details && (
         <details className="group pl-7">
           <summary className="cursor-pointer text-meta font-semibold text-muted-foreground hover:text-foreground">
-            Details
+            {t.details}
           </summary>
           <pre className="mt-1.5 max-h-32 overflow-auto rounded-xl bg-well px-3 py-2 font-mono text-meta whitespace-pre-wrap text-muted-foreground">
             {details}

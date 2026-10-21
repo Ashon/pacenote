@@ -1,5 +1,5 @@
-import { SETTING_FIELDS, setupSettingsRoute } from '@src/settings/fields'
-import type { BotStatus, LogLine, SupervisorState } from '@runtime/types'
+import { settingLabel, setupSettingsRoute } from '@src/settings/fields'
+import type { LogLine, SupervisorState } from '@runtime/types'
 import {
   ArrowDownToLine,
   Bot,
@@ -29,24 +29,15 @@ import {
 import { useBotLogs, useBotStatus } from '@/lib/api'
 import { botControl, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './bot-page.text'
 import { botKnown, describeBot, TONE_CLASS, type BotTone } from './bot-state'
 import { CodeBlock } from './code-block'
 import { PaceSpinner } from './pace-spinner'
 
-/** A setting as the Settings screen names it; one it does not show, by name */
-const settingLabel = (key: string) =>
-  SETTING_FIELDS.find((field) => field.key === key)?.label ?? key
-
-const SOCKET_LABEL: Record<BotStatus['socket']['state'], string> = {
-  connecting: 'connecting',
-  connected: 'connected',
-  reconnecting: 'reconnecting',
-  disconnecting: 'disconnecting',
-  disconnected: 'disconnected',
-}
-
 export function BotPage() {
+  const t = useText(text)
   const { data: view } = useBotStatus()
   const supervisor = useSupervisor()
   const control = botControl()
@@ -84,9 +75,12 @@ export function BotPage() {
               </h1>
               <p className="mt-0.5 text-copy text-muted-foreground">
                 {status
-                  ? `Socket Mode ${SOCKET_LABEL[status.socket.state]} ${formatRelative(status.socket.since)}` +
-                    `, ${status.socket.reconnects} ${status.socket.reconnects === 1 ? 'reconnect' : 'reconnects'}`
-                  : 'The process that receives your Slack mentions and answers them.'}
+                  ? t.socketLine(
+                      t.socket[status.socket.state],
+                      formatRelative(status.socket.since),
+                      status.socket.reconnects
+                    )
+                  : t.intro}
               </p>
             </div>
             <Controls supervisor={supervisor} />
@@ -113,30 +107,32 @@ export function BotPage() {
             </div>
           )}
           <div className="mt-6 grid grid-cols-2 gap-y-5 @min-[44rem]:grid-cols-4">
-            <Info icon={<Bot />} label="Bot account" known={Boolean(view)}>
+            <Info icon={<Bot />} label={t.botAccount} known={Boolean(view)}>
               {status?.bot ? `@${status.bot.user}` : '-'}
               <Sub>{status?.bot?.team}</Sub>
             </Info>
-            <Info icon={<Cpu />} label="Reasoner" known={Boolean(view)}>
+            <Info icon={<Cpu />} label={t.reasoner} known={Boolean(view)}>
               {status?.reasoner ?? '-'}
               <Sub>
                 {status
-                  ? `MCP ${status.mcp?.length ? status.mcp.join(', ') : 'none'} / diagrams ${status.diagrams ? 'on' : 'off'}`
+                  ? t.mcpLine(status.mcp ?? [], Boolean(status.diagrams))
                   : undefined}
               </Sub>
             </Info>
-            <Info icon={<Inbox />} label="Requests" known={Boolean(view)}>
-              {status ? `${status.requests.active} active` : '-'}
+            <Info icon={<Inbox />} label={t.requests} known={Boolean(view)}>
+              {status ? t.active(status.requests.active) : '-'}
               <Sub>
                 {status
-                  ? `${status.requests.handled} handled since start` +
-                    (status.requests.lastAt
-                      ? `, last ${formatRelative(status.requests.lastAt)}`
-                      : '')
+                  ? t.handled(
+                      status.requests.handled,
+                      status.requests.lastAt
+                        ? formatRelative(status.requests.lastAt)
+                        : undefined
+                    )
                   : undefined}
               </Sub>
             </Info>
-            <Info icon={<Square />} label="Process" known={Boolean(view)}>
+            <Info icon={<Square />} label={t.process} known={Boolean(view)}>
               {status
                 ? `pid ${status.pid}`
                 : supervisor?.pid
@@ -144,7 +140,10 @@ export function BotPage() {
                   : '-'}
               <Sub>
                 {status
-                  ? `${status.managedBy === 'desktop' ? 'Desktop app' : 'Terminal'}, up ${formatDuration(Date.now() - Date.parse(status.startedAt))}`
+                  ? t.processLine(
+                      status.managedBy === 'desktop',
+                      formatDuration(Date.now() - Date.parse(status.startedAt))
+                    )
                   : undefined}
               </Sub>
             </Info>
@@ -183,7 +182,7 @@ export function BotPage() {
               supervisor.phase === 'building') && (
               <CodeBlock
                 className="mt-3"
-                label="Last output"
+                label={t.lastOutput}
                 code={supervisor.output.slice(-40).join('\n')}
                 maxHeight="max-h-48"
               />
@@ -201,6 +200,7 @@ export function BotPage() {
  * with when the app tries again; anything else is a quiet note.
  */
 function Notice({ supervisor }: { supervisor: SupervisorState }) {
+  const t = useText(text)
   const { phase, message, issues, retryAt } = supervisor
   const tone =
     phase === 'setup'
@@ -241,7 +241,7 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
           onClick={() => (window.location.hash = setupSettingsRoute(issues))}
         >
           <Settings />
-          Open Settings
+          {t.openSettings}
         </Button>
       )}
     </div>
@@ -250,6 +250,7 @@ function Notice({ supervisor }: { supervisor: SupervisorState }) {
 
 /** When the app starts Pace again, counting down */
 function RetryCountdown({ at }: { at: number }) {
+  const t = useText(text)
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1_000)
@@ -259,8 +260,8 @@ function RetryCountdown({ at }: { at: number }) {
   return (
     <p>
       {seconds <= 0
-        ? 'Starting it again now.'
-        : `Starting it again in ${seconds < 60 ? `${seconds}s` : formatDuration(seconds * 1_000)}.`}
+        ? t.startingNow
+        : t.startingIn(seconds, formatDuration(seconds * 1_000))}
     </p>
   )
 }
@@ -332,6 +333,7 @@ function StopSign({ className }: { className?: string }) {
 }
 
 function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
+  const t = useText(text)
   const control = botControl()
   const [pending, setPending] = useState(false)
   if (control && !supervisor)
@@ -344,9 +346,9 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
   if (!control || !supervisor) {
     return (
       <p className="shrink-0 text-right text-meta text-muted-foreground">
-        Start and stop Pace
+        {t.desktopOnly[0]}
         <br />
-        from the desktop app.
+        {t.desktopOnly[1]}
       </p>
     )
   }
@@ -372,7 +374,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             onClick={() => run(() => control.start())}
           >
             <Play />
-            {waiting ? 'Start now' : 'Start'}
+            {waiting ? t.startNow : t.start}
           </Button>
         )}
         {live && (
@@ -383,7 +385,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             onClick={() => run(() => control.restart())}
           >
             <RotateCw />
-            Restart
+            {t.restart}
           </Button>
         )}
         {supervisor.canBuild && (
@@ -394,7 +396,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             onClick={() => run(() => control.restart(true))}
           >
             <Hammer />
-            Rebuild and restart
+            {t.rebuild}
           </Button>
         )}
         {(live || waiting) && (
@@ -405,7 +407,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
             onClick={() => run(() => control.stop())}
           >
             <Square />
-            Stop
+            {t.stop}
           </Button>
         )}
       </div>
@@ -459,14 +461,9 @@ function Sub({ children }: { children?: React.ReactNode }) {
   )
 }
 
-type LogView = 'all' | 'socket' | 'mention' | 'problems'
+export type LogView = 'all' | 'socket' | 'mention' | 'problems'
 
-const LOG_VIEWS: { value: LogView; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'socket', label: 'Socket Mode' },
-  { value: 'mention', label: 'Mentions' },
-  { value: 'problems', label: 'Warnings and errors' },
-]
+const LOG_VIEWS: LogView[] = ['all', 'socket', 'mention', 'problems']
 
 const matchesView = (line: LogLine, view: LogView) => {
   const scope = line.scope ?? ''
@@ -495,6 +492,7 @@ const LEVEL_CLASS: Record<string, string> = {
 }
 
 function LogPanel() {
+  const t = useText(text)
   const [view, setView] = useState<LogView>('all')
   const [q, setQ] = useState('')
   const [follow, setFollow] = useState(true)
@@ -518,21 +516,21 @@ function LogPanel() {
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b px-10 py-2.5">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="text-row">Logs</span>
+          <span className="text-row">{t.logs}</span>
           <div className="ml-2 flex gap-1">
             {LOG_VIEWS.map((item) => (
               <button
-                key={item.value}
+                key={item}
                 type="button"
-                onClick={() => setView(item.value)}
+                onClick={() => setView(item)}
                 className={cn(
                   'h-6 rounded-full px-2.5 text-meta font-medium transition-colors',
-                  view === item.value
+                  view === item
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 )}
               >
-                {item.label}
+                {t.views[item]}
               </button>
             ))}
           </div>
@@ -541,7 +539,7 @@ function LogPanel() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search logs"
+              placeholder={t.searchLogs}
               className="h-7 pl-7 text-meta"
             />
           </div>
@@ -552,13 +550,13 @@ function LogPanel() {
             aria-pressed={follow}
           >
             <ArrowDownToLine />
-            Follow
+            {t.follow}
           </Button>
           {botControl() && (
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Open logs folder"
+              aria-label={t.openLogs}
               onClick={() => void botControl()?.openLogs()}
             >
               <FolderOpen />
@@ -587,7 +585,7 @@ function LogPanel() {
             ))}
             {(data !== undefined || isError) && lines.length === 0 && (
               <p className="py-10 text-center font-sans text-copy text-muted-foreground">
-                {isError ? 'Could not load logs.' : 'No logs to show.'}
+                {isError ? t.logsFailed : t.noLogs}
               </p>
             )}
           </div>

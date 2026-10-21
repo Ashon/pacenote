@@ -1,4 +1,6 @@
+import { localized } from '../../i18n/locale.js'
 import { slackApiBase } from './api.js'
+import { text } from './check.text.js'
 
 /**
  * With OPTIONAL_BOT_SCOPES, must match oauth_config.scopes.bot in
@@ -29,9 +31,24 @@ export function missingScopes(
 }
 
 export interface SlackCheckItem {
+  /** What was checked, for code to find it by; label is for people */
+  id:
+    | 'tokens'
+    | 'botToken'
+    | 'botScopes'
+    | 'sameApp'
+    | 'socketMode'
+    // The team hub's check (src/hub/client.ts)
+    | 'hub'
+    | 'pairing'
+    | 'bot'
   label: string
   ok: boolean
   detail?: string
+  /** botToken: the workspace the bot is in */
+  team?: string
+  /** botScopes: the required scopes the bot lacks */
+  missing?: string[]
 }
 
 interface SlackResponse {
@@ -72,15 +89,17 @@ export async function checkSlackTokens(
   tokens: { botToken?: string; appToken?: string; apiUrl?: string },
   fetchImpl: typeof fetch = fetch
 ): Promise<SlackCheckItem[]> {
+  const t = localized(text)
   const items: SlackCheckItem[] = []
   const { botToken, appToken } = tokens
   const base = slackApiBase(tokens.apiUrl)
   if (!botToken || !appToken) {
     return [
       {
-        label: 'Tokens',
+        id: 'tokens',
+        label: t.tokens,
         ok: false,
-        detail: 'Both the bot token and the app token are required.',
+        detail: t.bothTokens,
       },
     ]
   }
@@ -90,13 +109,20 @@ export async function checkSlackTokens(
   try {
     const { body, headers } = await call(fetchImpl, base, 'auth.test', botToken)
     if (!body.ok) {
-      items.push({ label: 'Bot token', ok: false, detail: body.error })
+      items.push({
+        id: 'botToken',
+        label: t.botToken,
+        ok: false,
+        detail: body.error,
+      })
     } else {
       botId = body.bot_id as string | undefined
       items.push({
-        label: 'Bot token',
+        id: 'botToken',
+        label: t.botToken,
         ok: true,
         detail: `${String(body.user)} (${String(body.user_id)}) @ ${String(body.team)}`,
+        team: String(body.team),
       })
       const granted = (headers.get('x-oauth-scopes') ?? '')
         .split(',')
@@ -105,17 +131,24 @@ export async function checkSlackTokens(
       const missing = missingScopes(REQUIRED_BOT_SCOPES, granted)
       const optional = missingScopes(OPTIONAL_BOT_SCOPES, granted)
       items.push({
-        label: 'Bot scopes',
+        id: 'botScopes',
+        label: t.botScopes,
         ok: missing.length === 0,
+        ...(missing.length ? { missing } : {}),
         detail: missing.length
-          ? `Missing: ${missing.join(', ')}`
+          ? t.missingScopes(missing)
           : optional.length
-            ? `Missing ${optional.join(', ')}: only the asker sees that Pace is working or failed, instead of 👀 and ⚠️ on their mention. Add it from the manifest and reinstall the app.`
+            ? t.missingOptional(optional)
             : undefined,
       })
     }
   } catch (err) {
-    items.push({ label: 'Bot token', ok: false, detail: failure(err) })
+    items.push({
+      id: 'botToken',
+      label: t.botToken,
+      ok: false,
+      detail: failure(err),
+    })
   }
 
   const appIdFromToken = appToken.split('-')[2]
@@ -126,12 +159,18 @@ export async function checkSlackTokens(
       })
       const appId = (body.bot as { app_id?: string } | undefined)?.app_id
       items.push({
-        label: 'Same app',
+        id: 'sameApp',
+        label: t.sameApp,
         ok: body.ok && appId === appIdFromToken,
-        detail: `bot=${appId ?? '?'}, app token=${appIdFromToken ?? '?'}`,
+        detail: t.appIds(appId ?? '?', appIdFromToken ?? '?'),
       })
     } catch (err) {
-      items.push({ label: 'Same app', ok: false, detail: failure(err) })
+      items.push({
+        id: 'sameApp',
+        label: t.sameApp,
+        ok: false,
+        detail: failure(err),
+      })
     }
   }
 
@@ -143,12 +182,18 @@ export async function checkSlackTokens(
       appToken
     )
     items.push({
-      label: 'Socket Mode',
+      id: 'socketMode',
+      label: t.socketMode,
       ok: body.ok,
-      detail: body.ok ? 'Connection URL issued (not connected)' : body.error,
+      detail: body.ok ? t.urlIssued : body.error,
     })
   } catch (err) {
-    items.push({ label: 'Socket Mode', ok: false, detail: failure(err) })
+    items.push({
+      id: 'socketMode',
+      label: t.socketMode,
+      ok: false,
+      detail: failure(err),
+    })
   }
   return items
 }

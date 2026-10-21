@@ -1,5 +1,6 @@
 import type { AppMentionEvent } from '@slack/types'
 import type { WebClient } from '@slack/web-api'
+import { localized, type Locale } from '../../i18n/locale.js'
 import type { Logger } from '../../logger.js'
 import type {
   ContextMessage,
@@ -30,6 +31,7 @@ import {
   stripBotMention,
   toSlackMrkdwn,
 } from './format.js'
+import { text } from './messenger.text.js'
 
 /** Messages before a mention outside a thread, for context */
 const ROOT_CONTEXT_MESSAGES = 10
@@ -47,14 +49,14 @@ const REACTIONS: Record<Mark, string> = {
   failed: 'warning',
 }
 /**
- * Why reactions do not work, by error, as the status shows it. Pace tells the
- * asker alone instead, which works, so these are limits rather than faults.
+ * The errors that keep reactions from working, which the status shows (worded
+ * in messenger.text.ts). Pace tells the asker alone instead, which works, so
+ * these are limits rather than faults.
  */
-const REACTION_LIMITS: Record<string, string> = {
-  missing_scope:
-    'Slack: the app does not have reactions:write, so only the asker sees that Pace is working or failed, in messages for them alone, instead of 👀 and ⚠️ on their mention. Adding the scope (slack-app-manifest.yaml) and reinstalling the app turns reactions on.',
-  method_not_allowed_by_hub:
-    'Slack: the team hub does not relay reactions, so only the asker sees that Pace is working or failed, in messages for them alone, instead of 👀 and ⚠️ on their mention. Updating the hub turns reactions on.',
+type ReactionLimit = keyof (typeof text)[Locale]['reactionLimits']
+
+function isReactionLimit(error: string): error is ReactionLimit {
+  return Object.hasOwn(text.en.reactionLimits, error)
 }
 
 export interface SlackMessengerOptions {
@@ -73,6 +75,8 @@ export interface SlackMessengerOptions {
   scopes?: readonly string[]
   /** Called when limits changes */
   onLimits?: () => void
+  /** The language of Pace's own notes in Slack (NOTES_LANGUAGE). English */
+  notesLocale?: Locale
   log: Logger
   fetchImpl?: typeof fetch
 }
@@ -92,7 +96,7 @@ export class SlackMessenger implements Messenger {
   /** Reaction errors already logged, so each shows once */
   private readonly reactionWarnings = new Set<string>()
   /** Why reactions do not work, until one does */
-  private reactionLimit: string | undefined
+  private reactionLimit: ReactionLimit | undefined
 
   get owner(): string | undefined {
     return this.options.owner()
@@ -100,15 +104,18 @@ export class SlackMessenger implements Messenger {
 
   constructor(private readonly options: SlackMessengerOptions) {
     if (options.scopes && !options.scopes.includes('reactions:write'))
-      this.reactionLimit = REACTION_LIMITS.missing_scope
+      this.reactionLimit = 'missing_scope'
   }
 
   /**
    * What works in a reduced way, for the status: reactions without the scope,
-   * found at startup or when a reaction fails
+   * found at startup or when a reaction fails. In the language of the process
+   * when read.
    */
   get limits(): string[] {
-    return this.reactionLimit ? [this.reactionLimit] : []
+    return this.reactionLimit
+      ? [localized(text).reactionLimits[this.reactionLimit]]
+      : []
   }
 
   /**
@@ -145,7 +152,7 @@ export class SlackMessenger implements Messenger {
       : {
           label: channel.label,
           answerable: false,
-          refusal: 'I only answer in public channels.',
+          refusal: localized(text, this.options.notesLocale ?? 'en').publicOnly,
         }
   }
 
@@ -335,12 +342,13 @@ export class SlackMessenger implements Messenger {
       const error = slackError(err)
       // Still there from before a restart
       if (error === 'already_reacted') return true
-      const limit = REACTION_LIMITS[error]
+      const limit = isReactionLimit(error) ? error : undefined
       if (limit) this.setReactionLimit(limit)
       this.warnReaction(
         error,
-        limit ??
-          `Could not react to a mention (${error}); telling the asker alone instead.`
+        limit
+          ? localized(text, 'en').reactionLimits[limit]
+          : `Could not react to a mention (${error}); telling the asker alone instead.`
       )
       return false
     }
@@ -379,7 +387,7 @@ export class SlackMessenger implements Messenger {
       : undefined
   }
 
-  private setReactionLimit(limit: string | undefined): void {
+  private setReactionLimit(limit: ReactionLimit | undefined): void {
     if (limit === this.reactionLimit) return
     this.reactionLimit = limit
     this.options.onLimits?.()

@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
+import { useText } from '@/lib/i18n'
 import { useTasksPush } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { BotPage } from './components/bot-page'
@@ -29,6 +30,7 @@ import { YouPage } from './components/you-page'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
 import { SetupWizard } from './components/setup/wizard'
+import { text } from './App.text'
 
 /**
  * The Debug section is only in builds made for development: the Vite dev
@@ -280,14 +282,13 @@ function SidebarToggle({
   forced: boolean
   onToggle: () => void
 }) {
+  const t = useText(text)
   const key = isMac ? '⌘B' : 'Ctrl+B'
-  const label = compact ? 'Show sidebar labels' : 'Hide sidebar labels'
+  const label = compact ? t.showLabels : t.hideLabels
   return (
     <Tooltip
       side="bottom"
-      content={
-        forced ? 'The window is too narrow for labels' : `${label} (${key})`
-      }
+      content={forced ? t.tooNarrow : t.withKey(label, key)}
     >
       <button
         type="button"
@@ -326,6 +327,7 @@ function RunsPage({
   width: number
   onSelect: (id?: string) => void
 }) {
+  const t = useText(text)
   const [listWidth, setListWidth] = useStoredWidth(
     'pacenote.runList.width',
     LIST_WIDTH.default
@@ -346,7 +348,7 @@ function RunsPage({
           className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border px-4 text-row text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
-          Runs
+          {t.runs}
         </button>
         <div className="min-h-0 flex-1">
           <RunDetail key={selectedId} id={selectedId} />
@@ -369,7 +371,7 @@ function RunsPage({
           max={listMax}
           onChange={setListWidth}
           onReset={() => setListWidth(LIST_WIDTH.default)}
-          label="Resize run list"
+          label={t.resizeRunList}
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -378,8 +380,7 @@ function RunsPage({
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-copy text-muted-foreground">
             <MousePointerClick className="size-5" strokeWidth={1.75} />
-            Pick a run to see what it did: what Pace was asked and how it
-            answered, or what a collection found.
+            {t.pickRun}
           </div>
         )}
       </div>

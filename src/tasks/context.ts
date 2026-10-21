@@ -1,3 +1,6 @@
+import { getLocale, localized, type Locale } from '../i18n/locale.js'
+import type { Outcome } from '../you/types.js'
+import { text } from './context.text.js'
 import type {
   RelatedRun,
   RelatedTask,
@@ -42,31 +45,77 @@ export function lastSession(
   )
 }
 
-/** How a task ended (or where it stands), in words; undefined when open */
-export function outcomeOf(
+/** How a task ended (or where it stands); undefined when open */
+export function outcomeFacts(
   task: TaskView,
   work: WorkEntry[]
-): string | undefined {
+): Outcome | undefined {
   const session = lastSession(work, task.id)
-  const where = session ? ` in ${TOOL_LABEL[session.tool]}` : ''
   if (task.status === 'closed' && task.closed) {
     const by = toolName(task.closed.by)
     if (by)
-      return [`Done in ${by}`, task.closed.note].filter(Boolean).join(' · ')
-    if (task.closed.why === 'replied') return 'You replied in the thread'
-    if (task.closed.why === 'checked') return 'Marked with a check'
-    return 'Settled in Slack'
+      return {
+        kind: 'done-in',
+        by,
+        ...(task.closed.note ? { note: task.closed.note } : {}),
+      }
+    if (task.closed.why === 'replied') return { kind: 'replied' }
+    if (task.closed.why === 'checked') return { kind: 'checked' }
+    return { kind: 'settled' }
   }
-  if (task.status === 'done') return `Done${where}`
-  if (task.status === 'dismissed') return 'Dismissed'
-  return session ? `Worked on${where}` : undefined
+  if (task.status === 'done')
+    return session ? { kind: 'done', tool: session.tool } : { kind: 'done' }
+  if (task.status === 'dismissed') return { kind: 'dismissed' }
+  return session ? { kind: 'worked', tool: session.tool } : undefined
 }
+
+/**
+ * An outcome in words, in the app's language unless one is given (English
+ * for an AI tool or a prompt)
+ */
+export function outcomeWords(
+  outcome: Outcome | undefined,
+  locale: Locale = getLocale()
+): string | undefined {
+  if (!outcome) return undefined
+  const t = localized(text, locale)
+  switch (outcome.kind) {
+    case 'done-in':
+      // The note is the AI tool's, as it closed the task
+      return [t.doneIn(outcome.by), outcome.note].filter(Boolean).join(' · ')
+    case 'done':
+      return outcome.tool ? t.doneIn(TOOL_LABEL[outcome.tool]) : t.done
+    case 'replied':
+      return t.replied
+    case 'checked':
+      return t.checked
+    case 'settled':
+      return t.settled
+    case 'dismissed':
+      return t.dismissed
+    case 'done-already':
+      return t.doneAlready
+    case 'worked':
+      return t.workedIn(TOOL_LABEL[outcome.tool])
+  }
+}
+
+/** How a task ended (or where it stands), in words; undefined when open */
+export const outcomeOf = (
+  task: TaskView,
+  work: WorkEntry[],
+  locale: Locale = getLocale()
+): string | undefined => outcomeWords(outcomeFacts(task, work), locale)
 
 /** The thread a task's message is in: its own ts when it starts one */
 export const threadOf = (task: Pick<TaskView, 'source'>) =>
   `${task.source.conversation}:${task.source.thread ?? task.source.message}`
 
-function related(task: TaskView, work: WorkEntry[]): RelatedTask {
+function related(
+  task: TaskView,
+  work: WorkEntry[],
+  locale: Locale
+): RelatedTask {
   return {
     id: task.id,
     title: task.title,
@@ -74,7 +123,7 @@ function related(task: TaskView, work: WorkEntry[]): RelatedTask {
     where: task.source.label,
     postedAt: task.postedAt,
     status: task.status,
-    outcome: outcomeOf(task, work),
+    outcome: outcomeOf(task, work, locale),
     wrapUp: task.wrapUp?.text,
     session: lastSession(work, task.id),
   }
@@ -82,13 +131,15 @@ function related(task: TaskView, work: WorkEntry[]): RelatedTask {
 
 /**
  * What came before a task. all: every task kept (the history too), work: the
- * work log, runs: Pace's runs in the task's thread
+ * work log, runs: Pace's runs in the task's thread; outcomes in the app's
+ * language unless one is given (English for an AI tool)
  */
 export function taskContext(
   task: TaskView,
   all: TaskView[],
   work: WorkEntry[],
-  runs: RelatedRun[] = []
+  runs: RelatedRun[] = [],
+  locale: Locale = getLocale()
 ): TaskContext {
   const others = all
     .filter((other) => other.id !== task.id)
@@ -116,13 +167,17 @@ export function taskContext(
   return {
     thread: {
       runs: runs.slice(0, SHOWN),
-      tasks: inThread.slice(0, SHOWN).map((other) => related(other, work)),
+      tasks: inThread
+        .slice(0, SHOWN)
+        .map((other) => related(other, work, locale)),
     },
     repo:
       task.repo && inRepo.length
         ? {
             name: task.repo,
-            tasks: inRepo.slice(0, SHOWN).map((other) => related(other, work)),
+            tasks: inRepo
+              .slice(0, SHOWN)
+              .map((other) => related(other, work, locale)),
           }
         : undefined,
     person:
@@ -131,7 +186,7 @@ export function taskContext(
             name: task.askedBy,
             tasks: fromPerson
               .slice(0, SHOWN)
-              .map((other) => related(other, work)),
+              .map((other) => related(other, work, locale)),
           }
         : undefined,
   }

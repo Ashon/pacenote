@@ -23,9 +23,11 @@ import { useMacs, whereAnswers } from '@/lib/macs'
 import { useSupervisor, useUpdate } from '@/lib/desktop'
 import { useTasks } from '@/lib/tasks'
 import { formatRelative } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { SkeletonWord } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { botKnown, describeBot, TONE_CLASS } from './bot-state'
+import { text } from './status-bar.text'
 
 /**
  * The window's footer: indicators to glance at from any screen, on the chrome
@@ -80,6 +82,7 @@ export function StatusBarView({
   onOpenRoute: (route: string) => void
   now?: number
 }) {
+  const t = useText(text)
   const where = whereAnswers(macs)
   // Pace just moved here: said for a few seconds where it came from
   const moved =
@@ -104,7 +107,7 @@ export function StatusBarView({
       {/* When setup is needed, Pace's status goes straight to the settings
           that fix it. */}
       <Item
-        tip={setup ? 'Open Settings to set up Pace' : "Pace's status and logs"}
+        tip={setup ? t.setupTip : t.statusTip}
         onClick={
           setup
             ? () => onOpenRoute(setupSettingsRoute(supervisor?.issues))
@@ -127,33 +130,33 @@ export function StatusBarView({
           />
         </span>
         <span className={cn('font-semibold', TONE_CLASS[tone].text)}>
-          Pace:{' '}
+          {t.pace}{' '}
           {botKnown(data, supervisor) ? label : <SkeletonWord width="4rem" />}
         </span>
       </Item>
       {where && (
         <Item
-          tip="Where Pace answers: the Mac you're using (Settings > Macs)"
+          tip={t.whereTip}
           onClick={() => onOpenRoute('#/settings/macs')}
           className={cn(moved && 'text-primary')}
         >
           {moved ? <ArrowRightLeft /> : <Laptop />}
           <span data-where-answers={where.here ? 'here' : 'other'}>
             {moved
-              ? `Pace moved here from ${moved.from}`
+              ? t.movedHere(moved.from)
               : where.moving
                 ? where.here
-                  ? 'Moving here…'
-                  : `Moving to ${where.other?.name ?? 'your other Mac'}…`
+                  ? t.movingHere
+                  : t.movingTo(where.other?.name)
                 : where.here
-                  ? 'Answering here'
-                  : `${where.other?.name ?? 'Your other Mac'} answers`}
+                  ? t.answeringHere
+                  : t.otherAnswers(where.other?.name)}
           </span>
         </Item>
       )}
       {status?.reasoner && (
         <Item
-          tip="Reasoner backend"
+          tip={t.reasonerTip}
           onClick={openBot}
           className="@max-[34rem]:hidden"
         >
@@ -162,10 +165,7 @@ export function StatusBarView({
         </Item>
       )}
       {tools.length > 0 && (
-        <Item
-          tip="Tools attached to the reasoner (MCP), diagram rendering"
-          className="min-w-0 shrink @max-[52rem]:hidden"
-        >
+        <Item tip={t.toolsTip} className="min-w-0 shrink @max-[52rem]:hidden">
           <Plug />
           <span className="truncate">{tools.join(', ')}</span>
         </Item>
@@ -177,8 +177,7 @@ export function StatusBarView({
           className="text-status-interrupted"
         >
           <TriangleAlert />
-          {problems.length}{' '}
-          {problems.length === 1 ? 'check issue' : 'check issues'}
+          {t.checkIssues(problems.length)}
         </Item>
       )}
 
@@ -187,40 +186,40 @@ export function StatusBarView({
           <Item
             tip={
               collecting.reads
-                ? `Collecting your tasks: ${collecting.reads} ${collecting.reads === 1 ? 'lookup' : 'lookups'} so far`
-                : 'Collecting your tasks'
+                ? t.collectingReads(collecting.reads)
+                : t.collectingTip
             }
             onClick={() => onOpenRoute('#/tasks')}
             className="text-status-running"
           >
             <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-            Collecting tasks
+            {t.collecting}
           </Item>
         )}
         {active > 0 && (
           <Item
-            tip="Requests in progress now"
+            tip={t.activeTip}
             onClick={openBot}
             className="text-status-running"
           >
             <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-            {active} active
+            {t.active(active)}
           </Item>
         )}
         {status?.requests.lastAt && (
           <Item
-            tip={`${status.requests.handled} handled since Pace started`}
+            tip={t.handledTip(status.requests.handled)}
             className="@max-[44rem]:hidden"
           >
             <Clock />
-            Last request {formatRelative(status.requests.lastAt)}
+            {t.lastRequest(formatRelative(status.requests.lastAt))}
           </Item>
         )}
         {/* Only the icon: the folder's path is in Settings > General. */}
         {openDataDir && (
           <Item
-            label="Open run history in Finder"
-            tip="Open run history in Finder"
+            label={t.openDataDir}
+            tip={t.openDataDir}
             onClick={() => void openDataDir()}
           >
             <FolderOpen />
@@ -228,12 +227,12 @@ export function StatusBarView({
         )}
         {update?.available && update.latest && (
           <Item
-            tip={`Pacenote ${update.latest.version} is out: how to update`}
+            tip={t.updateTip(update.latest.version)}
             onClick={() => onOpenRoute('#/settings/general')}
             className="text-primary"
           >
             <CircleArrowUp />
-            Update
+            {t.update}
           </Item>
         )}
         {/* Which Pacenote this is, for upgrades and bug reports */}
@@ -291,16 +290,16 @@ function Item({
  * releases)
  */
 function Version() {
+  const t = useText(text)
   const { version, describe } = __PACENOTE_BUILD__
   const dev = Boolean(window.pacenoteDesktop?.dev)
-  const where = dev ? ', running from the repository' : ''
   if (!describe) {
     const notes = `https://github.com/Ashon/pacenote/releases/tag/v${version}`
     return dev ? (
-      <Item tip={`Pacenote ${version}${where}`}>v{version}</Item>
+      <Item tip={t.versionDev(version)}>v{version}</Item>
     ) : (
       <Item
-        tip={`Pacenote ${version}: open its release notes`}
+        tip={t.versionNotes(version)}
         onClick={() => window.open(notes, '_blank')}
       >
         v{version}
@@ -310,13 +309,9 @@ function Version() {
   // v0.3.9-3-g2034e74-dirty: 3 commits after v0.3.9, uncommitted changes
   const [, base = describe, ahead, hash, dirty] =
     /^(v.+?)(?:-(\d+)-g([0-9a-f]+))?(-dirty)?$/.exec(describe) ?? []
-  const parts = [
-    ahead ? `${ahead} commits after ${base} (${hash})` : `at ${base}`,
-    ...(dirty ? ['with uncommitted changes'] : []),
-  ]
   return (
     <Item
-      tip={`Pacenote built from git: ${parts.join(', ')}${where}`}
+      tip={t.gitBuild({ base, ahead, hash, dirty: Boolean(dirty), dev })}
       className="@max-[40rem]:hidden"
     >
       {describe}

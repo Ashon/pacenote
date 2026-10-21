@@ -7,9 +7,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
+import { useText } from '@/lib/i18n'
 import type { Detected } from '@/lib/setup'
 import type { SettingsView } from '@src/settings/fields'
 import type { CliCheck } from '@src/settings/setup'
+import { text } from './ai-step.text'
 import { ChoiceCard, Chip, CommandLine, Note, StepFrame } from './parts'
 
 type Backend = 'claude' | 'codex'
@@ -18,7 +20,6 @@ const SERVICES: Record<
   Backend,
   {
     name: string
-    plans: string
     command: string
     /** What signs it in, typed in Terminal */
     signIn: string
@@ -27,14 +28,12 @@ const SERVICES: Record<
 > = {
   claude: {
     name: 'Claude',
-    plans: 'Pro, Max, Team or Enterprise',
     command: 'claude',
     signIn: 'claude auth login',
     install: 'https://docs.anthropic.com/en/docs/claude-code/setup',
   },
   codex: {
     name: 'ChatGPT',
-    plans: 'Plus, Pro or Business, through Codex',
     command: 'codex',
     signIn: 'codex login',
     install: 'https://developers.openai.com/codex/cli',
@@ -61,6 +60,7 @@ export function AiStep({
   settings?: SettingsView
   onDone: () => void
 }) {
+  const t = useText(text)
   const cli = detect.detected?.cli
   const saved = settings?.values.REASONER as Backend | undefined
   const [chosen, setChosen] = useState<Backend>()
@@ -109,8 +109,8 @@ export function AiStep({
   return (
     <StepFrame
       step="ai"
-      title="Which AI service do you already use?"
-      lead="Pace answers with your own subscription, through that service's command-line tool. Pacenote doesn't bill you or manage the account."
+      title={t.title}
+      lead={t.lead}
       footer={
         <>
           <Button
@@ -121,7 +121,7 @@ export function AiStep({
             <RefreshCw
               className={detect.checking ? 'animate-spin' : undefined}
             />
-            Check again
+            {t.checkAgain}
           </Button>
           <span className="flex-1" />
           {error ? (
@@ -129,14 +129,12 @@ export function AiStep({
           ) : (
             cli &&
             !choice && (
-              <p className="text-body text-muted-foreground">
-                Sign in to one of them first
-              </p>
+              <p className="text-body text-muted-foreground">{t.signInFirst}</p>
             )
           )}
           <Button onClick={() => void use()} disabled={!choice || saving}>
             {saving && <LoaderCircle className="animate-spin" />}
-            {choice ? `Use ${SERVICES[choice].name}` : 'Continue'}
+            {choice ? t.use(SERVICES[choice].name) : t.continue}
           </Button>
         </>
       }
@@ -144,12 +142,12 @@ export function AiStep({
       {!cli ? (
         <p className="flex items-center gap-2 text-copy text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" />
-          Looking for Claude Code and Codex on this Mac
+          {t.looking}
         </p>
       ) : (
         <div
           role="radiogroup"
-          aria-label="AI service"
+          aria-label={t.serviceLabel}
           className="flex flex-col gap-3"
         >
           {(['claude', 'codex'] as const).map((backend) => (
@@ -164,34 +162,30 @@ export function AiStep({
         </div>
       )}
       <Note>
-        Connectors and account settings stay in{' '}
-        {choice ? SERVICES[choice].name : 'your AI service'}. Pacenote doesn't
-        set them up or change them.
-        {choice && cliReady(cli?.claude) && cliReady(cli?.codex) && (
-          <>
-            {' '}
-            With both here, {SERVICES[otherBackend(choice)].name} takes over
-            Todo and Recap when {SERVICES[choice].name} is at its limit.
-          </>
+        {t.note(
+          choice && SERVICES[choice].name,
+          choice && cliReady(cli?.claude) && cliReady(cli?.codex)
+            ? SERVICES[otherBackend(choice)].name
+            : undefined
         )}
       </Note>
       <Collapsible>
         <CollapsibleTrigger className="group inline-flex items-center gap-1.5 text-body font-semibold text-muted-foreground hover:text-foreground">
           <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-          Model and time limit
+          {t.modelAndLimit}
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="grid grid-cols-2 gap-4 pt-3">
             <label className="flex flex-col gap-1.5 text-body font-medium">
-              Model
+              {t.model}
               <Input
                 value={model ?? settings?.values.REASONER_MODEL ?? ''}
-                placeholder="Leave empty for the default"
+                placeholder={t.modelPlaceholder}
                 onChange={(e) => setModel(e.target.value)}
               />
             </label>
             <label className="flex flex-col gap-1.5 text-body font-medium">
-              Time limit (seconds)
+              {t.timeLimit}
               <Input
                 inputMode="numeric"
                 value={timeout ?? settings?.values.REASONER_TIMEOUT_SEC ?? ''}
@@ -217,6 +211,7 @@ function ServiceCard({
   checked: boolean
   onChoose: () => void
 }) {
+  const t = useText(text)
   const service = SERVICES[backend]
   const ready = cliReady(check)
   return (
@@ -229,44 +224,44 @@ function ServiceCard({
     >
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <b className="text-section">{service.name}</b>
-        <span className="text-body text-muted-foreground">{service.plans}</span>
+        <span className="text-body text-muted-foreground">
+          {t.plans[backend]}
+        </span>
         <span className="flex-1" />
         {ready ? (
-          <Chip tone="ok">Signed in</Chip>
+          <Chip tone="ok">{t.signedIn}</Chip>
         ) : !check.installed ? (
-          <Chip tone="neutral">Not on this Mac</Chip>
+          <Chip tone="neutral">{t.notOnThisMac}</Chip>
         ) : check.tooOld ? (
-          <Chip tone="warn">Too old</Chip>
+          <Chip tone="warn">{t.tooOldChip}</Chip>
         ) : (
-          <Chip tone="warn">Not signed in</Chip>
+          <Chip tone="warn">{t.notSignedIn}</Chip>
         )}
       </span>
       <span className="text-body text-muted-foreground">
         {ready ? (
-          <>
-            Found{' '}
+          t.found(
             <code className="rounded-sm bg-well px-1.5 font-mono text-meta">
               {service.command}
               {check.version && ` ${check.version}`}
-            </code>{' '}
-            on this Mac
-          </>
+            </code>
+          )
         ) : !check.installed ? (
           <>
-            Install it, then check again.{' '}
+            {t.installThen}{' '}
             <a
               href={service.install}
               target="_blank"
               rel="noreferrer"
               className="font-medium text-primary hover:underline"
             >
-              How to install {service.command}
+              {t.howToInstall(service.command)}
             </a>
           </>
         ) : check.tooOld ? (
-          `${service.command} ${check.version ?? ''} is too old for Pace. Update it, then check again.`
+          t.tooOld(service.command, check.version ?? '')
         ) : (
-          'Sign in from Terminal with this, and Pacenote sees it when you come back.'
+          t.signInHint
         )}
       </span>
       {check.installed && !check.tooOld && !ready && (

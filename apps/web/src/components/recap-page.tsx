@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatHourMinute, formatRelative, formatShortDay } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import {
   areaCounts,
   type CopyFormat,
@@ -52,18 +53,9 @@ import { areaHash } from '@/lib/you'
 import { taskHash } from '@/lib/tasks'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
+import { text } from './recap-page.text'
 
-const PERIODS: { value: RecapPeriod; label: string }[] = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-]
-
-const COPY: Record<RecapPeriod, string> = {
-  day: 'Copy as standup',
-  week: 'Copy as weekly update',
-  month: 'Copy as monthly recap',
-}
+const PERIODS: RecapPeriod[] = ['day', 'week', 'month']
 
 /** The period you looked at last, in this browser */
 const PERIOD_KEY = 'pacenote.recap.period'
@@ -98,6 +90,7 @@ export function RecapPage({
   /** The period's key; the current one when none */
   periodKey?: string
 }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.recap
   const recap = useRecap(period, periodKey)
   const write = useWriteRecap()
@@ -136,10 +129,8 @@ export function RecapPage({
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         {/* As tall as its buttons before they come */}
         <header className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-title">Recap</h1>
-          <span className="text-copy text-muted-foreground">
-            What you did, by day, week and month
-          </span>
+          <h1 className="text-title">{t.title}</h1>
+          <span className="text-copy text-muted-foreground">{t.subtitle}</span>
           <span className="flex-1" />
           {view && view.areas.length > 0 && (
             <span className="flex items-center gap-1.5">
@@ -151,7 +142,7 @@ export function RecapPage({
                   onClick={() => void writeUp()}
                 >
                   <PenLine />
-                  {writing ? 'Writing it up' : 'Write it up'}
+                  {writing ? t.writingItUp : t.writeItUp}
                 </Button>
               )}
               <CopyButton view={view} />
@@ -160,7 +151,7 @@ export function RecapPage({
         </header>
         {!bridge ? (
           <p className="mt-6 text-copy text-muted-foreground">
-            Recaps are counted by the desktop app.
+            {t.desktopOnly}
           </p>
         ) : (
           <>
@@ -169,10 +160,10 @@ export function RecapPage({
                 value={period}
                 onValueChange={(value) => choose(value as RecapPeriod)}
               >
-                <TabsList aria-label="Recap of">
-                  {PERIODS.map(({ value, label }) => (
+                <TabsList aria-label={t.recapOf}>
+                  {PERIODS.map((value) => (
                     <TabsTrigger key={value} value={value}>
-                      {label}
+                      {t.periods[value]}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -181,7 +172,7 @@ export function RecapPage({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={`The ${period} before`}
+                  aria-label={t.before(period)}
                   disabled={!view}
                   onClick={() => view && go(recapHash(period, view.prev))}
                 >
@@ -198,7 +189,7 @@ export function RecapPage({
                 <Button
                   size="icon-sm"
                   variant="ghost"
-                  aria-label={`The ${period} after`}
+                  aria-label={t.after(period)}
                   disabled={!view?.next}
                   onClick={() => view?.next && go(recapHash(period, view.next))}
                 >
@@ -236,6 +227,7 @@ export function RecapPage({
 }
 
 function CopyButton({ view }: { view: RecapView }) {
+  const t = useText(text)
   const [copied, setCopied] = useState(false)
   const copy = async (format: CopyFormat) => {
     await navigator.clipboard.writeText(recapText(view, format))
@@ -247,33 +239,33 @@ function CopyButton({ view }: { view: RecapView }) {
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant="outline">
           {copied ? <Check className="text-primary" /> : <Copy />}
-          {copied ? 'Copied' : COPY[view.period]}
+          {copied ? t.copied : t.copyAs[view.period]}
           <ChevronDown />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => void copy('markdown')}>
           <span className="flex flex-col">
-            {view.period === 'day' ? 'Standup' : 'As Markdown'}
+            {view.period === 'day' ? t.standup : t.asMarkdown}
             <span className="text-meta text-muted-foreground">
-              Each part with its lines
+              {t.markdownHint}
             </span>
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void copy('slack')}>
           <span className="flex flex-col">
-            For Slack
+            {t.forSlack}
             <span className="text-meta text-muted-foreground">
-              The same, in Slack's formatting
+              {t.slackHint}
             </span>
           </span>
         </DropdownMenuItem>
         {view.written && (
           <DropdownMenuItem onSelect={() => void copy('summary')}>
             <span className="flex flex-col">
-              The summary only
+              {t.summaryOnly}
               <span className="text-meta text-muted-foreground">
-                Just the sentences written up
+                {t.summaryHint}
               </span>
             </span>
           </DropdownMenuItem>
@@ -295,6 +287,7 @@ function RecapBody({
   arrived: boolean
   onWriteAgain: () => void
 }) {
+  const t = useText(text)
   const empty = view.areas.length === 0
   // While it is written, the text's place shows it being written; the text
   // takes that place when it comes.
@@ -311,14 +304,16 @@ function RecapBody({
         ) : (
           view.written && (
             <section
-              aria-label="Written up"
+              aria-label={t.writtenUp}
               className="mt-4 flex flex-col gap-1.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3"
             >
               <WrittenText text={view.written.text} arrived={arrived} />
               <div className="flex items-center gap-2">
                 <span className="text-meta text-muted-foreground">
-                  Written by {writerName(view.written.by)} from the lines below,
-                  with no tools · {formatRelative(view.written.at)}
+                  {t.writtenBy(
+                    writerName(view.written.by),
+                    formatRelative(view.written.at)
+                  )}
                   {view.written.switched && (
                     <span data-switch>
                       {' '}
@@ -327,7 +322,7 @@ function RecapBody({
                   )}
                 </span>
                 <Button size="xs" variant="ghost" onClick={onWriteAgain}>
-                  Write again
+                  {t.writeAgain}
                 </Button>
               </div>
             </section>
@@ -336,8 +331,7 @@ function RecapBody({
       </Swap>
       {empty ? (
         <p className="mt-5 border-t border-border py-8 text-copy text-muted-foreground">
-          Nothing here for this {view.period}. Tasks you settle, your commits
-          and your sessions show up here.
+          {t.empty(view.period)}
         </p>
       ) : view.period === 'day' && view.day ? (
         <DayBody view={view} />
@@ -357,6 +351,7 @@ const writerName = (by: string) => (isOwnCli(by) ? CLI_NAMES[by] : by)
  * first now (the other one while the chosen one rests)
  */
 function WritingUp() {
+  const t = useText(text)
   const [writer, setWriter] = useState<OwnCli>()
   useEffect(() => {
     void window.pacenoteDesktop?.ai.now().then((now) => {
@@ -365,15 +360,14 @@ function WritingUp() {
   }, [])
   return (
     <section
-      aria-label="Writing it up"
+      aria-label={t.writingItUp}
       aria-busy
       className="mt-4 flex items-start gap-3 rounded-xl bg-card-accent px-4 pt-3.5 pb-3.5"
     >
       <PaceSpinner writing />
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-0.5">
         <span className="text-meta text-muted-foreground">
-          {writer ? CLI_NAMES[writer] : 'Your AI'} is writing it up from the
-          lines below
+          {t.writing(writer ? CLI_NAMES[writer] : t.yourAi)}
         </span>
         <span className="writing-line w-[92%]" />
         <span className="writing-line w-[64%]" />
@@ -434,11 +428,12 @@ function LineSkeleton({ i }: { i: number }) {
  * Done and Next; for a week or a month, the totals and two areas
  */
 function RecapSkeleton({ period }: { period: RecapPeriod }) {
+  const t = useText(text)
   if (period === 'day')
     return (
       <div>
-        {(['Done', 'Next'] as const).map((title, g) => (
-          <section key={title} className="mt-5">
+        {[t.done, t.next].map((title, g) => (
+          <section key={g} className="mt-5">
             <div className="mb-1.5 flex items-baseline gap-2.5">
               <h2 className="text-section">{title}</h2>
             </div>
@@ -478,20 +473,21 @@ function RecapSkeleton({ period }: { period: RecapPeriod }) {
 }
 
 function DayBody({ view }: { view: RecapView }) {
+  const t = useText(text)
   const day = view.day!
   const carried = view.areas.flatMap((area) => area.carried)
   return (
     <>
       {day.yesterday && day.yesterday.length > 0 && (
-        <Group title="Yesterday" meta="what you did, for the standup">
+        <Group title={t.yesterday} meta={t.yesterdayMeta}>
           {day.yesterday.map((item, i) => (
             <Line key={i} item={item} kind="done" time="day" />
           ))}
         </Group>
       )}
-      <Group title="Done" meta={view.current ? 'today' : undefined}>
+      <Group title={t.done} meta={view.current ? t.today : undefined}>
         {day.done.length === 0 ? (
-          <Quiet>Nothing done yet.</Quiet>
+          <Quiet>{t.nothingDone}</Quiet>
         ) : (
           day.done.map((item, i) => (
             <Line key={i} item={item} kind="done" time="hour" />
@@ -501,15 +497,15 @@ function DayBody({ view }: { view: RecapView }) {
       {view.current ? (
         <>
           {day.doing.length > 0 && (
-            <Group title="Doing" meta="worked on today">
+            <Group title={t.doing} meta={t.doingMeta}>
               {day.doing.map((item, i) => (
                 <Line key={i} item={item} kind="doing" />
               ))}
             </Group>
           )}
-          <Group title="Next" meta="open, due ones first">
+          <Group title={t.next} meta={t.nextMeta}>
             {day.next.length === 0 ? (
-              <Quiet>Nothing open.</Quiet>
+              <Quiet>{t.nothingOpen}</Quiet>
             ) : (
               day.next.map((item, i) => (
                 <Line key={i} item={item} kind="next" />
@@ -519,7 +515,7 @@ function DayBody({ view }: { view: RecapView }) {
         </>
       ) : (
         carried.length > 0 && (
-          <Group title="Still open" meta="at the end of the day">
+          <Group title={t.stillOpen} meta={t.stillOpenMeta}>
             {carried.map((item, i) => (
               <Line key={i} item={item} kind="next" />
             ))}
@@ -545,6 +541,7 @@ function AreasBody({ view }: { view: RecapView }) {
 }
 
 function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
+  const t = useText(text)
   return (
     <section
       data-recap-area={area.id ?? 'elsewhere'}
@@ -554,7 +551,7 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
         {area.id ? (
           <a
             href={areaHash(area.id)}
-            title={`${area.name} on the You screen`}
+            title={t.onYou(area.name)}
             className="text-section hover:text-primary"
           >
             {area.name}
@@ -570,7 +567,7 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
         {area.id && (
           <span
             role="img"
-            aria-label={`About ${Math.round(area.share * 100)}% of your ${view.period}`}
+            aria-label={t.share(Math.round(area.share * 100), view.period)}
             className="mt-1 h-1.5 w-36 overflow-hidden rounded-full bg-muted"
           >
             <span
@@ -585,22 +582,14 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
           <Line
             key={i}
             item={item}
-            kind={
-              item.task
-                ? 'done'
-                : item.title.startsWith('Asked Pace')
-                  ? 'run'
-                  : 'commit'
-            }
+            kind={item.task ? 'done' : item.run ? 'run' : 'commit'}
             time="day"
             plain
           />
         ))}
         {area.commitsMore > 0 && (
           <li className="pl-6 text-meta text-muted-foreground">
-            and {area.commitsMore} more{' '}
-            {area.commitsMore === 1 ? 'commit' : 'commits'}
-            {area.repos.length > 0 && ` in ${area.repos.join(', ')}`}
+            {t.moreCommits(area.commitsMore, area.repos)}
           </li>
         )}
         {area.carried.map((item, i) => (
@@ -612,11 +601,12 @@ function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
 }
 
 function MonthChanges({ view }: { view: RecapView }) {
+  const t = useText(text)
   const month = view.month!
   const lines = [
-    month.started.length > 0 && ['Started', month.started.join(', ')],
-    month.quiet.length > 0 && ['Went quiet', month.quiet.join(', ')],
-    month.people.length > 0 && ['Asked most by', month.people.join(', ')],
+    month.started.length > 0 && [t.started, month.started.join(', ')],
+    month.quiet.length > 0 && [t.wentQuiet, month.quiet.join(', ')],
+    month.people.length > 0 && [t.askedMostBy, month.people.join(', ')],
   ].filter((line): line is [string, string] => Boolean(line))
   if (lines.length === 0) return null
   return (
@@ -657,6 +647,7 @@ function Line({
   /** Inside its area: no area chip */
   plain?: boolean
 }) {
+  const t = useText(text)
   const at =
     item.at &&
     (time === 'hour'
@@ -693,7 +684,7 @@ function Line({
         )}
         {(item.note || at) && (
           <span className="text-meta text-muted-foreground">
-            {[kind === 'carried' ? 'carries over' : undefined, item.note, at]
+            {[kind === 'carried' ? t.carriesOver : undefined, item.note, at]
               .filter(Boolean)
               .join(' · ')}
           </span>
@@ -733,19 +724,17 @@ const Quiet = ({ children }: { children: React.ReactNode }) => (
 
 /** Where the recap comes from, at its foot */
 function Sources({ view }: { view: RecapView }) {
+  const t = useText(text)
   const { totals } = view
   const parts = [
-    totals.done > 0 &&
-      `${totals.done} ${totals.done === 1 ? 'task' : 'tasks'} done`,
-    totals.commits > 0 &&
-      `${totals.commits} ${totals.commits === 1 ? 'commit' : 'commits'}${view.emails.length ? ` by ${view.emails.join(', ')}` : ''}`,
-    totals.runs > 0 &&
-      `${totals.runs} of Pace's ${totals.runs === 1 ? 'run' : 'runs'}`,
-  ].filter(Boolean)
+    totals.done > 0 && t.tasksDone(totals.done),
+    totals.commits > 0 && t.commits(totals.commits, view.emails),
+    totals.runs > 0 && t.runs(totals.runs),
+  ].filter((part): part is string => Boolean(part))
   if (parts.length === 0) return null
   return (
     <p className="mt-5 border-t border-border pt-3.5 text-meta text-muted-foreground">
-      From {parts.join(', ')}.
+      {t.from(parts)}
     </p>
   )
 }

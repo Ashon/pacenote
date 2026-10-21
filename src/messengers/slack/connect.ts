@@ -156,6 +156,7 @@ export async function connectSlack(
         ? () => receiver.member
         : () => config.mention.owner,
     scopes: auth.response_metadata?.scopes,
+    notesLocale: config.notesLocale,
     onLimits: options.onLimits,
     log: log.child('slack'),
   })

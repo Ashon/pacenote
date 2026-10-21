@@ -11,6 +11,7 @@ import {
 } from '../apps/desktop/src/bot-readiness.js'
 import { checkConfig, loadConfig } from '../src/config.js'
 import { checkHub, HubClient, newHubToken } from '../src/hub/client.js'
+import { loadHubConfig } from '../src/hub/config.js'
 import { createLogger } from '../src/logger.js'
 import { normalizeCode, Pairings, PAIRING_TTL_MS } from '../src/hub/pairing.js'
 import { fileIdOf, Grants } from '../src/hub/policy.js'
@@ -534,9 +535,14 @@ describe('desktop side of the hub', () => {
     expect(processed[0]).toMatchObject({ event: { text: 'hi' } })
 
     expect(await checkHub(base, token)).toEqual([
-      { label: 'Hub', ok: true, detail: 'Reachable' },
-      { label: 'Pairing', ok: true, detail: 'alice (U0ALICE) @ ashon' },
-      { label: 'Bot', ok: true, detail: 'Connected to the hub' },
+      { id: 'hub', label: 'Hub', ok: true, detail: 'Reachable' },
+      {
+        id: 'pairing',
+        label: 'Pairing',
+        ok: true,
+        detail: 'alice (U0ALICE) @ ashon',
+      },
+      { id: 'bot', label: 'Bot', ok: true, detail: 'Connected to the hub' },
     ])
 
     // Unpairing from the app stops the receiver for good.
@@ -654,5 +660,48 @@ describe('desktop side of the hub', () => {
       kind: 'slack',
       message: expect.stringContaining('hub_unauthorized'),
     })
+  })
+})
+
+describe("the hub's notes in Slack", () => {
+  const env = { SLACK_BOT_TOKEN: 'xoxb-1', SLACK_APP_TOKEN: 'xapp-1' }
+
+  it('are in English unless HUB_NOTES_LANGUAGE says otherwise', async () => {
+    expect(loadHubConfig(env).notesLocale).toBe('en')
+    const config = loadHubConfig({ ...env, HUB_NOTES_LANGUAGE: 'ko' })
+    expect(config.notesLocale).toBe('ko')
+    expect(() => loadHubConfig({ ...env, HUB_NOTES_LANGUAGE: 'fr' })).toThrow(
+      /HUB_NOTES_LANGUAGE/
+    )
+
+    const notices: string[] = []
+    const hub = new HubServer({
+      store: new DesktopStore(path.join(root, 'data3', 'desktops.json')),
+      pairings: new Pairings(),
+      slack: {
+        call: async () => ({ status: 200, json: { ok: true } }),
+        download: async () => new Response(''),
+        upload: async () => new Response(''),
+        postEphemeral: async (_channel, _user, text) => {
+          notices.push(text)
+        },
+        userName: async (id) => id,
+      },
+      team: { id: 'T1', name: 'ashon' },
+      allowedUsers: ['U0BOB'],
+      notesLocale: config.notesLocale,
+      log: createLogger('error', 'hub', []),
+    })
+    const mention = (user: string, text: string) => ({
+      event: { type: 'app_mention', user, text, channel: 'C1', ts: '1.1' },
+    })
+    await hub.handleMention(mention(alice.id, '<@B1> hi'))
+    await hub.handleMention(mention('U0BOB', '<@B1> hi'))
+    await hub.handleMention(mention('U0BOB', '<@B1> connect ABCD-EFGH'))
+    expect(notices).toEqual([
+      '여기서 Pacenote를 쓸 수 있는 팀원 목록에 없어요. 허브 관리자에게 문의해 주세요.',
+      expect.stringContaining('설정 > 메신저 > Slack을 열고 팀 허브를 골라'),
+      expect.stringContaining('유효하지 않거나 만료된 코드예요.'),
+    ])
   })
 })

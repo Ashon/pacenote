@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { setLocale } from '../src/i18n/locale.js'
 import {
   failureAdvice,
   failureCause,
@@ -105,5 +106,41 @@ describe('why a reasoner run failed', () => {
     expect(failureAdvice('limit', 'claude', 'vm')?.lasting).toBe(true)
     expect(failureAdvice('unavailable', 'claude', 'vm')?.lasting).toBe(false)
     expect(failureAdvice('other', 'claude', 'vm')).toBeUndefined()
+  })
+
+  it("tells the asker in Pace's notes language", () => {
+    expect(failureReply('limit', 'codex', { locale: 'ko' })).toBe(
+      '답변을 만들지 못했어요. 지금은 Codex 사용 한도에 도달했어요. 나중에 다시 시도해 주세요.'
+    )
+    expect(failureReply('unavailable', 'claude', { locale: 'ko' })).toContain(
+      '지금은 Claude를 쓸 수 없어요.'
+    )
+    expect(
+      failureReply('timeout', 'claude', { timeoutMs: 900_000, locale: 'ko' })
+    ).toContain('요청이 15분 넘게 걸렸어요.')
+    expect(
+      failureReply('timeout', 'claude', { timeoutMs: 90_000, locale: 'ko' })
+    ).toContain('요청이 90초 넘게 걸렸어요.')
+    expect(failureReply('auth', 'claude', { own: true, locale: 'ko' })).toBe(
+      '답변을 만들지 못했어요. 사용하시는 Mac에서 제 Claude 로그인이 거부됐어요. 다시 로그인해 주세요. 방법은 Pacenote에 나와 있어요.'
+    )
+  })
+
+  it("tells the operator in the app's language at the time", () => {
+    setLocale('ko')
+    try {
+      expect(failureAdvice('auth', 'codex', 'vm')?.text).toContain(
+        '설정 > 샌드박스 > 답변 CLI 로그인에서 Codex에 로그인한 다음'
+      )
+      expect(failureAdvice('timeout', 'claude', 'vm')).toMatchObject({
+        text: expect.stringContaining('설정 > 답변'),
+        route: '#/settings/answers',
+      })
+    } finally {
+      setLocale('en')
+    }
+    expect(failureAdvice('auth', 'codex', 'vm')?.text).toContain(
+      'Sign in to Codex in Settings > Sandbox'
+    )
   })
 })

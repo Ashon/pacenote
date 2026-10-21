@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { localized } from '../../../src/i18n/locale.js'
 import { redactLogLine } from '../../../src/logger.js'
 import {
   checkAllowlist,
@@ -24,6 +25,7 @@ import {
 } from '../../../src/sandbox/types.js'
 import { readSettingsValues } from '../../../src/settings/settings-file.js'
 import { allowlistPath } from '../../../src/settings/paths.js'
+import { text } from './sandbox.text.js'
 
 const OUTPUT_LINES = 400
 /** Terminal color codes (in the jobs' output) */
@@ -79,7 +81,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
 
   saveAllowlist(raw: unknown): AllowlistIssue[] {
     if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) {
-      return [{ message: 'The domain list format is invalid.' }]
+      return [{ message: localized(text).badDomains }]
     }
     const values = {
       ...readSettingsValues(this.options.settingsFile),
@@ -103,19 +105,14 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
   }
 
   run(kind: unknown): { job?: SandboxJob; error?: string } {
+    const t = localized(text)
     if (typeof kind !== 'string' || !(kind in SANDBOX_JOBS))
-      return { error: 'Unknown job.' }
+      return { error: t.unknownJob }
     const jobKind = kind as SandboxJobKind
-    if (this.current?.state === 'running') {
-      return {
-        error: `A job is already in progress: ${SANDBOX_JOBS[this.current.kind].label}.`,
-      }
-    }
-    if (!existsSync(this.options.jobRunner)) {
-      return {
-        error: `Job runner not found: ${this.options.jobRunner} (run pnpm bundle in the repository)`,
-      }
-    }
+    if (this.current?.state === 'running')
+      return { error: t.jobRunning(SANDBOX_JOBS[this.current.kind].label) }
+    if (!existsSync(this.options.jobRunner))
+      return { error: t.noRunner(this.options.jobRunner) }
     const job: SandboxJob = {
       kind: jobKind,
       state: 'running',
@@ -151,7 +148,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
     child.stdout.on('data', capture)
     child.stderr.on('data', capture)
     child.on('error', (err) => {
-      job.output.push(`Failed to run: ${err.message}`)
+      job.output.push(t.failedToRun(err.message))
     })
     child.on('close', (code) => {
       if (pendingEmit) clearTimeout(pendingEmit)

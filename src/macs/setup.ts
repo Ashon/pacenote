@@ -1,8 +1,10 @@
 import { EventEmitter } from 'node:events'
 import { WebSocket } from 'ws'
+import { localized } from '../i18n/locale.js'
 import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import { setupDial, type MacChannel, type MacHello } from './channel.js'
 import { hostPort } from './network.js'
+import { text } from './setup.text.js'
 import type { FromMacState, SetupPayload } from './types.js'
 
 /**
@@ -95,10 +97,7 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
             return parsed ? { ...parsed, name: target.address } : undefined
           })()
     if (!where)
-      return this.set({
-        step: 'error',
-        message: 'Enter a name or address, like 100.68.0.12.',
-      })
+      return this.set({ step: 'error', message: localized(text).enterAddress })
     const attempt = ++this.attempt
     this.closeChannel()
     this.set({ step: 'connecting', name: where.name })
@@ -138,20 +137,14 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
       if (t === 'setup-settings' && payload)
         void this.take(channel, name, payload, target)
       else if (t === 'setup-declined')
-        this.end(channel, `Cancelled on ${name}. Nothing was copied.`)
+        this.end(channel, localized(text).cancelled(name))
       else if (t === 'setup-expired')
-        this.end(
-          channel,
-          `${name} stopped waiting. Click Add a Mac there again.`
-        )
+        this.end(channel, localized(text).stoppedWaiting(name))
     })
     channel.on('close', () => {
       if (this.channel !== channel || this.state.step !== 'confirming') return
       this.channel = undefined
-      this.set({
-        step: 'error',
-        message: `${name} closed the connection. Nothing was copied.`,
-      })
+      this.set({ step: 'error', message: localized(text).closed(name) })
     })
   }
 
@@ -175,9 +168,7 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
       })
     } catch {
       ws.terminate()
-      return {
-        error: `Couldn't reach ${where.name}. Check that Add a Mac is waiting there and both Macs are on the same network. If your other Mac uses your team's hub, join the hub from this Mac instead.`,
-      }
+      return { error: localized(text).unreachable(where.name) }
     }
     try {
       return await setupDial(ws, { me: this.options.me() })
@@ -210,7 +201,7 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     } catch (err) {
       const message = (err as Error).message
       channel.send({ t: 'setup-failed', error: message })
-      return this.end(channel, `Couldn't take the settings: ${message}`)
+      return this.end(channel, localized(text).couldNotTake(message))
     }
     channel.send({ t: 'setup-done' })
     this.channel = undefined

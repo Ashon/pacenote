@@ -1,7 +1,9 @@
 import type { FailureCause } from '../mention/failure.js'
-import type { Switch } from '../tasks/own-ai.js'
+import type { Switch, Unable } from '../tasks/own-ai.js'
 import type { MessengerId } from '../messengers/ids.js'
 import type { TokenUsage } from './usage.js'
+import type { Locale } from '../i18n/locale.js'
+import { text } from './types.text.js'
 
 /**
  * Pacenote run history format. The bot writes the answers to mentions, the
@@ -155,6 +157,8 @@ export interface CollectionRunRecord {
   /** What add_tasks kept, once it answered */
   found?: { added: number; maybe: number; skipped: number }
   error?: string
+  /** Why the CLI could not collect at all (no connector, signed out ...) */
+  unable?: Unable
   /**
    * The CLI chosen could not collect, so the other one did (backend names
    * the one that did)
@@ -187,6 +191,8 @@ export interface RunSummary {
   toolCalls: number
   /** Slack lookups (collections) */
   reads?: number
+  /** What a collection added, for the app to word its title */
+  found?: { added: number; maybe: number }
   outputs: number
   attempts: number
 }
@@ -246,6 +252,9 @@ export function summarize(run: HistoryRecord): RunSummary {
       reasoner: `${run.backend.reasoner}@${run.backend.sandbox}`,
       toolCalls: run.events.filter((e) => e.kind === 'tool').length,
       reads: run.reads ?? 0,
+      ...(run.found
+        ? { found: { added: run.found.added, maybe: run.found.maybe } }
+        : {}),
       outputs: 0,
       attempts: run.attempts,
     }
@@ -277,25 +286,25 @@ export const TRIGGER_LABEL: Record<CollectionRunRecord['trigger'], string> = {
 
 /**
  * What a collection did, as its title: "Added 2 tasks and 1 Maybe", "Nothing
- * new to add", or why it stopped
+ * new to add", or why it stopped. In English for run summaries (AI tools read
+ * them through MCP); the app words it in its language.
  */
-export function collectionTitle(run: CollectionRunRecord): string {
-  if (run.status === 'running') return 'Collecting'
-  if (run.found) {
-    const { added, maybe } = run.found
-    const parts = [
-      added && `${added} ${added === 1 ? 'task' : 'tasks'}`,
-      maybe && `${maybe} ${maybe === 1 ? 'Maybe' : 'Maybes'}`,
-    ].filter(Boolean)
-    return parts.length ? `Added ${parts.join(' and ')}` : 'Nothing new to add'
-  }
+export function collectionTitle(
+  run: Pick<CollectionRunRecord, 'status' | 'error'> & {
+    found?: { added: number; maybe: number }
+  },
+  locale: Locale = 'en'
+): string {
+  const t = text[locale]
+  if (run.status === 'running') return t.collecting
+  if (run.found) return t.added(run.found.added, run.found.maybe)
   // The first sentence of why it stopped
   const line = run.error?.trim().split('\n')[0] ?? ''
   const reason = (/^(.+?[.!?])(\s|$)/.exec(line)?.[1] ?? line).replace(
     /[.!?]$/,
     ''
   )
-  return reason || 'Stopped before it finished'
+  return !reason || reason === text.en.stoppedBefore ? t.stoppedBefore : reason
 }
 
 /** A version 1 record's Slack fields */

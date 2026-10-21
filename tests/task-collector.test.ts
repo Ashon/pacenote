@@ -3,6 +3,7 @@ import {
   collectCommand,
   CollectStream,
   SIGNED_OUT,
+  STOPPED,
   TaskCollector,
 } from '../apps/desktop/src/task-collector.js'
 import { OwnAi } from '../apps/desktop/src/own-ai.js'
@@ -316,7 +317,7 @@ describe('collecting from the app with Claude Code', () => {
     // Stopped is stopped, signed out or not
     const stopped = new CollectStream()
     expect(
-      stopped.outcome('T', 'Stopped.', 'Not logged in · Please run /login')
+      stopped.outcome('T', STOPPED, 'Not logged in · Please run /login')
     ).toMatchObject({ error: 'Stopped.' })
   })
 

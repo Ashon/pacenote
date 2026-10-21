@@ -1,14 +1,25 @@
 import path from 'node:path'
 import { z } from 'zod'
 import type { ConfigIssue } from '../config.js'
+import { text as configText } from '../config.text.js'
+import { localized } from '../i18n/locale.js'
+import { text } from './env.text.js'
+
+/**
+ * A rule's message, read when a value is checked rather than when the schema
+ * is built, so it is in the language of that moment
+ */
+const says = (rule: keyof (typeof text)['en']['rules']) => ({
+  error: () => localized(text).rules[rule],
+})
+
+/** zod's own messages in the language of the moment, as config.ts has them */
+const inLanguage = () => ({ error: localized(configText).zodIssue })
 
 /** Mount paths accept only absolute paths: ~ is not expanded. */
 const absolutePath = z
   .string()
-  .refine(
-    (value) => value.startsWith('/'),
-    'Must be an absolute path. (~ is not expanded)'
-  )
+  .refine((value) => value.startsWith('/'), says('absolutePath'))
 
 const owner = '[A-Za-z0-9][A-Za-z0-9-]*'
 const projectKey = '[A-Za-z][A-Za-z0-9_]*'
@@ -33,7 +44,7 @@ export const BrokerEnvSchema = z.object({
     .string()
     .regex(
       new RegExp(`^\\s*${owner}(\\s*,\\s*${owner})*\\s*$`),
-      'Must be comma-separated GitHub org names'
+      says('githubOrgs')
     )
     .optional(),
   /**
@@ -42,7 +53,7 @@ export const BrokerEnvSchema = z.object({
    * git config.
    */
   OPS_GIT_AUTHOR_NAME: z.string().optional(),
-  OPS_GIT_AUTHOR_EMAIL: z.email('Must be an email address').optional(),
+  OPS_GIT_AUTHOR_EMAIL: z.email(says('email')).optional(),
   /**
    * Jira queries, issue creation, and comments (jira_*). On only when all four
    * are set. Writes are made as the token owner.
@@ -50,16 +61,16 @@ export const BrokerEnvSchema = z.object({
   OPS_JIRA_URL: z
     .url({
       protocol: /^https$/,
-      error: 'Must be an https URL (e.g. https://your-site.atlassian.net)',
+      ...says('jiraUrl'),
     })
     .optional(),
-  OPS_JIRA_EMAIL: z.email('Must be an email address').optional(),
+  OPS_JIRA_EMAIL: z.email(says('email')).optional(),
   OPS_JIRA_TOKEN: z.string().optional(),
   OPS_JIRA_PROJECTS: z
     .string()
     .regex(
       new RegExp(`^\\s*${projectKey}(\\s*,\\s*${projectKey})*\\s*$`),
-      'Must be comma-separated Jira project keys'
+      says('jiraProjects')
     )
     .optional(),
   /**
@@ -69,25 +80,19 @@ export const BrokerEnvSchema = z.object({
   OPS_SSH_INVENTORY_DIR: z.string().optional(),
   OPS_SSH_INVENTORY: z
     .string()
-    .regex(
-      /^[A-Za-z0-9._/-]+$/,
-      'Must be a relative path inside the inventory directory'
-    )
+    .regex(/^[A-Za-z0-9._/-]+$/, says('inventoryPath'))
     .refine(
       (value) => !value.split('/').includes('..'),
-      'Cannot point outside the inventory directory'
+      says('inventoryInside')
     )
     .optional(),
   OPS_SSH_ALLOWED_CIDR: z
     .string()
-    .regex(
-      /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/,
-      'Must be an IPv4 CIDR (e.g. 192.168.10.0/24)'
-    )
+    .regex(/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/, says('cidr'))
     .optional(),
   OPS_SSH_USER: z
     .string()
-    .regex(/^[a-z_][a-z0-9_-]{0,31}$/, 'Must be a valid Linux user name')
+    .regex(/^[a-z_][a-z0-9_-]{0,31}$/, says('linuxUser'))
     .optional(),
   OPS_SSH_KEY: absolutePath.optional(),
   OPS_SSH_KNOWN_HOSTS: absolutePath.optional(),
@@ -99,19 +104,16 @@ export const BrokerEnvSchema = z.object({
     .string()
     .regex(
       new RegExp(`^\\s*${name}(\\s*,\\s*${name})*\\s*$`),
-      'Must be comma-separated kubeconfig context names'
+      says('k8sContexts')
     )
     .optional(),
   OPS_K8S_SA: z
     .string()
-    .regex(
-      /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/,
-      'Must be a valid ServiceAccount name'
-    )
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, says('serviceAccount'))
     .default('pacenote-ro'),
   OPS_K8S_SA_NAMESPACE: z
     .string()
-    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Must be a valid namespace name')
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, says('namespace'))
     .default('pacenote'),
 })
 
@@ -127,7 +129,7 @@ function provided(env: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 export function checkBrokerEnv(env: NodeJS.ProcessEnv): ConfigIssue[] {
-  const parsed = BrokerEnvSchema.safeParse(provided(env))
+  const parsed = BrokerEnvSchema.safeParse(provided(env), inLanguage())
   if (parsed.success) return []
   return parsed.error.issues.map((issue) => ({
     key: issue.path[0] === undefined ? undefined : String(issue.path[0]),
@@ -140,7 +142,7 @@ export function checkBrokerEnv(env: NodeJS.ProcessEnv): ConfigIssue[] {
  * kubeconfig).
  */
 export function loadBrokerEnv(env: NodeJS.ProcessEnv): BrokerEnv {
-  const parsed = BrokerEnvSchema.safeParse(provided(env))
+  const parsed = BrokerEnvSchema.safeParse(provided(env), inLanguage())
   if (parsed.success) return parsed.data
   throw new Error(
     parsed.error.issues

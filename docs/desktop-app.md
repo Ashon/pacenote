@@ -150,7 +150,7 @@ Settings:
 
   | Section | What it holds |
   | --- | --- |
-  | General | Theme, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
+  | General | Theme, language, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
   | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login, allowed domains |
@@ -264,6 +264,9 @@ Other:
   the same shape on the macOS icon grid (an 824 body in 1024, shadow, highlight) as `assets/pacenote-icon.png`.
   Development runs use the PNG as the Dock icon as is, so this does the system's processing by hand.
 - `PACENOTE_DESKTOP_THEME=light|dark` pins the theme. (The default follows the system; it can also be changed under "Theme" in Settings > General)
+- The app reads in English and Korean: macOS's language by default, or the one chosen under "Language" in Settings > General
+  (kept in `desktop.json`). `PACENOTE_DESKTOP_LANGUAGE=en|ko` stands in for macOS's language, as the end-to-end tests do. See
+  [Languages](i18n.md).
 - Build check: `PACENOTE_DESKTOP_CAPTURE=/tmp/pacenote.png pnpm --filter @pacenote/desktop start` saves the UI as a PNG without showing
   a window, then exits. (`PACENOTE_DESKTOP_CAPTURE_HASH=#/bot` picks the screen, and `PACENOTE_DESKTOP_CAPTURE_WIDTH` and
   `PACENOTE_DESKTOP_CAPTURE_HEIGHT` the window size; the bot is not started in this mode)

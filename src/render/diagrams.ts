@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { localized, type Locale } from '../i18n/locale.js'
 import { runProcess } from '../sandbox/process.js'
 import { vmProblems, vmRunArgs, vmStatus } from '../sandbox/vm.js'
+import { text } from './diagrams.text.js'
 
 /**
  * Renders the diagram/chart code blocks in an answer to PNG.
@@ -56,22 +58,22 @@ export function extractDiagrams(markdown: string): DiagramBlock[] {
 
 /**
  * Replaces rendered blocks with a (Figure N) marker and keeps the source of
- * blocks that could not be rendered.
+ * blocks that could not be rendered. locale: Pace's notes language.
  */
 export function composeAnswer(
   markdown: string,
-  results: { block: DiagramBlock; figure?: number }[]
+  results: { block: DiagramBlock; figure?: number }[],
+  locale: Locale = 'en'
 ): string {
-  let text = markdown
+  const t = localized(text, locale)
+  let answer = markdown
   for (const { block, figure } of results) {
-    text = text.replace(
+    answer = answer.replace(
       block.raw,
-      figure !== undefined
-        ? `_(Figure ${figure}: image below)_`
-        : `${block.raw}\n_(Couldn't render this diagram, so the source is shown)_`
+      figure !== undefined ? t.figure(figure) : `${block.raw}\n${t.unrendered}`
     )
   }
-  return text
+  return answer
 }
 
 /** Where the renderer runs: its VM's helper, folder and image */
@@ -182,7 +184,7 @@ export class DiagramRenderer {
   /** What keeps it from rendering: this Mac, or the built-in sandbox's parts */
   async verify(): Promise<string[]> {
     const status = await vmStatus(this.options)
-    const problems = vmProblems(status, 'the diagram renderer image')
+    const problems = vmProblems(status, 'renderer')
     return problems
   }
 

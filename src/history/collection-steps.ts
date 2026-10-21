@@ -1,4 +1,6 @@
+import { getLocale, LOCALE_TAGS, localized } from '../i18n/locale.js'
 import { lookupLabel } from '../tasks/sources.js'
+import { text } from './collection-steps.text.js'
 import type { CollectionRunRecord, RunEvent } from './types.js'
 
 /**
@@ -32,20 +34,6 @@ export interface CollectionResult {
   rules?: string
 }
 
-/**
- * Pacenote's and the CLI's tools as a person reads them (the sources' are in
- * src/tasks/sources.ts)
- */
-const LABELS: Record<string, string> = {
-  collect_context: 'Got the rules',
-  my_tasks: 'Read your open tasks',
-  add_tasks: 'Added tasks',
-  close_task: 'Closed a task',
-  update_task: 'Updated a task',
-  wrap_up_task: 'Wrapped up a task',
-  ToolSearch: 'Loaded its tools',
-}
-
 /** Calls of one tool in a row, as the Lookups tab lists them */
 export interface LookupGroup {
   /** The first call's start, from the collection's start */
@@ -74,9 +62,6 @@ function parse<T>(text: string | undefined): T | undefined {
     return undefined
   }
 }
-
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`
 
 /**
  * What add_tasks, update_task, close_task and wrap_up_task did, and the rules
@@ -130,6 +115,7 @@ export function collectionResult(run: CollectionRunRecord): CollectionResult {
 function noteFor(call: ToolEvent): string | undefined {
   if (call.server !== 'pacenote' || call.status === 'failed')
     return call.status === 'failed' ? call.error : undefined
+  const t = localized(text)
   if (call.tool === 'add_tasks') {
     const body = parse<{ added?: FoundTask[]; skipped?: unknown[] }>(
       call.result
@@ -138,10 +124,10 @@ function noteFor(call: ToolEvent): string | undefined {
     const added = body.added ?? []
     const maybe = added.filter((task) => task.confidence === 'maybe').length
     return [
-      `${plural(added.length - maybe, 'task')} added`,
-      maybe ? plural(maybe, 'Maybe') : undefined,
+      t.added(added.length - maybe),
+      maybe ? t.maybe(maybe) : undefined,
       body.skipped?.length
-        ? `${body.skipped.length} left out by your settings`
+        ? t.leftOutBySettings(body.skipped.length)
         : undefined,
     ]
       .filter(Boolean)
@@ -179,23 +165,39 @@ function noteFor(call: ToolEvent): string | undefined {
     if (!body) return undefined
     return [
       body.since
-        ? `Since ${new Date(body.since).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          })}`
+        ? t.since(
+            // Oct 20, 14:03 (10월 20일 14:03)
+            new Date(body.since).toLocaleString(LOCALE_TAGS[getLocale()], {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })
+          )
         : undefined,
-      body.dms ? 'DMs count' : 'DMs not counted',
+      body.dms ? t.dmsCount : t.dmsNotCounted,
       body.leaveOut?.length
-        ? `${plural(body.leaveOut.length, 'channel')} left out`
+        ? t.channelsLeftOut(body.leaveOut.length)
         : undefined,
     ]
       .filter(Boolean)
       .join(' · ')
   }
   return undefined
+}
+
+/**
+ * A tool as a person reads it: Pacenote's, the CLI's or a source's, else by
+ * its name
+ */
+function toolLabel(tool: string): string {
+  const tools: Record<string, string> = localized(text).tools
+  return (
+    (Object.hasOwn(tools, tool) ? tools[tool] : undefined) ??
+    lookupLabel(tool) ??
+    tool
+  )
 }
 
 /**
@@ -232,7 +234,7 @@ export function lookupGroups(run: CollectionRunRecord): LookupGroup[] {
     }
     const group: LookupGroup = {
       offsetMs: Math.max(0, at - start),
-      label: LABELS[call.tool] ?? lookupLabel(call.tool) ?? call.tool,
+      label: toolLabel(call.tool),
       server: call.server,
       tool: call.tool,
       count: 1,

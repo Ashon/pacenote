@@ -62,6 +62,19 @@ describe('composeAnswer', () => {
     )
     expect(text).toContain('```bash\nkubectl get pods\n```')
   })
+
+  it("words the markers in Pace's notes language", () => {
+    const [mermaid, dot] = extractDiagrams(answer)
+    const text = composeAnswer(
+      answer,
+      [{ block: mermaid!, figure: 1 }, { block: dot! }],
+      'ko'
+    )
+    expect(text).toContain('_(그림 1: 아래 이미지)_')
+    expect(text).toContain(
+      '```graphviz\ndigraph { a -> b }\n```\n_(이 다이어그램은 그리지 못해서 소스를 그대로 보여 드려요)_'
+    )
+  })
 })
 
 const vm = {

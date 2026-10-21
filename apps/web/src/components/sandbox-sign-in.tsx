@@ -8,7 +8,9 @@ import {
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './sandbox-sign-in.text'
 
 type Cli = 'claude' | 'codex'
 type Prompt = { url: string; code?: string; paste?: boolean }
@@ -36,6 +38,7 @@ export function SandboxSignIn({
   onSignedIn: () => void
   className?: string
 }) {
+  const t = useText(text)
   const bridge = window.pacenoteDesktop?.sandbox
   const [state, setState] = useState<
     | { step: 'idle' }
@@ -68,7 +71,7 @@ export function SandboxSignIn({
         onSignedIn()
       } else
         setState(
-          res.error === 'Cancelled.'
+          res.cancelled
             ? { step: 'idle' }
             : { step: 'error', message: res.error }
         )
@@ -87,22 +90,20 @@ export function SandboxSignIn({
       {state.step === 'prompt' ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-copy">
-            {state.prompt.code ? (
-              <>
-                Open the {name} page and enter this code:{' '}
-                <b className="font-mono font-semibold tracking-wider select-text">
-                  {state.prompt.code}
-                </b>
-              </>
-            ) : (
-              'Open the Claude page and approve, then paste the code it shows here.'
-            )}
+            {state.prompt.code
+              ? t.enterCode(
+                  name,
+                  <b className="font-mono font-semibold tracking-wider select-text">
+                    {state.prompt.code}
+                  </b>
+                )
+              : t.approveAndPaste}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild size="sm" variant="outline">
               <a href={state.prompt.url} target="_blank" rel="noreferrer">
                 <ExternalLink />
-                Open the {name} page
+                {t.openPage(name)}
               </a>
             </Button>
             {state.prompt.paste && (
@@ -112,8 +113,8 @@ export function SandboxSignIn({
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
                   onKeyDown={(event) => event.key === 'Enter' && send()}
-                  placeholder="Code from the page"
-                  aria-label="Code from the Claude page"
+                  placeholder={t.codePlaceholder}
+                  aria-label={t.codeLabel}
                   disabled={state.sent}
                 />
                 <Button
@@ -121,20 +122,18 @@ export function SandboxSignIn({
                   onClick={send}
                   disabled={!code.trim() || state.sent}
                 >
-                  Sign in
+                  {t.signIn}
                 </Button>
               </>
             )}
             <Button size="sm" variant="ghost" onClick={cancel}>
-              Cancel
+              {t.cancel}
             </Button>
           </div>
           {(state.prompt.code || state.sent) && (
             <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <LoaderCircle className="size-3.5 animate-spin" />
-              {state.sent
-                ? 'Signing in…'
-                : 'Waiting for you to approve on the page…'}
+              {state.sent ? t.signingIn : t.waitingApproval}
             </p>
           )}
         </div>
@@ -157,23 +156,23 @@ export function SandboxSignIn({
               {state.step === 'error'
                 ? state.message
                 : state.step === 'starting'
-                  ? 'Starting the sign-in in the sandbox…'
+                  ? t.starting
                   : signedIn
-                    ? `Signed in to ${name} inside the sandbox`
-                    : `Sign in to ${name} inside the sandbox`}
+                    ? t.signedIn(name)
+                    : t.signInInside(name)}
             </p>
             {state.step !== 'error' && (
               <p className="mt-0.5 text-meta text-muted-foreground">
                 {ready
-                  ? `${name} signs in on ${cli === 'claude' ? 'Claude' : 'OpenAI'}'s own page and keeps its login in the sandbox. Pacenote never sees it. Uses your own plan.`
-                  : 'Once the sandbox is ready: the sign-in runs inside it.'}
+                  ? t.ownPlan(name, cli === 'claude' ? 'Claude' : 'OpenAI')
+                  : t.notReady}
               </p>
             )}
           </div>
           {busy ? (
             <Button size="sm" variant="ghost" onClick={cancel}>
               <LoaderCircle className="animate-spin" />
-              Cancel
+              {t.cancel}
             </Button>
           ) : (
             <Button
@@ -186,10 +185,10 @@ export function SandboxSignIn({
             >
               <KeyRound />
               {state.step === 'error'
-                ? 'Try again'
+                ? t.tryAgain
                 : signedIn
-                  ? 'Sign in again'
-                  : `Sign in to ${name}`}
+                  ? t.signInAgain
+                  : t.signInTo(name)}
             </Button>
           )}
         </div>

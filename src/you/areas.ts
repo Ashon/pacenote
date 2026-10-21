@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { outcomeOf } from '../tasks/context.js'
+import { getLocale, localized, type Locale } from '../i18n/locale.js'
+import { outcomeOf, outcomeWords } from '../tasks/context.js'
 import type { TaskView, WorkEntry } from '../tasks/types.js'
+import { text } from './areas.text.js'
 import type { SessionMark } from './sessions.js'
 import type {
   AreaPart,
@@ -440,17 +442,19 @@ export function taskArea(
 
 const ROLE_ORDER: AreaRole[] = ['build', 'review', 'answer', 'on-call']
 
-const times = (n: number) => (n === 1 ? 'once' : `${n} times`)
-const names = (list: string[]) =>
-  list.length <= 1 ? (list[0] ?? '') : `${list[0]} and ${list[1]}`
-
-/** What is going on in each area kept, from your work */
+/**
+ * What is going on in each area kept, from your work; what shows each role
+ * and how tasks ended, in the app's language unless one is given (English for
+ * an AI tool)
+ */
 export function areaViews(
   records: readonly AreaRecord[],
   signals: readonly Signal[],
   work: readonly WorkEntry[],
-  now = Date.now()
+  now = Date.now(),
+  locale: Locale = getLocale()
 ): AreaView[] {
+  const t = localized(text, locale)
   const views = records
     .filter((record) => !record.left)
     .map((record): AreaView => {
@@ -472,18 +476,18 @@ export function areaViews(
       if (days)
         roles.push({
           role: 'build',
-          evidence: `sessions here on ${days} ${days === 1 ? 'day' : 'days'} of the last 30`,
+          evidence: t.sessionDays(days),
         })
       const reviews = tasks.filter((task) => /\breview|리뷰/i.test(task.title))
       if (reviews.length >= 2)
         roles.push({
           role: 'review',
-          evidence: `${reviews.length} reviews asked of you`,
+          evidence: t.reviews(reviews.length),
         })
       if (asked.length >= 2)
         roles.push({
           role: 'answer',
-          evidence: `${names(askers)} asked you ${times(asked.length)}`,
+          evidence: t.peopleAsked(askers.slice(0, 2), asked.length),
         })
       const groups = record.parts.filter((part) => part.kind === 'group')
       const byGroup = tasks.filter((task) =>
@@ -492,7 +496,10 @@ export function areaViews(
       if (byGroup.length)
         roles.push({
           role: 'on-call',
-          evidence: `${groups.map((g) => g.label).join(', ')} asked you ${times(byGroup.length)}`,
+          evidence: t.groupsAsked(
+            groups.map((g) => g.label),
+            byGroup.length
+          ),
         })
       roles.sort(
         (a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role)
@@ -545,8 +552,8 @@ export function areaViews(
             at: task.settledAt!,
             outcome:
               task.status === 'dismissed'
-                ? 'Done already'
-                : outcomeOf(task, [...work]),
+                ? outcomeWords({ kind: 'done-already' }, locale)
+                : outcomeOf(task, [...work], locale),
           })),
         latelyMore: Math.max(0, unique(settled).length - LATELY),
         people: askers.slice(0, PEOPLE),

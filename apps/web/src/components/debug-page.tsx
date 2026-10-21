@@ -44,9 +44,12 @@ import {
 } from '@/components/ui/motion'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { BotMark } from './bot-page'
 import { TONE_CLASS, type BotTone } from './bot-state'
+import { text as stateText, type BotStateName } from './bot-state.text'
+import { text } from './debug-page.text'
 import { PaceSpinner } from './pace-spinner'
 import { StatusBarView } from './status-bar'
 
@@ -55,30 +58,31 @@ const SPEEDS = [0.1, 0.25, 0.5, 1]
 /** Load lengths for the settle bench, in seconds */
 const LOADS = [0.2, 1.5, 5, 12]
 /** Pace's states as the status bar names them, and what makes each */
-const PACE_STATES: Record<string, { phase: BotPhase; socket?: SocketState }> = {
-  Connected: { phase: 'running', socket: 'connected' },
-  Starting: { phase: 'starting' },
-  Building: { phase: 'building' },
-  Stopping: { phase: 'stopping' },
-  Reconnecting: { phase: 'running', socket: 'reconnecting' },
-  Disconnected: { phase: 'running', socket: 'disconnected' },
-  'Setup needed': { phase: 'setup' },
-  'Failed to start': { phase: 'failed' },
-  Crashed: { phase: 'crashed' },
-  Stopped: { phase: 'idle' },
+const PACE_STATES: Partial<
+  Record<BotStateName, { phase: BotPhase; socket?: SocketState }>
+> = {
+  connected: { phase: 'running', socket: 'connected' },
+  starting: { phase: 'starting' },
+  building: { phase: 'building' },
+  stopping: { phase: 'stopping' },
+  reconnecting: { phase: 'running', socket: 'reconnecting' },
+  disconnected: { phase: 'running', socket: 'disconnected' },
+  setup: { phase: 'setup' },
+  failed: { phase: 'failed' },
+  crashed: { phase: 'crashed' },
+  stopped: { phase: 'idle' },
 }
 /** States of Pace's mark on the Pace screen, in the order they come */
-const MARK_STATES: Record<string, BotTone> = {
-  Stopped: 'off',
-  Starting: 'busy',
-  Connected: 'ok',
-  Reconnecting: 'warn',
-  Stopping: 'busy',
+const MARK_STATES: Partial<Record<BotStateName, BotTone>> = {
+  stopped: 'off',
+  starting: 'busy',
+  connected: 'ok',
+  reconnecting: 'warn',
+  stopping: 'busy',
 }
-const CHECK_ISSUES = [
-  'Sandbox: the egress proxy is not running',
-  'Diagrams: the renderer did not answer',
-]
+/** A table's state names, in its order */
+const names = (table: Partial<Record<BotStateName, unknown>>) =>
+  Object.keys(table) as BotStateName[]
 /**
  * Footer widths: as wide as this page (0), then just under where it drops an
  * item: the attached tools, the last request, the version, the reasoner
@@ -90,15 +94,13 @@ const WIDTHS = [0, 820, 700, 630, 530]
  * spinner, with slow motion and a frame rate readout.
  */
 export function DebugPage() {
+  const t = useText(text)
   return (
     <ScrollArea className="h-full">
       <div className="@container max-w-4xl space-y-8 px-8 py-7">
         <header>
-          <h1 className="text-title">Debug</h1>
-          <p className="mt-1 text-copy text-muted-foreground">
-            Only in development builds. Nothing here changes Pace or its
-            settings.
-          </p>
+          <h1 className="text-title">{t.title}</h1>
+          <p className="mt-1 text-copy text-muted-foreground">{t.intro}</p>
         </header>
         <SpinnerBench />
         <SettleBench />
@@ -115,6 +117,7 @@ export function DebugPage() {
  * all of their animations at once, so they stay in step.
  */
 function SpinnerBench() {
+  const t = useText(text)
   const bench = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(true)
   const [speed, setSpeed] = useState(1)
@@ -149,7 +152,7 @@ function SpinnerBench() {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-section">Spinner</h2>
+        <h2 className="mr-auto text-section">{t.spinner}</h2>
         <span className="text-meta text-muted-foreground tabular-nums">
           {loop}
         </span>
@@ -158,9 +161,9 @@ function SpinnerBench() {
             'text-meta tabular-nums',
             fps < 55 ? 'text-status-interrupted' : 'text-muted-foreground'
           )}
-          title="Frames drawn in the last second, and the longest gap between two"
+          title={t.fpsTip}
         >
-          {fps} fps · longest frame {longest} ms
+          {t.fps(fps, longest)}
         </span>
         <SpeedPicker value={speed} onChange={setSpeed} />
         <Button
@@ -169,13 +172,13 @@ function SpinnerBench() {
           onClick={() => setPlaying(!playing)}
         >
           {playing ? <Pause /> : <Play />}
-          {playing ? 'Pause' : 'Play'}
+          {playing ? t.pause : t.play}
         </Button>
       </div>
 
       {length > 0 && (
         <label className="flex items-center gap-3 text-meta text-muted-foreground">
-          Jump to
+          {t.jumpTo}
           <input
             type="range"
             min={0}
@@ -214,7 +217,9 @@ function SpinnerBench() {
               <div style={{ width: size, height: size }}>
                 <PaceSpinner writing className="size-full" />
               </div>
-              <figcaption className="tabular-nums">writing {size}px</figcaption>
+              <figcaption className="tabular-nums">
+                {t.writing(size)}
+              </figcaption>
             </figure>
           ))}
         </div>
@@ -230,9 +235,9 @@ function SpinnerBench() {
               )}
             >
               <PaceSpinner />
-              Working
+              {t.working}
               <span className="font-normal text-muted-foreground">
-                on {bg.replace('bg-', '')}
+                {t.on(bg.replace('bg-', ''))}
               </span>
             </div>
           ))}
@@ -247,6 +252,7 @@ function SpinnerBench() {
  * runs and eases back into the logo when it ends, wherever it was in the loop.
  */
 function SettleBench() {
+  const t = useText(text)
   const box = useRef<HTMLDivElement>(null)
   const timer = useRef<number>(undefined)
   const [loading, setLoading] = useState(false)
@@ -280,14 +286,10 @@ function SettleBench() {
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-section">Loading, then the logo</h2>
+        <h2 className="mr-auto text-section">{t.settle}</h2>
         <SpeedPicker value={speed} onChange={setSpeed} />
       </div>
-      <p className="text-meta text-muted-foreground">
-        Pace looks around while a load runs and eases back into the logo when it
-        ends, wherever it was. The loop is still for its first 0.3 seconds, so a
-        shorter load never moves.
-      </p>
+      <p className="text-meta text-muted-foreground">{t.settleNote}</p>
       <div className="flex flex-wrap items-center gap-2">
         {LOADS.map((seconds) => (
           <Button
@@ -296,19 +298,19 @@ function SettleBench() {
             variant="outline"
             onClick={() => load(seconds)}
           >
-            Load {seconds}s
+            {t.load(seconds)}
           </Button>
         ))}
         <Button size="sm" onClick={() => (loading ? stop() : load())}>
           {loading ? <Square /> : <Play />}
-          {loading ? 'Stop' : 'Load until stopped'}
+          {loading ? t.stop : t.loadUntilStopped}
         </Button>
         <span className="ml-1 text-meta text-muted-foreground">
           {loading
             ? length === undefined
-              ? 'Loading until stopped'
-              : `Loading for ${length}s`
-            : 'At rest'}
+              ? t.loadingUntilStopped
+              : t.loadingFor(length)
+            : t.atRest}
         </span>
       </div>
 
@@ -342,21 +344,19 @@ function SettleBench() {
               <span className="font-semibold">Pace</span>
               {loading ? (
                 <span className="text-shimmer text-caption text-status-running">
-                  Working
+                  {t.working}
                 </span>
               ) : (
                 <span className="text-caption text-muted-foreground">
-                  Just now
+                  {t.justNow}
                 </span>
               )}
             </div>
             <p className="mt-2 leading-relaxed">
               {loading ? (
-                <span className="text-muted-foreground">
-                  Reading the thread and checking web-01…
-                </span>
+                <span className="text-muted-foreground">{t.reading}</span>
               ) : (
-                'web-01 is healthy apart from disk: /var is at 91%. Rotating the logs under /var/log/app should bring it under 60%.'
+                t.answer
               )}
             </p>
           </div>
@@ -372,31 +372,28 @@ function SettleBench() {
  * faster while it answers.
  */
 function MarkBench() {
-  const [pace, setPace] = useState('Connected')
+  const t = useText(text)
+  const states = useText(stateText)
+  const [pace, setPace] = useState<BotStateName>('connected')
   const [active, setActive] = useState(0)
   const tone = MARK_STATES[pace]!
   const answering = tone === 'ok' && active > 0
 
   return (
     <section className="space-y-5">
-      <h2 className="text-section">Pace screen</h2>
-      <p className="text-meta text-muted-foreground">
-        The mark beside Pace&apos;s name. It looks around while Pace starts or
-        stops, turns once in 16 seconds while Pace is connected, and four times
-        as fast while it answers. Stopped, it is a gray stop sign. Switch states
-        to see it change.
-      </p>
+      <h2 className="text-section">{t.paceScreen}</h2>
+      <p className="text-meta text-muted-foreground">{t.markNote}</p>
       <div className="grid gap-x-8 gap-y-3 text-meta text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>
         <Choice
-          options={Object.keys(MARK_STATES).map((name) => ({
+          options={names(MARK_STATES).map((name) => ({
             value: name,
-            label: name,
+            label: states[name],
           }))}
           value={pace}
           onChange={setPace}
         />
-        <span className="self-center">Requests in progress</span>
+        <span className="self-center">{t.requestsInProgress}</span>
         <Choice
           options={[0, 1, 3].map((n) => ({ value: n, label: String(n) }))}
           value={active}
@@ -410,13 +407,11 @@ function MarkBench() {
             <div className="flex items-center gap-2 text-title">
               Pace
               <span className={cn('text-row', TONE_CLASS[tone].text)}>
-                {pace}
+                {states[pace]}
               </span>
             </div>
             <p className="mt-0.5 text-copy text-muted-foreground">
-              {answering
-                ? `Answering ${active} ${active === 1 ? 'mention' : 'mentions'}`
-                : 'As on the Pace screen, at 40 px and at 96 px'}
+              {answering ? t.answering(active) : t.asOnScreen}
             </p>
           </div>
         </div>
@@ -432,7 +427,9 @@ function MarkBench() {
  * would go instead of going there.
  */
 function StatusBench() {
-  const [pace, setPace] = useState('Connected')
+  const t = useText(text)
+  const states = useText(stateText)
+  const [pace, setPace] = useState<BotStateName>('connected')
   const [active, setActive] = useState(1)
   const [collect, setCollect] = useState<'off' | 'starting' | 'reading'>(
     'reading'
@@ -460,7 +457,7 @@ function StatusBench() {
           reasoner: 'claude@vm',
           mcp: ['github', 'linear'],
           diagrams: true,
-          problems: CHECK_ISSUES.slice(0, issues),
+          problems: t.issues.slice(0, issues),
           requests: { active, handled: 12, lastAt: ago(4 * 60_000) },
         },
       }
@@ -476,7 +473,7 @@ function StatusBench() {
         ? [
             {
               key: 'SLACK_BOT_TOKEN',
-              message: 'The Slack bot token is missing',
+              message: t.tokenMissing,
             },
           ]
         : undefined,
@@ -488,49 +485,47 @@ function StatusBench() {
 
   return (
     <section className="space-y-5">
-      <h2 className="text-section">Status bar</h2>
-      <p className="text-meta text-muted-foreground">
-        The window&apos;s footer in made-up states. Requests and check issues
-        show while Pace runs (Connected, Reconnecting, Disconnected).
-      </p>
+      <h2 className="text-section">{t.statusBar}</h2>
+      <p className="text-meta text-muted-foreground">{t.statusNote}</p>
       <div className="grid gap-x-8 gap-y-3 text-meta text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>
         <select
           value={pace}
-          onChange={(e) => setPace(e.target.value)}
+          onChange={(e) => setPace(e.target.value as BotStateName)}
           className="h-7 w-fit rounded-md border border-input bg-background px-2 text-meta text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 dark:bg-input/30"
         >
-          {Object.keys(PACE_STATES).map((name) => (
-            <option key={name}>{name}</option>
+          {names(PACE_STATES).map((name) => (
+            <option key={name} value={name}>
+              {states[name]}
+            </option>
           ))}
         </select>
-        <span className="self-center">Requests in progress</span>
+        <span className="self-center">{t.requestsInProgress}</span>
         <Choice
           options={[0, 1, 3].map((n) => ({ value: n, label: String(n) }))}
           value={active}
           onChange={setActive}
         />
-        <span className="self-center">Task collection</span>
+        <span className="self-center">{t.taskCollection}</span>
         <Choice
-          options={[
-            { value: 'off' as const, label: 'None' },
-            { value: 'starting' as const, label: 'Starting' },
-            { value: 'reading' as const, label: '12 lookups' },
-          ]}
+          options={(['off', 'starting', 'reading'] as const).map((value) => ({
+            value,
+            label: t.collect[value],
+          }))}
           value={collect}
           onChange={setCollect}
         />
-        <span className="self-center">Check issues</span>
+        <span className="self-center">{t.checkIssues}</span>
         <Choice
           options={[0, 1, 2].map((n) => ({ value: n, label: String(n) }))}
           value={issues}
           onChange={setIssues}
         />
-        <span className="self-center">Width</span>
+        <span className="self-center">{t.width}</span>
         <Choice
           options={WIDTHS.map((w) => ({
             value: w,
-            label: w ? `${w} px` : 'Page',
+            label: w ? `${w} px` : t.page,
           }))}
           value={width}
           onChange={setWidth}
@@ -548,16 +543,14 @@ function StatusBench() {
         />
       </div>
       <p className="text-meta text-muted-foreground">
-        {opened
-          ? `That click would open ${opened}.`
-          : 'Click an item to see where it would go. (the folder button opens Finder)'}
+        {opened ? t.wouldOpen(opened) : t.clickHint}
       </p>
     </section>
   )
 }
 
-const SCREENS = ['Overview', 'Todo', 'Runs']
-const TABS = ['Open', 'Maybe', 'Done']
+const SCREENS = ['overview', 'tasks', 'runs'] as const
+const TABS = ['open', 'maybe', 'done'] as const
 
 /**
  * The app's motion patterns (motion.css) on its own primitives, to look at
@@ -565,6 +558,7 @@ const TABS = ['Open', 'Maybe', 'Done']
  * open (--motion-scale), menus and dialogs included.
  */
 function MotionBench() {
+  const t = useText(text)
   const [speed, setSpeed] = useState(1)
   useEffect(() => {
     const root = document.documentElement.style
@@ -573,58 +567,61 @@ function MotionBench() {
       root.removeProperty('--motion-scale')
     }
   }, [speed])
-  const [screen, setScreen] = useState(SCREENS[0]!)
-  const [tab, setTab] = useState(TABS[0]!)
+  const [screen, setScreen] = useState<(typeof SCREENS)[number]>(SCREENS[0])
+  const [tab, setTab] = useState<(typeof TABS)[number]>(TABS[0])
   const [open, setOpen] = useState(false)
   const [layer, setLayer] = useState<'center' | 'sheet'>()
   const [added, setAdded] = useState(3)
   const [tasks, setTasks] = useState([1, 2, 3])
   const list = useListMotion(tasks, String)
   const [working, setWorking] = useState(false)
-  const [due, setDue] = useState('Thursday')
+  const [due, setDue] = useState<keyof typeof t.days>('thursday')
 
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="mr-auto text-section">Motion</h2>
+        <h2 className="mr-auto text-section">{t.motion}</h2>
         <SpeedPicker value={speed} onChange={setSpeed} />
       </div>
-      <p className="text-meta text-muted-foreground">
-        Each pattern on the components the screens use. With reduced motion on,
-        nothing moves or resizes and what comes and goes fades.
-      </p>
+      <p className="text-meta text-muted-foreground">{t.motionNote}</p>
       <div className="grid gap-x-10 gap-y-8 @min-[44rem]:grid-cols-2">
-        <Bench title="swap" note="A screen or a tab's list giving way">
+        <Bench title="swap" note={t.swapNote}>
           <Choice
-            options={SCREENS.map((name) => ({ value: name, label: name }))}
+            options={SCREENS.map((name) => ({
+              value: name,
+              label: t.screens[name],
+            }))}
             value={screen}
             onChange={setScreen}
           />
           <Swap id={screen} className="mt-3">
             <p className="rounded-xl bg-well px-4 py-6 text-copy">
-              {screen}: the old screen fades out, then this one rises in.
+              {t.swapped(t.screens[screen])}
             </p>
           </Swap>
         </Bench>
 
-        <Bench title="indicator" note="The selected tab, with its list">
-          <Tabs value={tab} onValueChange={setTab}>
+        <Bench title="indicator" note={t.indicatorNote}>
+          <Tabs
+            value={tab}
+            onValueChange={(value) => setTab(value as (typeof TABS)[number])}
+          >
             <TabsList>
               {TABS.map((name) => (
                 <TabsTrigger key={name} value={name}>
-                  {name}
+                  {t.tabs[name]}
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
           <Swap id={tab} className="mt-3">
             <p className="rounded-xl bg-well px-4 py-6 text-copy">
-              The {tab} list.
+              {t.tabList(t.tabs[tab])}
             </p>
           </Swap>
         </Bench>
 
-        <Bench title="reveal" note="A row opening in place">
+        <Bench title="reveal" note={t.revealNote}>
           <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleTrigger className="group flex items-center gap-2 text-section">
               <ChevronRight
@@ -633,21 +630,17 @@ function MotionBench() {
                   open && 'rotate-90'
                 )}
               />
-              Review the payments retry PR
+              {t.task}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <p className="pt-2 pl-6 text-body text-muted-foreground">
-                mina asked for a review of the retry change before Thursday. The
-                thread settled on 5 retries with a backoff.
+                {t.taskDetail}
               </p>
             </CollapsibleContent>
           </Collapsible>
         </Bench>
 
-        <Bench
-          title="arrive and settle"
-          note="Rows coming into a list and leaving it"
-        >
+        <Bench title="arrive and settle" note={t.arriveNote}>
           <Button
             size="xs"
             variant="outline"
@@ -657,7 +650,7 @@ function MotionBench() {
             }}
           >
             <Plus />
-            Add a task
+            {t.addTask}
           </Button>
           <ul ref={list.ref} className="mt-3">
             {list.entries.map((entry) => (
@@ -666,7 +659,7 @@ function MotionBench() {
                 {...motionItem(entry)}
                 className="flex items-center border-t border-border py-2.5 text-copy"
               >
-                <span className="flex-1">Task {entry.item}</span>
+                <span className="flex-1">{t.taskN(entry.item)}</span>
                 <Button
                   size="xs"
                   onClick={() =>
@@ -674,31 +667,28 @@ function MotionBench() {
                   }
                 >
                   <CircleCheck />
-                  Done
+                  {t.done}
                 </Button>
               </li>
             ))}
           </ul>
         </Bench>
 
-        <Bench
-          title="dialog and sheet"
-          note="A question, and a panel at the side"
-        >
+        <Bench title="dialog and sheet" note={t.dialogNote}>
           <div className="flex gap-2">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setLayer('center')}
             >
-              Open a dialog
+              {t.openDialog}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => setLayer('sheet')}
             >
-              Open a sheet
+              {t.openSheet}
             </Button>
           </div>
           <Dialog
@@ -707,14 +697,14 @@ function MotionBench() {
           >
             <DialogContent className="w-[28rem] gap-4 p-6">
               <DialogTitle className="text-heading">
-                Where should the session open?
+                {t.dialogTitle}
               </DialogTitle>
               <DialogDescription className="text-body text-muted-foreground">
-                It lifts in and sinks back out.
+                {t.dialogBody}
               </DialogDescription>
               <div className="flex justify-end">
                 <DialogClose asChild>
-                  <Button variant="secondary">Close</Button>
+                  <Button variant="secondary">{t.close}</Button>
                 </DialogClose>
               </div>
             </DialogContent>
@@ -722,56 +712,55 @@ function MotionBench() {
           {layer === 'sheet' && (
             <Dialog open onOpenChange={() => setLayer(undefined)}>
               <DialogContent variant="sheet" className="w-[28rem] gap-3 p-6">
-                <DialogTitle className="text-section">Session log</DialogTitle>
+                <DialogTitle className="text-section">
+                  {t.sessionLog}
+                </DialogTitle>
                 <DialogDescription className="text-body text-muted-foreground">
-                  It slides in and goes at once.
+                  {t.sheetBody}
                 </DialogDescription>
               </DialogContent>
             </Dialog>
           )}
         </Bench>
 
-        <Bench
-          title="fade and flash"
-          note="An AI tool at work on a task, and what it changes"
-        >
+        <Bench title="fade and flash" note={t.fadeNote}>
           <div className="flex flex-wrap gap-2">
             <Button
               size="xs"
               variant="outline"
               onClick={() => setWorking(!working)}
             >
-              {working ? 'Done working' : 'Start working'}
+              {working ? t.doneWorking : t.startWorking}
             </Button>
             <Button
               size="xs"
               variant="outline"
               onClick={() =>
-                setDue(due === 'Thursday' ? 'Wednesday' : 'Thursday')
+                setDue(due === 'thursday' ? 'wednesday' : 'thursday')
               }
             >
-              Move the due date
+              {t.moveDue}
             </Button>
           </div>
-          <AtWorkRow working={working} due={due} />
+          <AtWorkRow working={working} due={t.days[due]} />
         </Bench>
 
-        <Bench title="pop" note="A menu and a tooltip out of their anchors">
+        <Bench title="pop" note={t.popNote}>
           <div className="flex items-center gap-2">
-            <Tooltip content="Opens in ~/git/payments">
+            <Tooltip content={t.tooltip}>
               <Button size="sm" variant="outline">
-                Hover for a tooltip
+                {t.hover}
               </Button>
             </Tooltip>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon-sm" variant="ghost" aria-label="A menu">
+                <Button size="icon-sm" variant="ghost" aria-label={t.menu}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>Continue in Codex</DropdownMenuItem>
-                <DropdownMenuItem>Draft a reply</DropdownMenuItem>
+                <DropdownMenuItem>{t.continueInCodex}</DropdownMenuItem>
+                <DropdownMenuItem>{t.draftReply}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -783,11 +772,12 @@ function MotionBench() {
 
 /** A task row as an AI tool works on it: its mark, and a due date it moves */
 function AtWorkRow({ working, due }: { working: boolean; due: string }) {
+  const t = useText(text)
   const mark = usePresence<HTMLSpanElement>(working)
   const flash = useFlash({ due })
   return (
     <div className="mt-3 border-t border-border pt-2.5">
-      <p className="text-section">Review the payments retry PR</p>
+      <p className="text-section">{t.task}</p>
       <p className="mt-1 flex flex-wrap items-center gap-2 text-meta text-muted-foreground">
         mina · #payments
         <span
@@ -803,7 +793,7 @@ function AtWorkRow({ working, due }: { working: boolean; due: string }) {
             className="motion-fade inline-flex items-center gap-1.5 font-medium text-status-running"
           >
             <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-            Working in Claude Code
+            {t.workingIn}
           </span>
         )}
       </p>

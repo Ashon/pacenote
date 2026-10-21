@@ -48,6 +48,7 @@ then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the
 | `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN` | The Slack app's tokens (required) |
 | `HUB_PUBLIC_URL` | The HTTPS URL members use; upload URLs handed to desktops are built from it |
 | `HUB_ALLOWED_USERS` | Comma-separated Slack user IDs who may pair and use the hub. Empty: everyone |
+| `HUB_NOTES_LANGUAGE` | The language of the notes the hub posts to members in Slack (pairing, not connected): `en` (default) or `ko` |
 | `HUB_PORT`, `HUB_HOST`, `HUB_DATA_DIR` | Listen port (8790, 0 for any free one), address (0.0.0.0) and data folder (`/data`) |
 | `SLACK_API_URL` | Slack's Web API (default `https://slack.com/api/`): `https://slack-gov.com/api/` for GovSlack. The hub fetches files only from that Slack's file host |
 | `LOG_LEVEL` | debug, info (default), warn, error |

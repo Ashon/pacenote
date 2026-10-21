@@ -188,7 +188,27 @@ plistSet(infoPlist, {
   // Settings > Macs: macOS asks once before Pacenote looks for your other Macs
   NSLocalNetworkUsageDescription:
     'Pacenote finds your other Macs on this network, so Pace answers on the one you are using.',
+  CFBundleDevelopmentRegion: 'en',
 })
+// Pacenote reads in English and Korean (docs/i18n.md). macOS takes an app's
+// languages from its lproj folders, and Electron brings an empty one for each
+// language Chromium has: those go, so macOS offers the app in its own two
+// languages only (and its menus and dialogs follow). Korean also gets the
+// words macOS shows for the app, the local network prompt.
+const LANGUAGES = ['en', 'ko']
+for (const name of await readdir(resourcesDir)) {
+  if (!name.endsWith('.lproj') || LANGUAGES.includes(name.slice(0, -6)))
+    continue
+  const dir = path.join(resourcesDir, name)
+  if ((await readdir(dir)).length === 0) await rmdir(dir)
+}
+for (const language of LANGUAGES) {
+  await mkdir(path.join(resourcesDir, `${language}.lproj`), { recursive: true })
+}
+await writeFile(
+  path.join(resourcesDir, 'ko.lproj/InfoPlist.strings'),
+  '"NSLocalNetworkUsageDescription" = "Pacenote가 이 네트워크에서 내 다른 Mac을 찾아, 지금 쓰는 Mac에서 Pace가 답하게 해요.";\n'
+)
 // The Bonjour service your Macs find each other by (src/macs/bonjour.ts)
 try {
   execFileSync(

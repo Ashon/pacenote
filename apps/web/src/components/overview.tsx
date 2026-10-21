@@ -28,9 +28,11 @@ import {
   formatTokens,
   formatWait,
 } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { useTaskTrend } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { Briefing, BriefingSkeleton, lastBriefing } from './briefing'
+import { text } from './overview.text'
 import { ResumeSetup, SetupFacts } from './setup/resume'
 
 /**
@@ -48,17 +50,18 @@ function SetupCard({
   issues?: { key?: string }[]
   onGuide?: () => void
 }) {
+  const t = useText(text)
   return (
     <div className="mt-6 flex items-center gap-4 rounded-xl bg-card-accent px-5 py-4">
       <div className="min-w-0 flex-1">
-        <h2 className="text-section">Set up Pace</h2>
+        <h2 className="text-section">{t.setUpPace}</h2>
         <p className="mt-0.5 text-copy text-muted-foreground">
-          {message ?? 'Some settings are missing before Pace can start.'}
+          {message ?? t.missingSettings}
         </p>
       </div>
       {onGuide && (
         <Button size="sm" variant="ghost" onClick={onGuide}>
-          Set up step by step
+          {t.stepByStep}
         </Button>
       )}
       <Button
@@ -66,7 +69,7 @@ function SetupCard({
         onClick={() => (window.location.hash = setupSettingsRoute(issues))}
       >
         <Settings />
-        Open Settings
+        {t.openSettings}
       </Button>
     </div>
   )
@@ -82,6 +85,7 @@ function splitUnit(text: string): [string, string] {
 }
 
 export function Overview() {
+  const t = useText(text)
   const stats = useStats()
   const supervisor = useSupervisor()
   const setup = useSetup()
@@ -119,11 +123,8 @@ export function Overview() {
     <div className="@container mx-auto max-w-4xl px-10 py-9">
       {/* A page title like the other screens'; the brand is the sidebar's. */}
       <header>
-        <h1 className="text-title">Overview</h1>
-        <p className="mt-1 text-copy text-muted-foreground">
-          How Pace has answered your Slack mentions and how your tasks went: how
-          many, how well, with which tools, and with how many tokens.
-        </p>
+        <h1 className="text-title">{t.title}</h1>
+        <p className="mt-1 text-copy text-muted-foreground">{t.intro}</p>
       </header>
 
       <Placeholder
@@ -177,33 +178,36 @@ export function Overview() {
           <>
             <Briefing open={trend.data?.open} />
             <section
-              aria-label="Totals"
+              aria-label={t.totals}
               className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4"
             >
               <Metric
                 icon={<Activity className="text-primary" />}
-                label="Total runs"
+                label={t.totalRuns}
                 value={data ? formatNumber(data.total) : '-'}
-                unit={data?.total === 1 ? 'run' : 'runs'}
-                hint={data ? `${formatNumber(today)} today` : undefined}
+                unit={t.runsUnit(data?.total ?? 0)}
+                hint={data ? t.today(formatNumber(today)) : undefined}
               />
               <Metric
                 icon={<CircleCheck className="text-status-succeeded" />}
-                label="Success rate"
+                label={t.successRate}
                 value={successRate === undefined ? '-' : String(successRate)}
                 unit="%"
                 hint={
                   data
-                    ? `${data.byStatus.failed} failed / ${data.byStatus.interrupted} interrupted`
+                    ? t.failedInterrupted(
+                        data.byStatus.failed,
+                        data.byStatus.interrupted
+                      )
                     : undefined
                 }
               />
               <Metric
                 icon={<Timer className="text-primary" />}
-                label="Average duration"
+                label={t.averageDuration}
                 value={avgValue}
                 unit={avgUnit}
-                hint="Time to finish one request"
+                hint={t.averageHint}
               />
               <Metric
                 icon={
@@ -214,12 +218,10 @@ export function Overview() {
                     )}
                   />
                 }
-                label="Running"
+                label={t.running}
                 value={data ? String(running) : '-'}
-                unit={running === 1 ? 'run' : 'runs'}
-                hint={
-                  running > 0 ? 'Generating replies now' : 'No active requests'
-                }
+                unit={t.runsUnit(running)}
+                hint={running > 0 ? t.generating : t.noActive}
                 accent={running > 0}
               />
             </section>
@@ -228,26 +230,26 @@ export function Overview() {
               <section className="flex flex-col">
                 <CardHeader
                   icon={<BarChart3 className="text-primary" />}
-                  label="Last 14 days"
-                  meta="Runs per day"
+                  label={t.last14Days}
+                  meta={t.runsPerDay}
                 />
                 <ChartTotal
                   value={formatNumber(recentRuns)}
-                  unit={recentRuns === 1 ? 'run' : 'runs'}
+                  unit={t.runsUnit(recentRuns)}
                   hint={
-                    recentFailed > 0 ? `${recentFailed} failed` : 'No failures'
+                    recentFailed > 0 ? t.failed(recentFailed) : t.noFailures
                   }
                 />
                 <div className="mt-4 flex min-h-32 flex-1">
                   <DayBars
-                    label="Runs per day for the last 14 days, failures at the top"
+                    label={t.runsChart}
                     topClassNames={['bg-status-failed']}
                     days={daily.map((day) => ({
                       day: day.day,
                       value: day.runs,
                       tops: [day.failed],
                       hover: String(day.runs),
-                      title: `${day.day}: ${day.runs} ${day.runs === 1 ? 'run' : 'runs'}${day.failed ? `, ${day.failed} failed` : ''}`,
+                      title: t.runsDay(day.day, day.runs, day.failed),
                     }))}
                   />
                 </div>
@@ -256,8 +258,8 @@ export function Overview() {
               <section>
                 <CardHeader
                   icon={<Wrench className="text-primary" />}
-                  label="Top tools"
-                  meta="Calls"
+                  label={t.topTools}
+                  meta={t.calls}
                 />
                 {data?.topTools.length ? (
                   <ul className="mt-5 space-y-3">
@@ -280,7 +282,7 @@ export function Overview() {
                   </ul>
                 ) : (
                   <p className="py-8 text-copy text-muted-foreground">
-                    No tool calls recorded.
+                    {t.noToolCalls}
                   </p>
                 )}
               </section>
@@ -401,6 +403,7 @@ function OverviewSkeleton({
   /** The briefing's lines last time */
   briefing: number
 }) {
+  const t = useText(text)
   return (
     <>
       {setupCard > 0 && (
@@ -413,31 +416,31 @@ function OverviewSkeleton({
       <section className="mt-9 grid grid-cols-2 gap-y-8 @min-[46rem]:grid-cols-4">
         <MetricSkeleton
           icon={<Activity className="text-primary" />}
-          label="Total runs"
+          label={t.totalRuns}
         />
         <MetricSkeleton
           icon={<CircleCheck className="text-status-succeeded" />}
-          label="Success rate"
+          label={t.successRate}
         />
         <MetricSkeleton
           icon={<Timer className="text-primary" />}
-          label="Average duration"
+          label={t.averageDuration}
         />
         <MetricSkeleton
           icon={<LoaderCircle className="text-status-running" />}
-          label="Running"
+          label={t.running}
         />
       </section>
       <BandSkeleton
         left={{
           icon: <BarChart3 className="text-primary" />,
-          label: 'Last 14 days',
-          meta: 'Runs per day',
+          label: t.last14Days,
+          meta: t.runsPerDay,
         }}
         right={{
           icon: <Wrench className="text-primary" />,
-          label: 'Top tools',
-          meta: 'Calls',
+          label: t.topTools,
+          meta: t.calls,
         }}
         rows={5}
       />
@@ -445,13 +448,13 @@ function OverviewSkeleton({
         <BandSkeleton
           left={{
             icon: <ListChecks className="text-primary" />,
-            label: 'Tasks handled',
-            meta: 'Per day',
+            label: t.tasksHandled,
+            meta: t.perDay,
           }}
           right={{
             icon: <Flag className="text-primary" />,
-            label: 'How they ended',
-            meta: 'Last 14 days',
+            label: t.howTheyEnded,
+            meta: t.last14Days,
           }}
           rows={3}
         />
@@ -459,13 +462,13 @@ function OverviewSkeleton({
       <BandSkeleton
         left={{
           icon: <Coins className="text-primary" />,
-          label: 'Tokens per day',
-          meta: 'New tokens',
+          label: t.tokensPerDay,
+          meta: t.newTokens,
         }}
         right={{
           icon: <Layers className="text-primary" />,
-          label: 'By source',
-          meta: 'Last 14 days',
+          label: t.bySource,
+          meta: t.last14Days,
         }}
         rows={3}
       />
@@ -473,17 +476,15 @@ function OverviewSkeleton({
   )
 }
 
-const HOW: { how: HandledHow; label: string }[] = [
-  { how: 'tool', label: 'In Claude Code or Codex' },
-  { how: 'slack', label: 'Closed in Slack' },
-  { how: 'you', label: 'Marked done' },
-]
+/** How tasks ended, in the order the list shows them */
+const HOW: HandledHow[] = ['tool', 'slack', 'you']
 
 /**
  * Your tasks over the same 14 days, with Todo on: how many you handled each
  * day and how they ended. With none handled, a line says so.
  */
 function TaskBand({ trend }: { trend?: TaskTrend }) {
+  const t = useText(text)
   if (!trend) return null
   const handled = trend.daily.reduce((sum, day) => sum + day.handled, 0)
   if (handled === 0)
@@ -491,11 +492,10 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
       <section className="mt-10 border-t border-border pt-9">
         <CardHeader
           icon={<ListChecks className="text-primary" />}
-          label="Tasks handled"
+          label={t.tasksHandled}
         />
         <p className="mt-3 text-copy text-muted-foreground">
-          None handled in the last 14 days.
-          {trend.open > 0 && ` ${trend.open} still open.`}
+          {t.noneHandled(trend.open)}
         </p>
       </section>
     )
@@ -505,24 +505,24 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
       <section className="flex flex-col">
         <CardHeader
           icon={<ListChecks className="text-primary" />}
-          label="Tasks handled"
-          meta="Per day"
+          label={t.tasksHandled}
+          meta={t.perDay}
         />
         <ChartTotal
           value={formatNumber(handled)}
-          unit="handled"
-          hint={trend.open ? `${trend.open} still open` : 'None open'}
+          unit={t.handledUnit}
+          hint={trend.open ? t.stillOpen(trend.open) : t.noneOpen}
         />
         <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
-            label="Tasks you handled per day for the last 14 days"
+            label={t.tasksChart}
             topClassNames={[]}
             days={trend.daily.map((day) => ({
               day: day.day,
               value: day.handled,
               tops: [],
               hover: String(day.handled),
-              title: `${day.day}: ${day.handled} handled`,
+              title: t.tasksDay(day.day, day.handled),
             }))}
           />
         </div>
@@ -531,14 +531,14 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
       <section>
         <CardHeader
           icon={<Flag className="text-primary" />}
-          label="How they ended"
-          meta="Last 14 days"
+          label={t.howTheyEnded}
+          meta={t.last14Days}
         />
         <ul className="mt-5 space-y-3">
-          {HOW.map(({ how, label }) => (
+          {HOW.map((how) => (
             <li key={how} className="text-meta">
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <span className="truncate font-medium">{label}</span>
+                <span className="truncate font-medium">{t.how[how]}</span>
                 <span className="shrink-0 font-medium tabular-nums">
                   {trend.how[how]}
                 </span>
@@ -553,9 +553,9 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
         {trend.medianMs !== undefined && (
           <div
             className="mt-3.5 flex items-center gap-2 border-t border-border pt-3 text-meta text-muted-foreground"
-            title="The median, from a task's message to when it was handled"
+            title={t.medianTitle}
           >
-            <span className="font-medium">Usually handled within</span>
+            <span className="font-medium">{t.usuallyWithin}</span>
             <span className="ml-auto font-medium tabular-nums">
               {formatWait(trend.medianMs)}
             </span>
@@ -573,6 +573,7 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
  * most of the input and costs far less.
  */
 function TokenBand({ tokens }: { tokens?: TokenStats }) {
+  const t = useText(text)
   const mentions = tokens ? newTokens(tokens.mentions.usage) : 0
   const collections = tokens ? newTokens(tokens.collections.usage) : 0
   const recaps = tokens ? newTokens(tokens.recaps.usage) : 0
@@ -593,21 +594,21 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
       <section className="flex flex-col">
         <CardHeader
           icon={<Coins className="text-primary" />}
-          label="Tokens per day"
-          meta="New tokens"
+          label={t.tokensPerDay}
+          meta={t.newTokens}
         />
         <ChartTotal
           value={tokens ? formatTokens(all) : '-'}
-          unit={tokens ? 'new' : undefined}
+          unit={tokens ? t.newUnit : undefined}
           hint={
             cacheRead > 0
-              ? `+${formatTokens(cacheRead)} from cache`
-              : 'None from cache'
+              ? t.fromCache(formatTokens(cacheRead))
+              : t.noneFromCache
           }
         />
         <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
-            label="New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections above them, recap write-ups on top"
+            label={t.tokensChart}
             topClassNames={['bg-chart-5', 'bg-chart-4']}
             days={(tokens?.daily ?? []).map((day) => {
               const fromMentions = newTokens(day.mentions)
@@ -623,7 +624,14 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
                 value: total,
                 tops: [fromRecaps, fromCollections],
                 hover: formatTokens(total),
-                title: `${day.day}: ${formatTokens(total)} new (mentions ${formatTokens(fromMentions)}, task collections ${formatTokens(fromCollections)}, recaps ${formatTokens(fromRecaps)}), ${formatTokens(cached)} from cache`,
+                title: t.tokensDay(
+                  day.day,
+                  formatTokens(total),
+                  formatTokens(fromMentions),
+                  formatTokens(fromCollections),
+                  formatTokens(fromRecaps),
+                  formatTokens(cached)
+                ),
               }
             })}
           />
@@ -633,64 +641,64 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
       <section>
         <CardHeader
           icon={<Layers className="text-primary" />}
-          label="By source"
-          meta="Last 14 days"
+          label={t.bySource}
+          meta={t.last14Days}
         />
         <ul className="mt-5 space-y-3 text-meta">
           <SourceRow
-            label="Mentions"
+            label={t.mentions}
             className="pacenote-gradient"
             value={mentions}
             share={mentions / top}
             hint={
               runs
-                ? `${runs} ${runs === 1 ? 'run' : 'runs'} · ${formatTokens(mentions / runs)} per run`
-                : 'No runs with tokens yet'
+                ? t.mentionsHint(runs, formatTokens(mentions / runs))
+                : t.noRunsWithTokens
             }
           />
           <SourceRow
-            label="Task collections"
+            label={t.collections}
             className="bg-chart-4"
             value={collections}
             share={collections / top}
             hint={
               count
                 ? [
-                    `${count} ${count === 1 ? 'collection' : 'collections'}`,
-                    `${formatTokens(collections / count)} each`,
+                    t.collectionsCount(count),
+                    t.each(formatTokens(collections / count)),
                     found
-                      ? `${formatTokens(collections / found)} per task found`
+                      ? t.perTaskFound(formatTokens(collections / found))
                       : undefined,
                   ]
                     .filter(Boolean)
                     .join(' · ')
-                : 'None run from the app yet'
+                : t.noCollections
             }
           />
           <SourceRow
-            label="Recaps"
+            label={t.recaps}
             className="bg-chart-5"
             value={recaps}
             share={recaps / top}
             hint={
               written
-                ? `${written} ${written === 1 ? 'write-up' : 'write-ups'} · ${formatTokens(recaps / written)} each`
-                : 'None written up yet'
+                ? t.recapsHint(written, formatTokens(recaps / written))
+                : t.noRecaps
             }
           />
         </ul>
         <div className="mt-3.5 border-t border-border pt-3 text-meta text-muted-foreground">
           <div className="flex items-center gap-2">
             <span className="size-2 shrink-0 rounded-full border border-input bg-well" />
-            <span className="font-medium">Read from cache</span>
+            <span className="font-medium">{t.readFromCache}</span>
             <span className="ml-auto font-medium tabular-nums">
               {formatTokens(cacheRead)}
             </span>
           </div>
           <p className="mt-1.5">
             {cacheRead > 0
-              ? `Context reused from earlier turns: ${Math.round((cacheRead / (all + cacheRead)) * 100)}% of all tokens.`
-              : 'Context reused from earlier turns.'}
+              ? t.reusedShare(Math.round((cacheRead / (all + cacheRead)) * 100))
+              : t.reused}
           </p>
         </div>
       </section>

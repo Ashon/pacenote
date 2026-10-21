@@ -156,6 +156,8 @@ async function openMac(
       PACENOTE_DATA_DIR: home,
       PACENOTE_DESKTOP_USER_DATA: path.join(home, 'user-data'),
       PACENOTE_DESKTOP_THEME: 'light',
+      // In English whatever this Mac's language (docs/i18n.md)
+      PACENOTE_DESKTOP_LANGUAGE: 'en',
       PACENOTE_MACS_NAME: name,
       PACENOTE_MACS_PORT: String(port),
       PACENOTE_MACS_BONJOUR: 'off',

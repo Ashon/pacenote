@@ -1,4 +1,6 @@
 import { checkConfig, type ConfigIssue } from '../../../src/config.js'
+import { localized } from '../../../src/i18n/locale.js'
+import { text } from './bot-readiness.text.js'
 
 /**
  * Why the bot cannot run yet. The supervisor shows it as "Setup needed" and
@@ -16,20 +18,15 @@ export interface SetupProblem {
 
 /**
  * What each Slack connection needs before the bot can start (src/config.ts
- * SLACK_CONNECTION)
+ * SLACK_CONNECTION), and what it says without it
  */
 const SLACK_NEEDS = {
   app: {
     keys: ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN'],
-    message:
-      "Slack is not connected yet. In Settings > Messengers > Slack, connect to your team's hub or enter your own Slack app's tokens.",
+    says: 'slackNotConnected',
   },
-  hub: {
-    keys: ['HUB_URL', 'HUB_TOKEN'],
-    message:
-      'This desktop is not paired with the team hub yet. Connect it in Settings > Messengers > Slack to start Pace.',
-  },
-}
+  hub: { keys: ['HUB_URL', 'HUB_TOKEN'], says: 'hubNotPaired' },
+} as const
 
 /**
  * Checks the environment the bot would get with the bot's own rules
@@ -41,27 +38,19 @@ export function setupProblem(
 ): SetupProblem | undefined {
   const issues = check(env)
   if (issues.length === 0) return undefined
+  const t = localized(text)
   const needs =
     SLACK_NEEDS[env.SLACK_CONNECTION?.trim() === 'hub' ? 'hub' : 'app']
   if (needs.keys.some((key) => !env[key]?.trim()))
-    return { kind: 'slack', message: needs.message, issues: [] }
+    return { kind: 'slack', message: t[needs.says], issues: [] }
   // Your own Slack app answers no one until you say who (src/config.ts).
   if (
     issues.every(
       (issue) => issue.key === 'MENTION_ALLOWED_USERS' && issue.missing
     )
   )
-    return {
-      kind: 'config',
-      message:
-        'Say who you are: add your own Slack member ID in Settings > Messengers > Slack. Pace answers only you.',
-      issues,
-    }
-  return {
-    kind: 'config',
-    message: 'Some settings need fixing before Pace can start.',
-    issues,
-  }
+    return { kind: 'config', message: t.sayWhoYouAre, issues }
+  return { kind: 'config', message: t.settingsToFix, issues }
 }
 
 /**
@@ -84,23 +73,13 @@ const HUB_AUTH_ERROR = /\b(hub_unauthorized|hub_revoked)\b/
 export function startFailureProblem(
   output: readonly string[]
 ): SetupProblem | undefined {
+  const t = localized(text)
   for (const line of [...output].reverse()) {
     const hub = HUB_AUTH_ERROR.exec(line)?.[1]
-    if (hub) {
-      return {
-        kind: 'slack',
-        message: `The team hub no longer accepts this desktop (${hub}). Connect it again in Settings > Messengers > Slack.`,
-        issues: [],
-      }
-    }
+    if (hub) return { kind: 'slack', message: t.hubRejected(hub), issues: [] }
     const code = SLACK_AUTH_ERROR.exec(line)?.[1]
-    if (code) {
-      return {
-        kind: 'slack',
-        message: `Slack rejected the tokens (${code}). Check them with "Check connection" in Settings, then save to start Pace.`,
-        issues: [],
-      }
-    }
+    if (code)
+      return { kind: 'slack', message: t.slackRejected(code), issues: [] }
   }
   return undefined
 }

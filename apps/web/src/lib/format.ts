@@ -1,3 +1,11 @@
+// Relative imports, so the tests (and the root's typecheck) can load it
+import {
+  getLocale,
+  LOCALE_TAGS,
+  localized,
+} from '../../../../src/i18n/locale.js'
+import { text } from './format.text.js'
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** 10/08 14:03:09 */
@@ -18,59 +26,76 @@ export function formatHourMinute(iso: string): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')
-
-/** List group label: Today, Yesterday, Mon, Oct 6 */
-export function formatDayGroup(iso: string, now = new Date()): string {
+/** The day a time falls on, as whole days before today: 0 today, 1 yesterday */
+export function daysAgo(iso: string, now = new Date()): number {
   const d = new Date(iso)
   const day = (x: Date) =>
     new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const diff = Math.round((day(now) - day(d)) / 86_400_000)
-  if (diff === 0) return 'Today'
-  if (diff === 1) return 'Yesterday'
-  return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`
+  return Math.round((day(now) - day(d)) / 86_400_000)
+}
+
+/** List group label: Today, Yesterday, Mon, Oct 6 (오늘, 어제, 10월 6일 (월)) */
+export function formatDayGroup(iso: string, now = new Date()): string {
+  const t = localized(text)
+  const diff = daysAgo(iso, now)
+  if (diff === 0) return t.today
+  if (diff === 1) return t.yesterday
+  return new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+    month: getLocale() === 'ko' ? 'long' : 'short',
+    day: 'numeric',
+    weekday: 'short',
+  }).format(new Date(iso))
 }
 
 /** A day in a short list: Today, Yesterday, Fri (for the last week) */
 export function formatShortDay(iso: string, now = new Date()): string {
-  const group = formatDayGroup(iso, now)
-  return group.includes(',') ? group.split(',')[0]! : group
+  const t = localized(text)
+  const diff = daysAgo(iso, now)
+  if (diff === 0) return t.today
+  if (diff === 1) return t.yesterday
+  return new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+    weekday: getLocale() === 'ko' ? 'long' : 'short',
+  }).format(new Date(iso))
 }
 
+/** just now, 5m ago, 3h ago, 2d ago, then the date (10/08) */
 export function formatRelative(iso: string, now = Date.now()): string {
+  const t = localized(text)
   const sec = Math.max(0, Math.round((now - Date.parse(iso)) / 1000))
-  if (sec < 45) return 'just now'
-  if (sec < 3600) return `${Math.round(sec / 60)}m ago`
-  if (sec < 86_400) return `${Math.floor(sec / 3600)}h ago`
+  if (sec < 45) return t.justNow
+  if (sec < 3600) return t.minutesAgo(Math.round(sec / 60))
+  if (sec < 86_400) return t.hoursAgo(Math.floor(sec / 3600))
   const days = Math.floor(sec / 86_400)
-  return days < 7 ? `${days}d ago` : formatDateTime(iso).slice(0, 5)
+  return days < 7 ? t.daysAgo(days) : formatDateTime(iso).slice(0, 5)
 }
 
+/** 850ms, 12.3s, 2m 5s, 2h 5m (2분 5초, 2시간 5분) */
 export function formatDuration(ms: number | undefined): string {
   if (ms === undefined || Number.isNaN(ms)) return '-'
+  const t = localized(text)
   if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  if (ms < 60_000) return t.seconds((ms / 1000).toFixed(1))
   // Splitting minutes and hours from the rounded seconds avoids "1m 60s".
   const total = Math.round(ms / 1000)
   const hours = Math.floor(total / 3600)
   const min = Math.floor((total % 3600) / 60)
   const sec = total % 60
-  if (hours > 0) return min ? `${hours}h ${min}m` : `${hours}h`
-  return sec ? `${min}m ${sec}s` : `${min}m`
+  if (hours > 0) return min ? t.hoursMinutes(hours, min) : t.hours(hours)
+  return sec ? t.minutesSeconds(min, sec) : t.minutes(min)
 }
 
 /** A longer wait, in words: 40 min, 3 hours, 1.5 days */
 export function formatWait(ms: number): string {
+  const t = localized(text)
   const min = Math.round(ms / 60_000)
-  if (min < 60) return `${Math.max(1, min)} min`
+  if (min < 60) return t.waitMinutes(Math.max(1, min))
   const hours = Math.round(ms / 3_600_000)
-  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
-  const days = Number((ms / 86_400_000).toFixed(1))
-  return `${days} ${days === 1 ? 'day' : 'days'}`
+  if (hours < 24) return t.waitHours(hours)
+  return t.waitDays(Number((ms / 86_400_000).toFixed(1)))
 }
 
-export const formatNumber = (n: number) => n.toLocaleString('en-US')
+export const formatNumber = (n: number) =>
+  n.toLocaleString(LOCALE_TAGS[getLocale()])
 
 /** Token counts, short: 950, 8.6k, 37k, 1.54M */
 export function formatTokens(n: number): string {

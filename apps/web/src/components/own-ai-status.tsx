@@ -2,7 +2,6 @@ import {
   CLI_NAMES,
   cliOrder,
   OWN_CLIS,
-  switchWords,
   type CliReadiness,
   type CliState,
   type OwnAiView,
@@ -22,7 +21,10 @@ import {
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { formatHourMinute } from '@/lib/format'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { getLocale, LOCALE_TAGS, localized } from '@src/i18n/locale'
+import { text } from './own-ai-status.text'
 
 /**
  * The CLIs that do Pacenote's own work (Collect now, Looks done, Write it up,
@@ -52,19 +54,23 @@ export function useOwnAi() {
   return query
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-
-/** When a rest ends: 14:00 today, "Tue 14:00" on another day */
+/** When a rest ends: 14:00 today, "Tue 14:00" (화요일 14:00) on another day */
 export function untilWords(iso: string, now = new Date()): string {
   const at = new Date(iso)
-  return at.toDateString() === now.toDateString()
-    ? formatHourMinute(iso)
-    : `${WEEKDAYS[at.getDay()]} ${formatHourMinute(iso)}`
+  if (at.toDateString() === now.toDateString()) return formatHourMinute(iso)
+  const weekday = new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+    weekday: getLocale() === 'ko' ? 'long' : 'short',
+  }).format(at)
+  return `${weekday} ${formatHourMinute(iso)}`
 }
 
 /** A switch in a line: "Claude Code was at its usage limit until 14:00" */
 export function switchLine(switched: Switch, now = new Date()): string {
-  return `${switchWords(switched)}${switched.until ? ` until ${untilWords(switched.until, now)}` : ''}`
+  return localized(text).switched(
+    CLI_NAMES[switched.from],
+    switched.unable,
+    switched.until && untilWords(switched.until, now)
+  )
 }
 
 type Tone = 'ok' | 'warn' | 'rest' | 'off'
@@ -77,40 +83,38 @@ export function describeCli(
   state: CliState | undefined,
   now = new Date()
 ): { tone: Tone; text: string; signIn?: boolean } {
+  const t = localized(text)
   const chosen = view.chosen === cli
   // Who does the work while this one cannot: the first that may take over
   const next = cliOrder(view.chosen, view.fallback, {}).find((c) => c !== cli)
-  if (!ready.installed) return { tone: 'off', text: 'Not on this Mac.' }
-  if (ready.tooOld)
-    return { tone: 'warn', text: 'Too old. Update it to use it here.' }
-  if (!ready.signedIn)
-    return { tone: 'warn', text: 'Signed out.', signIn: true }
+  if (!ready.installed) return { tone: 'off', text: t.notHere }
+  if (ready.tooOld) return { tone: 'warn', text: t.tooOld }
+  if (!ready.signedIn) return { tone: 'warn', text: t.signedOut, signIn: true }
   if (state?.until)
     return {
       tone: 'rest',
-      text: `${state.unable === 'unavailable' ? 'Unavailable' : 'At its usage limit'} until ${untilWords(state.until, now)}.${chosen && next ? ` ${CLI_NAMES[next]} does the work until then.` : ''}`,
+      text: t.resting(
+        state.unable === 'unavailable',
+        untilWords(state.until, now),
+        chosen && next ? CLI_NAMES[next] : undefined
+      ),
     }
   if (cli === 'opencode') {
-    if (!chosen) return { tone: 'off', text: 'Used only when chosen.' }
+    if (!chosen) return { tone: 'off', text: t.onlyWhenChosen }
     return {
       tone: 'ok',
-      text: next
-        ? `Ready. Looks done and Write it up run here; Collect now and drafts go to ${CLI_NAMES[next]}, as it reads no Slack yet.`
-        : "Ready. Looks done and Write it up run here; Collect now and drafts need Claude Code or Codex, and switching when it can't is off.",
+      text: next ? t.opencodeReady(CLI_NAMES[next]) : t.opencodeAlone,
     }
   }
   if (state?.unable === 'connector')
     return {
       tone: 'warn',
-      text: `Has no Slack connector. Connect Slack in ${SOURCES.slack.connectors[cli].where}.`,
+      text: t.noConnector(SOURCES.slack.connectors[cli].where),
     }
-  if (chosen) return { tone: 'ok', text: 'Ready. It does the work.' }
+  if (chosen) return { tone: 'ok', text: t.doesTheWork }
   return view.fallback
-    ? {
-        tone: 'ok',
-        text: `Ready to take over when ${CLI_NAMES[view.chosen]} can't.`,
-      }
-    : { tone: 'off', text: "Not used: switching when it can't is off." }
+    ? { tone: 'ok', text: t.takesOver(CLI_NAMES[view.chosen]) }
+    : { tone: 'off', text: t.notUsed }
 }
 
 const ICON: Record<Tone, typeof CircleCheck> = {
@@ -139,6 +143,7 @@ export function OwnAiStatus({
   chosen: OwnCli
   fallback: boolean
 }) {
+  const t = useText(text)
   const ai = useOwnAi()
   const [signing, setSigning] = useState<OwnCli>()
   const [error, setError] = useState<string>()
@@ -156,9 +161,7 @@ export function OwnAiStatus({
       className="space-y-2 border-t border-border bg-well/30 px-4 py-3"
     >
       <div className="flex items-start gap-2">
-        <p className="flex-1 text-meta text-muted-foreground">
-          Each runs on this Mac, with your own login or opencode's config.
-        </p>
+        <p className="flex-1 text-meta text-muted-foreground">{t.intro}</p>
         <Button
           size="xs"
           variant="ghost"
@@ -166,13 +169,13 @@ export function OwnAiStatus({
           onClick={() => void ai.refetch()}
         >
           <RotateCw className={cn(ai.isFetching && 'animate-spin')} />
-          Check again
+          {t.checkAgain}
         </Button>
       </div>
       {!view ? (
         <p className="flex items-center gap-2 py-1 text-meta text-muted-foreground">
           <LoaderCircle className="size-3.5 animate-spin" />
-          Checking Claude Code, Codex and opencode…
+          {t.checking}
         </p>
       ) : (
         <ul className="divide-y divide-border rounded-lg bg-well/60">
@@ -201,7 +204,7 @@ export function OwnAiStatus({
                     disabled={signing !== undefined}
                     onClick={() => void signIn(cli)}
                   >
-                    Sign in
+                    {t.signIn}
                   </Button>
                 )}
               </li>

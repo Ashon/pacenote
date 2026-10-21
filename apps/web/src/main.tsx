@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { ErrorBoundary } from './components/error-boundary'
+import { LanguageProvider } from './lib/i18n'
 import { ThemeProvider } from './lib/theme'
 import './index.css'
 
@@ -13,11 +14,13 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </ThemeProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   </StrictMode>
 )

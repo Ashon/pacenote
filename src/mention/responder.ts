@@ -3,6 +3,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Config } from '../config.js'
 import type { HistoryStore, RunHandle } from '../history/recorder.js'
+import { localized, type Locale } from '../i18n/locale.js'
 import { redactAnswer } from '../broker/redact.js'
 import type { Logger } from '../logger.js'
 import {
@@ -37,6 +38,7 @@ import {
 } from './inflight.js'
 import { ConcurrencyLimiter } from './limiter.js'
 import { systemPrompt, userPrompt } from './prompt.js'
+import { text } from './responder.text.js'
 import { recordAttachments, recordOutputs } from './run-record.js'
 
 /** Run queue limit. Beyond it, the bot replies that it is busy. */
@@ -54,10 +56,16 @@ const PROGRESS: readonly Mark[] = ['waiting', 'working', 'slow']
 /**
  * The line under every answer. Everyone in the channel reads it, not only the
  * person Pace answers, so it says an AI wrote it and with what (Korea's AI
- * Basic Act, Article 31; Anthropic's Usage Policy).
+ * Basic Act, Article 31; Anthropic's Usage Policy). locale: Pace's notes
+ * language.
  */
-export function aiNote(backend: Reasoner['backend']): string {
-  return `_AI answer by Pace, with ${backend === 'codex' ? 'Codex' : 'Claude Code'}_`
+export function aiNote(
+  backend: Reasoner['backend'],
+  locale: Locale = 'en'
+): string {
+  return localized(text, locale).aiNote(
+    backend === 'codex' ? 'Codex' : 'Claude Code'
+  )
 }
 
 export interface MentionResponderDeps {
@@ -124,9 +132,6 @@ export function isOwner(
 ): boolean {
   return Boolean(owner) && mention.userId === owner
 }
-
-/** What anyone else is told, alone */
-export const NOT_OWNER_NOTICE = 'I only answer the person I work for.'
 
 /**
  * The context passed on: all of it when it is short, otherwise the first
@@ -202,6 +207,11 @@ export class MentionResponder {
     )
   }
 
+  /** What Pace says itself in the conversation, in its notes language */
+  private notes() {
+    return localized(text, this.deps.config.notesLocale)
+  }
+
   async handle(mention: Mention): Promise<void> {
     const { log } = this.deps
     const messenger = this.messengers.get(mention.messenger)
@@ -214,31 +224,24 @@ export class MentionResponder {
     if (this.seen.size > 1000)
       this.seen.delete(this.seen.values().next().value!)
 
+    const t = this.notes()
     const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
     if (!isOwner(mention, messenger.owner)) {
       log.info(
         `Ignoring mention from someone other than the owner: ${mention.userId}${mention.external ? ' (outside the workspace)' : ''} in ${mention.conversation}`
       )
-      await messenger.notice(mention, say(NOT_OWNER_NOTICE))
+      await messenger.notice(mention, say(t.notOwner))
       return
     }
     const venue = await messenger.venue(mention)
     if (!venue.answerable) {
-      await messenger.notice(
-        mention,
-        say(venue.refusal ?? "I don't answer here.")
-      )
+      await messenger.notice(mention, say(venue.refusal ?? t.notHere))
       return
     }
 
     // Only the asker needs to know, so the conversation stays as it was.
     if (this.limiter.full) {
-      await messenger.notice(
-        mention,
-        say(
-          'I have too many requests right now. Please mention me again in a moment.'
-        )
-      )
+      await messenger.notice(mention, say(t.busy))
       return
     }
     const entry: InflightEntry = {
@@ -271,6 +274,7 @@ export class MentionResponder {
   ): Promise<Mark | undefined> {
     const { reasoner } = this.deps
     const { mention } = entry
+    const t = this.notes()
     // A placeholder message an older version posted, cut off by the upgrade:
     // it goes, since the answer comes as a new reply.
     if (entry.placeholder)
@@ -278,7 +282,7 @@ export class MentionResponder {
         messenger,
         mention,
         entry.placeholder,
-        'I restarted; the answer comes below.'
+        t.restarted
       )
     const mark: Mark = waits ? 'waiting' : 'working'
     const marked = Boolean(
@@ -290,13 +294,8 @@ export class MentionResponder {
         if (stale !== mark) await messenger.unmark?.(mention, stale)
     if (!marked) {
       const where = `\`${reasoner.backend}@${reasoner.sandbox}\``
-      const text = {
-        now: `Working on it... (${where})`,
-        queued: `Got it. I'll start on this after the requests ahead of it. (${where})`,
-        resumed: `I restarted, so I'm picking this up again... (${where})`,
-      }[taking]
       await messenger
-        .notice(mention, messenger.render(text)[0] ?? '')
+        .notice(mention, messenger.render(t.taking[taking](where))[0] ?? '')
         .catch(() => undefined)
     }
     return marked ? mark : undefined
@@ -497,7 +496,9 @@ export class MentionResponder {
       // Once any of it is in the thread, a restart does not answer again.
       note({ answer: 'posting' })
       const said = text.trim() ? `${text}\n\n` : ''
-      for (const chunk of messenger.render(said + aiNote(reasoner.backend)))
+      for (const chunk of messenger.render(
+        said + aiNote(reasoner.backend, config.notesLocale)
+      ))
         await messenger.post(mention, chunk)
       note({ answer: 'posted' })
       const generated = await this.shrinkImages(
@@ -536,9 +537,13 @@ export class MentionResponder {
         ...(cause === 'other' ? {} : { cause }),
       })
       const advice = failureAdvice(cause, reasoner.backend, reasoner.sandbox)
+      // The status is the app's, so it is in the app's language.
       if (advice?.lasting)
         this.deps.onReasoner?.(
-          `${advice.text} (last at ${formatTime(Date.now(), config.timezone)})`
+          localized(text).lastAt(
+            advice.text,
+            formatTime(Date.now(), config.timezone)
+          )
         )
       // ⚠️ on the mention, and what it means to the asker alone; the error
       // itself stays in the log and the run history.
@@ -549,6 +554,7 @@ export class MentionResponder {
           failureReply(cause, reasoner.backend, {
             own: this.deps.ownMentions,
             timeoutMs: config.reasoner.timeoutMs,
+            locale: config.notesLocale,
           })
         )
       )
@@ -637,9 +643,7 @@ export class MentionResponder {
         await this.fail(
           messenger,
           entry.mention,
-          messenger.render(
-            'I restarted while posting my answer, so it may be cut short. Please mention me again if it is.'
-          )[0] ?? ''
+          messenger.render(this.notes().cutShort)[0] ?? ''
         )
         continue
       }
@@ -776,14 +780,11 @@ export class MentionResponder {
     mention: Mention,
     placeholder: string | undefined
   ): Promise<void> {
-    const text =
-      messenger.render(
-        "I couldn't finish this: I restarted and the request was cut off. Please mention me again."
-      )[0] ?? ''
+    const notice = messenger.render(this.notes().cutOff)[0] ?? ''
     if (placeholder)
-      await this.dropPlaceholder(messenger, mention, placeholder, text)
+      await this.dropPlaceholder(messenger, mention, placeholder, notice)
     await this.clearMarks(messenger, mention)
-    await this.fail(messenger, mention, text)
+    await this.fail(messenger, mention, notice)
   }
 
   /**
@@ -852,7 +853,10 @@ export class MentionResponder {
         results.push({ block })
       }
     }
-    return { text: composeAnswer(answer, results), figures }
+    return {
+      text: composeAnswer(answer, results, this.deps.config.notesLocale),
+      figures,
+    }
   }
 
   /**
@@ -891,16 +895,17 @@ export class MentionResponder {
     generated: Buffer[],
     figures: Figure[]
   ): Promise<boolean> {
+    const t = this.notes()
     const uploads: (Upload & { raw?: string })[] = [
       ...generated.map((data, i) => ({
         data,
         filename: `image-${i + 1}.png`,
-        title: `Generated image ${i + 1}`,
+        title: t.generatedImage(i + 1),
       })),
       ...figures.map(({ figure, png, raw }) => ({
         data: png,
         filename: `figure-${figure}.png`,
-        title: `Figure ${figure}`,
+        title: t.figure(figure),
         raw,
       })),
     ]
@@ -913,7 +918,8 @@ export class MentionResponder {
       const sources = uploads
         .filter((upload) => upload.raw)
         .map(
-          (upload) => `${upload.title} source:\n\`\`\`\n${upload.raw}\n\`\`\``
+          (upload) =>
+            `${t.sourceOf(upload.title)}\n\`\`\`\n${upload.raw}\n\`\`\``
         )
         .join('\n\n')
       // The sources are part of the answer; that the upload failed is the
@@ -922,9 +928,7 @@ export class MentionResponder {
         .notice(
           mention,
           messenger.render(
-            sources
-              ? "I couldn't upload the images, so their sources are in the thread."
-              : "I couldn't upload the generated images."
+            sources ? t.uploadFailedSources : t.uploadFailed
           )[0] ?? ''
         )
         .catch(() => undefined)

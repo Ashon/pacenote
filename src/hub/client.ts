@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { localized } from '../i18n/locale.js'
 import type { SlackCheckItem } from '../messengers/slack/check.js'
+import { text } from './client.text.js'
 import {
   HUB_PATHS,
   type HubMe,
@@ -87,7 +89,8 @@ export async function checkHub(
   token: string | undefined,
   fetchImpl: typeof fetch = fetch
 ): Promise<SlackCheckItem[]> {
-  if (!url) return [{ label: 'Hub', ok: false, detail: 'Enter the hub URL.' }]
+  const t = localized(text)
+  if (!url) return [{ id: 'hub', label: t.hub, ok: false, detail: t.enterUrl }]
   const client = new HubClient(url, fetchImpl)
   try {
     const res = await fetchImpl(
@@ -100,20 +103,22 @@ export async function checkHub(
   } catch (err) {
     return [
       {
-        label: 'Hub',
+        id: 'hub',
+        label: t.hub,
         ok: false,
-        detail: `Not reachable: ${(err as Error).message}`,
+        detail: t.notReachable((err as Error).message),
       },
     ]
   }
   const items: SlackCheckItem[] = [
-    { label: 'Hub', ok: true, detail: 'Reachable' },
+    { id: 'hub', label: t.hub, ok: true, detail: t.reachable },
   ]
   if (!token) {
     items.push({
-      label: 'Pairing',
+      id: 'pairing',
+      label: t.pairing,
       ok: false,
-      detail: 'Not paired yet. Connect below.',
+      detail: t.notPaired,
     })
     return items
   }
@@ -121,20 +126,25 @@ export async function checkHub(
     const me = await client.me(token)
     items.push(
       {
-        label: 'Pairing',
+        id: 'pairing',
+        label: t.pairing,
         ok: true,
         detail: `${me.user.name} (${me.user.id}) @ ${me.team.name}`,
       },
       {
-        label: 'Bot',
+        id: 'bot',
+        label: t.bot,
         ok: me.connected,
-        detail: me.connected
-          ? 'Connected to the hub'
-          : 'Not connected to the hub (start the bot)',
+        detail: me.connected ? t.connected : t.notConnected,
       }
     )
   } catch (err) {
-    items.push({ label: 'Pairing', ok: false, detail: (err as Error).message })
+    items.push({
+      id: 'pairing',
+      label: t.pairing,
+      ok: false,
+      detail: (err as Error).message,
+    })
   }
   return items
 }

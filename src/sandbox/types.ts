@@ -1,3 +1,6 @@
+import { localized } from '../i18n/locale.js'
+import { text } from './types.text.js'
+
 /**
  * Sandbox status and jobs. The desktop app produces them and the settings
  * screen shows them. (Only types also read in the browser live here) Sandbox
@@ -75,29 +78,40 @@ export interface AllowlistIssue {
 
 export type SandboxJobKind = 'kubeconfig' | 'vm'
 
+/** A job's button and what it does, in the language of the moment */
+function jobWords(kind: SandboxJobKind, script: string) {
+  return {
+    script,
+    get label() {
+      return localized(text).jobs[kind].label
+    },
+    get help() {
+      return localized(text).jobs[kind].help
+    },
+  }
+}
+
+/**
+ * The sandbox jobs. Their label and help are read in the language of the
+ * moment each time, so the screens that show them follow a change of language.
+ */
 export const SANDBOX_JOBS: Record<
   SandboxJobKind,
-  { label: string; script: string; help: string }
+  { readonly label: string; script: string; readonly help: string }
 > = {
-  kubeconfig: {
-    label: 'Rebuild kubeconfig',
-    script: 'k8s:kubeconfig',
-    help: "Builds the broker's kubeconfig from the read-only SA token. Used when Pace restarts.",
-  },
-  vm: {
-    label: 'Set up built-in sandbox',
-    script: 'sandbox:vm',
-    help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with ops tools on, the broker. After an update, it builds the images that changed.',
-  },
+  kubeconfig: jobWords('kubeconfig', 'k8s:kubeconfig'),
+  vm: jobWords('vm', 'sandbox:vm'),
 }
 
 /**
  * Where to fix a sandbox problem: the job's button in Settings > Sandbox, and
- * its pnpm script for a run from the repository
+ * its pnpm script for a run from the repository. A clause a sentence ends
+ * with: '...: run "Set up built-in sandbox" in Settings > Sandbox (pnpm
+ * sandbox:vm)'
  */
 export function jobHint(kind: SandboxJobKind): string {
   const job = SANDBOX_JOBS[kind]
-  return `run "${job.label}" in Settings > Sandbox (pnpm ${job.script})`
+  return localized(text).jobHint(job.label, job.script)
 }
 
 export interface SandboxJob {
@@ -108,3 +122,13 @@ export interface SandboxJob {
   exitCode?: number | null
   output: string[]
 }
+
+/** How signing a sandbox CLI in ended (vm-login.ts) */
+export type LoginResult =
+  | { ok: true }
+  | {
+      ok: false
+      error: string
+      /** Stopped from the app, which is no error to show */
+      cancelled?: true
+    }

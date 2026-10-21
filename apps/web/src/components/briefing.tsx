@@ -1,8 +1,10 @@
 import { Placeholder } from '@/components/ui/motion'
 import { SkeletonText } from '@/components/ui/skeleton'
 import { briefLines, type BriefLine } from '@/lib/briefing'
+import { useText } from '@/lib/i18n'
 import { recapHash, useRecap } from '@/lib/recap'
 import { taskHash } from '@/lib/tasks'
+import { text } from './briefing.text'
 
 /** The Overview's briefing (lib/briefing.ts): three lines at most */
 
@@ -49,6 +51,7 @@ export function BriefingSkeleton({ lines }: { lines: number }) {
  * do not wait for it.
  */
 export function Briefing({ open }: { open: number | undefined }) {
+  const t = useText(text)
   const recap = useRecap('day')
   const desktop = Boolean(window.pacenoteDesktop)
   const ready = !desktop || recap.isFetched
@@ -61,7 +64,7 @@ export function Briefing({ open }: { open: number | undefined }) {
       skeleton={<BriefingSkeleton lines={lastBriefing()} />}
     >
       {lines.length > 0 && (
-        <dl aria-label="Briefing" className={GRID}>
+        <dl aria-label={t.briefing} className={GRID}>
           {lines.map((line) => (
             <div key={line.label} className="contents">
               <dt className="text-muted-foreground">{line.label}</dt>

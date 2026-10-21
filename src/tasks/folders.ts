@@ -11,6 +11,8 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { localized } from '../i18n/locale.js'
+import { text } from './folders.text.js'
 import { readJson, writeJson } from './store.js'
 import type { FolderCheck, TaskView } from './types.js'
 
@@ -76,12 +78,13 @@ export async function checkFolder(
   folder: string,
   repo: string | undefined
 ): Promise<FolderCheck> {
+  const t = localized(text)
   if (!existsSync(folder) || !statSync(folder).isDirectory())
-    return { path: folder, matches: false, error: 'There is no such folder.' }
+    return { path: folder, matches: false, error: t.noFolder }
   const remote = await git(folder, ['remote', 'get-url', 'origin'])
   const status = await git(folder, ['status', '--porcelain'])
   if (status === undefined)
-    return { path: folder, matches: !repo, error: 'It is not a git checkout.' }
+    return { path: folder, matches: !repo, error: t.notCheckout }
   return {
     path: folder,
     remote: remote?.trim() || undefined,

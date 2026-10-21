@@ -10,35 +10,33 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useText } from '@/lib/i18n'
 import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
+import { text } from './sidebar.text'
 
 export type Section =
   'overview' | 'runs' | 'tasks' | 'recap' | 'you' | 'bot' | 'settings' | 'debug'
 
-type Item = { section: Section; label: string; icon: LucideIcon }
+type Item = { section: Section; icon: LucideIcon }
 
 /** The screens for watching Pace, at the top */
 const ITEMS: Item[] = [
-  { section: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { section: 'overview', icon: LayoutDashboard },
   // What you have to do, above the jobs Pacenote ran
-  { section: 'tasks', label: 'Todo', icon: ListChecks },
+  { section: 'tasks', icon: ListChecks },
   // What you did, by day, week and month: what is behind, after what is ahead
-  { section: 'recap', label: 'Recap', icon: CalendarCheck },
+  { section: 'recap', icon: CalendarCheck },
   // Where you contribute, from those tasks and your sessions
-  { section: 'you', label: 'You', icon: UserRound },
-  { section: 'runs', label: 'Runs', icon: History },
-  { section: 'bot', label: 'Pace', icon: Bot },
+  { section: 'you', icon: UserRound },
+  { section: 'runs', icon: History },
+  { section: 'bot', icon: Bot },
 ]
 /** Setting the app up, at the bottom */
-const SETTINGS: Item = {
-  section: 'settings',
-  label: 'Settings',
-  icon: Settings,
-}
+const SETTINGS: Item = { section: 'settings', icon: Settings }
 /** Builds made for development only (see App), above Settings */
-const DEBUG: Item = { section: 'debug', label: 'Debug', icon: Bug }
+const DEBUG: Item = { section: 'debug', icon: Bug }
 
 /**
  * The app's sections as a labeled list: the screens for watching Pace at the
@@ -60,6 +58,7 @@ export function Sidebar({
   onNavigate: (section: Section) => void
   showDebug: boolean
 }) {
+  const t = useText(text)
   // Open tasks, beside Tasks
   const tasks = useTasks().data
   const openTasks = tasks?.settings.on
@@ -69,6 +68,7 @@ export function Sidebar({
     <NavItem
       key={props.section}
       {...props}
+      label={t.sections[props.section]}
       count={props.section === 'tasks' ? openTasks : 0}
       current={active === props.section}
       compact={compact}
@@ -77,7 +77,7 @@ export function Sidebar({
   )
   return (
     <nav
-      aria-label="Sections"
+      aria-label={t.nav}
       className={cn(
         'motion-layout flex shrink-0 flex-col px-3 pb-3',
         compact ? 'w-16' : 'w-56'
@@ -100,7 +100,7 @@ export function Sidebar({
             aria-hidden={compact || undefined}
             className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-caption font-semibold text-status-interrupted"
           >
-            Dev
+            {t.dev}
           </span>
         )}
       </div>
@@ -123,6 +123,7 @@ function NavItem({
   compact,
   onClick,
 }: Item & {
+  label: string
   /**
    * Shown when above zero: a tinted badge beside the label, or a solid one on
    * the icon's corner in the compact sidebar
@@ -132,7 +133,8 @@ function NavItem({
   compact: boolean
   onClick: () => void
 }) {
-  const name = count > 0 ? `${label} (${count})` : label
+  const t = useText(text)
+  const name = count > 0 ? t.withCount(label, count) : label
   // The label and its badge, or the badge on the icon's corner, are always
   // there and only hidden, so they can fade as the sidebar changes width.
   const labeled = { 'data-hidden': compact || undefined }

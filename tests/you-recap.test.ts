@@ -5,7 +5,8 @@ import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { setLocale } from '../src/i18n/locale.js'
 import { registerTaskTools } from '../src/tasks/mcp.js'
 import { saveRepo } from '../src/tasks/folders.js'
 import type { TaskView, WorkEntry } from '../src/tasks/types.js'
@@ -281,6 +282,42 @@ describe('a recap', () => {
     expect(prompt).toContain('- Done: Ship retry backoff (Done)')
     expect(prompt).toContain('- Still open: Review the payment retry PR')
     expect(prompt).not.toContain('feat: last week')
+  })
+
+  describe('in Korean', () => {
+    afterEach(() => setLocale('en'))
+
+    it('words its own lines in Korean, and the write-up prompt still in English', () => {
+      setLocale('ko')
+      const week = recap('week', '2026-W42')
+      expect(week.areas.map((a) => a.name)).toEqual([
+        'Payments',
+        'Infra on-call',
+        '기타',
+      ])
+      const [payments] = week.areas
+      expect(payments!.items.map((i) => i.title)).toContain(
+        'Pace에게 요청: any retry timeouts?'
+      )
+      expect(payments!.items[0]!.note).toBe('완료')
+      expect(payments!.carried[0]!.note).toBe('mina님의 요청 · 마감 Friday')
+      expect(recap('day', '2026-10-15').day!.yesterday![2]!.title).toBe(
+        'Ashon/payments 커밋 2개'
+      )
+
+      const prompt = recapPrompt(
+        week,
+        'the week of Mon Oct 12, 2026 (so far)',
+        commits
+      )
+      expect(prompt).toContain('## Elsewhere: ')
+      expect(prompt).toContain('- Done: Ship retry backoff (Done)')
+      expect(prompt).toContain('- Asked Pace: any retry timeouts?')
+      expect(prompt).toContain(
+        '- Still open: Review the payment retry PR (mina asked you · due Friday)'
+      )
+      expect(prompt).not.toMatch(/[가-힣]/)
+    })
   })
 })
 

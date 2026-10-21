@@ -1,6 +1,8 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { text } from './search-field.text'
 
 const isMac = /Mac/.test(navigator.platform)
 
@@ -17,6 +19,7 @@ export function SearchField({
   onChange: (value: string) => void
   className?: string
 }) {
+  const t = useText(text)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -44,15 +47,15 @@ export function SearchField({
           if (value) onChange('')
           else e.currentTarget.blur()
         }}
-        placeholder="Search runs by request, channel or reply"
-        aria-label="Search runs"
+        placeholder={t.placeholder}
+        aria-label={t.label}
         className="h-8 w-full rounded-lg border border-sidebar-border bg-card pr-14 pl-8.5 text-body shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
       />
       <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
         {value ? (
           <button
             type="button"
-            aria-label="Clear search"
+            aria-label={t.clear}
             onClick={() => {
               onChange('')
               input.current?.focus()

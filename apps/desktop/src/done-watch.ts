@@ -4,7 +4,6 @@ import { redactSecrets } from '../../../src/broker/redact.js'
 import type { CodexDefaults } from '../../../src/reasoners/codex.js'
 import {
   CLI_NAMES,
-  unableFrom,
   type OwnCli,
   type Unable,
 } from '../../../src/tasks/own-ai.js'
@@ -16,7 +15,13 @@ import type {
   WorkEntry,
   WorkFile,
 } from '../../../src/tasks/types.js'
-import { exitError, outputOf, runPlain, type OpencodeRun } from './headless.js'
+import {
+  exitError,
+  exitUnable,
+  outputOf,
+  runPlain,
+  type OpencodeRun,
+} from './headless.js'
 
 /**
  * Whether a task looks done once its session went quiet. Pacenote does not
@@ -169,7 +174,8 @@ export function judgementFrom(answer: string): Judgement | undefined {
 
 /**
  * Runs the judge on a CLI with no tools; an error says why it could not, and
- * unable whether the other CLI may judge instead
+ * unable whether the other CLI may judge instead. The error goes only to the
+ * log, so it is in English.
  */
 export async function judge(options: {
   cli: OwnCli
@@ -200,11 +206,17 @@ export async function judge(options: {
   const output = outputOf(options.cli, exit.stdout)
   if (output && 'text' in output)
     return judgementFrom(output.text) ?? { error: `${name} gave no judgement.` }
-  const error = exitError(options.cli, exit, output, {
-    slow: `${name} did not answer in 2 minutes.`,
-    nothing: `${name} gave no judgement.`,
-  })
-  const unable = exit.timedOut ? undefined : unableFrom(error)
+  const error = exitError(
+    options.cli,
+    exit,
+    output,
+    {
+      slow: `${name} did not answer in 2 minutes.`,
+      nothing: `${name} gave no judgement.`,
+    },
+    'en'
+  )
+  const unable = exitUnable(exit, error)
   return unable ? { error, unable } : { error }
 }
 

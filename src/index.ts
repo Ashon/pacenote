@@ -32,6 +32,8 @@ import { loadSettings } from './settings/load-settings.js'
 import { moveEnvSettings } from './settings/settings-file.js'
 import { readTasksSettings } from './tasks/settings.js'
 import { ANSWER_HERE } from './macs/types.js'
+import { envLocale, localized, setLocale } from './i18n/locale.js'
+import { text } from './index.text.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -56,6 +58,9 @@ async function main(): Promise<void> {
   // An earlier version's .env becomes settings.json, once.
   const moved = moveEnvSettings(settingsFilePath())
   loadSettings()
+  // What the app shows of Pace (setup issues, problems) is in the app's
+  // language, or the terminal's.
+  setLocale(envLocale(process.env))
   const config = loadConfig()
   // Settings, run history and logs stay with this account.
   securePrivateDir(pacenoteHome())
@@ -161,12 +166,10 @@ async function main(): Promise<void> {
     for (const problem of rendererProblems) {
       if (config.render.asked) {
         log.warn(`Diagram rendering disabled: ${problem}`)
-        problems.push(`Diagram rendering disabled: ${problem}`)
+        problems.push(localized(text).diagramsOff(problem))
       } else {
         log.info(`Diagrams stay off for now: ${problem}`)
-        renderLimits.push(
-          'Diagrams stay as text until the built-in sandbox is set up for them (Settings > Sandbox).'
-        )
+        renderLimits.push(localized(text).diagramsWait)
       }
     }
     if (rendererProblems.length === 0) renderer = candidate
@@ -197,13 +200,16 @@ async function main(): Promise<void> {
   // follows a setup that finishes later.
   // On this Mac, the CLI itself is what to check: installed, signed in, and
   // recent enough, before a mention fails on it.
-  const checked = sandbox.kind === 'host' ? 'Reasoner' : 'Sandbox'
-  const allProblems = () => [
-    ...sandboxHealth.current.map((problem) => `${checked}: ${problem}`),
-    ...(reasonerProblem ? [`Reasoner: ${reasonerProblem}`] : []),
-    ...imageHealth.current,
-    ...problems,
-  ]
+  const checked = sandbox.kind === 'host' ? 'reasoner' : 'sandbox'
+  const allProblems = () => {
+    const t = localized(text)
+    return [
+      ...sandboxHealth.current.map((problem) => t.problem(checked, problem)),
+      ...(reasonerProblem ? [t.problem('reasoner', reasonerProblem)] : []),
+      ...imageHealth.current,
+      ...problems,
+    ]
+  }
   const sandboxHealth = new SandboxHealth(
     sandbox.kind === 'host'
       ? () =>
@@ -214,7 +220,8 @@ async function main(): Promise<void> {
       : () => sandbox.verify(),
     () => status.update({ problems: allProblems() }),
     log,
-    checked
+    // What the log calls it
+    checked === 'reasoner' ? 'Reasoner' : 'Sandbox'
   )
   await sandboxHealth.check()
   await imageHealth.check()
@@ -279,14 +286,18 @@ async function main(): Promise<void> {
   // only when a mention fails on them.
   const auth = config.reasoner.auth
   if (sandbox.isolated && !auth?.login && !auth?.env) {
-    reasonerProblem = `${failureAdvice('auth', reasoner.backend, sandbox.kind)?.text} (checked at startup)`
+    reasonerProblem = localized(text).atStartup(
+      `${failureAdvice('auth', reasoner.backend, sandbox.kind)?.text}`
+    )
     status.update({ problems: allProblems() })
   } else if (sandbox.isolated && reasoner.backend === 'claude')
     void checkClaudeCredential(
       claudeCredential(config.reasoner.auth?.env ?? {})
     ).then((state) => {
       if (state !== 'rejected' || reasonerProblem) return
-      reasonerProblem = `${failureAdvice('auth', 'claude', sandbox.kind)?.text} (checked at startup)`
+      reasonerProblem = localized(text).atStartup(
+        `${failureAdvice('auth', 'claude', sandbox.kind)?.text}`
+      )
       status.update({ problems: allProblems() })
     })
   // Another of your Macs answers: start with the Slack connection closed
