@@ -177,7 +177,8 @@ export type FromMacState =
       /** Macs waiting in Add a Mac on this network */
       found: { instance: string; name: string }[]
     }
-  | { step: 'connecting'; name: string }
+  /** retrying: the first try did not get through, and it tries again */
+  | { step: 'connecting'; name: string; retrying?: boolean }
   /** Compare the number, then Allow on the other Mac */
   | { step: 'confirming'; name: string; code: string }
   | { step: 'copied'; name: string; me?: { id: string; name: string } }

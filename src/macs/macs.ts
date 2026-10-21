@@ -75,6 +75,19 @@ const DIAL_MS = 10_000
  */
 const STALLED_MS = 60_000
 /**
+ * A Mac that just claimed the lease waits this long before it claims again
+ * by itself (Answer here aside), so two Macs whose rules disagree for a moment
+ * never take it back and forth
+ */
+const CLAIM_COOLDOWN_MS = 15_000
+/**
+ * Unreachable this long, as macOS answers while Local Network access is off,
+ * before Settings > Macs says so: the first time, macOS is still asking
+ */
+const BLOCKED_MS = 30_000
+/** How often to dial again while the network turns this Mac away */
+const REDIAL_MS = 2_000
+/**
  * Just started, how long this Mac waits to hear from the one that answered
  * before taking over from it
  */
@@ -133,6 +146,9 @@ export interface MacsOptions {
   bonjour?: boolean
   now?: () => number
   tickMs?: number
+  /** Tests shorten these: STALLED_MS, CLAIM_COOLDOWN_MS */
+  stalledMs?: number
+  cooldownMs?: number
 }
 
 export class Macs extends EventEmitter<{
@@ -163,6 +179,10 @@ export class Macs extends EventEmitter<{
   private here = true
   private moved?: { from: string; at: string }
   private blocked = false
+  /** Since when dialing has been turned away as by Local Network access */
+  private unreachableSince?: number
+  /** When this Mac last claimed the lease */
+  private claimedAt?: number
   private lastView = ''
   private port = 0
   /** The network side being opened or closed again (network()) */
@@ -487,7 +507,8 @@ export class Macs extends EventEmitter<{
               stalled:
                 this.file.lease?.holder === link.state.id &&
                 link.closedSince !== undefined &&
-                now - link.closedSince >= STALLED_MS,
+                now - link.closedSince >=
+                  (this.options.stalledMs ?? STALLED_MS),
             },
           ]
         : []
@@ -515,7 +536,12 @@ export class Macs extends EventEmitter<{
       this.file.known[lease.holder] !== undefined &&
       !this.heardSinceStart.has(lease.holder) &&
       this.now() - this.startedAt < STARTUP_MS
-    if (take && reason && !waiting) this.take(reason)
+    const cooling =
+      reason !== 'asked' &&
+      this.claimedAt !== undefined &&
+      this.now() - this.claimedAt <
+        (this.options.cooldownMs ?? CLAIM_COOLDOWN_MS)
+    if (take && reason && !waiting && !cooling) this.take(reason)
     return shouldAnswer({
       me: { id: this.id },
       lease: this.file.lease,
@@ -526,6 +552,7 @@ export class Macs extends EventEmitter<{
   }
 
   private take(reason: ClaimReason): void {
+    this.claimedAt = this.now()
     const previous = this.file.lease
     const lease = claim(this.id, previous, this.now())
     this.setLease(lease)
@@ -551,6 +578,13 @@ export class Macs extends EventEmitter<{
     if (next === before) return
     if (before?.holder === this.id && next?.holder !== this.id)
       this.heldUntil = this.now()
+    // A Mac that holds the lease is stalled only after it has held it a while
+    // without opening its connection, not counting the time it stood by
+    if (next && next.holder !== before?.holder) {
+      const link = this.links.get(next.holder)
+      if (link)
+        link.closedSince = link.state?.answering ? undefined : this.now()
+    }
     this.save({ lease: next })
   }
 
@@ -567,7 +601,12 @@ export class Macs extends EventEmitter<{
     for (const link of this.links.values())
       if (now - link.heardAt >= SILENT_MS) link.channel.close()
     if (this.enabled()) {
-      if (now - this.lastDial >= DIAL_MS) {
+      const every =
+        this.unreachableSince !== undefined &&
+        now - this.unreachableSince < 60_000
+          ? REDIAL_MS
+          : DIAL_MS
+      if (now - this.lastDial >= every) {
         this.lastDial = now
         for (const [key, target] of this.targets)
           void this.dialTarget(key, target)
@@ -823,13 +862,18 @@ export class Macs extends EventEmitter<{
         ws.once('error', reject)
       })
       const channel = await dial(ws, { key: signingKey, me: this.hello() })
+      this.unreachableSince = undefined
       this.blocked = false
       this.linked(channel, target.address ?? target.host, key)
     } catch (err) {
       ws.terminate()
       const code = (err as NodeJS.ErrnoException).code
-      // macOS answers this way when Local Network access is off for the app
-      if (code === 'EHOSTUNREACH' && target.instance) this.blocked = true
+      // macOS answers this way when Local Network access is off for the app,
+      // and while it first asks: said only once it lasts
+      if (code === 'EHOSTUNREACH' && target.instance) {
+        this.unreachableSince ??= this.now()
+        this.blocked = this.now() - this.unreachableSince >= BLOCKED_MS
+      }
     } finally {
       this.dialing.delete(key)
     }

@@ -299,12 +299,21 @@ describe('your Macs', () => {
   const leaseOf = (dataDir: string) =>
     (
       JSON.parse(readFileSync(path.join(dataDir, MACS_FILE), 'utf8')) as {
-        lease?: { holder: string }
+        lease?: { holder: string; term: number }
       }
     ).lease
 
   /** One Mac: its use and whether its Slack connection is open, as set */
-  function mac(name: string, token = 'xapp-1-HOME') {
+  function mac(
+    name: string,
+    token = 'xapp-1-HOME',
+    timing: {
+      stalledMs?: number
+      cooldownMs?: number
+      /** Pace's connection opens this long after it is asked to */
+      answerAfterMs?: number
+    } = {}
+  ) {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'pacenote-macs-'))
     dirs.push(dataDir)
     // Turned on in Settings > Macs
@@ -328,8 +337,12 @@ describe('your Macs', () => {
       pace: () => ({ ready: it.ready, answering: it.answering }),
       onAnswer: (here) => {
         it.calls.push(here)
-        it.answering = here
+        if (here && timing.answerAfterMs)
+          setTimeout(() => (it.answering = true), timing.answerAfterMs)
+        else it.answering = here
       },
+      stalledMs: timing.stalledMs,
+      cooldownMs: timing.cooldownMs,
       log: () => undefined,
       port: 0,
       bonjour: false,
@@ -434,6 +447,40 @@ describe('your Macs', () => {
     await macs.setFollow(true)
     expect(macs.listening).toBeGreaterThan(0)
   })
+
+  it('never takes the lease back and forth when a Mac that stood by takes over', async () => {
+    // The Pro stands by a long while, then takes over; its Slack connection
+    // opens a moment later. The Air must not count the time it stood by as
+    // a stall and take the lease straight back.
+    const pro = mac('MacBook Pro', 'xapp-1-HOME', {
+      stalledMs: 300,
+      cooldownMs: 0,
+      answerAfterMs: 100,
+    })
+    const air = mac('MacBook Air', 'xapp-1-HOME', {
+      stalledMs: 300,
+      cooldownMs: 0,
+    })
+    await pro.start()
+    await poll(() => leaseOf(pro.dataDir)?.holder).toBe(pro.macs.id)
+    await air.start()
+    air.macs.addAddress(`127.0.0.1:${pro.macs.listening}`)
+    // You go to the Air: it takes over, and the Pro stands by
+    pro.state.use = { ...left }
+    await poll(() => pro.state.answering).toBe(false)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    // Back at the Pro, the Air left
+    air.state.use = { ...left }
+    pro.state.use = { ...using }
+    const term = leaseOf(pro.dataDir)!.term
+    await poll(() => pro.state.answering).toBe(true)
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(leaseOf(pro.dataDir)).toMatchObject({
+      holder: pro.macs.id,
+      term: term + 1,
+    })
+    expect(air.state.answering).toBe(false)
+  }, 30_000)
 
   it('answers here when following is off or there is no app token', async () => {
     const pro = mac('MacBook Pro', '')

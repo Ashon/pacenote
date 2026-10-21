@@ -435,7 +435,9 @@ function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
           ) : state.step === 'connecting' ? (
             <p className="flex items-center gap-2 text-meta text-muted-foreground">
               <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-              Connecting to {state.name}…
+              {state.retrying
+                ? `Waiting for ${state.name}. Check that Add a Mac is open there.`
+                : `Connecting to ${state.name}…`}
             </p>
           ) : (
             <>

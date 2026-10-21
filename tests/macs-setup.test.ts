@@ -83,7 +83,7 @@ describe('setting up a new Mac from one already set up', () => {
   }
 
   /** The new Mac's setup, with what it took */
-  function air() {
+  function air(retryMs = 300) {
     const took: { payload: SetupPayload; from: unknown }[] = []
     const states: FromMacState[] = []
     const setup = new SetupFromMac({
@@ -91,6 +91,7 @@ describe('setting up a new Mac from one already set up', () => {
       apply: (payload, from) => void took.push({ payload, from }),
       log: () => undefined,
       bonjour: false,
+      retryMs,
     })
     setup.on('change', (state) => states.push(state))
     stops.push(() => setup.cancel())
@@ -152,6 +153,27 @@ describe('setting up a new Mac from one already set up', () => {
       kind: 'declined',
       name: 'MacBook Air',
     })
+  })
+
+  it('tries again quietly while the other Mac is not waiting yet', async () => {
+    const { macs } = await pro()
+    await macs.setFollow(true)
+    const { setup, states } = air(10_000)
+    // Asked before Add a Mac: no error, it waits and tries again
+    const connecting = setup.connect({
+      address: `127.0.0.1:${macs.listening}`,
+    })
+    await poll(() =>
+      states.some((s) => s.step === 'connecting' && s.retrying)
+    ).toBe(true)
+    expect(states.some((s) => s.step === 'error')).toBe(false)
+    await macs.startAdding()
+    await connecting
+    expect(setup.current).toMatchObject({
+      step: 'confirming',
+      name: 'MacBook Pro',
+    })
+    expect(states.some((s) => s.step === 'error')).toBe(false)
   })
 
   it('offers nothing without your own Slack app', async () => {

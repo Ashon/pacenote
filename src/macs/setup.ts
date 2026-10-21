@@ -14,6 +14,8 @@ import type { FromMacState, SetupPayload } from './types.js'
  */
 
 const MAX_MESSAGE = 16 * 1024 * 1024
+/** How long a first connection is tried again before setup says it failed */
+const RETRY_MS = 30_000
 
 export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
   private state: FromMacState = { step: 'idle' }
@@ -39,6 +41,8 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
       log: (message: string) => void
       /** Look on the network with Bonjour (off in tests) */
       bonjour?: boolean
+      /** Tests shorten RETRY_MS */
+      retryMs?: number
     }
   ) {
     super()
@@ -98,32 +102,27 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     const attempt = ++this.attempt
     this.closeChannel()
     this.set({ step: 'connecting', name: where.name })
-    const host = where.host.includes(':') ? `[${where.host}]` : where.host
-    const ws = new WebSocket(`ws://${host}:${where.port}/setup`, {
-      handshakeTimeout: 5_000,
-      maxPayload: MAX_MESSAGE,
-    })
-    this.ws = ws
-    try {
-      await new Promise<void>((resolve, reject) => {
-        ws.once('open', () => resolve())
-        ws.once('error', reject)
-        ws.once('unexpected-response', () => reject(new Error('not waiting')))
-      })
-    } catch {
-      ws.terminate()
+    // The first try often meets macOS still asking for Local Network access,
+    // or the other Mac not waiting yet: tried again quietly for a while
+    const started = Date.now()
+    let opened: Awaited<ReturnType<typeof setupDial>> | undefined
+    for (let tries = 0; ; tries++) {
+      const result = await this.tryOnce(where)
+      if (attempt !== this.attempt) {
+        if (result && 'channel' in result) result.channel.close()
+        return
+      }
+      if ('channel' in result) {
+        opened = result
+        break
+      }
+      if (Date.now() - started >= (this.options.retryMs ?? RETRY_MS))
+        return this.set({ step: 'error', message: result.error })
+      this.set({ step: 'connecting', name: where.name, retrying: true })
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(500 * 2 ** tries, 4_000))
+      )
       if (attempt !== this.attempt) return
-      return this.set({
-        step: 'error',
-        message: `Couldn't reach ${where.name}. Check that Add a Mac is waiting there and both Macs are on the same network. If your other Mac uses your team's hub, join the hub from this Mac instead.`,
-      })
-    }
-    let opened: Awaited<ReturnType<typeof setupDial>>
-    try {
-      opened = await setupDial(ws, { me: this.options.me() })
-    } catch (err) {
-      if (attempt !== this.attempt) return
-      return this.set({ step: 'error', message: (err as Error).message })
     }
     if (attempt !== this.attempt) return opened.channel.close()
     const { channel, code } = opened
@@ -154,6 +153,38 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
         message: `${name} closed the connection. Nothing was copied.`,
       })
     })
+  }
+
+  /** One try at the other Mac: the channel, or why not */
+  private async tryOnce(where: {
+    name: string
+    host: string
+    port: number
+  }): Promise<Awaited<ReturnType<typeof setupDial>> | { error: string }> {
+    const host = where.host.includes(':') ? `[${where.host}]` : where.host
+    const ws = new WebSocket(`ws://${host}:${where.port}/setup`, {
+      handshakeTimeout: 5_000,
+      maxPayload: MAX_MESSAGE,
+    })
+    this.ws = ws
+    try {
+      await new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve())
+        ws.once('error', reject)
+        ws.once('unexpected-response', () => reject(new Error('not waiting')))
+      })
+    } catch {
+      ws.terminate()
+      return {
+        error: `Couldn't reach ${where.name}. Check that Add a Mac is waiting there and both Macs are on the same network. If your other Mac uses your team's hub, join the hub from this Mac instead.`,
+      }
+    }
+    try {
+      return await setupDial(ws, { me: this.options.me() })
+    } catch (err) {
+      ws.terminate()
+      return { error: (err as Error).message }
+    }
   }
 
   /** Cancel: lets the other Mac go, and stops looking */
