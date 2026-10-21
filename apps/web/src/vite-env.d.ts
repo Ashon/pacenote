@@ -132,7 +132,7 @@ declare global {
                 exclude: string[]
                 /** Where code tasks continue */
                 cli: WorkTool
-                /** Where each tool's new sessions open: its app, or a terminal */
+                /** Where each tool's sessions open: its app or a terminal */
                 opensIn: Record<WorkTool, 'app' | 'terminal'>
               }
               collect: TasksCollect
