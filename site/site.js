@@ -22,9 +22,19 @@ if (location.hostname === 'pacenote.dev') {
   document.head.append(tag)
 }
 
+/**
+ * Counts one action, such as a copy of the install command. Off pacenote.dev
+ * there is no gtag, so it counts nothing.
+ */
+function count(action, params) {
+  window.gtag?.('event', action, params)
+}
+
 // Copy the install command; the status line says so for screen readers too.
+// The copy is counted, with which command it was (the home page has two).
 for (const button of document.querySelectorAll('[data-copy]')) {
   button.addEventListener('click', async () => {
+    count('copy_install', { placement: button.dataset.copy })
     const text = document.getElementById(button.dataset.copy).textContent
     const status = button.parentElement.querySelector('.copied')
     try {
