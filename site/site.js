@@ -5,6 +5,84 @@
 // at any refresh rate), run only while on screen, can be paused, and hold
 // still under reduced motion.
 
+// The words this script puts on a page, in its language: the pages in ko/
+// say <html lang="ko">. Korean is the app's (docs/i18n.md); the diagram's
+// words stay short, as they sit on a fixed grid (LAYOUTS).
+const TEXT = {
+  en: {
+    copy: 'Copy',
+    copied: 'Copied',
+    copiedStatus: 'Install command copied',
+    copyFailed: 'Select the command to copy it',
+    pause: 'Pause',
+    play: 'Play',
+    replay: 'Replay',
+    /** A motion control to a screen reader: Pause the animation */
+    control: (action, what) => `${action} ${what}`,
+    animation: 'the animation',
+    diagram: 'the diagram',
+    showStep: (n) => `Show step ${n} in the diagram`,
+    // Home: every tool reports back to Pacenote
+    nodes: {
+      n0: 'mina asked you',
+      n1: 'On your list',
+      n2: 'Session in Claude Code',
+      n3: 'How it ended',
+      n4: 'Reply you send',
+      nh: 'hyun asked you',
+      n5: 'On the Air, with #482',
+      n6: 'Session in Codex',
+      n7: 'How it ended',
+    },
+    /** What Pacenote keeps, one a beat */
+    ledger: [
+      "mina's ask",
+      'to Claude Code',
+      'Claude Code: how it ended',
+      'reply drafted',
+      "hyun's ask",
+      'to Codex, with #482',
+      'Codex: how it ended',
+    ],
+    keeps: 'Pacenote keeps',
+  },
+  ko: {
+    copy: '복사',
+    copied: '복사됨',
+    copiedStatus: '설치 명령을 복사했어요',
+    copyFailed: '명령을 선택해서 복사하세요',
+    pause: '일시정지',
+    play: '재생',
+    replay: '다시 재생',
+    control: (action, what) => `${what} ${action}`,
+    animation: '애니메이션',
+    diagram: '다이어그램',
+    showStep: (n) => `다이어그램에서 ${n}단계 보기`,
+    nodes: {
+      n0: 'mina님의 요청',
+      n1: '할 일에 추가',
+      n2: 'Claude Code 세션',
+      n3: '작업 결과',
+      n4: '내가 보낼 답장',
+      nh: 'hyun님의 요청',
+      n5: 'Air에서, #482와 함께',
+      n6: 'Codex 세션',
+      n7: '작업 결과',
+    },
+    ledger: [
+      'mina님의 요청',
+      'Claude Code로',
+      'Claude Code 결과',
+      '답장 초안',
+      'hyun님의 요청',
+      '#482와 함께 Codex로',
+      'Codex 결과',
+    ],
+    keeps: 'Pacenote의 기록',
+  },
+}
+const T = TEXT[document.documentElement.lang.startsWith('ko') ? 'ko' : 'en']
+
 // Visits to pacenote.dev are counted with Google Analytics, as the Privacy
 // page says; a local preview of the site counts nothing, and the app has none.
 const ANALYTICS_ID = 'G-HSPB6E8SST'
@@ -39,13 +117,13 @@ for (const button of document.querySelectorAll('[data-copy]')) {
     const status = button.parentElement.querySelector('.copied')
     try {
       await navigator.clipboard.writeText(text)
-      button.textContent = 'Copied'
-      status.textContent = 'Install command copied'
+      button.textContent = T.copied
+      status.textContent = T.copiedStatus
     } catch {
-      status.textContent = 'Select the command to copy it'
+      status.textContent = T.copyFailed
     }
     setTimeout(() => {
-      button.textContent = 'Copy'
+      button.textContent = T.copy
       status.textContent = ''
     }, 2000)
   })
@@ -176,14 +254,11 @@ function control(get, what) {
   button.type = 'button'
   button.className = 'motion-control'
   const show = (state) => {
-    const [icon, label] =
-      state === 'playing'
-        ? ['pause', 'Pause']
-        : state === 'ended'
-          ? ['replay', 'Replay']
-          : ['play', 'Play']
+    const icon =
+      state === 'playing' ? 'pause' : state === 'ended' ? 'replay' : 'play'
+    const label = T[icon]
     button.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${ICONS[icon]}</svg><span>${label}</span>`
-    button.setAttribute('aria-label', `${label} ${what}`)
+    button.setAttribute('aria-label', T.control(label, what))
   }
   button.addEventListener('click', () => {
     const timeline = get()
@@ -241,34 +316,19 @@ const LANES = [
 ]
 
 // One ask after another, in beats: who it is at, where, and what it says
+// (T.nodes)
 const NODES = {
-  n0: { lane: 'slack', t: 0, text: 'mina asked you' },
-  n1: { lane: 'pacenote', t: 1, text: 'On your list' },
-  n2: { lane: 'claude', t: 2, text: 'Session in Claude Code' },
-  n3: { lane: 'pacenote', t: 3, text: 'How it ended', tall: 'under' },
-  n4: { lane: 'slack', t: 4, text: 'Reply you send', wide: 'left' },
-  nh: {
-    lane: 'slack',
-    t: 5,
-    text: 'hyun asked you',
-    wide: 'above',
-    tall: 'above',
-  },
-  n5: {
-    lane: 'pacenote',
-    t: 5,
-    text: 'On the Air, with #482',
-    wide: 'above',
-  },
-  n6: { lane: 'codex', t: 6, text: 'Session in Codex' },
-  n7: {
-    lane: 'pacenote',
-    t: 7,
-    text: 'How it ended',
-    wide: 'left',
-    tall: 'under',
-  },
+  n0: { lane: 'slack', t: 0 },
+  n1: { lane: 'pacenote', t: 1 },
+  n2: { lane: 'claude', t: 2 },
+  n3: { lane: 'pacenote', t: 3, tall: 'under' },
+  n4: { lane: 'slack', t: 4, wide: 'left' },
+  nh: { lane: 'slack', t: 5, wide: 'above', tall: 'above' },
+  n5: { lane: 'pacenote', t: 5, wide: 'above' },
+  n6: { lane: 'codex', t: 6 },
+  n7: { lane: 'pacenote', t: 7, wide: 'left', tall: 'under' },
 }
+for (const [id, node] of Object.entries(NODES)) node.text = T.nodes[id]
 const LINES = [
   { from: 'n0', to: 'n1', beat: 1 },
   { from: 'n1', to: 'n2', beat: 2 },
@@ -279,15 +339,8 @@ const LINES = [
   { from: 'n5', to: 'n6', beat: 6 },
   { from: 'n6', to: 'n7', beat: 7, back: true },
 ]
-const LEDGER = [
-  ["mina's ask", 1],
-  ['to Claude Code', 2],
-  ['Claude Code: how it ended', 3],
-  ['reply drafted', 4],
-  ["hyun's ask", 5],
-  ['to Codex, with #482', 6],
-  ['Codex: how it ended', 7],
-]
+// What Pacenote keeps, one a beat from the first
+const LEDGER = T.ledger.map((text, i) => [text, i + 1])
 const BEAT = 1150
 const LEAD = 250
 const beatAt = (beat) => LEAD + (beat - 1) * BEAT
@@ -390,7 +443,7 @@ function converge(figure) {
   }
 
   build()
-  const { button, show } = control(() => timeline, 'the animation')
+  const { button, show } = control(() => timeline, T.animation)
   top.append(button)
   timeline.onstate = show
   if (still) {
@@ -543,7 +596,7 @@ function drawConverge(stage, caption, L, M, wide, steps, onstate) {
       ? { left: px(M.x(0)), top: px(ledgerTop + 3) }
       : { left: px(M.x(0)), top: px(ledgerTop - 26) }
   )
-  label.innerHTML = `${icon('keeps')}<span>Pacenote keeps</span>`
+  label.innerHTML = `${icon('keeps')}<span>${T.keeps}</span>`
   const ledger = div(
     'cv-ledger',
     stage,
@@ -908,7 +961,7 @@ function architecture(figure) {
   place()
 
   const bar = figure.querySelector('.arch-head')
-  const { button, show } = control(() => timeline, 'the diagram')
+  const { button, show } = control(() => timeline, T.diagram)
   timeline.onstate = show
   bar.append(button)
 
@@ -921,7 +974,7 @@ function architecture(figure) {
       jump.type = 'button'
       jump.className = 'step-num'
       jump.textContent = String(i + 1)
-      jump.setAttribute('aria-label', `Show step ${i + 1} in the diagram`)
+      jump.setAttribute('aria-label', T.showStep(i + 1))
       jump.addEventListener('click', () => {
         timeline.seek(STEPS[i][0] + 1)
         if (timeline.state !== 'playing') timeline.play()

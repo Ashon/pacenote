@@ -7,8 +7,11 @@
   in HTML (the av-* styles, icons.svg from scripts/site-icons.mjs), not pictures. To preview, run that workflow's "stage" step from
   the repository root and serve site/ over http (python3 -m http.server -d site).
 
+  ko/ has the same four pages in Korean, in the same markup, with the app's Korean words (docs/i18n.md); site.js picks its
+  own words by <html lang>. Each page names its counterpart (hreflang) and links to it from the header.
+
   Every claim here must stay true to the code, as the README's must: recheck "What Pace never does"
-  (here and on privacy/) when Slack, sandbox, broker or network code changes.
+  (here and on privacy/, in both languages) when Slack, sandbox, broker or network code changes.
 -->
 <html lang="en">
 <head>
@@ -17,6 +20,9 @@
   <title>Pacenote: your own AI assistant in Slack, on your Mac</title>
   <meta name="description" content="A free Mac app. Pace answers you in Slack when you mention it, with your own Claude Code or Codex login, and lists what people asked of you. Open source, no telemetry.">
   <link rel="canonical" href="https://pacenote.dev/">
+  <link rel="alternate" hreflang="en" href="https://pacenote.dev/">
+  <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/">
+  <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/">
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Pacenote: your own AI assistant in Slack">
@@ -24,6 +30,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/">
   <meta property="og:site_name" content="Pacenote">
+  <meta property="og:locale" content="en_US">
   <meta property="og:image" content="https://pacenote.dev/assets/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -47,6 +54,7 @@
       <a href="privacy/">Privacy</a>
       <a href="install/">Install</a>
       <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
+      <a class="lang" href="ko/" lang="ko" hreflang="ko">한국어</a>
       <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
     </nav>
   </header>

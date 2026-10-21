@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>작동 방식 - Pacenote</title>
+  <meta name="description" content="Pace가 내 Mac이나 쓰고 버리는 VM에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 그간의 기록과 함께 Claude Code나 Codex에 넘기는 방식이에요.">
+  <link rel="canonical" href="https://pacenote.dev/ko/how-it-works/">
+  <link rel="alternate" hreflang="en" href="https://pacenote.dev/how-it-works/">
+  <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/how-it-works/">
+  <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/how-it-works/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Pacenote 작동 방식">
+  <meta property="og:description" content="Pace는 내 Mac에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 Claude Code나 Codex에 넘겨요.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/ko/how-it-works/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../../media/pacenote-mark.svg">
+  <link rel="stylesheet" href="../../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote 홈">
+      <img src="../../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="페이지">
+      <a href="../how-it-works/" aria-current="page">작동 방식</a>
+      <a href="../privacy/">개인정보 보호</a>
+      <a href="../install/">설치</a>
+      <a href="https://github.com/Ashon/pacenote#readme">문서<span aria-hidden="true"> ↗</span></a>
+      <a class="lang" href="../../how-it-works/" lang="en" hreflang="en">English</a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head">
+      <h1>작동 방식</h1>
+      <p class="lede">Pacenote는 내 Mac에서 돌아가요. Pace는 Slack에서 내게 답하고, 사람들이 내게 부탁한 일을 목록으로
+        챙기고, 할 일마다 Claude Code나 Codex에 넘겨요. 한 일은 모두 <code>~/.pacenote</code>에 남아요.</p>
+    </div>
+
+    <div class="surface">
+      <section class="block compact" aria-labelledby="toc-title">
+        <nav class="toc" aria-labelledby="toc-title">
+          <h2 id="toc-title">이 페이지에서</h2>
+          <ol>
+            <li><a href="#loop">한 바퀴 흐름</a></li>
+            <li><a href="#answer">답변이 만들어지는 과정</a></li>
+            <li><a href="#sandbox">내 Mac에서, 또는 샌드박스에서</a></li>
+            <li><a href="#todo">내 할 일</a></li>
+            <li><a href="#handoff">Claude Code나 Codex에 할 일 넘기기</a></li>
+            <li><a href="#macs">내 Mac 사이를 오가기</a></li>
+            <li><a href="#teams">팀원과 팀 허브</a></li>
+            <li><a href="#also">Pacenote의 다른 기능</a></li>
+          </ol>
+        </nav>
+      </section>
+
+      <section class="block" id="loop" aria-labelledby="loop-title">
+        <h2 id="loop-title">한 바퀴 흐름</h2>
+        <p>일은 Slack 스레드로 들어오고, Claude Code나 Codex에서 끝나요. 도구마다 기록이 따로라서, 스레드를 다시 붙여
+          넣고, 다시 설명하고, 어디까지 했는지 다시 찾아야 해요. Pacenote는 어느 도구로 일했든 할 일마다 기록을 내 Mac에
+          한데 모아 두고, Mac을 두 대 쓰면 다른 Mac에도 모아 둬요.</p>
+        <ol class="track" aria-label="할 일 하나, 요청부터 마무리까지">
+          <li><b>요청</b><span>Slack 스레드와 그 링크</span></li>
+          <li><b>할 일 목록에</b><span>요약을 붙여 할 일로 모음</span></li>
+          <li><b>착수</b><span>스레드, 관련 작업의 결과와 함께</span></li>
+          <li><b>작업</b><span>내 세션과 브랜치</span></li>
+          <li><b>마무리</b><span>어떻게 끝났는지, 보낼 답장</span></li>
+        </ol>
+        <p class="aside">이름의 유래: 랠리에서는 코드라이버가 페이스 노트를 읽어 주어, 드라이버가 도로에서 눈을 떼지 않게
+          해요. 운전은 내가 하고, 노트는 Pace가 읽어요.</p>
+      </section>
+
+      <section class="block" id="answer" aria-labelledby="answer-title">
+        <h2 id="answer-title">답변이 만들어지는 과정</h2>
+        <ol class="steps">
+          <li><code>@Pace</code>를 멘션하면, 그 멘션은 내 Mac이 여는 연결인 Slack Socket Mode나 팀 허브를 거쳐 내 Mac의 앱에
+            도착해요.</li>
+          <li>Pace는 요청한 사람이 나인지, 공개 채널인지 확인하고 스레드와 파일을 읽어요.</li>
+          <li>내 Mac에서 폴더 하나에만 읽기 전용으로 접근하게 해서 <code>claude</code>나 <code>codex</code>를 실행하거나,
+            답변이 끝나면 버리는 Linux VM에서 실행해요.</li>
+          <li>답변에서 자신의 비밀 값을 지우고, 스레드에 답하고, 모든 단계를 기록해요.</li>
+        </ol>
+        <figure class="arch" data-arch aria-labelledby="arch-title">
+          <p class="arch-head"><span id="arch-title">답변 하나, 처음부터 끝까지</span></p>
+          <div class="arch-map">
+            <div class="arch-group">
+              <p class="arch-title">Slack <span>내 워크스페이스</span></p>
+              <div class="arch-card" data-node="s_mention"><b>@Pace web-01 확인해 줘</b><span>#ops에서 보낸 내 멘션</span></div>
+              <div class="arch-card" data-node="s_socket"><b>Socket Mode</b><span>내 Mac이 연 연결로 오는 이벤트</span></div>
+              <div class="arch-card" data-node="s_api"><b>Web API</b><span>답변, 이모지 반응, 파일</span></div>
+              <div class="arch-card arch-reply" data-node="s_reply" data-late><b>Pace</b><span>가능성 높은 원인: 09:02 배포</span></div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">내 Mac <span>앱이 실행하는 Pace</span></p>
+              <div class="arch-card" data-node="p_msg"><b>messengers/slack</b><span>Slack 이벤트를 받고 답변을 보냄</span></div>
+              <div class="arch-card" data-node="p_pipe"><b>mention pipeline</b><span>물어볼 수 있는 사람, 스레드, 파일</span></div>
+              <div class="arch-chip" data-node="p_checks" data-late>요청한 사람은 나 · 공개 채널</div>
+              <div class="arch-card" data-node="p_reason"><b>reasoners/claude, codex</b><span>CLI를 호출하고 그 단계를 읽음</span></div>
+              <div class="arch-card" data-node="p_sandbox"><b>sandbox/vm</b><span>답변마다 Linux VM 하나</span></div>
+              <div class="arch-chip" data-node="p_redact" data-late>자신의 비밀 값을 지움</div>
+              <div class="arch-card" data-node="p_runs"><b>~/.pacenote</b><span>실행 기록, 할 일, 설정</span></div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">내장 샌드박스 <span>pacenote-vm</span></p>
+              <div class="arch-card" data-node="v_vm"><b>답변 CLI VM</b><span>claude 또는 codex · 읽기 전용 이미지 · 네트워크 장치 없음</span></div>
+              <div class="arch-card" data-node="v_proxy"><b>Pace 안의 프록시</b><span>허용 도메인만</span></div>
+              <div class="arch-domains">
+                <div class="arch-chip" data-node="v_allow">api.anthropic.com</div>
+                <div class="arch-chip arch-blocked" data-node="v_block">example.com</div>
+              </div>
+              <div class="arch-card" data-node="v_broker"><b>ops-broker</b><span>SSH, k8s, GitHub, Jira: 자격 증명은 여기에만</span></div>
+              <div class="arch-card arch-gone" data-node="v_gone"><b>답변이 끝나면 사라짐</b><span>VM에는 아무것도 남지 않음</span></div>
+            </div>
+          </div>
+        </figure>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/architecture.md">다이어그램 7개로 보는 전체 아키텍처<span aria-hidden="true"> ↗</span></a>
+      </section>
+
+      <section class="block" id="sandbox" aria-labelledby="sandbox-title">
+        <h2 id="sandbox-title">내 Mac에서, 또는 샌드박스에서</h2>
+        <p>Pace는 내가 로그인해 둔 <code>claude</code>나 <code>codex</code> CLI를 실행해요. 내 Mac에서는 CLI가 내가 고른
+          폴더 하나에만 읽기 전용으로 접근하고, 자격 증명 폴더에는 절대 접근하지 않아요.</p>
+        <p>내장 샌드박스에서는 답변마다 Apple의 Containerization 프레임워크로 띄운 Linux VM 하나에서 실행해요. VM에는 자체
+          네트워크 장치가 없고, Pace 안의 프록시를 거쳐 내가 허용한 도메인에만 접근하며, 답변이 끝나면 버려져요.
+          샌드박스에서는 다이어그램과 차트가 이미지로 돌아오고, Pace가 내 할 일을 추가하거나, 목록으로 보거나, 닫을 수
+          있어요. 샌드박스에는 macOS 15 이상이 필요해요.</p>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/sandbox.md">샌드박스 자세히 보기<span aria-hidden="true"> ↗</span></a>
+      </section>
+
+      <section class="block" id="todo" aria-labelledby="todo-title">
+        <h2 id="todo-title">내 할 일</h2>
+        <p><b>지금 모으기</b>를 누르면 Claude Code가 내 claude.ai Slack 커넥터로, 또는 Codex가 ChatGPT의 Slack 앱으로 Slack을
+          읽기 전용으로 읽고, 한쪽이 사용 한도에 걸리면 다른 쪽이 이어받아요. 그러면 내 @멘션, 사람들이 나를 부르는 다른
+          이름, 나를 가리키는 사용자 그룹으로 사람들이 내게 부탁한 일과, 내가 하겠다고 한 일이 목록으로 정리돼요.</p>
+        <p>확실하지 않은 건 후보에서 기다리고, 같은 메시지가 할 일이 되는 건 한 번뿐이에요. 모으기는 내가 켜기 전까지
+          꺼져 있어요.</p>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/tasks.md">할 일 자세히 보기<span aria-hidden="true"> ↗</span></a>
+      </section>
+
+      <section class="block" id="handoff" aria-labelledby="handoff-title">
+        <div class="row">
+          <div class="copy">
+            <h2 id="handoff-title">Claude Code나 Codex에 할 일 넘기기</h2>
+            <p><b>Claude Code에서 계속</b>이나 Codex에서 계속을 누르면 할 일, 스레드, Pace가 거기서 찾은 내용, 그리고
+              지난번 관련 작업이 어떻게 끝났는지까지 담은 터미널 세션이 열려요. 그 작업을 다른 도구에서 했더라도요.
+              아니면 이 모든 내용을 적어 둔 Claude 앱이나 Codex 앱이 열리고, 보내기는 내가 해요.</p>
+            <p>저장소에서 내가 직접 시작한 세션도 처음부터 열린 할 일을 전달받고, 할 일 화면에는 작업이 진행되는 대로
+              보여요. 작업이 끝나면 할 일은 어떻게 끝났는지 메모와 함께 닫히고, 누군가 기다리고 있다면 내가 보낼 답장도
+              함께 남아요.</p>
+          </div>
+          <figure class="shot">
+            <div class="av av-taskview" role="img"
+              aria-label="닫힌 할 일: mina님이 멱등성 키를 고치고 #482를 병합했고, Claude Code에서 완료했어요. 그 아래에 방금 복사한 내 답장이 있어요: #482 리뷰했어요, 멱등성 키 관련 코멘트 3개 남겼어요. 복사하고 스레드 열기, 초안 다시 쓰기 버튼과 함께 Pacenote는 대신 보내지 않는다는 안내가 있어요.">
+              <div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev open" aria-hidden="true"><use href="../../icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title done">결제 재시도 PR 리뷰</span><span class="av-meta"><span>mina님의 요청 · #payments · 2시간 전</span><span class="av-badge plain">닫힘: Claude Code에서 완료</span><span class="av-badge area">결제</span></span><span class="av-mono">acme/payments</span></div></div><div class="av-actions"><span class="av-btn secondary"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#undo-2"/></svg>다시 열기</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#external-link"/></svg></span></div></div><div class="av-context"><div>mina님이 목요일 전까지 PR #482 리뷰를 부탁했어요.</div><div class="av-kv"><span class="av-k">결과</span><span class="av-v"><b>mina님이 멱등성 키를 고치고 #482를 병합했어요.</b><span class="av-muted">Claude Code에서 완료 · #482에 코멘트 3개 남김</span></span><span></span><span class="av-k">지난번</span><span class="av-v"><b>재시도 설정 변경 리뷰</b><span class="av-muted">Claude Code에서 완료 · 코멘트 2개 · 일요일</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#square-terminal"/></svg></span><span class="av-k">내 작업</span><span class="av-v"><b>Claude Code 세션</b><span class="av-muted">방금 마지막 활동</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#square-terminal"/></svg></span><span class="av-k">이 스레드</span><span class="av-v"><b>payments-worker에 재시도 타임아웃이 있나요?</b><span class="av-muted">Pace · 어제</span></span><span></span></div><div class="av-show">접기</div><div class="av-reply"><div class="av-meta">내 답장 · 방금 복사함</div><div class="av-reply-box">#482 리뷰했어요. 멱등성 키 관련 코멘트 3개 남겼어요.</div><div class="av-reply-actions"><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#copy"/></svg>복사하고 스레드 열기</span><span class="av-btn ghost"><svg class="av-i" aria-hidden="true"><use href="../../icons.svg#rotate-cw"/></svg>초안 다시 쓰기</span><span class="av-meta">Pacenote는 대신 보내지 않아요.</span></div></div></div></div>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <section class="block" id="macs" aria-labelledby="macs-title">
+        <h2 id="macs-title">내 Mac 사이를 오가기</h2>
+        <p>두 Mac에 Pacenote가 있고 내 Slack 앱을 쓴다면, 각 Mac에서 설정 &gt; 내 Mac을 켜세요. 두 Mac은 내 네트워크에서,
+          또는 Tailscale을 거쳐 주소로 서로를 찾고, 그중 한 대가 Pace의 Slack 연결을 맡아요. 바로 내가 쓰고 있는 Mac이에요.
+          그 Mac을 잠그거나, 잠자기 상태로 두거나, 뚜껑을 닫거나, 5분 동안 그대로 두면 다른 Mac이 이어받아요. 두 Mac을 모두
+          쓰면 Pace는 있던 곳에 그대로 있어요. 다음 Mac이 연결된 뒤에야 이전 Mac이 연결을 놓으므로, 멘션을 놓치거나 두 번
+          답하는 일이 없어요.</p>
+        <p>할 일, 내 결정, 작업 기록, 회고, 영역은 바뀔 때마다 두 Mac 사이에서 직접 합쳐져서 두 Mac에서 같아요. 세션은
+          실행 중인 Mac에 머물고, 다른 Mac에서는 그곳에서 새 세션을 시작하도록 제안해요.</p>
+        <p>두 Mac은 함께 쓰는 Slack 앱에서 나온 키로 서로를 알아보고, 내 네트워크에서 오는 연결만 받아요. 새 Mac은 지금
+          쓰는 Mac에서 설정을 가져와요. 기존 Mac에서 Mac&nbsp;추가를 누르고, 새 Mac의 초기 설정에서
+          내&nbsp;다른&nbsp;Mac에&nbsp;연결을 고른 다음, 두 Mac에 같은 여섯 자리 숫자가 보이는지 확인하고 허용하세요.</p>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/macs.md">내 Mac<span aria-hidden="true"> ↗</span></a>
+      </section>
+
+      <section class="block" id="teams" aria-labelledby="teams-title">
+        <h2 id="teams-title">팀원과 팀 허브</h2>
+        <p>Pace는 나에게만 답해요. 다른 사람이 멘션하면 그 사람에게만 보이는 안내를 받아요. 팀원은 각자 자기 Mac에서 자기
+          로그인으로 자기 Pace를 실행해요.</p>
+        <p>팀은 Pacenote 허브로 Slack 앱 하나를 함께 쓸 수 있어요. 허브는 각 멘션을 쓴 사람의 데스크톱으로 보내고, Pace는
+          거기서 그 사람의 로그인으로 답하며, Slack 토큰은 허브에 머물러요.</p>
+        <p>회사가 Slack에 추가하는 어시스턴트와 다른 점이 바로 이거예요. 그런 어시스턴트는 관리자가 설정하고 회사 계정으로
+          돌아가요. Pace는 내가 직접, 내 Mac에서, 내 요금제로 설정하는 어시스턴트예요.</p>
+        <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">팀 허브<span aria-hidden="true"> ↗</span></a>
+      </section>
+
+      <section class="block" id="also" aria-labelledby="also-title">
+        <h2 id="also-title">Pacenote의 다른 기능</h2>
+        <ul class="wells">
+          <li>
+            <h3><a href="https://github.com/Ashon/pacenote/blob/main/docs/recap.md">하루, 한 주, 한 달 회고하기</a></h3>
+            <p>하루는 스탠드업으로, 한 주는 이월되는 일과 함께 영역별로, 한 달은 일이 어디에 쓰였는지로 정리해요. 바로
+              올릴 수 있게 텍스트로 복사돼요.</p>
+          </li>
+          <li>
+            <h3><a href="https://github.com/Ashon/pacenote/blob/main/docs/you.md">내가 일하는 영역 보기</a></h3>
+            <p>Pacenote가 내 할 일과 Claude Code, Codex 세션을 내가 기여하는 영역별로 나눠요. 틀린 건 내가 바로잡으면
+              돼요.</p>
+          </li>
+          <li>
+            <h3><a href="https://github.com/Ashon/pacenote/blob/main/docs/history-mcp.md">AI 도구가 직접 찾아보게 하기</a></h3>
+            <p>Pacenote의 MCP 서버로 Claude Code, Codex, 그 밖의 MCP 클라이언트가 Pace가 한 일과 내 할 일 목록을 읽을 수
+              있어요. 추가하기 전까지는 꺼져 있고, 추가는 클릭 한 번이면 돼요.</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="block closing" aria-labelledby="next-title">
+        <h2 id="next-title">내 Mac에서 써 보세요</h2>
+        <div class="get">
+          <div class="command" role="group" aria-label="Homebrew로 설치">
+            <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+            <button class="button secondary copy" type="button" data-copy="install-command">복사</button>
+            <span class="copied" role="status" aria-live="polite"></span>
+          </div>
+          <a class="button primary" href="../install/">초기 설정 단계</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote는 한 사람이 만들고, 있는 그대로 제공해요.</p>
+    <nav aria-label="프로젝트">
+      <a href="../privacy/">개인정보 보호</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">문서</a>
+      <a href="https://github.com/Ashon/pacenote/releases">릴리스</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">라이선스</a>
+    </nav>
+    <p class="legal">Pacenote는 독립 프로젝트로, Anthropic, OpenAI, Slack이 만들거나 보증하거나 지원하지 않아요.
+      Claude, Claude Code, Codex, ChatGPT, Slack은 각 소유자의 상표예요.</p>
+    <p class="legal">© 2026 Ashon. Pacenote는 Apache License 2.0에 따른 오픈 소스예요.</p>
+  </footer>
+
+  <script src="../../site.js"></script>
+</body>
+</html>

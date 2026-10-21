@@ -61,9 +61,15 @@ jobs:
           set -euo pipefail
           version=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)
           test -n "$version" || { echo "could not read the latest release tag" >&2; exit 1; }
-          test "$(grep -c 'id="release-link"' site/index.html)" -eq 1 || { echo "expected one release-link" >&2; exit 1; }
-          sed -i -E "s|(<a class=\"release\" id=\"release-link\" href=\")[^\"]*(\">)[^<]*</a>|\1https://github.com/${{ github.repository }}/releases/tag/${version}\2What's new in ${version}</a>|" site/index.html
-          grep -o '<a class="release" id="release-link"[^<]*</a>' site/index.html | grep -F "$version"
+          # Each home page's link, in its language: the English one and the Korean one in ko/
+          stamp() {
+            local page=$1 words=$2
+            test "$(grep -c 'id="release-link"' "$page")" -eq 1 || { echo "expected one release-link in $page" >&2; exit 1; }
+            sed -i -E "s|(<a class=\"release\" id=\"release-link\" href=\")[^\"]*(\">)[^<]*</a>|\1https://github.com/${{ github.repository }}/releases/tag/${version}\2${words}</a>|" "$page"
+            grep -o '<a class="release" id="release-link"[^<]*</a>' "$page" | grep -F "$words"
+          }
+          stamp site/index.html "What's new in ${version}"
+          stamp site/ko/index.html "${version}에서 달라진 점"
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

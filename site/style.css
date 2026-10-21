@@ -3,8 +3,9 @@
  * the canvas is the window chrome, one white content surface sits on it, and inside that surface
  * parts are split by hairlines and grouped in recessed wells. Surfaces, not borders, set the levels.
  * Type is the app's pair: Latin in the system font (SF Pro on a Mac) and Hangul in Pretendard.
- * The page is English, so Pretendard is only taken from the visitor's Mac when it is installed;
- * nothing is fetched from another host. Code is in the system's monospace.
+ * Pretendard is only taken from the visitor's Mac when it is installed, the Korean pages (ko/)
+ * falling back to the system's Hangul; nothing is fetched from another host. Code is in the
+ * system's monospace.
  */
 
 @font-face {
@@ -108,6 +109,11 @@ h3 {
 p,
 li {
   text-wrap: pretty;
+}
+/* Korean breaks between words, as Korean pages do, not inside one */
+:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 img {
@@ -1785,6 +1791,16 @@ code {
   /* GitHub is in the footer too; the row keeps the pages */
   .top nav .button {
     display: none;
+  }
+  /* The other language stays at the end of the brand's row */
+  .top {
+    position: relative;
+  }
+  .top nav .lang {
+    position: absolute;
+    top: calc(1.25rem + 14px);
+    right: 1.5rem;
+    transform: translateY(-50%);
   }
   /* The track turns to run down the page */
   .track {

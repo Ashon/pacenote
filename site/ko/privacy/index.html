@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>개인정보 보호: Pace가 절대 하지 않는 일 - Pacenote</title>
+  <meta name="description" content="Pace가 절대 하지 않는 일, 각 제한을 코드로 지키는 방식, 그리고 내 Mac을 떠나는 것과 남는 것.">
+  <link rel="canonical" href="https://pacenote.dev/ko/privacy/">
+  <link rel="alternate" hreflang="en" href="https://pacenote.dev/privacy/">
+  <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/privacy/">
+  <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/privacy/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Pace가 절대 하지 않는 일">
+  <meta property="og:description" content="모든 제한은 모델에 맡기지 않고 코드로 지켜요. 그리고 코드는 공개되어 있어요.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/ko/privacy/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../../media/pacenote-mark.svg">
+  <link rel="stylesheet" href="../../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote 홈">
+      <img src="../../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="페이지">
+      <a href="../how-it-works/">작동 방식</a>
+      <a href="../privacy/" aria-current="page">개인정보 보호</a>
+      <a href="../install/">설치</a>
+      <a href="https://github.com/Ashon/pacenote#readme">문서<span aria-hidden="true"> ↗</span></a>
+      <a class="lang" href="../../privacy/" lang="en" hreflang="en">English</a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head">
+      <h1>Pace가 절대 하지 않는 일</h1>
+      <p class="lede">모든 제한은 모델에 맡기지 않고 코드로 지키며, 그 코드는 공개되어 있어요. 각 제한이 무슨 뜻인지,
+        어디서 확인할 수 있는지 정리했어요.</p>
+    </div>
+
+    <div class="surface">
+      <section class="block" aria-label="제한">
+        <div class="claim">
+          <h2>나 말고 다른 사람에게 답하기</h2>
+          <p>Pace는 내 로그인으로 실행되므로, 내가 소유자로 정한 Slack 멤버에게만 답해요. 다른 사람이 멘션하면 그
+            사람에게만 보이는 안내를 받아요. 팀원은 각자 자기 Pace를 실행해요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">작동 방식</a></p>
+        </div>
+        <div class="claim">
+          <h2>비공개 채널이나 DM에서 답하기</h2>
+          <p>Slack 앱은 비공개 채널이나 DM 권한(scope)을 요청하지 않고, Pace는 초대받은 공개 채널에서만 답해요. 공개
+            채널인지 알 수 없으면 답하지 않아요. 답변에도 비공개 채널과 DM에서 온 내 할 일은 넣지 않아요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/slack-app-manifest.yaml">Slack 앱의 권한</a></p>
+        </div>
+        <div class="claim">
+          <h2>나 대신 메시지 보내기</h2>
+          <p>Pace는 내가 물어본 스레드에만 답해요. 할 일을 위해 써 둔 답장 초안은 내가 복사할 수 있게 보여 줄 뿐, 내가
+            올리기 전에는 아무것도 올라가지 않아요. 초안 PR과 Jira 이슈나 댓글을 만들 수 있는 운영 도구는 내가 켜기
+            전까지 꺼져 있어요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/tasks.md">할 일</a></p>
+        </div>
+        <div class="claim">
+          <h2>내 파일 바꾸기</h2>
+          <p>내 Mac에서 CLI는 내가 고른 폴더 하나에만 읽기 전용으로 접근하고, <code>~/.ssh</code>나 AI 도구의 로그인 정보
+            같은 자격 증명 폴더에는 절대 접근하지 않아요. 내장 샌드박스에서는 답변마다 내가 허용한 도메인에만 접근하는
+            Linux VM에서 실행되고, 그 VM은 답변 뒤에 버려져요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/sandbox.md">답변 CLI 샌드박스</a></p>
+        </div>
+        <div class="claim">
+          <h2>내 자격 증명을 모델에 넘기기</h2>
+          <p>Slack과 허브 토큰은 CLI에 절대 전달되지 않고, Pace는 모든 답변에서 자신의 비밀 값을 지워요. 운영 도구를 켜면
+            SSH 키와 클러스터, GitHub, Jira 토큰은 별도의 브로커에 머물고, 모델은 읽기 전용 조회, 초안 PR, Jira 이슈나
+            댓글을 그 브로커에 요청해요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">운영 도구</a></p>
+        </div>
+        <div class="claim">
+          <h2>공개 엔드포인트를 열거나 몰래 외부로 정보 보내기</h2>
+          <p>Pace는 Socket Mode로 내 Mac에서 Slack에 연결하므로, 내 Mac에서 인터넷으로부터 오는 연결을 받는 것은 없어요.
+            접속해 오는 건 내 네트워크에 있는 내 Mac뿐이에요. 그 기능을 켰을 때 같은 Slack 앱을 쓰는 Mac, 또는 Mac
+            추가가 기다리는 동안의 새 Mac이요. 텔레메트리는 없고, 연결하는 곳은 아래에 모두 적어 두었어요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">작동 방식</a></p>
+        </div>
+        <div class="claim">
+          <h2>요금 청구하기</h2>
+          <p>Pacenote는 무료 오픈 소스예요. 답변은 이미 결제하고 있는 Claude나 ChatGPT 요금제로 공식 CLI를 통해 실행되고,
+            그 요금제의 사용 한도에 포함돼요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">Apache License 2.0</a></p>
+        </div>
+      </section>
+
+      <section class="block" id="leaves" aria-labelledby="leaves-title">
+        <h2 id="leaves-title">내 Mac을 떠나는 것</h2>
+        <p>로컬에서 돈다고 해서 AI 서비스에도 비공개라는 뜻은 아니에요. 내가 묻는 스레드는 AI 서비스로 전달돼요. 데이터
+          약관이 내 업무에 맞는 요금제를 고르세요.</p>
+        <div class="table">
+          <table>
+            <thead>
+              <tr><th scope="col">무엇이</th><th scope="col">어디로</th><th scope="col">언제</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>내가 묻는 스레드와 그 파일</td><td>내가 로그인한 CLI를 통해 Anthropic이나 OpenAI로</td><td>Pace를 멘션할 때마다</td></tr>
+              <tr><td>Pace의 답변</td><td>Slack의 그 스레드로</td><td>답변할 때마다</td></tr>
+              <tr><td>팀 허브를 쓸 때의 멘션과 답변</td><td>Slack으로 가는 길에 팀 허브로</td><td>허브와 페어링한 경우에만</td></tr>
+              <tr><td>할 일을 모으거나 답장 초안을 쓸 때 읽는 Slack 메시지</td><td>Claude Code의 Slack 커넥터나 Codex 안의 ChatGPT Slack 앱을 통해 Anthropic이나 OpenAI로</td><td>지금 모으기나 답장 초안 쓰기를 누를 때. 켜기 전까지는 꺼져 있어요</td></tr>
+              <tr><td>회고에 쓰는 할 일 제목과 커밋 메시지 한 줄</td><td>설정 &gt; 할 일에서 고른 AI로: Claude Code나 Codex를 통해 Anthropic이나 OpenAI로, 또는 회사 서버에 있는 모델처럼 opencode에 설정한 모델로</td><td>정리하기를 누를 때</td></tr>
+              <tr><td>할 일이 끝난 것 같은지 판단하려고 읽는, 조용해진 세션의 마지막 대화</td><td>위에서 고른 같은 AI로</td><td>할 일의 세션이 10분 동안 조용할 때. 켜기 전까지는 꺼져 있어요</td></tr>
+              <tr><td>운영 도구로 하는 조회</td><td>연결한 서비스로: 내 호스트와 클러스터, GitHub, Jira</td><td>Pace가 쓸 때. 켜기 전까지는 꺼져 있어요</td></tr>
+              <tr><td>내 할 일, 결정, 작업 기록, 회고, 영역</td><td>같은 Slack 앱을 쓰는 내 다른 Mac으로, 내 네트워크 안에서 직접, 암호화해서</td><td>각 Mac에서 설정 &gt; 내 Mac을 켠 경우에만</td></tr>
+              <tr><td>내 Slack 앱의 토큰, Pace가 답하는 사람, 할 일 모으기 방식</td><td>내 새 Mac으로, 두 Mac에 같은 6자리 숫자가 보이고 내가 허용한 뒤 한 번, 직접, 암호화해서</td><td>Mac 추가를 누를 때만</td></tr>
+              <tr><td>업데이트 확인</td><td>GitHub</td><td>시작 직후, 그다음엔 12시간마다</td></tr>
+              <tr><td>샌드박스 이미지</td><td>GitHub의 컨테이너 레지스트리, 그리고 이미지를 빌드할 때 쓰는 호스트</td><td>샌드박스를 설정할 때</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="block" id="stays" aria-labelledby="stays-title">
+        <h2 id="stays-title">내 Mac에 남는 것</h2>
+        <p>설정, 실행 기록, 내 할 일과 회고는 나만 읽을 수 있는 폴더인 <code>~/.pacenote</code>에 있어요. 실행 기록은 따로
+          바꾸지 않으면 30일 동안 보관해요. 설정 &gt; 내 Mac을 켜면 내 할 일과 회고는 다른 Mac에도 보관돼요. 앱을 삭제해도
+          폴더는 남으니, 지우려면 폴더를 삭제하세요.</p>
+      </section>
+
+      <section class="block" id="site" aria-labelledby="site-title">
+        <h2 id="site-title">이 웹사이트</h2>
+        <p>pacenote.dev는 Google Analytics로 방문을 집계해요. 보는 페이지, 이곳으로 오게 한 사이트, 설치 명령을 복사했는지,
+          대략적인 위치와 기기를 Google이 설정하는 쿠키로 기록해요. 사람들이 무엇을 읽는지 알아보는 데 써요. 앱에는 이런
+          것이 전혀 없고, Google로 아무것도 보내지 않아요.</p>
+      </section>
+
+      <section class="block" id="report" aria-labelledby="report-title">
+        <h2 id="report-title">보안 문제 신고</h2>
+        <p>저장소의 <a href="https://github.com/Ashon/pacenote/security/advisories/new">GitHub 취약점 신고</a>로 비공개로
+          알려 주세요. 신고 내용은 보안 권고가 공개될 때까지 신고한 분과 메인테이너만 볼 수 있으니, 자세한 내용은 공개
+          이슈에 올리지 말아 주세요.</p>
+      </section>
+
+      <section class="block closing" aria-labelledby="next-title">
+        <h2 id="next-title">내 Mac에서 써 보세요</h2>
+        <div class="get">
+          <div class="command" role="group" aria-label="Homebrew로 설치">
+            <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+            <button class="button secondary copy" type="button" data-copy="install-command">복사</button>
+            <span class="copied" role="status" aria-live="polite"></span>
+          </div>
+          <a class="button primary" href="../install/">초기 설정 단계</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote는 한 사람이 만들고, 있는 그대로 제공해요.</p>
+    <nav aria-label="프로젝트">
+      <a href="../privacy/">개인정보 보호</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">문서</a>
+      <a href="https://github.com/Ashon/pacenote/releases">릴리스</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">라이선스</a>
+    </nav>
+    <p class="legal">Pacenote는 독립 프로젝트로, Anthropic, OpenAI, Slack이 만들거나 보증하거나 지원하지 않아요.
+      Claude, Claude Code, Codex, ChatGPT, Slack은 각 소유자의 상표예요.</p>
+    <p class="legal">© 2026 Ashon. Pacenote는 Apache License 2.0에 따른 오픈 소스예요.</p>
+  </footer>
+
+  <script src="../../site.js"></script>
+</body>
+</html>
