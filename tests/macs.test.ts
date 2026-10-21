@@ -378,10 +378,13 @@ describe('your Macs', () => {
     expect(air.state.answering).toBe(false)
 
     // You leave the Pro and use the Air: the Air connects first, then the Pro
-    // closes its connection.
+    // closes its connection. At once, though the Air claimed as it started,
+    // knowing no lease yet: that first claim is nothing to cool off from.
+    const leftAt = Date.now()
     pro.state.use = { ...left }
     air.state.use = { ...using }
     await poll(() => air.state.answering).toBe(true)
+    expect(Date.now() - leftAt).toBeLessThan(5_000)
     await poll(() => pro.state.answering).toBe(false)
     expect(air.macs.view().moved?.from).toBe('MacBook Pro')
     expect(pro.macs.view().macs.map((m) => [m.name, m.status])).toEqual([

@@ -552,7 +552,9 @@ export class Macs extends EventEmitter<{
   }
 
   private take(reason: ClaimReason): void {
-    this.claimedAt = this.now()
+    // A first claim, with no lease known yet, is no disagreement to cool off
+    // from: once there is a lease, no Mac claims for that reason again.
+    if (reason !== 'none') this.claimedAt = this.now()
     const previous = this.file.lease
     const lease = claim(this.id, previous, this.now())
     this.setLease(lease)
