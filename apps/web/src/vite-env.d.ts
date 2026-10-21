@@ -24,7 +24,7 @@ import type {
   SetupView,
 } from '@src/settings/setup'
 import type { OwnAiNow, OwnAiView, OwnCli } from '@src/tasks/own-ai'
-import type { MacsView } from '@src/macs/types'
+import type { FromMacState, MacsView } from '@src/macs/types'
 import type {
   CollectionRecord,
   CollectOutcome,
@@ -234,6 +234,15 @@ declare global {
         removeAddress(address: string): Promise<void>
         /** Stop following to that Mac */
         ignore(id: string): Promise<void>
+        /** Add a Mac: waits 10 minutes; false without your own Slack app */
+        addStart(): Promise<boolean>
+        addStop(): Promise<void>
+        /** Sends the new Mac your Slack app, who Pace answers, Todo settings */
+        addAllow(): Promise<void>
+        /** Not this one */
+        addDecline(): Promise<void>
+        /** Done with what Add a Mac says */
+        addClose(): Promise<void>
         /** System Settings > Privacy & Security > Local Network */
         openPrivacy(): Promise<void>
         onChange(callback: (view: MacsView) => void): () => void
@@ -315,6 +324,15 @@ declare global {
         } | null>
         /** Listens on your own Slack app for "@Pace it's me" */
         claimStart(): Promise<{ ok: true } | { error: string }>
+        /** Connect to your other Mac, as far as it got */
+        macState(): Promise<FromMacState | null>
+        /** Looks for a Mac waiting in Add a Mac on this network */
+        macLook(): Promise<void>
+        macConnect(
+          target: { instance: string } | { address: string }
+        ): Promise<void>
+        macCancel(): Promise<void>
+        onMacChanged(callback: (state: FromMacState) => void): () => void
         /** Lets the person who mentioned Pace ask it, and stops listening */
         claimConfirm(
           user: ClaimedUser

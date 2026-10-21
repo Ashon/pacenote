@@ -1,12 +1,18 @@
 import type { RunRecord, RunSummary } from '@src/history/types'
 import { failureAdvice, failureCause } from '@src/mention/failure'
 import type { SetupRecord } from '@src/settings/setup'
-import { CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  CircleCheck,
+  CircleX,
+  LoaderCircle,
+} from 'lucide-react'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Swap } from '@/components/ui/motion'
 import { useRun, useRuns } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
+import { useMacs, whereAnswers } from '@/lib/macs'
 import { PaceSpinner } from '../pace-spinner'
 import { Chip, CommandLine, Hint, Problem, StepFrame, useWaited } from './parts'
 
@@ -45,6 +51,9 @@ export function AnswerStep({
   const running =
     phase === undefined || phase === 'running' || phase === 'external'
   const waited = useWaited(running && !shown && !done, 30_000)
+  // Set up from your other Mac: Pace moves here, the Mac you're using
+  const macs = useMacs()
+  const where = record.fromMac ? whereAnswers(macs) : undefined
 
   return (
     <StepFrame
@@ -79,6 +88,17 @@ export function AnswerStep({
             ? 'Pace is starting.'
             : `Pace isn't running, so it can't answer yet.${supervisor?.message ? ` ${supervisor.message}` : ''}`}
         </Problem>
+      )}
+      {where && (
+        <p
+          className="flex items-center gap-2 text-body text-muted-foreground"
+          data-where-answers={where.here ? 'here' : 'other'}
+        >
+          <ArrowRightLeft className="size-4 shrink-0" />
+          {where.here
+            ? `Pace moved here from ${macs?.moved?.from ?? record.fromMac?.name}: this Mac answers the hello.`
+            : `Moving here from ${where.other?.name ?? record.fromMac?.name}…`}
+        </p>
       )}
       {!done && (
         <div className="flex flex-col gap-2.5">

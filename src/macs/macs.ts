@@ -4,12 +4,13 @@ import { createServer, type Server } from 'node:http'
 import path from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
 import { readJson, writeJson } from '../tasks/store.js'
-import { Bonjour } from './bonjour.js'
+import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import {
   accept,
   dial,
   macsGroup,
   macsKey,
+  setupAccept,
   type MacChannel,
   type MacHello,
 } from './channel.js'
@@ -26,11 +27,13 @@ import {
   inUse,
   laterLease,
   type Lease,
+  type AddingView,
   type MacState,
   type MacStatus,
   type MacsView,
   type MacUse,
   type MacView,
+  type SetupPayload,
 } from './types.js'
 
 /**
@@ -77,6 +80,10 @@ const STALLED_MS = 60_000
  */
 const STARTUP_MS = 15_000
 const MAX_MESSAGE = 16 * 1024 * 1024
+/** How long Add a Mac waits for the new Mac */
+export const ADDING_MS = 10 * 60_000
+/** Setup just finished: how long the new Mac waits to hear the others */
+const CLAIM_WAIT_MS = 30_000
 
 /** What Macs say to each other over their channel */
 type MacMessage = { t: 'state'; state: MacState }
@@ -117,6 +124,8 @@ export interface MacsOptions {
   onAnswer: (here: boolean) => void
   /** Collect now runs here, since then */
   collecting?: () => string | undefined
+  /** What Add a Mac sends a new Mac once you Allow */
+  setupPayload?: () => SetupPayload
   log: (message: string) => void
   /** 0 takes any free port (tests); MACS_PORT otherwise */
   port?: number
@@ -162,6 +171,16 @@ export class Macs extends EventEmitter<{
   private readonly seenAt = new Map<string, number>()
   /** The Macs heard from since this one started */
   private readonly heardSinceStart = new Set<string>()
+  /** Add a Mac, while it waits or until you close what it says */
+  private adding?: {
+    until: number
+    timer?: NodeJS.Timeout
+    advert?: Bonjour
+    request?: { name: string; code: string; channel: MacChannel }
+    result?: AddingView['result']
+  }
+  /** Set up just now from another Mac: this one takes over once it can */
+  private claimSince?: number
   private readonly now: () => number
 
   constructor(private readonly options: MacsOptions) {
@@ -267,6 +286,22 @@ export class Macs extends EventEmitter<{
       addresses: this.file.addresses,
       blocked: this.blocked,
       moved: this.moved,
+      ...(this.adding
+        ? {
+            adding: {
+              until: new Date(this.adding.until).toISOString(),
+              ...(this.adding.request
+                ? {
+                    request: {
+                      name: this.adding.request.name,
+                      code: this.adding.request.code,
+                    },
+                  }
+                : {}),
+              ...(this.adding.result ? { result: this.adding.result } : {}),
+            },
+          }
+        : {}),
     }
   }
 
@@ -289,6 +324,74 @@ export class Macs extends EventEmitter<{
     if (!link) return false
     link.channel.send(message)
     return true
+  }
+
+  /**
+   * Add a Mac: shows this Mac on your network for a new one's setup, for 10
+   * minutes, with following turned on. false without your own Slack app.
+   */
+  async startAdding(): Promise<boolean> {
+    if (!this.options.appToken()) return false
+    this.clearAdding()
+    if (!this.file.follow) await this.setFollow(true)
+    if (!this.server) return false
+    const timer = setTimeout(() => this.endAdding('expired'), ADDING_MS)
+    timer.unref?.()
+    const advert =
+      this.options.bonjour === false
+        ? undefined
+        : new Bonjour({
+            service: SETUP_SERVICE,
+            advertise: {
+              name: this.options.name,
+              port: this.port,
+              txt: { id: this.id },
+            },
+            log: this.options.log,
+          })
+    advert?.start()
+    this.adding = { until: this.now() + ADDING_MS, timer, advert }
+    this.options.log('Macs: waiting for a new Mac to set up from this one')
+    this.emitIfChanged()
+    return true
+  }
+
+  /** Stop: no new Mac is waited for any longer */
+  stopAdding(): void {
+    this.clearAdding()
+    this.emitIfChanged()
+  }
+
+  /** Allow: sends the new Mac what it takes from this one */
+  allowAdding(): void {
+    const request = this.adding?.request
+    const payload = this.options.setupPayload?.()
+    if (!request || this.adding?.result || !payload) return
+    request.channel.send({ t: 'setup-settings', payload })
+    this.options.log(`Macs: sending ${request.name} what it needs`)
+  }
+
+  /** Not this one: the numbers differ, or it is not your Mac */
+  declineAdding(): void {
+    const request = this.adding?.request
+    if (!request || this.adding?.result) return
+    request.channel.send({ t: 'setup-declined' })
+    this.endAdding('declined', request.name)
+  }
+
+  /** What Add a Mac said is read: it goes away */
+  closeAdding(): void {
+    if (this.adding?.result) this.clearAdding()
+    this.emitIfChanged()
+  }
+
+  /**
+   * Setup just finished here from another Mac: Pace moves here once it runs,
+   * since this is the Mac in use, after it has heard from the others
+   */
+  claimWhenReady(): void {
+    this.claimSince = this.now()
+    void this.tick()
   }
 
   /** Answer here: this Mac claims the lease now */
@@ -470,6 +573,16 @@ export class Macs extends EventEmitter<{
           void this.dialTarget(key, target)
       }
     }
+    if (
+      this.claimSince !== undefined &&
+      this.enabled() &&
+      this.options.pace().ready &&
+      (this.peers().some((peer) => peer.reachable) ||
+        now - this.claimSince >= CLAIM_WAIT_MS)
+    ) {
+      this.claimSince = undefined
+      if (this.file.lease?.holder !== this.id) this.take('asked')
+    }
     const here = this.decide()
     if (here !== this.here) {
       this.here = here
@@ -531,22 +644,28 @@ export class Macs extends EventEmitter<{
     await this.listen()
     if (this.options.bonjour !== false)
       this.bonjour = new Bonjour({
-        name: this.options.name,
-        port: this.port,
-        group: macsGroup(this.key),
-        id: this.id,
-        found: (mac) => {
-          if (mac.id && this.file.ignored.includes(mac.id)) return
-          this.targets.set(`bonjour:${mac.instance}`, {
-            host: mac.host,
-            port: mac.port,
-            id: mac.id,
-            instance: mac.instance,
-          })
-          this.lastDial = 0
-          void this.tick()
+        advertise: {
+          name: this.options.name,
+          port: this.port,
+          txt: { g: macsGroup(this.key), id: this.id },
         },
-        lost: (instance) => this.targets.delete(`bonjour:${instance}`),
+        look: {
+          accept: (txt) =>
+            txt.g === macsGroup(this.key!) &&
+            txt.id !== this.id &&
+            !this.file.ignored.includes(txt.id ?? ''),
+          found: (mac) => {
+            this.targets.set(`bonjour:${mac.instance}`, {
+              host: mac.host,
+              port: mac.port,
+              id: mac.txt.id,
+              instance: mac.instance,
+            })
+            this.lastDial = 0
+            void this.tick()
+          },
+          lost: (instance) => this.targets.delete(`bonjour:${instance}`),
+        },
         log: this.options.log,
       })
     this.bonjour?.start()
@@ -555,6 +674,7 @@ export class Macs extends EventEmitter<{
   }
 
   private async disconnect(): Promise<void> {
+    this.clearAdding()
     this.bonjour?.stop()
     this.bonjour = undefined
     for (const link of this.links.values()) link.channel.close()
@@ -582,16 +702,25 @@ export class Macs extends EventEmitter<{
     const server = createServer((_req, res) => {
       res.writeHead(426).end()
     })
-    const wss = new WebSocketServer({ server, maxPayload: MAX_MESSAGE })
-    wss.on('connection', (ws, req) => {
+    const wss = new WebSocketServer({
+      noServer: true,
+      maxPayload: MAX_MESSAGE,
+    })
+    server.on('upgrade', (req, socket, head) => {
       const address = req.socket.remoteAddress
       // Only your own networks, never the internet
-      if (!privateAddress(address)) return ws.terminate()
+      if (!privateAddress(address)) return socket.destroy()
+      // A new Mac setting up from this one, only while Add a Mac waits
+      const setup = (req.url ?? '').startsWith('/setup')
       const key = this.key
-      if (!key) return ws.terminate()
-      accept(ws, { key, me: this.hello() })
-        .then((channel) => this.linked(channel, address))
-        .catch(() => undefined)
+      if (setup ? !this.adding || this.adding.result : !key)
+        return socket.destroy()
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        if (setup) return this.setupConnection(ws)
+        accept(ws, { key: key!, me: this.hello() })
+          .then((channel) => this.linked(channel, address))
+          .catch(() => undefined)
+      })
     })
     const wanted = this.options.port ?? MACS_PORT
     this.port = await new Promise<number>((resolve, reject) => {
@@ -612,6 +741,64 @@ export class Macs extends EventEmitter<{
     })
     this.server = server
     this.wss = wss
+  }
+
+  /** A new Mac asking to set up from this one, while Add a Mac waits */
+  private setupConnection(ws: WebSocket): void {
+    const adding = this.adding
+    if (!adding || adding.result || adding.request) return ws.close()
+    setupAccept(ws, { me: this.hello() })
+      .then(({ channel, code }) => {
+        if (this.adding !== adding || adding.request || adding.result)
+          return channel.close()
+        const name = channel.peer.name
+        adding.request = { name, code, channel }
+        channel.on('message', (message) => {
+          const { t, error } = (message ?? {}) as { t?: string; error?: string }
+          if (t === 'setup-done') {
+            this.options.log(`Macs: ${name} is set up from this Mac`)
+            this.endAdding('sent', name)
+          } else if (t === 'setup-failed')
+            this.options.log(
+              `Macs: ${name} could not take the settings: ${error}`
+            )
+        })
+        channel.on('close', () => {
+          if (adding.request?.channel !== channel || adding.result) return
+          adding.request = undefined
+          this.emitIfChanged()
+        })
+        this.options.log(`Macs: ${name} asks to set up from this Mac`)
+        this.emitIfChanged()
+      })
+      .catch(() => undefined)
+  }
+
+  /** Add a Mac ended: it stops showing itself, and says how it ended */
+  private endAdding(
+    kind: NonNullable<AddingView['result']>['kind'],
+    name?: string
+  ): void {
+    const adding = this.adding
+    if (!adding || adding.result) return
+    if (kind === 'expired') adding.request?.channel.send({ t: 'setup-expired' })
+    adding.advert?.stop()
+    clearTimeout(adding.timer)
+    adding.request?.channel.close()
+    this.adding = {
+      until: adding.until,
+      result: { kind, ...(name ? { name } : {}) },
+    }
+    this.emitIfChanged()
+  }
+
+  private clearAdding(): void {
+    const adding = this.adding
+    if (!adding) return
+    adding.advert?.stop()
+    clearTimeout(adding.timer)
+    adding.request?.channel.close()
+    this.adding = undefined
   }
 
   private hello(): MacHello {

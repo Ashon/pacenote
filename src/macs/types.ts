@@ -125,4 +125,60 @@ export interface MacsView {
   blocked: boolean
   /** The last time Pace moved to this Mac, and from which */
   moved?: { from: string; at: string }
+  /** Add a Mac: this Mac waits for a new one to set up from it */
+  adding?: AddingView
 }
+
+/**
+ * Settings > Macs > Add a Mac: this Mac shows itself on your network for 10
+ * minutes, for a new Mac's setup to connect to it, and sends what that one
+ * needs once you Allow
+ */
+export interface AddingView {
+  /** It waits until then */
+  until: string
+  /** A new Mac asks, and the number both Macs show */
+  request?: { name: string; code: string }
+  /** How it ended: sent, you said Not this one, or it stopped waiting */
+  result?: { kind: 'sent' | 'declined' | 'expired'; name?: string }
+}
+
+/**
+ * The settings a new Mac takes from the one already set up: your Slack app,
+ * who Pace answers, and how Todo collects. Not the AI, the sandbox, folders,
+ * ops tools or anything else this Mac chose for itself, and never an AI
+ * sign-in.
+ */
+export const SETUP_KEYS = [
+  'SLACK_CONNECTION',
+  'SLACK_APP_TOKEN',
+  'SLACK_BOT_TOKEN',
+  'MENTION_ALLOWED_USERS',
+  'TASKS',
+  'TASKS_DMS',
+  'TASKS_EXCLUDE_CHANNELS',
+  'TASKS_NAMES',
+  'TASKS_GROUPS',
+] as const
+
+/** What the Mac already set up sends the new one, once you Allow */
+export interface SetupPayload {
+  /** SETUP_KEYS, as that Mac has them */
+  values: Partial<Record<(typeof SETUP_KEYS)[number], string>>
+  /** Who Pace answers, as that Mac's setup knew you */
+  me?: { id: string; name: string }
+}
+
+/** A new Mac's setup taking it from your other Mac, step by step */
+export type FromMacState =
+  | { step: 'idle' }
+  | {
+      step: 'looking'
+      /** Macs waiting in Add a Mac on this network */
+      found: { instance: string; name: string }[]
+    }
+  | { step: 'connecting'; name: string }
+  /** Compare the number, then Allow on the other Mac */
+  | { step: 'confirming'; name: string; code: string }
+  | { step: 'copied'; name: string; me?: { id: string; name: string } }
+  | { step: 'error'; message: string }

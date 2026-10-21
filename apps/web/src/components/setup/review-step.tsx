@@ -2,7 +2,7 @@ import type { SettingsView } from '@src/settings/fields'
 import { stepToFix, type SetupRecord } from '@src/settings/setup'
 import type { SupervisorState } from '@src/runtime/types'
 import { LoaderCircle, Lock } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { useSupervisor } from '@/lib/desktop'
@@ -267,6 +267,22 @@ export function ReviewStep({
           required
         />
       )}
+      {record.fromMac && (
+        <section
+          className="flex flex-col gap-1.5 rounded-xl bg-well px-5 py-4"
+          data-from-mac-review
+        >
+          <b className="text-section">From {record.fromMac.name}</b>
+          <span className="text-body text-muted-foreground">
+            Your Slack app, who Pace answers and how Todo collects. The AI and
+            where it runs are this Mac's own, chosen in the steps before.
+          </span>
+          <span className="text-meta text-muted-foreground">
+            Your Macs: Pace follows the Mac you're using. When you start Pace
+            here, it moves to this Mac.
+          </span>
+        </section>
+      )}
       <section className="flex flex-col gap-2.5 rounded-xl bg-well px-5 py-4">
         <b className="text-section">Who can ask Pace</b>
         <span className="flex flex-wrap items-center gap-2">
@@ -389,13 +405,37 @@ export function ReviewStep({
         </Row>
         <Row label="Run history">
           <span className="text-muted-foreground">
-            Kept on this Mac, in {settings.view?.dataDir ?? '~/.pacenote'}
+            Kept on this Mac, in{' '}
+            <PathText
+              path={homePath(settings.view?.dataDir ?? '~/.pacenote')}
+            />
           </span>
         </Row>
       </dl>
     </StepFrame>
   )
 }
+
+/** A path that breaks after its slashes, not inside a folder's name */
+function PathText({ path }: { path: string }) {
+  return (
+    <span>
+      {path.split('/').map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && (
+            <>
+              /<wbr />
+            </>
+          )}
+          {part}
+        </Fragment>
+      ))}
+    </span>
+  )
+}
+
+/** A folder in your home as you would type it: ~/.pacenote */
+const homePath = (dir: string) => dir.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
 /** You, the one who may ask: by the name Slack showed, or your member ID */
 function Person({ name, id }: { name?: string; id?: string }) {

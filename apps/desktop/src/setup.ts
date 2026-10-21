@@ -15,6 +15,8 @@ export interface SetupPatch {
   step?: SetupStep
   slack?: 'hub' | 'app'
   me?: { id: string; name: string } | null
+  /** Set up from that Mac (its name), or null when Slack is set up anew */
+  fromMac?: string | null
   answerSince?: string
   /** true ends setup; false opens it again (reopened) */
   finished?: boolean
@@ -55,6 +57,9 @@ export class SetupStore {
     }
     if (patch.me === null) delete next.me
     else if (patch.me) next.me = patch.me
+    if (patch.fromMac === null) delete next.fromMac
+    else if (patch.fromMac)
+      next.fromMac = { name: patch.fromMac, at: new Date().toISOString() }
     this.write(next)
     return { open: !next.finishedAt, record: next }
   }
@@ -86,6 +91,8 @@ function parsePatch(raw: unknown): SetupPatch {
   if (me === null) patch.me = null
   else if (typeof me?.id === 'string' && typeof me.name === 'string')
     patch.me = { id: me.id, name: me.name }
+  if (value.fromMac === null) patch.fromMac = null
+  else if (typeof value.fromMac === 'string') patch.fromMac = value.fromMac
   if (
     typeof value.answerSince === 'string' &&
     !Number.isNaN(Date.parse(value.answerSince))

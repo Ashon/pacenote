@@ -156,6 +156,8 @@ import {
 } from './handoff.js'
 import { KeepAwake } from './keep-awake.js'
 import { Macs } from '../../../src/macs/macs.js'
+import { SetupFromMac } from '../../../src/macs/setup.js'
+import { SETUP_KEYS } from '../../../src/macs/types.js'
 import { TodoSync } from '../../../src/macs/todo-sync.js'
 import { MacUseWatch, macName } from './macs.js'
 import { McpClients } from './mcp-clients.js'
@@ -523,6 +525,8 @@ let macs: Macs | undefined
 let macUse: MacUseWatch | undefined
 /** Your Todo, the same on your other Macs */
 let todoSync: TodoSync | undefined
+/** Setup's Connect to your other Mac: this Mac set up from another */
+let fromMac: SetupFromMac | undefined
 
 const supervisor = manageBot
   ? new BotSupervisor({
@@ -570,6 +574,17 @@ if (supervisor) {
     onAnswer: (here) => supervisor.answer(here),
     // Read when the app is ready: Collect now is set up further down
     collecting: () => taskCollectorRunning(),
+    // Add a Mac: your Slack app, who Pace answers and how Todo collects
+    setupPayload: () => {
+      const env = settings.effectiveEnv()
+      const values: Record<string, string> = {}
+      for (const key of SETUP_KEYS) {
+        const value = env[key]?.trim()
+        if (value) values[key] = value
+      }
+      const me = setup.view().record.me
+      return { values, ...(me ? { me } : {}) }
+    },
     log: (message) => log.info(message),
     bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
     ...(process.env.PACENOTE_MACS_PORT
@@ -581,6 +596,44 @@ if (supervisor) {
     // Todo says when another Mac collects
     mainWindow?.webContents.send('pacenote:tasks:changed')
   })
+  const thisMac = macs
+  fromMac = new SetupFromMac({
+    me: () => ({
+      id: thisMac.id,
+      name: process.env.PACENOTE_MACS_NAME || macName(),
+    }),
+    // What your other Mac sent: its Slack app, who Pace answers and how Todo
+    // collects. This Mac's own choices (steps 1 and 2) stay as they are.
+    apply: async (payload, from) => {
+      const values: Record<string, string> = {}
+      for (const key of SETUP_KEYS) {
+        const value = payload.values[key]
+        if (typeof value === 'string') values[key] = value
+      }
+      if (!values.SLACK_APP_TOKEN || !values.SLACK_BOT_TOKEN)
+        throw new Error(`${from.name} has no Slack app of its own to share.`)
+      const issues = settings.save(values)
+      if (issues.length > 0)
+        throw new Error(issues.map((issue) => issue.message).join(' '))
+      const owner = (values.MENTION_ALLOWED_USERS ?? '').split(/[\s,]+/)[0]
+      const me = payload.me ?? (owner ? { id: owner, name: owner } : undefined)
+      setup.save({
+        slack: 'app',
+        step: 'review',
+        fromMac: from.name,
+        ...(me ? { me } : {}),
+      })
+      await thisMac.setFollow(true)
+      if (from.address) thisMac.addAddress(from.address)
+      // This is the Mac in use: Pace moves here once it runs
+      thisMac.claimWhenReady()
+    },
+    log: (message) => log.info(message),
+    bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
+  })
+  fromMac.on('change', (state) =>
+    mainWindow?.webContents.send('pacenote:setup:mac-changed', state)
+  )
   todoSync = new TodoSync({
     dataDir,
     macs,
@@ -999,6 +1052,22 @@ function registerBotIpc(): void {
   })
   ipcMain.handle('pacenote:macs:ignore', (event, id: unknown) => {
     if (fromMainWindow(event) && typeof id === 'string') macs?.ignore(id)
+  })
+  // Add a Mac: a new Mac's setup takes your Slack app from this one
+  ipcMain.handle('pacenote:macs:add-start', async (event) =>
+    fromMainWindow(event) ? ((await macs?.startAdding()) ?? false) : false
+  )
+  ipcMain.handle('pacenote:macs:add-stop', (event) => {
+    if (fromMainWindow(event)) macs?.stopAdding()
+  })
+  ipcMain.handle('pacenote:macs:add-allow', (event) => {
+    if (fromMainWindow(event)) macs?.allowAdding()
+  })
+  ipcMain.handle('pacenote:macs:add-decline', (event) => {
+    if (fromMainWindow(event)) macs?.declineAdding()
+  })
+  ipcMain.handle('pacenote:macs:add-close', (event) => {
+    if (fromMainWindow(event)) macs?.closeAdding()
   })
   ipcMain.handle('pacenote:macs:open-privacy', (event) => {
     if (fromMainWindow(event))
@@ -1944,6 +2013,24 @@ function registerBotIpc(): void {
       })
     )
   }
+  // Connect to your other Mac: setup takes your Slack app from it
+  ipcMain.handle('pacenote:setup:mac-state', (event) =>
+    fromMainWindow(event) ? (fromMac?.current ?? null) : null
+  )
+  ipcMain.handle('pacenote:setup:mac-look', (event) => {
+    if (fromMainWindow(event)) fromMac?.look()
+  })
+  ipcMain.handle('pacenote:setup:mac-connect', (event, raw: unknown) => {
+    if (!fromMainWindow(event)) return
+    const target = (raw ?? {}) as { instance?: unknown; address?: unknown }
+    if (typeof target.instance === 'string')
+      void fromMac?.connect({ instance: target.instance })
+    else if (typeof target.address === 'string')
+      void fromMac?.connect({ address: target.address })
+  })
+  ipcMain.handle('pacenote:setup:mac-cancel', (event) => {
+    if (fromMainWindow(event)) fromMac?.cancel()
+  })
   ipcMain.handle('pacenote:setup:detect', async (event) => {
     if (!fromMainWindow(event)) return null
     return {
@@ -2340,6 +2427,7 @@ app.on('before-quit', (event) => {
   taskCollector.cancel()
   void stopClaim()
   todoSync?.stop()
+  fromMac?.cancel()
   void macs?.stop()
   supervisor?.dispose()
   // A bot started by the app finishes active requests before it stops. (up to

@@ -2,9 +2,13 @@ import {
   createCipheriv,
   createDecipheriv,
   createHmac,
+  createPublicKey,
+  diffieHellman,
+  generateKeyPairSync,
   hkdfSync,
   randomBytes,
   timingSafeEqual,
+  type KeyObject,
 } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import type { RawData, WebSocket } from 'ws'
@@ -223,7 +227,7 @@ class Incoming {
   }
 
   /** The next frame as a hello, within the handshake's time */
-  next(timeoutMs: number): Promise<HelloMessage> {
+  next<T = HelloMessage>(timeoutMs: number): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiter = undefined
@@ -237,7 +241,7 @@ class Incoming {
           )
         try {
           if (frame.binary) throw new Error('binary')
-          resolve(JSON.parse(frame.data.toString('utf8')) as HelloMessage)
+          resolve(JSON.parse(frame.data.toString('utf8')) as T)
         } catch {
           reject(new HandshakeError('The other Mac said something unexpected.'))
         }
@@ -382,4 +386,162 @@ export async function accept(
     { id: hello.id, name: String(hello.name ?? hello.id) },
     false
   )
+}
+
+/**
+ * Setting up a new Mac from one already set up (Settings > Macs > Add a Mac,
+ * and Connect to your other Mac in the new Mac's setup). The new Mac has no
+ * Slack app token yet, so the two cannot know each other by it: this once,
+ * they agree on a key with X25519, and both show a 6-digit number made from
+ * it. Someone in between on the network would agree on a key with each, and
+ * the numbers would differ, so you compare them before you Allow. What follows
+ * is sealed as on any channel.
+ */
+
+const SETUP_PROTOCOL = 1
+
+interface SetupHello {
+  t: 'setup'
+  v: number
+  id: string
+  name: string
+  /** X25519 public key, DER (SPKI), base64 */
+  key: string
+  nonce: string
+}
+
+/** A setup channel, with the number both Macs show */
+export interface SetupOpened {
+  channel: MacChannel
+  code: string
+}
+
+function setupKeys(): { privateKey: KeyObject; key: string } {
+  const { publicKey, privateKey } = generateKeyPairSync('x25519')
+  return {
+    privateKey,
+    key: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+  }
+}
+
+/** The number to compare and the two directions' keys */
+function setupSecrets(
+  privateKey: KeyObject,
+  dialer: SetupHello,
+  listener: SetupHello,
+  peerKey: string
+): { code: string; dialer: Buffer; listener: Buffer } {
+  const shared = diffieHellman({
+    privateKey,
+    publicKey: createPublicKey({
+      key: Buffer.from(peerKey, 'base64'),
+      format: 'der',
+      type: 'spki',
+    }),
+  })
+  const bytes = Buffer.from(
+    hkdfSync(
+      'sha256',
+      shared,
+      Buffer.concat([
+        Buffer.from(dialer.nonce, 'base64'),
+        Buffer.from(listener.nonce, 'base64'),
+      ]),
+      ['pacenote-macs setup', dialer.key, listener.key].join('\n'),
+      68
+    )
+  )
+  return {
+    code: String(bytes.readUInt32BE(64) % 1_000_000).padStart(6, '0'),
+    dialer: bytes.subarray(0, 32),
+    listener: bytes.subarray(32, 64),
+  }
+}
+
+const isSetupHello = (value: Partial<SetupHello>): value is SetupHello =>
+  value.t === 'setup' &&
+  value.v === SETUP_PROTOCOL &&
+  typeof value.id === 'string' &&
+  typeof value.key === 'string' &&
+  typeof value.nonce === 'string'
+
+/** The new Mac: asks the one already set up */
+export async function setupDial(
+  ws: WebSocket,
+  options: { me: MacHello; timeoutMs?: number }
+): Promise<SetupOpened> {
+  const incoming = new Incoming(ws)
+  const { privateKey, key } = setupKeys()
+  const hello: SetupHello = {
+    t: 'setup',
+    v: SETUP_PROTOCOL,
+    id: options.me.id,
+    name: options.me.name,
+    key,
+    nonce: randomBytes(16).toString('base64'),
+  }
+  const answer = incoming.next<Partial<SetupHello>>(
+    options.timeoutMs ?? HANDSHAKE_MS
+  )
+  ws.send(JSON.stringify(hello))
+  const peer = await answer.catch((err: unknown) => {
+    ws.close()
+    throw err
+  })
+  if (!isSetupHello(peer)) {
+    ws.close()
+    throw new HandshakeError(
+      'The other Mac is not waiting for a new Mac. Click Add a Mac there.'
+    )
+  }
+  const secrets = setupSecrets(privateKey, hello, peer, peer.key)
+  return {
+    code: secrets.code,
+    channel: new MacChannel(
+      ws,
+      incoming,
+      { send: secrets.dialer, receive: secrets.listener },
+      { id: peer.id, name: String(peer.name ?? peer.id) },
+      true
+    ),
+  }
+}
+
+/** The Mac already set up, while Add a Mac waits: answers the new one */
+export async function setupAccept(
+  ws: WebSocket,
+  options: { me: MacHello; timeoutMs?: number }
+): Promise<SetupOpened> {
+  const incoming = new Incoming(ws)
+  const peer = await incoming
+    .next<Partial<SetupHello>>(options.timeoutMs ?? HANDSHAKE_MS)
+    .catch((err: unknown) => {
+      ws.close()
+      throw err
+    })
+  if (!isSetupHello(peer)) {
+    ws.close()
+    throw new HandshakeError('The other Mac said something unexpected.')
+  }
+  const { privateKey, key } = setupKeys()
+  const hello: SetupHello = {
+    t: 'setup',
+    v: SETUP_PROTOCOL,
+    id: options.me.id,
+    name: options.me.name,
+    key,
+    nonce: randomBytes(16).toString('base64'),
+  }
+  ws.send(JSON.stringify(hello))
+  const secrets = setupSecrets(privateKey, peer, hello, peer.key)
+  return {
+    code: secrets.code,
+    channel: new MacChannel(
+      ws,
+      incoming,
+      { send: secrets.listener, receive: secrets.dialer },
+      { id: peer.id, name: String(peer.name ?? peer.id) },
+      false
+    ),
+  }
 }

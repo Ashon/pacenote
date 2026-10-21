@@ -82,7 +82,8 @@
         <div class="claim">
           <h2>Open a public endpoint or phone home</h2>
           <p>It connects out to Slack over Socket Mode, so nothing on your Mac accepts connections from the internet:
-            only your other Macs with the same Slack app reach it, on your own network, once you turn that on. There is
+            only your own Macs reach it, on your own network: ones with the same Slack app once you turn that on, or a
+            new one while Add a Mac waits for it. There is
             no telemetry; everything it contacts is listed below.</p>
           <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">How it works</a></p>
         </div>
@@ -112,6 +113,7 @@
               <tr><td>The last turns of a quiet session, to say whether its task looks done</td><td>The same AI you chose</td><td>When a task's session has been quiet for 10 minutes; off until you turn it on</td></tr>
               <tr><td>Lookups with ops tools</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
               <tr><td>Your tasks, decisions, work log, recaps and areas</td><td>Your other Macs with the same Slack app, directly and encrypted, on your own network</td><td>Only if you turn on Settings &gt; Macs on each</td></tr>
+              <tr><td>Your Slack app's tokens, who Pace answers and how Todo collects</td><td>A new Mac of yours, directly and encrypted, once, after both show the same 6 digits and you Allow</td><td>Only when you click Add a Mac</td></tr>
               <tr><td>An update check</td><td>GitHub</td><td>Shortly after start, then every 12 hours</td></tr>
               <tr><td>Sandbox images</td><td>GitHub's container registry and the hosts the images are built from</td><td>When you set up the sandbox</td></tr>
             </tbody>

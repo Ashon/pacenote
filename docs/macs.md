@@ -57,6 +57,31 @@ These stay with their Mac:
 
 While one Mac collects, the other's Collect now waits and says "Collecting on MacBook Pro".
 
+## Set up a new Mac from this one
+
+A new Mac can take what it needs from the one already set up, instead of a Slack app of its own and "@Pace it's me":
+
+1. On the Mac already set up, click **Add a Mac** in Settings > Macs. It turns following on and shows the Mac on your
+   network for 10 minutes, only while it waits.
+2. In the new Mac's setup, choose your AI and where Pace runs as usual. At the Slack step, choose **Connect to your
+   other Mac**: it finds the waiting Mac on your network, or takes its address (Tailscale).
+3. Both Macs show the same 6-digit number. If they match, click **Allow** on the Mac already set up.
+
+What comes over, once:
+
+- **From the Mac already set up:** your Slack app's tokens, who Pace answers, how Todo collects (names, groups, channels
+  left out, DMs), and following turned on.
+- **Kept as this Mac chose it:** the AI that answers and the one for Todo's work, where Pace runs, CLI paths, folders
+  and ops tools.
+
+An AI sign-in never comes over: each Mac signs in to Claude Code or Codex itself. Starting Pace on the new Mac moves it
+there, the Mac in use, and Todo arrives through the usual sync. Not this one, or 10 minutes without a new Mac, sends
+nothing. With the team hub, pair the new Mac with the hub instead.
+
+The new Mac has no token yet, so this once the Macs agree on a key with X25519. The 6 digits come from that key:
+someone in between on the network would agree on a different key with each Mac, and the numbers would differ.
+Everything after is encrypted, and from then on the Macs know each other by the shared token as below.
+
 ## How the Macs find and trust each other
 
 - **Finding.** Each Mac advertises Pacenote on your local network with Bonjour (`_pacenote._tcp`, through macOS's own
@@ -80,6 +105,7 @@ Regenerate the app-level token and both Macs need the new one before they know e
 - **Your Macs**: this one and the others, with what each is doing: answering, standing by, moving, or out of reach since
   when.
 - **Stop following to this Mac** (⋯): leaves one Mac out.
+- **Add a Mac**: sets up a new Mac from this one.
 - **Add by address**: a Mac on another network.
 
 What a Mac knows of the others is kept in `PACENOTE_DATA_DIR/macs.json`.

@@ -75,7 +75,7 @@ import {
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
 import { macsControl, useMacs } from '@/lib/macs'
-import type { MacView } from '@src/macs/types'
+import type { AddingView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
@@ -2039,7 +2039,8 @@ function MacsSection() {
         {header}
         <p className="px-4 py-3 text-meta text-muted-foreground">
           Your Macs follow you only with your own Slack app (Settings &gt;
-          Messengers). With the team hub, Pace answers on the Mac you connected.
+          Messengers). With your team's hub, Pace answers on one Mac per person:
+          pair a new Mac with the hub instead, and Pace moves there.
         </p>
       </section>
     )
@@ -2068,6 +2069,23 @@ function MacsSection() {
             onChange={(on) => void control?.follow(on)}
           />
         </Row>
+        {view.adding ? (
+          <AddingPanel adding={view.adding} />
+        ) : (
+          <Row
+            label="Add a Mac"
+            help="Set up Pacenote on a new Mac from this one: its Slack app and who you are come from here."
+          >
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => void control?.addStart()}
+            >
+              <Laptop />
+              Add a Mac
+            </Button>
+          </Row>
+        )}
         {view.follow && (
           <>
             {view.macs.map((mac) => (
@@ -2171,6 +2189,119 @@ function MacsSection() {
         )}
       </div>
     </section>
+  )
+}
+
+/** 482917 as both Macs show it: 482 917 */
+const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
+
+/**
+ * Add a Mac, while it waits for the new Mac, when the new Mac asks (compare
+ * the number, then Allow), and how it ended
+ */
+function AddingPanel({ adding }: { adding: AddingView }) {
+  const control = macsControl()
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (adding.result || adding.request) return
+    const timer = setInterval(() => setNow(Date.now()), 1_000)
+    return () => clearInterval(timer)
+  }, [adding.result, adding.request])
+  if (adding.result) {
+    const { kind, name } = adding.result
+    return (
+      <div className="flex items-center gap-3 px-4 py-3" data-adding={kind}>
+        {kind === 'sent' ? (
+          <CircleCheck className="size-4 shrink-0 text-status-succeeded" />
+        ) : (
+          <CircleX className="size-4 shrink-0 text-muted-foreground" />
+        )}
+        <p className="min-w-0 flex-1 text-body">
+          {kind === 'sent'
+            ? `${name ?? 'Your new Mac'} is set up. Pace follows the Mac you're using.`
+            : kind === 'declined'
+              ? 'Cancelled. Nothing was sent.'
+              : 'Stopped waiting. Nothing was sent.'}
+        </p>
+        {kind === 'expired' && (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => void control?.addStart()}
+          >
+            Try again
+          </Button>
+        )}
+        <Button size="xs" onClick={() => void control?.addClose()}>
+          {kind === 'sent' ? 'Done' : 'Close'}
+        </Button>
+      </div>
+    )
+  }
+  if (adding.request) {
+    const { name, code } = adding.request
+    return (
+      <div className="flex flex-col gap-3 px-4 py-4" data-adding="request">
+        <b className="text-section">{name} wants to set up from this Mac.</b>
+        <p
+          className="text-number tracking-[0.2em] tabular-nums select-text"
+          data-code
+        >
+          {codeWords(code)}
+        </p>
+        <p className="text-body text-muted-foreground">
+          Do both Macs show this number?
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => void control?.addAllow()}>
+            Allow
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void control?.addDecline()}
+          >
+            Not this one
+          </Button>
+        </div>
+        <p className="text-meta text-muted-foreground">
+          Sends your Slack app, who Pace answers and Todo's collection settings.
+          Not your AI sign-in, the sandbox, ops tools or folders.
+        </p>
+      </div>
+    )
+  }
+  const left = Math.max(0, Date.parse(adding.until) - now)
+  const clock = `${Math.floor(left / 60_000)}:${String(
+    Math.floor(left / 1_000) % 60
+  ).padStart(2, '0')}`
+  return (
+    <div className="flex flex-col gap-2 px-4 py-4" data-adding="waiting">
+      <div className="flex items-center gap-3">
+        <b className="min-w-0 flex-1 text-section">Add a Mac</b>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => void control?.addStop()}
+        >
+          Stop
+        </Button>
+      </div>
+      <p className="text-body text-pretty">
+        Open Pacenote on the new Mac and choose{' '}
+        <span className="font-semibold whitespace-nowrap">
+          Connect to your other Mac
+        </span>{' '}
+        at the Slack step.
+      </p>
+      <p className="flex items-center gap-2 text-meta text-muted-foreground">
+        <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+        Waiting for it on this network… {clock} left
+      </p>
+      <p className="text-meta text-muted-foreground">
+        This Mac shows itself on your network only while it waits.
+      </p>
+    </div>
   )
 }
 

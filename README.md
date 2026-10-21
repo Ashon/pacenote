@@ -84,7 +84,8 @@ to post.
 
 With Pacenote on two Macs, Pace answers on the one you're using and moves with you when you leave it for the other, and
 Todo is the same on both. Turn it on in Settings > Macs on each: Macs with the same Slack app find each other on your
-network, with nothing to pair and no server in between. See [Your Macs](docs/macs.md).
+network, with nothing to pair and no server in between. A new Mac's setup can take your Slack app from the other one
+(Add a Mac). See [Your Macs](docs/macs.md).
 
 ### Share the history with your AI tools
 
@@ -104,7 +105,8 @@ and where you contribute. You add it to each tool with one click, and only if yo
   cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only lookups, draft PRs, and
   Jira issues or comments.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
-  only your other Macs with the same Slack app reach it, on your own network. Besides Slack (or your hub), your AI
+  only your other Macs reach it, on your own network: ones with the same Slack app, or a new one while Add a Mac waits.
+  Besides Slack (or your hub), your AI
   service and the services you connect as ops tools, it talks only to GitHub to check for updates, and downloads the
   sandbox's images when you set it up. There is no telemetry.
 - **Bill you or hold your AI account.** Answers use the subscription you already have, through its official CLI.

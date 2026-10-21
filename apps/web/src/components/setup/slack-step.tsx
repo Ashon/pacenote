@@ -2,14 +2,20 @@ import type { HubUser } from '@src/hub/protocol'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type { SettingsView } from '@src/settings/fields'
 import type { ClaimedUser } from '@src/settings/setup'
-import { ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react'
+import {
+  CircleCheck,
+  ExternalLink,
+  Laptop,
+  LoaderCircle,
+  TriangleAlert,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
-import { allowedIds } from '@/lib/setup'
+import { allowedIds, useFromMac } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { PaceSpinner } from '../pace-spinner'
 import { SLACK_APP_URL } from '../slack-app-setup'
@@ -25,15 +31,18 @@ import {
 
 export type SlackPart = 'choose' | 'app' | 'me'
 type Connection = 'hub' | 'app'
+/** The hub, your own app, or your own app as your other Mac has it */
+type Choice = Connection | 'mac'
 type Me = { id: string; name: string }
 
 /** Your Slack apps, where a made app's settings and tokens are */
 const SLACK_APPS_URL = 'https://api.slack.com/apps'
 
 /**
- * 3. How Pace reaches Slack: your team's hub, paired here, or your own Slack
+ * 3. How Pace reaches Slack: your team's hub, paired here; your own Slack
  * app, made from the manifest (3a), and then told who you are with one
- * mention (3b)
+ * mention (3b); or your own Slack app and who you are, taken from your other
+ * Mac (3c, Add a Mac there)
  */
 export function SlackStep({
   part,
@@ -85,6 +94,7 @@ export function SlackStep({
       onBack={onBack}
       onApp={() => onPart('app')}
       onPaired={(me) => onDone('hub', me)}
+      onFromMac={(me) => onDone('app', me)}
     />
   )
 }
@@ -105,6 +115,7 @@ function ChooseConnection({
   onBack,
   onApp,
   onPaired,
+  onFromMac,
 }: {
   settings?: SettingsView
   saved?: Connection
@@ -113,10 +124,13 @@ function ChooseConnection({
   onBack: () => void
   onApp: () => void
   onPaired: (me: Me) => void
+  /** Set up from your other Mac: on to the review */
+  onFromMac: (me: Me) => void
 }) {
   const hub = window.pacenoteDesktop?.hub
-  const [chosen, setChosen] = useState<Connection>()
-  const connection: Connection =
+  const mac = useFromMac()
+  const [chosen, setChosen] = useState<Choice>()
+  const connection: Choice =
     chosen ??
     saved ??
     (settings?.values.SLACK_CONNECTION === 'hub' || settings?.values.HUB_URL
@@ -156,6 +170,8 @@ function ChooseConnection({
   }, [pair.step, hub])
   // Leaving cancels a pairing that was not confirmed.
   useEffect(() => () => void hub?.pairCancel(), [hub])
+  // Leaving the step lets your other Mac go
+  useEffect(() => () => void window.pacenoteDesktop?.setup?.macCancel(), [])
 
   const start = () => {
     const id = ++attempt.current
@@ -189,14 +205,42 @@ function ChooseConnection({
       onPaired({ id: res.user.id, name: res.user.name })
     })
   }
-  const choose = (next: Connection) => {
-    if (next === 'app' && pair.step !== 'idle') cancel()
+  const choose = (next: Choice) => {
+    if (next !== 'hub' && pair.step !== 'idle') cancel()
+    if (next === 'mac' && connection !== 'mac') mac.look()
+    if (next !== 'mac' && connection === 'mac') mac.cancel()
     setChosen(next)
   }
 
   const asking = pair.step === 'starting' || pair.step === 'waiting'
+  const copied = mac.state.step === 'copied' ? mac.state : undefined
   const primary =
-    connection === 'app' ? (
+    connection === 'mac' ? (
+      copied ? (
+        <Button
+          onClick={() =>
+            onFromMac(
+              copied.me ?? {
+                id: allowedIds(settings?.values.MENTION_ALLOWED_USERS)[0] ?? '',
+                name: copied.name,
+              }
+            )
+          }
+        >
+          Continue
+        </Button>
+      ) : mac.state.step === 'confirming' ? (
+        <>
+          <Button variant="ghost" onClick={() => mac.look()}>
+            Cancel
+          </Button>
+          <Button disabled>
+            <LoaderCircle className="animate-spin" />
+            Waiting for {mac.state.name}
+          </Button>
+        </>
+      ) : null
+    ) : connection === 'app' ? (
       <Button onClick={onApp}>Set up your own app</Button>
     ) : pair.step === 'bound' || pair.step === 'confirming' ? null : asking ? (
       <>
@@ -243,7 +287,7 @@ function ChooseConnection({
       <div
         role="radiogroup"
         aria-label="How Pace reaches Slack"
-        className="grid grid-cols-1 gap-3 @min-[34rem]:grid-cols-2"
+        className="grid grid-cols-1 gap-3"
       >
         <ChoiceCard
           name="connection"
@@ -251,7 +295,7 @@ function ChooseConnection({
           checked={connection === 'hub'}
           onChoose={() => choose('hub')}
         >
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <b className="text-section">Join your team's hub</b>
             <Chip tone="neutral">For teams</Chip>
           </span>
@@ -272,7 +316,27 @@ function ChooseConnection({
             Best when you're the only one using Pace.
           </span>
         </ChoiceCard>
+        <ChoiceCard
+          name="connection"
+          value="mac"
+          checked={connection === 'mac'}
+          onChoose={() => choose('mac')}
+        >
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <b className="text-section">Connect to your other Mac</b>
+            <Chip tone="neutral">Already set up</Chip>
+          </span>
+          <span className="text-body text-muted-foreground">
+            Pacenote is set up on another of your Macs. Bring its Slack app and
+            who you are from there; nothing to create.
+          </span>
+        </ChoiceCard>
       </div>
+      <Collapsible open={connection === 'mac'}>
+        <CollapsibleContent>
+          <FromMacBody mac={mac} />
+        </CollapsibleContent>
+      </Collapsible>
       <Collapsible open={connection === 'hub'}>
         <CollapsibleContent>
           <div className="flex flex-col gap-3 rounded-xl bg-well px-5 py-4">
@@ -304,6 +368,143 @@ function ChooseConnection({
         </CollapsibleContent>
       </Collapsible>
     </StepFrame>
+  )
+}
+
+/** 482917 as both Macs show it: 482 917 */
+const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
+
+/**
+ * 3c. Your other Mac: found waiting in Add a Mac, or by its address; the
+ * number to compare; and what came from it
+ */
+function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
+  const [typing, setTyping] = useState(false)
+  const [address, setAddress] = useState('')
+  const { state } = mac
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-xl bg-well px-5 py-4"
+      data-from-mac={state.step}
+      aria-live="polite"
+    >
+      {state.step === 'copied' ? (
+        <>
+          <b className="flex items-center gap-2 text-section">
+            <CircleCheck className="size-4 text-status-succeeded" />
+            Connected to {state.name}
+          </b>
+          <ul className="flex flex-col gap-1 text-body">
+            <li>Your Slack app</li>
+            {state.me && <li>Pace answers {state.me.name}</li>}
+            <li>Todo settings: your names, groups and channels left out</li>
+            <li>Follow the Mac you're using: on</li>
+          </ul>
+          <p className="text-meta text-muted-foreground">
+            AI sign-in, the sandbox, ops tools and folders stay with each Mac.
+          </p>
+        </>
+      ) : state.step === 'confirming' ? (
+        <>
+          <p
+            className="text-number tracking-[0.2em] tabular-nums select-text"
+            data-code
+          >
+            {codeWords(state.code)}
+          </p>
+          <p className="text-body">
+            Check that {state.name} shows the same number, then click Allow
+            there.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="text-body">
+            On your other Mac, open{' '}
+            <span className="font-semibold whitespace-nowrap">
+              Pacenote &gt; Settings &gt; Macs
+            </span>{' '}
+            and click{' '}
+            <span className="font-semibold whitespace-nowrap">Add a Mac</span>.
+          </p>
+          {state.step === 'error' ? (
+            <p className="flex items-start gap-2 text-body text-status-failed">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span className="select-text">{state.message}</span>
+            </p>
+          ) : state.step === 'connecting' ? (
+            <p className="flex items-center gap-2 text-meta text-muted-foreground">
+              <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+              Connecting to {state.name}…
+            </p>
+          ) : (
+            <>
+              {state.step === 'looking' &&
+                state.found.map((found) => (
+                  <div
+                    key={found.instance}
+                    className="flex items-center gap-3 rounded-lg bg-card px-3 py-2"
+                  >
+                    <Laptop className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate text-row">
+                      {found.name}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => mac.connect({ instance: found.instance })}
+                    >
+                      Connect
+                    </Button>
+                  </div>
+                ))}
+              <p className="flex items-center gap-2 text-meta text-muted-foreground">
+                <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+                Looking for it on this network…
+              </p>
+            </>
+          )}
+          {state.step === 'error' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={() => mac.look()}
+            >
+              Try again
+            </Button>
+          )}
+          {typing ? (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (address.trim()) mac.connect({ address })
+              }}
+            >
+              <Input
+                autoFocus
+                aria-label="Address of your other Mac"
+                placeholder="100.68.0.12 or macbook-pro.local"
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+                className="h-8 flex-1"
+              />
+              <Button size="sm" type="submit" disabled={!address.trim()}>
+                Connect
+              </Button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="self-start text-meta text-muted-foreground hover:text-foreground hover:underline"
+              onClick={() => setTyping(true)}
+            >
+              Not on this network? Enter its address
+            </button>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

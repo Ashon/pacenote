@@ -132,6 +132,12 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     removeAddress: (address: string) =>
       ipcRenderer.invoke('pacenote:macs:remove-address', address),
     ignore: (id: string) => ipcRenderer.invoke('pacenote:macs:ignore', id),
+    // Add a Mac: a new Mac's setup takes your Slack app from this one
+    addStart: () => ipcRenderer.invoke('pacenote:macs:add-start'),
+    addStop: () => ipcRenderer.invoke('pacenote:macs:add-stop'),
+    addAllow: () => ipcRenderer.invoke('pacenote:macs:add-allow'),
+    addDecline: () => ipcRenderer.invoke('pacenote:macs:add-decline'),
+    addClose: () => ipcRenderer.invoke('pacenote:macs:add-close'),
     openPrivacy: () => ipcRenderer.invoke('pacenote:macs:open-privacy'),
     onChange: (callback: (view: unknown) => void) => {
       const listener = (_event: IpcRendererEvent, view: unknown) =>
@@ -189,6 +195,19 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     save: (patch: unknown) => ipcRenderer.invoke('pacenote:setup:save', patch),
     detect: () => ipcRenderer.invoke('pacenote:setup:detect'),
     claimStart: () => ipcRenderer.invoke('pacenote:setup:claim-start'),
+    // Connect to your other Mac: setup takes your Slack app from it
+    macState: () => ipcRenderer.invoke('pacenote:setup:mac-state'),
+    macLook: () => ipcRenderer.invoke('pacenote:setup:mac-look'),
+    macConnect: (target: { instance: string } | { address: string }) =>
+      ipcRenderer.invoke('pacenote:setup:mac-connect', target),
+    macCancel: () => ipcRenderer.invoke('pacenote:setup:mac-cancel'),
+    onMacChanged: (callback: (state: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, state: unknown) =>
+        callback(state)
+      ipcRenderer.on('pacenote:setup:mac-changed', listener)
+      return () =>
+        ipcRenderer.removeListener('pacenote:setup:mac-changed', listener)
+    },
     claimConfirm: (user: unknown) =>
       ipcRenderer.invoke('pacenote:setup:claim-confirm', user),
     claimStop: () => ipcRenderer.invoke('pacenote:setup:claim-stop'),

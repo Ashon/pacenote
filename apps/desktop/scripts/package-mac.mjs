@@ -211,6 +211,12 @@ run('/usr/libexec/PlistBuddy', [
   'Add :NSBonjourServices:0 string _pacenote._tcp',
   infoPlist,
 ])
+// Add a Mac: a new Mac's setup finds the one waiting for it
+run('/usr/libexec/PlistBuddy', [
+  '-c',
+  'Add :NSBonjourServices:1 string _pacenote-setup._tcp',
+  infoPlist,
+])
 try {
   execFileSync(
     '/usr/libexec/PlistBuddy',

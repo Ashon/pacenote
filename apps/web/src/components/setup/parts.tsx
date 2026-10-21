@@ -33,7 +33,9 @@ export function StepFrame({
   return (
     <div className="flex h-full flex-col">
       <ScrollArea className="min-h-0 flex-1">
-        <div className="@container mx-auto max-w-3xl px-10 pt-9 pb-8">
+        {/* Lines break where they read well: no word left alone at the end
+            of a paragraph, and a title or lead in even lines. */}
+        <div className="@container mx-auto max-w-3xl px-10 pt-9 pb-8 text-pretty">
           <p className="text-body font-semibold text-primary">
             Step {SETUP_STEPS.indexOf(step) + 1} of {SETUP_STEPS.length}
             {part && ` · ${part}`}
@@ -41,11 +43,11 @@ export function StepFrame({
           <h1
             ref={heading}
             tabIndex={-1}
-            className="mt-1 text-title outline-none"
+            className="mt-1 text-title text-balance outline-none"
           >
             {title}
           </h1>
-          <p className="mt-1.5 max-w-xl text-copy text-muted-foreground">
+          <p className="mt-1.5 max-w-xl text-copy text-balance text-muted-foreground">
             {lead}
           </p>
           <div className="mt-6 flex flex-col gap-4">{children}</div>
@@ -94,7 +96,9 @@ export function ChoiceCard({
         onChange={() => onChoose(value)}
         className="mt-0.5 size-4 shrink-0 accent-primary"
       />
-      <span className="flex min-w-0 flex-1 flex-col gap-1.5">{children}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5 text-balance">
+        {children}
+      </span>
     </label>
   )
 }

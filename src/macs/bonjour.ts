@@ -11,15 +11,16 @@ export const SERVICE = '_pacenote._tcp'
 const DNS_SD = '/usr/bin/dns-sd'
 const RESOLVE_MS = 5_000
 
+export const SETUP_SERVICE = '_pacenote-setup._tcp'
+
 /** A Mac found on the network */
 export interface Found {
   /** Its Bonjour name, the Mac's name */
   instance: string
   host: string
   port: number
-  /** From its TXT record */
-  group?: string
-  id?: string
+  /** Its TXT record */
+  txt: Record<string, string>
 }
 
 /** A line of `dns-sd -B`: a Mac that came or went */
@@ -27,7 +28,7 @@ export function browseLine(
   line: string
 ): { added: boolean; instance: string } | undefined {
   const match =
-    /^\s*\S+\s+(Add|Rmv)\s+\d+\s+\d+\s+\S+\s+_pacenote\._tcp\.\s+(.+?)\s*$/.exec(
+    /^\s*\S+\s+(Add|Rmv)\s+\d+\s+\d+\s+\S+\s+_[\w-]+\._tcp\.\s+(.+?)\s*$/.exec(
       line
     )
   return match ? { added: match[1] === 'Add', instance: match[2]! } : undefined
@@ -50,7 +51,6 @@ export function resolved(
     const eq = pair.indexOf('=')
     if (eq > 0) txt[pair.slice(0, eq)] = pair.slice(eq + 1)
   }
-  if (!txt.g) return undefined
   return {
     host: where[1]!.replace(/\.$/, ''),
     port: Number(where[2]),
@@ -59,44 +59,52 @@ export function resolved(
 }
 
 /**
- * Advertising this Mac and looking for the others, until stop(). found and
- * lost tell about the Macs in the same group; a Mac with another Slack app is
- * never reported.
+ * Advertising this Mac, looking for the others, or both, until stop(). found
+ * and lost tell about the Macs accept takes, by their TXT record: Macs in the
+ * same group, so one with another Slack app is never reported.
  */
 export class Bonjour {
   private readonly children: ChildProcess[] = []
   /** Each Mac is seen once per network interface: how many now */
   private readonly seen = new Map<string, number>()
   private stopped = false
+  private readonly service: string
 
   constructor(
     private readonly options: {
-      name: string
-      port: number
-      group: string
-      id: string
-      found: (mac: Found) => void
-      lost: (instance: string) => void
+      /** _pacenote._tcp, unless another */
+      service?: string
+      /** This Mac, advertised; none: it only looks */
+      advertise?: { name: string; port: number; txt: Record<string, string> }
+      /** Looking for the others; none: it only advertises */
+      look?: {
+        accept: (txt: Record<string, string>) => boolean
+        found: (mac: Found) => void
+        lost: (instance: string) => void
+      }
       log: (message: string) => void
       /** dns-sd, unless a test names another */
       bin?: string
     }
-  ) {}
+  ) {
+    this.service = options.service ?? SERVICE
+  }
 
   start(): void {
-    const { name, port, group, id } = this.options
-    this.children.push(
-      this.run([
-        '-R',
-        name,
-        SERVICE,
-        'local.',
-        String(port),
-        `g=${group}`,
-        `id=${id}`,
-      ])
-    )
-    const browser = this.run(['-B', SERVICE, 'local.'])
+    const { advertise, look } = this.options
+    if (advertise)
+      this.children.push(
+        this.run([
+          '-R',
+          advertise.name,
+          this.service,
+          'local.',
+          String(advertise.port),
+          ...Object.entries(advertise.txt).map(([k, v]) => `${k}=${v}`),
+        ])
+      )
+    if (!look) return
+    const browser = this.run(['-B', this.service, 'local.'])
     this.children.push(browser)
     let rest = ''
     browser.stdout?.on('data', (chunk: Buffer) => {
@@ -110,7 +118,7 @@ export class Bonjour {
         if (next > 0) this.seen.set(event.instance, next)
         else this.seen.delete(event.instance)
         if (count === 0 && next > 0) void this.resolve(event.instance)
-        else if (count > 0 && next === 0) this.options.lost(event.instance)
+        else if (count > 0 && next === 0) look.lost(event.instance)
       }
     })
   }
@@ -121,7 +129,7 @@ export class Bonjour {
   }
 
   private async resolve(instance: string): Promise<void> {
-    const child = this.run(['-L', instance, SERVICE, 'local.'])
+    const child = this.run(['-L', instance, this.service, 'local.'])
     this.children.push(child)
     const result = await new Promise<ReturnType<typeof resolved>>((settle) => {
       let output = ''
@@ -141,15 +149,13 @@ export class Bonjour {
     })
     child.kill()
     this.children.splice(this.children.indexOf(child), 1)
-    if (this.stopped || !result) return
-    if (result.txt.g !== this.options.group) return
-    if (result.txt.id === this.options.id) return
-    this.options.found({
+    const look = this.options.look
+    if (this.stopped || !result || !look?.accept(result.txt)) return
+    look.found({
       instance,
       host: result.host,
       port: result.port,
-      group: result.txt.g,
-      id: result.txt.id,
+      txt: result.txt,
     })
   }
 

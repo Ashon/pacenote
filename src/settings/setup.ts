@@ -21,6 +21,11 @@ export interface SetupRecord {
   slack?: 'hub' | 'app'
   /** You, the one Pace answers, as Slack showed you */
   me?: { id: string; name: string }
+  /**
+   * Set up from your other Mac (Connect to your other Mac): its name, and
+   * when its Slack app and who Pace answers came from it
+   */
+  fromMac?: { name: string; at: string }
   /** When the wizard reached its last step; the first answer is one after it */
   answerSince?: string
   /**

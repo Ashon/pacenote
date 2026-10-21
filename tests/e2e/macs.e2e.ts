@@ -9,7 +9,10 @@ import { readDecisions } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks } from '../../src/tasks/write.js'
 import { readEnvValues } from '../../src/settings/env-file.js'
-import { settingsText } from '../../src/settings/settings-file.js'
+import {
+  readSettingsValues,
+  settingsText,
+} from '../../src/settings/settings-file.js'
 import { eventually, REPO } from './support/processes.js'
 import { World } from './support/world.js'
 
@@ -81,6 +84,10 @@ async function openMac(
     addresses?: string[]
     /** Settings > Macs > Follow the Mac you're using, as turned on before */
     follow?: boolean
+    /** Not set up yet: it opens on setup, with no Slack app or owner */
+    firstRun?: boolean
+    /** Who setup let in, on a Mac set up before */
+    me?: { id: string; name: string }
   } = {}
 ): Promise<Mac> {
   const home = homeOf(world, name)
@@ -90,10 +97,15 @@ async function openMac(
       path.join(home, 'macs.json'),
       JSON.stringify({ follow: true, addresses: options.addresses ?? [] })
     )
-  writeFileSync(
-    path.join(home, 'setup.json'),
-    JSON.stringify({ step: 'answer', finishedAt: new Date().toISOString() })
-  )
+  if (!options.firstRun)
+    writeFileSync(
+      path.join(home, 'setup.json'),
+      JSON.stringify({
+        step: 'answer',
+        finishedAt: new Date().toISOString(),
+        ...(options.me ? { slack: 'app', me: options.me } : {}),
+      })
+    )
   writeFileSync(
     path.join(home, 'settings.json'),
     settingsText(
@@ -104,9 +116,13 @@ async function openMac(
           'RENDER_DIAGRAMS=off',
           'TIMEZONE=UTC',
           `SLACK_API_URL=${world.slack.apiUrl}`,
-          `SLACK_APP_TOKEN=${world.slack.appToken}`,
-          `SLACK_BOT_TOKEN=${world.slack.botToken}`,
-          `MENTION_ALLOWED_USERS=${world.alice.id}`,
+          ...(options.firstRun
+            ? []
+            : [
+                `SLACK_APP_TOKEN=${world.slack.appToken}`,
+                `SLACK_BOT_TOKEN=${world.slack.botToken}`,
+                `MENTION_ALLOWED_USERS=${world.alice.id}`,
+              ]),
           `CLAUDE_BIN=${world.claudeBin}`,
           `FAKE_CLAUDE_DIR=${world.claudeDir}`,
           `CODEX_BIN=${path.join(world.root, 'no-codex')}`,
@@ -360,5 +376,99 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await reviewOnAir.getByText('Review the payment retry PR').click()
     await reviewOnAir.getByText(/On MacBook Pro/).waitFor()
     await reviewOnAir.getByRole('button', { name: 'Start here' }).waitFor()
+  })
+
+  it('sets up a new Mac from the one already set up', async () => {
+    world = await World.create([{ match: 'hello', answer: 'Hi alice.' }])
+    const { slack, ops, alice } = world
+
+    // The Pro is set up, with following off until Add a Mac.
+    const pro = await openMac(world, 'MacBook Pro', 2, {
+      follow: false,
+      me: { id: alice.id, name: 'alice' },
+    })
+    await pro.page.getByText(/Pace: Connected/).waitFor()
+    await pro.page.evaluate("window.location.hash = '#/settings/macs'")
+    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByText('Waiting for it on this network').waitFor()
+
+    // The Air's first run: its own AI and where it runs, then Slack from the
+    // Pro.
+    const air = await openMac(world, 'MacBook Air', 1, {
+      follow: false,
+      firstRun: true,
+    })
+    await air.page
+      .getByRole('heading', { name: 'Which AI service do you already use?' })
+      .waitFor()
+    await air.page.getByRole('button', { name: 'Use Claude' }).click()
+    await air.page
+      .getByRole('heading', { name: 'Where should Pace work out answers?' })
+      .waitFor()
+    await air.page
+      .getByRole('button', { name: 'Run directly on this Mac' })
+      .click()
+    await air.page
+      .getByRole('heading', { name: 'Connect Pace to Slack' })
+      .waitFor()
+    await air.page.getByText('Connect to your other Mac').click()
+    await air.page
+      .getByRole('button', { name: 'Not on this network? Enter its address' })
+      .click()
+    await air.page
+      .getByLabel('Address of your other Mac')
+      .fill(`127.0.0.1:${pro.port}`)
+    await air.page.getByRole('button', { name: 'Connect', exact: true }).click()
+
+    // Both show the same number; you Allow on the Pro.
+    const code = air.page.locator('[data-code]')
+    await code.waitFor()
+    await pro.page
+      .getByText('MacBook Air wants to set up from this Mac.')
+      .waitFor()
+    expect(await pro.page.locator('[data-code]').textContent()).toBe(
+      await code.textContent()
+    )
+    await pro.page.getByRole('button', { name: 'Allow', exact: true }).click()
+    await air.page.getByText('Connected to MacBook Pro').waitFor()
+    await air.page.getByText('Pace answers alice').waitFor()
+    await pro.page.getByText(/MacBook Air is set up/).waitFor()
+    expect(
+      readSettingsValues(path.join(air.home, 'settings.json'))
+    ).toMatchObject({
+      SLACK_APP_TOKEN: world.slack.appToken,
+      SLACK_BOT_TOKEN: world.slack.botToken,
+      MENTION_ALLOWED_USERS: alice.id,
+      // The Air's own choice stays
+      REASONER_SANDBOX: 'none',
+    })
+
+    // Review says where it came from; started, Pace moves to the Air, the Mac
+    // in use, which answers the hello.
+    await air.page
+      .getByRole('button', { name: 'Continue', exact: true })
+      .click()
+    await air.page
+      .getByRole('heading', { name: 'Review and start Pace' })
+      .waitFor()
+    await air.page.getByText('From MacBook Pro').waitFor()
+    await air.page.getByText('@alice', { exact: true }).waitFor()
+    await air.page
+      .getByRole('button', { name: 'Start Pace', exact: true })
+      .click()
+    await air.page
+      .getByRole('heading', { name: 'Say hello to Pace in Slack' })
+      .waitFor()
+    await air.page.getByText(/Pace moved here from MacBook Pro/).waitFor()
+    await pro.page.getByText('MacBook Air answers').waitFor()
+    await eventually('one Slack connection', () => slack.connections === 1)
+    const hello = await slack.mention({
+      channel: ops.id,
+      user: alice.id,
+      text: `<@${slack.botUserId}> hello`,
+    })
+    await world.answered(ops.id, hello)
+    await air.page.getByRole('heading', { name: 'Pace is set up' }).waitFor()
+    expect(air.answered().some((request) => /hello/.test(request))).toBe(true)
   })
 })
