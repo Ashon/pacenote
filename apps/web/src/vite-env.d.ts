@@ -132,6 +132,8 @@ declare global {
                 exclude: string[]
                 /** Where code tasks continue */
                 cli: WorkTool
+                /** Where each tool's new sessions open: its app, or a terminal */
+                opensIn: Record<WorkTool, 'app' | 'terminal'>
               }
               collect: TasksCollect
               /** Pacenote's own work: the CLI chosen, and what each last did */
@@ -200,12 +202,19 @@ declare global {
         chooseFolder(repo?: string): Promise<FolderCheck | undefined>
         /** Each repository's folder (tasks-repos.json) */
         repos(): Promise<Record<string, string>>
+        /** Whether the Claude app and the Codex app are on this Mac */
+        apps(): Promise<Record<WorkTool, boolean> | null>
         setRepo(repo: string, folder?: string): Promise<Record<string, string>>
-        /** Opens a session for the task in a terminal, in the folder */
+        /**
+         * Opens a session for the task in the folder: in a terminal, or in the
+         * tool's desktop app with a note on what to do there
+         */
         continueIn(
           id: string,
           how: { tool: WorkTool; folder: string }
-        ): Promise<{ entry?: WorkEntry; error?: string } | undefined>
+        ): Promise<
+          { entry?: WorkEntry; error?: string; note?: string } | undefined
+        >
         /** Opens a session again, to continue it */
         resume(entryId: string): Promise<{ error?: string } | undefined>
         /** Has Claude Code draft a reply from the thread, read only */

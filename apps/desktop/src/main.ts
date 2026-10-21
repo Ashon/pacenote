@@ -100,6 +100,7 @@ import {
   changeWork,
   openProposals,
   readWork,
+  UNSENT_MS,
   updateWork,
   workFor,
 } from '../../../src/tasks/work.js'
@@ -142,16 +143,18 @@ import { draftReply } from './drafter.js'
 import { SessionIndex } from './session-index.js'
 import { isTaskBranch, linkSessions, RepoLookup } from './session-links.js'
 import {
+  findClaudeSession,
   findCodexSession,
   lastActive,
+  openSession,
   readSessionLog,
   resumeCommand,
   resumeSession,
   sessionFile,
   signInCli,
-  startSession,
   terminalOf,
   type HandoffOptions,
+  type OpenIn,
   type Session,
 } from './handoff.js'
 import { KeepAwake } from './keep-awake.js'
@@ -1112,8 +1115,15 @@ function registerBotIpc(): void {
 
   // Your tasks: AI tools add them through the MCP server; the app shows them
   // and keeps your decisions (tasks-decisions.json, which only the app writes).
+  // The Claude app and the Codex app, when on this Mac: sessions can open in
+  // them (Open sessions in); tests list them in PACENOTE_HANDOFF_APPS.
+  const hasApp = (tool: WorkTool) =>
+    process.env.PACENOTE_HANDOFF_APPS === undefined
+      ? Boolean(app.getApplicationNameForProtocol(`${tool}://`))
+      : listOf(process.env.PACENOTE_HANDOFF_APPS).includes(tool)
   const tasksSettings = () => {
     const env = settings.effectiveEnv()
+    const inApp = env.TASKS_OPEN_IN === 'app'
     return {
       on: env.TASKS === 'on',
       dms: env.TASKS_DMS === 'on',
@@ -1122,6 +1132,11 @@ function registerBotIpc(): void {
       groups: listOf(env.TASKS_GROUPS),
       /** Where code tasks continue */
       cli: env.TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
+      /** Where each tool's new sessions open: its app, when on this Mac */
+      opensIn: {
+        claude: inApp && hasApp('claude') ? 'app' : 'terminal',
+        codex: inApp && hasApp('codex') ? 'app' : 'terminal',
+      } satisfies Record<WorkTool, OpenIn>,
     }
   }
   ipcMain.handle('pacenote:tasks:list', (event) => {
@@ -1400,6 +1415,8 @@ function registerBotIpc(): void {
       (tool === 'claude' ? env().CLAUDE_BIN : env().CODEX_BIN)?.trim() || tool,
     terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
+    openIn: () => (env().TASKS_OPEN_IN === 'app' ? 'app' : 'terminal'),
+    hasApp,
   })
   // Pacenote's own work signed out: claude auth login (or codex login), in
   // your terminal
@@ -1614,15 +1631,21 @@ function registerBotIpc(): void {
     const all = allTaskViews(dataDir)
     const task = all.find((t) => t.id === id)
     if (!task) return null
-    // Codex sessions Pacenote opened get their id once they have started.
-    for (const entry of workFor(readWork(dataDir).entries, id))
+    // Codex sessions Pacenote opened, and those opened in a desktop app, get
+    // their id once they have started; one opened in an app is looked for a
+    // day, even when opened again since.
+    for (const entry of readWork(dataDir).entries)
       if (
         entry.kind === 'session' &&
-        entry.tool === 'codex' &&
+        entry.task === id &&
         !entry.session &&
-        !entry.mac
+        !entry.mac &&
+        (!entry.app || Date.now() - Date.parse(entry.startedAt) <= UNSENT_MS)
       ) {
-        const session = findCodexSession(homedir(), entry)
+        const session =
+          entry.tool === 'codex'
+            ? findCodexSession(homedir(), entry)
+            : findClaudeSession(homedir(), entry)
         if (session) updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
       }
     linkSessionsSoon()
@@ -1755,6 +1778,12 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:tasks:repos', (event) =>
     fromMainWindow(event) ? readRepos(dataDir) : {}
   )
+  // Settings > Todo: whether the Claude app and the Codex app are on this Mac
+  ipcMain.handle('pacenote:tasks:apps', (event) =>
+    fromMainWindow(event)
+      ? { claude: hasApp('claude'), codex: hasApp('codex') }
+      : null
+  )
   ipcMain.handle(
     'pacenote:tasks:set-repo',
     (event, repo: unknown, folder: unknown) => {
@@ -1780,7 +1809,7 @@ function registerBotIpc(): void {
         return { error: 'Choose the folder to work in first.' }
       try {
         if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
-        const entry = await startSession(
+        const { entry, note } = await openSession(
           handoff(),
           detail.task,
           detail.context,
@@ -1788,7 +1817,7 @@ function registerBotIpc(): void {
           folder
         )
         addWork(dataDir, entry)
-        return { entry }
+        return { entry, note }
       } catch (error) {
         return { error: (error as Error).message }
       }

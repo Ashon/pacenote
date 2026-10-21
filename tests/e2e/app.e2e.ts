@@ -23,6 +23,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
 import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
+import { saveRepo } from '../../src/tasks/folders.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
 import { withHub } from './support/hub.js'
@@ -1299,6 +1300,296 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       })
       .waitFor()
     await kept.getByText('Ashon/payments').first().waitFor()
+  }, 180_000)
+
+  it('opens code tasks in the Claude app or the Codex app with the task written in, finds each session once sent, and opens the terminal when the app is not here', async () => {
+    world = await World.create([])
+    const { home, root } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    const link = (at: number) =>
+      `https://acme.slack.com/archives/C0OPS/p${String(Math.floor(at / 1000))}000100`
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    execFileSync('git', ['init', '-q'], { cwd: checkout })
+    // Its folder is known from before: Continue opens there without asking.
+    saveRepo(home, 'Ashon/payments', checkout)
+    const [review, flaky] = addTasks(
+      home,
+      [
+        {
+          title: 'Review the payment retry PR',
+          asked_by: 'mina',
+          where: '#ops',
+          link: link(now - 2 * HOUR),
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'mina wants a review of PR #482 before Thursday.',
+        },
+        {
+          title: 'Fix the flaky webhook test',
+          asked_by: 'hyun',
+          where: '#ops',
+          link: link(now - 3 * HOUR),
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'hyun says the webhook test fails one run in ten.',
+        },
+      ],
+      {
+        settings: { on: true, dms: false, exclude: [] },
+        now: new Date(now - HOUR),
+      }
+    ).added as [
+      NonNullable<ReturnType<typeof addTasks>['added'][0]>,
+      NonNullable<ReturnType<typeof addTasks>['added'][0]>,
+    ]
+
+    // The apps open by their links, and the terminal by its script: a
+    // stand-in keeps each one it is given. Both apps are on this Mac.
+    const opened = path.join(root, 'opened.log')
+    const opener = path.join(root, 'open-link')
+    writeFileSync(opener, `#!/bin/sh\necho "$1" >> "${opened}"\n`)
+    chmodSync(opener, 0o755)
+    const openedNow = () =>
+      existsSync(opened)
+        ? readFileSync(opened, 'utf8').split('\n').filter(Boolean)
+        : []
+    const page = await launch(world, {
+      settings: ['TASKS=on'],
+      env: {
+        PACENOTE_HANDOFF_OPENER: opener,
+        PACENOTE_HANDOFF_APPS: 'claude,codex',
+      },
+    })
+
+    // Settings > Todo: sessions open in the desktop app from now on.
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    const sessionsIn = page.getByRole('radiogroup', {
+      name: 'Open sessions in',
+    })
+    expect(
+      await sessionsIn
+        .getByRole('radio', { name: 'Terminal' })
+        .getAttribute('aria-checked')
+    ).toBe('true')
+    await sessionsIn.getByRole('radio', { name: 'Desktop app' }).click()
+    // Whether each app is on this Mac shows under it.
+    const appHere = (tool: string) =>
+      page.locator(`[data-setting="TASKS_OPEN_IN"] [data-app="${tool}"]`)
+    await appHere('claude').getByText('Claude app · on this Mac').waitFor()
+    await appHere('codex').getByText('Codex app · on this Mac').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-app-settings.png'),
+    })
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await eventually('Desktop app saved', () =>
+      saved(world!).TASKS_OPEN_IN === 'app' ? true : undefined
+    )
+
+    // Todo: Continue says where it opens, on hover.
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const row = page.locator(`[data-task-row="${review.id}"]`)
+    const continueButton = row.getByRole('button', {
+      name: 'Continue in Claude Code',
+    })
+    await continueButton.hover()
+    await page
+      .getByRole('tooltip', {
+        name: /^Opens the Claude app's Code tab in .*payments with the task written in\. Send it there to start\.$/,
+      })
+      .waitFor()
+    await continueButton.click()
+
+    // The Claude app's Code tab, in the folder, the task written in
+    const claudeLink = await eventually('the Claude app opened', () =>
+      openedNow().find((line) => line.startsWith('claude://'))
+    )
+    expect(claudeLink.startsWith('claude://code/new?')).toBe(true)
+    const claudeUrl = new URL(claudeLink)
+    expect(claudeUrl.searchParams.get('folder')).toBe(checkout)
+    const prompt = claudeUrl.searchParams.get('q')!
+    expect(prompt).toMatch(/\[pacenote-task:[0-9a-f-]{36}\]/)
+    expect(prompt).toContain(
+      `<task id="${review.id}" action="code" repo="Ashon/payments">`
+    )
+    expect(prompt).toContain(
+      'Summary: mina wants a review of PR #482 before Thursday.'
+    )
+    expect(prompt).toContain(`close_task with id ${review.id}`)
+    // Nothing ran in a terminal.
+    expect(openedNow().some((line) => line.endsWith('.command'))).toBe(false)
+    // What to do there, and the session waiting for you to send it
+    await row
+      .getByRole('status')
+      .getByText(
+        'Opened in the Claude app with the task written in. Confirm the folder there, then send it.'
+      )
+      .waitFor()
+    const workLine = (of: Locator) =>
+      of.locator('div.grid', {
+        has: page.getByText('Your work', { exact: true }),
+      })
+    await workLine(row)
+      .getByText(/^in the Claude app · started /)
+      .waitFor()
+    await workLine(row).getByText('Waiting for you to send it').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-app-waiting.png'),
+    })
+
+    // Sent in the app: Claude Code's log has the session, the marker in its
+    // first prompt.
+    const session = 'd5e6f7a8-0000-4000-8000-00000000c1a0'
+    const project = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[^a-zA-Z0-9]/g, '-')
+    )
+    mkdirSync(project, { recursive: true })
+    const at = new Date().toISOString()
+    writeFileSync(
+      path.join(project, `${session}.jsonl`),
+      [
+        {
+          type: 'user',
+          cwd: checkout,
+          sessionId: session,
+          entrypoint: 'claude-desktop',
+          timestamp: at,
+          message: { role: 'user', content: prompt },
+        },
+        {
+          type: 'assistant',
+          cwd: checkout,
+          sessionId: session,
+          entrypoint: 'claude-desktop',
+          timestamp: at,
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Here is how I will review it.' }],
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join('\n') + '\n'
+    )
+    await workLine(row)
+      .getByText(/^in the Claude app · last active /)
+      .waitFor()
+    // At work now: the note on what to do there goes.
+    await row.getByRole('status').waitFor({ state: 'detached' })
+    // The Claude app has no link to continue a session: the terminal does.
+    const resume = workLine(row).getByRole('button', {
+      name: 'Continue this session in your terminal',
+    })
+    await resume.click()
+    const resumed = await eventually('the session continued', () =>
+      openedNow().find((line) => line.endsWith('.command'))
+    )
+    expect(readFileSync(resumed, 'utf8')).toContain(`--resume '${session}'`)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-app-found.png'),
+    })
+
+    // Codex, from the row's menu: the Codex app, the same way
+    const other = page.locator(`[data-task-row="${flaky.id}"]`)
+    await other.getByRole('button', { name: 'More for this task' }).click()
+    await page.getByRole('menuitem', { name: 'Continue in Codex' }).click()
+    const codexLink = await eventually('the Codex app opened', () =>
+      openedNow().find((line) => line.startsWith('codex://new?'))
+    )
+    const codexUrl = new URL(codexLink)
+    expect(codexUrl.searchParams.get('path')).toBe(checkout)
+    const codexPrompt = codexUrl.searchParams.get('prompt')!
+    expect(codexPrompt).toContain(
+      `<task id="${flaky.id}" action="code" repo="Ashon/payments">`
+    )
+    await other
+      .getByText(
+        'Opened in the Codex app with the task written in. Send it there to start.'
+      )
+      .waitFor()
+    await workLine(other)
+      .getByText(/^in the Codex app · started /)
+      .waitFor()
+    await workLine(other).getByText('Waiting for you to send it').waitFor()
+    // Sent: the Codex app's rollout, the marker in its first prompt
+    const thread = '019a0b6c-1111-7222-8333-944445555666'
+    const today = new Date()
+    const day = path.join(
+      root,
+      '.codex',
+      'sessions',
+      String(today.getFullYear()),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0')
+    )
+    mkdirSync(day, { recursive: true })
+    writeFileSync(
+      path.join(
+        day,
+        `rollout-${at.slice(0, 19).replace(/:/g, '-')}-${thread}.jsonl`
+      ),
+      [
+        {
+          type: 'session_meta',
+          timestamp: at,
+          payload: { id: thread, cwd: checkout, originator: 'Codex Desktop' },
+        },
+        {
+          type: 'response_item',
+          timestamp: at,
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'input_text', text: codexPrompt }],
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join('\n') + '\n'
+    )
+    // It continues in the Codex app, by its thread.
+    const back = workLine(other).getByRole('button', {
+      name: 'Continue this session in the Codex app',
+    })
+    await back.click()
+    await eventually('the Codex thread opened', () =>
+      openedNow().find((line) => line === `codex://threads/${thread}`)
+    )
+
+    // Without the Claude app on this Mac, the terminal opens instead, saying
+    // so; Continue says where it opens.
+    await app!.evaluate(() => {
+      process.env.PACENOTE_HANDOFF_APPS = 'codex'
+    })
+    await page.evaluate("window.location.hash = '#/settings/tasks'")
+    await appHere('claude')
+      .getByText('Claude app · not on this Mac, so your terminal opens instead')
+      .waitFor()
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await row.getByRole('button', { name: 'Continue in Claude Code' }).hover()
+    await page.getByRole('tooltip', { name: /^Opens in .*payments$/ }).waitFor()
+    const before = openedNow().filter((line) => line.endsWith('.command'))
+    await row.getByRole('button', { name: 'Continue in Claude Code' }).click()
+    const script = await eventually('the terminal opened instead', () =>
+      openedNow().find(
+        (line) => line.endsWith('.command') && !before.includes(line)
+      )
+    )
+    expect(readFileSync(script, 'utf8')).toContain('--session-id')
+    await row
+      .getByText(
+        "The Claude app isn't on this Mac, so the session opened in your terminal."
+      )
+      .waitFor()
+    expect(
+      openedNow().filter((line) => line.startsWith('claude://'))
+    ).toHaveLength(1)
   }, 180_000)
 
   it('links the sessions you start yourself to the task they worked on, and asks about the ones that only look related', async () => {

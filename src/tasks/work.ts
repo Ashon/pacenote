@@ -133,11 +133,38 @@ export function answerSuggestion(
   return answered
 }
 
-/** A task's entries, newest first */
-export function workFor(entries: WorkEntry[], task: string): WorkEntry[] {
+/** How long a session opened in a desktop app waits to be sent there */
+export const UNSENT_MS = 24 * 60 * 60_000
+
+/**
+ * A session opened in a desktop app and never sent there, once another
+ * session of the task came after it or a day went by: left out of the log.
+ * It stays in the file, as your other Mac would bring it back.
+ */
+const unsent = (entry: WorkEntry, superseded: boolean, now: number) =>
+  entry.kind === 'session' &&
+  !!entry.app &&
+  !entry.session &&
+  (superseded || now - Date.parse(entry.startedAt) > UNSENT_MS)
+
+/**
+ * A task's entries, newest first, without the sessions opened in a desktop
+ * app that were never sent there
+ */
+export function workFor(
+  entries: WorkEntry[],
+  task: string,
+  now = Date.now()
+): WorkEntry[] {
+  let sessions = 0
   return entries
     .filter((entry) => entry.task === task)
     .sort((a, b) => Date.parse(entryAt(b)) - Date.parse(entryAt(a)))
+    .filter((entry) => {
+      const left = unsent(entry, sessions > 0, now)
+      if (entry.kind === 'session') sessions += 1
+      return !left
+    })
 }
 
 /**

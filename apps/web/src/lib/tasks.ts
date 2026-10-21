@@ -168,9 +168,10 @@ export function useTaskDetail(id: string, enabled = true) {
 }
 
 /**
- * Continuing a task: in a terminal (Claude Code or Codex), with a reply
- * drafted to send yourself, or a session opened again. Each refreshes the task
- * and the list, and returns the error to show, if any.
+ * Continuing a task: in a terminal or a desktop app (Claude Code or Codex),
+ * with a reply drafted to send yourself, or a session opened again. Each
+ * refreshes the task and the list, and returns the error to show, if any;
+ * continueIn also what to do in the app it opened.
  */
 export function useTaskWork(id: string) {
   const bridge = window.pacenoteDesktop?.tasks
@@ -188,8 +189,11 @@ export function useTaskWork(id: string) {
     return result?.error
   }
   return {
-    continueIn: (tool: WorkTool, folder: string) =>
-      after(bridge?.continueIn(id, { tool, folder })),
+    continueIn: async (tool: WorkTool, folder: string) => {
+      const result = await bridge?.continueIn(id, { tool, folder })
+      await refresh()
+      return { error: result?.error, note: result?.note }
+    },
     resume: (entryId: string) => after(bridge?.resume(entryId)),
     draft: () => after(bridge?.draft(id)),
     copyReply: (text: string) => after(bridge?.copyReply(id, text)),

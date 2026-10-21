@@ -82,6 +82,14 @@ import { PaceSpinner } from './pace-spinner'
  */
 
 const TOOL: Record<WorkTool, string> = { claude: 'Claude Code', codex: 'Codex' }
+/** The desktop app each tool's sessions can open in (Open sessions in) */
+const APP: Record<WorkTool, string> = {
+  claude: 'Claude app',
+  codex: 'Codex app',
+}
+/** A Codex session from the Codex app continues there; others in a terminal */
+const resumesInApp = (session: Session) =>
+  !!session.app && session.tool === 'codex'
 const other = (tool: WorkTool): WorkTool =>
   tool === 'claude' ? 'codex' : 'claude'
 
@@ -166,6 +174,7 @@ export function TaskRow({
   task,
   motion,
   cli,
+  opensIn,
   working,
   live,
   follows,
@@ -183,6 +192,8 @@ export function TaskRow({
   motion?: Parameters<typeof motionItem>[0]
   /** Where code tasks continue */
   cli: WorkTool
+  /** Where each tool's new sessions open: its desktop app, or a terminal */
+  opensIn?: Record<WorkTool, 'app' | 'terminal'>
   /** Its latest session: the tool and when it was last active */
   working?: { tool: WorkTool; at: string }
   /** An AI tool working on it now over MCP (tasks-activity.jsonl) */
@@ -230,6 +241,11 @@ export function TaskRow({
   const [drafting, setDrafting] = useState(false)
   const [reply, setReply] = useState<string>()
   const [error, setError] = useState<string>()
+  // What to do in the desktop app a session opened in, or why it did not,
+  // and when it was said
+  const [note, setNote] = useState<{ text: string; at: number }>()
+  const noteOf = (text?: string) =>
+    setNote(text ? { text, at: Date.now() } : undefined)
   const row = useRef<HTMLLIElement>(null)
   // What an AI tool changes while the row is in view lights up a moment.
   const flash = useFlash({ title: task.title, due: task.due, repo: task.repo })
@@ -241,6 +257,11 @@ export function TaskRow({
   const liveTool = useRef('an AI tool')
   if (live) liveTool.current = closedBy(live.by) ?? 'an AI tool'
 
+  // The note goes once a session of the task is at work after it.
+  useEffect(() => {
+    if (note && working && Date.parse(working.at) >= note.at) setNote(undefined)
+  }, [note, working])
+
   // Opened from a link, the row comes into view.
   useEffect(() => {
     if (open) row.current?.scrollIntoView({ block: 'nearest' })
@@ -248,14 +269,18 @@ export function TaskRow({
 
   const continueIn = async (tool: WorkTool) => {
     setError(undefined)
+    setNote(undefined)
     if (!open) onToggle()
     // A folder the repository was opened in before goes straight on.
     const detail = await client.fetchQuery(taskDetailQuery(task.id))
-    if (detail?.folder) setError(await act.continueIn(tool, detail.folder))
-    else askFolder(tool)
+    if (!detail?.folder) return askFolder(tool)
+    const result = await act.continueIn(tool, detail.folder)
+    setError(result.error)
+    noteOf(result.note)
   }
   const draft = async () => {
     setError(undefined)
+    setNote(undefined)
     if (!open) onToggle()
     setDrafting(true)
     setReply(undefined)
@@ -511,7 +536,10 @@ export function TaskRow({
             {task.status === 'open' && !dismissing && (
               <>
                 {task.action === 'code' && (
-                  <OpensIn folder={folder}>
+                  <OpensIn
+                    folder={folder}
+                    app={opensIn?.[cli] === 'app' ? cli : undefined}
+                  >
                     <Button
                       size="sm"
                       variant="outline"
@@ -610,6 +638,14 @@ export function TaskRow({
             {error}
           </p>
         )}
+        {note && !error && (
+          <p
+            role="status"
+            className="mt-2 pl-6 text-copy text-pretty text-muted-foreground"
+          >
+            {note.text}
+          </p>
+        )}
         <CollapsibleContent>
           <TaskOpen
             task={task}
@@ -635,8 +671,9 @@ export function TaskRow({
           open={folderAsk.open}
           onClose={() => setFolderAsk({ ...folderAsk, open: false })}
           onOpen={async (folder) => {
-            const failed = await act.continueIn(folderAsk.tool, folder)
-            if (failed) return failed
+            const result = await act.continueIn(folderAsk.tool, folder)
+            if (result.error) return result.error
+            noteOf(result.note)
             setFolderAsk({ ...folderAsk, open: false })
             return undefined
           }}
@@ -1018,7 +1055,7 @@ function EarlierLine({
   // The terminal icon of the row's own Continue button: it opens there too.
   // Its name is a tooltip at its left, clear of the lines' icons above.
   const resume = session?.session
-    ? `Continue ${task ? 'its' : 'this'} session in ${TOOL[session.tool]}`
+    ? `Continue ${task ? 'its' : 'this'} session in ${resumesInApp(session) ? `the ${APP.codex}` : session.app ? 'your terminal' : TOOL[session.tool]}`
     : ''
   const action =
     elsewhere && session ? (
@@ -1050,7 +1087,9 @@ function EarlierLine({
       </Tooltip>
     ) : line.session ? (
       <span className="text-meta text-muted-foreground">
-        Waiting for {TOOL[line.session.tool]} to start it
+        {line.session.app
+          ? 'Waiting for you to send it'
+          : `Waiting for ${TOOL[line.session.tool]} to start it`}
       </span>
     ) : undefined
   const name = (text: string, href?: string, hint?: string) =>
@@ -1103,6 +1142,7 @@ function EarlierLine({
       {quiet(
         [
           elsewhere && `On ${elsewhere}`,
+          own.app && `in the ${APP[own.tool]}`,
           own.branch,
           own.lastActiveAt
             ? `last active ${formatRelative(own.lastActiveAt)}`
@@ -1269,15 +1309,26 @@ const repoFolderOf = (
 const tilde = (folder: string) => folder.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
 /** Continue, with where it opens on hover when it opens without asking */
+/**
+ * Where Continue opens, on hover: the folder, and the desktop app with the
+ * task written in when sessions open there
+ */
 function OpensIn({
   folder,
+  app,
   children,
 }: {
   folder: string | undefined
+  /** The tool whose desktop app it opens */
+  app?: WorkTool
   children: React.ReactElement
 }) {
-  if (!folder) return children
-  return <Tooltip content={`Opens in ${tilde(folder)}`}>{children}</Tooltip>
+  const where = folder ? ` in ${tilde(folder)}` : ''
+  const content = app
+    ? `Opens ${app === 'claude' ? "the Claude app's Code tab" : `the ${APP.codex}`}${where} with the task written in. Send it there to start.`
+    : folder && `Opens in ${tilde(folder)}`
+  if (!content) return children
+  return <Tooltip content={content}>{children}</Tooltip>
 }
 
 type FolderProps = {
@@ -1542,7 +1593,8 @@ function SessionLogPanel({
                     disabled={!entry.session}
                   >
                     <SquareTerminal />
-                    Continue in {tool}
+                    Continue in{' '}
+                    {resumesInApp(entry) ? `the ${APP.codex}` : tool}
                   </Button>
                   {entry.session && (
                     <Button

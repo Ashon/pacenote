@@ -216,6 +216,11 @@ export const EnvSchema = z.object({
    * for whether its task looks done
    */
   TASKS_CLI: z.enum(['claude', 'codex']).default('claude'),
+  /**
+   * Where those sessions open: a terminal, or the tool's desktop app (the
+   * Claude app's Code tab, the Codex app) by its link, the task written in
+   */
+  TASKS_OPEN_IN: z.enum(['terminal', 'app']).default('terminal'),
   TASKS_TERMINAL: z
     .enum(['auto', 'terminal', 'iterm', 'ghostty'])
     .default('auto'),
@@ -334,6 +339,7 @@ const OUTSIDE_FINGERPRINT = new Set([
   'TASKS_NAMES',
   'TASKS_GROUPS',
   'TASKS_CLI',
+  'TASKS_OPEN_IN',
   'TASKS_TERMINAL',
   'TASKS_PLAN_FIRST',
   'TASKS_LINK_SESSIONS',

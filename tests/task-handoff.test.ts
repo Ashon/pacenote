@@ -6,6 +6,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -18,10 +19,15 @@ import {
   draftReply,
 } from '../apps/desktop/src/drafter.js'
 import {
+  appLink,
   chooseTerminal,
+  codexThreadLink,
   commandScript,
+  findClaudeSession,
   findCodexSession,
   handoffPrompt,
+  LINK_PROMPT_CHARS,
+  openSession,
   lastActive,
   readSessionLog,
   resumeCommand,
@@ -409,6 +415,141 @@ describe('the handoff', () => {
     expect(terminalOf(undefined)).toBe('auto')
     expect(terminalOf('toString')).toBe('auto')
   })
+
+  it('writes the task into a link that opens the Claude app or the Codex app', () => {
+    expect(appLink('claude', 'Fix it & ship', '/w/my payments')).toBe(
+      'claude://code/new?q=Fix%20it%20%26%20ship&folder=%2Fw%2Fmy%20payments'
+    )
+    expect(appLink('codex', '#482?', '/w/payments')).toBe(
+      'codex://new?prompt=%23482%3F&path=%2Fw%2Fpayments'
+    )
+    expect(codexThreadLink('019a0b6c-1111')).toBe(
+      'codex://threads/019a0b6c-1111'
+    )
+  })
+
+  it('opens a session in the desktop app with the task written in, or in the terminal when the app is not here', async () => {
+    const links: string[] = []
+    const scripts: string[] = []
+    const apps = new Set(['claude', 'codex'])
+    let openIn: 'app' | 'terminal' = 'app'
+    const options: HandoffOptions = {
+      dataDir: dir('app-data'),
+      home: dir('app-home'),
+      bin: (tool) => `/opt/${tool}`,
+      terminal: () => 'terminal',
+      planFirst: () => false,
+      open: async (file) => void scripts.push(file),
+      openIn: () => openIn,
+      hasApp: (tool) => apps.has(tool),
+      openLink: async (url) => void links.push(url),
+      now: () => new Date('2026-10-21T09:00:00Z'),
+    }
+
+    const claude = await openSession(
+      options,
+      task,
+      context,
+      'claude',
+      '/w/payments'
+    )
+    expect(claude.entry).toEqual({
+      kind: 'session',
+      id: claude.entry.id,
+      task: task.id,
+      tool: 'claude',
+      cwd: '/w/payments',
+      startedAt: '2026-10-21T09:00:00.000Z',
+      app: true,
+    })
+    expect(claude.note).toBe(
+      'Opened in the Claude app with the task written in. Confirm the folder there, then send it.'
+    )
+    expect(scripts).toEqual([])
+    const url = new URL(links[0]!)
+    expect(url.protocol).toBe('claude:')
+    expect(url.searchParams.get('folder')).toBe('/w/payments')
+    const prompt = url.searchParams.get('q')!
+    expect(prompt).toContain(`[pacenote-task:${claude.entry.id}]`)
+    expect(prompt).toContain('Earlier task: Review the retry config change')
+    expect(prompt).not.toContain('xoxb-123456789012')
+
+    const codex = await openSession(
+      options,
+      task,
+      context,
+      'codex',
+      '/w/payments'
+    )
+    expect(codex.note).toBe(
+      'Opened in the Codex app with the task written in. Send it there to start.'
+    )
+    const codexUrl = new URL(links[1]!)
+    expect(codexUrl.protocol).toBe('codex:')
+    expect(codexUrl.searchParams.get('path')).toBe('/w/payments')
+    expect(codexUrl.searchParams.get('prompt')).toContain(
+      `[pacenote-task:${codex.entry.id}]`
+    )
+
+    // A Codex session from the app goes back there; Claude's in the terminal
+    await resumeSession(options, { ...codex.entry, session: 'th-1' })
+    expect(links[2]).toBe('codex://threads/th-1')
+    await resumeSession(options, { ...claude.entry, session: 's-1' })
+    expect(readFileSync(scripts[0]!, 'utf8')).toContain(
+      `'/opt/claude' --resume 's-1'`
+    )
+
+    // A long thread: what came before is left to task_context
+    const long = {
+      ...context,
+      thread: {
+        ...context.thread,
+        runs: Array.from({ length: 200 }, (_, i) => ({
+          id: `r${i}`,
+          request: `${'why does the retry stop '.repeat(6)}${i}`,
+          at: '2026-10-09T19:26:00.000Z',
+          status: 'succeeded' as const,
+        })),
+      },
+    }
+    const brief = await openSession(options, task, long, 'claude', '/w/p')
+    const briefPrompt = new URL(links[3]!).searchParams.get('q')!
+    expect(briefPrompt.length).toBeLessThanOrEqual(LINK_PROMPT_CHARS)
+    expect(briefPrompt).toContain(`[pacenote-task:${brief.entry.id}]`)
+    expect(briefPrompt).toContain(
+      `call Pacenote's task_context with id ${task.id} before you start`
+    )
+    expect(briefPrompt).not.toContain('Earlier in the thread')
+
+    // Not on this Mac: the terminal, saying so
+    apps.delete('codex')
+    const instead = await openSession(
+      options,
+      task,
+      context,
+      'codex',
+      '/w/payments'
+    )
+    expect(instead.note).toBe(
+      "The Codex app isn't on this Mac, so the session opened in your terminal."
+    )
+    expect(instead.entry.app).toBeUndefined()
+    expect(readFileSync(scripts[1]!, 'utf8')).toContain(`'/opt/codex' "$(cat`)
+    expect(links).toHaveLength(4)
+
+    // Opens in: Terminal
+    openIn = 'terminal'
+    const terminal = await openSession(
+      options,
+      task,
+      context,
+      'claude',
+      '/w/payments'
+    )
+    expect(terminal.note).toBeUndefined()
+    expect(terminal.entry.session).toMatch(/^[0-9a-f-]{36}$/)
+    expect(scripts).toHaveLength(3)
+  })
 })
 
 describe("the tools' own session logs", () => {
@@ -450,6 +591,62 @@ describe("the tools' own session logs", () => {
     expect(findCodexSession(home, entry)).toBe(id)
     expect(findCodexSession(home, { ...entry, id: 'other' })).toBeUndefined()
     expect(sessionFile(home, { ...entry, session: id })).toContain(id)
+  })
+
+  it('finds the session the Claude app started, once you sent it, by its marker', () => {
+    const home = dir('claude-app-home')
+    const projects = path.join(home, '.claude', 'projects')
+    const write = (project: string, session: string, marker: string) => {
+      mkdirSync(path.join(projects, project), { recursive: true })
+      const file = path.join(projects, project, `${session}.jsonl`)
+      writeFileSync(
+        file,
+        [
+          { type: 'queue-operation', sessionId: session },
+          {
+            type: 'user',
+            cwd: '/w/payments',
+            sessionId: session,
+            entrypoint: 'claude-desktop',
+            message: {
+              role: 'user',
+              content: `You are taking over a task from Pacenote [pacenote-task:${marker}].`,
+            },
+          },
+        ]
+          .map((line) => JSON.stringify(line))
+          .join('\n')
+      )
+      return file
+    }
+    write('-w-payments', 'aaaa1111-0000-4000-8000-000000000000', 'w1')
+    // Another folder you chose in the app
+    write('-w-payments-wt', 'bbbb2222-0000-4000-8000-000000000000', 'w2')
+    // Written before the entry: not its session
+    const old = write(
+      '-w-payments',
+      'cccc3333-0000-4000-8000-000000000000',
+      'w3'
+    )
+    const before = new Date(Date.now() - 3 * 86_400_000)
+    utimesSync(old, before, before)
+    const entry: Session = {
+      kind: 'session',
+      id: 'w1',
+      task: task.id,
+      tool: 'claude',
+      cwd: '/w/payments',
+      startedAt: new Date(Date.now() - 5_000).toISOString(),
+      app: true,
+    }
+    expect(findClaudeSession(home, entry)).toBe(
+      'aaaa1111-0000-4000-8000-000000000000'
+    )
+    expect(findClaudeSession(home, { ...entry, id: 'w2' })).toBe(
+      'bbbb2222-0000-4000-8000-000000000000'
+    )
+    expect(findClaudeSession(home, { ...entry, id: 'w3' })).toBeUndefined()
+    expect(findClaudeSession(dir('no-claude'), entry)).toBeUndefined()
   })
 
   it('reads a session’s log as turns and steps, secrets redacted', () => {

@@ -246,7 +246,7 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     id: 'work',
     section: 'tasks',
     label: 'Continuing work',
-    help: 'A code task continues in Claude Code or Codex, opened in a terminal in its repository with the task and what came before it. The session runs as you, with your own permissions.',
+    help: 'A code task continues in Claude Code or Codex, opened in a terminal or the desktop app in its repository with the task and what came before it. The session runs as you, with your own permissions.',
   },
   {
     id: 'history',
@@ -806,11 +806,27 @@ export const SETTING_FIELDS: SettingField[] = [
     shownWhen: { key: 'TASKS', equals: 'on' },
   },
   {
+    key: 'TASKS_OPEN_IN',
+    path: 'tasks.sessionsIn',
+    group: 'work',
+    label: 'Open sessions in',
+    help: "Desktop app opens the Claude app's Code tab or the Codex app with the task written in, for you to send. Terminal runs claude or codex in your terminal.",
+    type: 'select',
+    segmented: true,
+    options: [
+      { value: 'terminal', label: 'Terminal' },
+      { value: 'app', label: 'Desktop app' },
+    ],
+    default: 'terminal',
+    applies: 'app',
+    shownWhen: { key: 'TASKS', equals: 'on' },
+  },
+  {
     key: 'TASKS_TERMINAL',
     path: 'tasks.terminal',
     group: 'work',
     label: 'Terminal',
-    help: 'Where the session opens. Automatic picks the terminal you have open, else the one you used last.',
+    help: "Where the session opens. With Desktop app, it still continues Claude Code sessions, and opens a session when its app isn't on this Mac. Automatic picks the terminal you have open, else the one you used last.",
     type: 'select',
     segmented: true,
     options: [

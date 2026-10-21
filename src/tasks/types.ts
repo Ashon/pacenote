@@ -319,10 +319,18 @@ export type WorkEntry =
       id: string
       task: string
       tool: WorkTool
-      /** The tool's session id; Codex's is found after it starts */
+      /**
+       * The tool's session id; Codex's, and one opened in a desktop app, is
+       * found after it starts
+       */
       session?: string
       cwd: string
       startedAt: string
+      /**
+       * Opened in the tool's desktop app (Open sessions in: Desktop app),
+       * with the task written in for you to send there
+       */
+      app?: boolean
       /** When it was opened again to continue */
       resumedAt?: string[]
       /** Found in the tool's log (a session you started yourself) */

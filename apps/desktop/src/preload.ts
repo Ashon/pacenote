@@ -109,6 +109,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     chooseFolder: (repo?: string) =>
       ipcRenderer.invoke('pacenote:tasks:choose-folder', repo),
     repos: () => ipcRenderer.invoke('pacenote:tasks:repos'),
+    apps: () => ipcRenderer.invoke('pacenote:tasks:apps'),
     setRepo: (repo: string, folder?: string) =>
       ipcRenderer.invoke('pacenote:tasks:set-repo', repo, folder),
     continueIn: (id: string, how: { tool: string; folder: string }) =>

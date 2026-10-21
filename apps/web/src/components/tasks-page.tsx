@@ -336,6 +336,7 @@ export function TasksPage({
                 task={task}
                 motion={motion}
                 cli={data.settings.cli}
+                opensIn={data.settings.opensIn}
                 working={data.working?.[task.id]}
                 live={live?.working[task.id]}
                 proposal={data.proposals?.[task.id]}

@@ -55,10 +55,11 @@ both on your Mac, the other one takes over when the one you chose is at its usag
 
 ### Pick up where you left off, in either tool
 
-**Continue in Claude Code** (or Codex) opens a terminal session with the task, the thread, what Pace found there, and
-how related work ended last time, even when that work was done in the other tool. When the session is done, it closes
-the task with a note on how it ended and, if someone is waiting on you, a reply for you to send. A session you start
-yourself in a repository is told its open tasks from the start, and Todo shows the work as it happens.
+**Continue in Claude Code** (or Codex) opens a session in your terminal, or in the Claude app or the Codex app, with the
+task, the thread, what Pace found there, and how related work ended last time, even when that work was done in the other
+tool. When the session is done, it closes the task with a note on how it ended and, if someone is waiting on you, a
+reply for you to send. A session you start yourself in a repository is told its open tasks from the start, and Todo
+shows the work as it happens.
 
 <p align="center">
 <picture>

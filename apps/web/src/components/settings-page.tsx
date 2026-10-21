@@ -482,14 +482,18 @@ export function SettingsPage() {
    * What a choice field shows beside its options: the run environment's
    * readiness and setup under each sandbox, and what the chosen one has ready
    */
-  const choiceExtras: Partial<Record<string, ChoiceExtras>> = sandbox.available
-    ? {
-        REASONER_SANDBOX: {
-          footers: { vm: <VmFooter sandbox={sandbox} /> },
-          below: <EnvironmentDetails sandbox={sandbox} chosen={builtIn} />,
-        },
-      }
-    : {}
+  const choiceExtras: Partial<Record<string, ChoiceExtras>> = {
+    ...(sandbox.available && {
+      REASONER_SANDBOX: {
+        footers: { vm: <VmFooter sandbox={sandbox} /> },
+        below: <EnvironmentDetails sandbox={sandbox} chosen={builtIn} />,
+      },
+    }),
+    // Desktop app chosen: whether each app is on this Mac
+    ...(valueOf('TASKS_OPEN_IN') === 'app' && {
+      TASKS_OPEN_IN: { below: <AppsHere /> },
+    }),
+  }
   const row = (field: SettingField) => (
     <FieldRow
       key={field.key}
@@ -1660,6 +1664,7 @@ function FieldRow({
       help={field.help}
       issue={issue}
       warning={warning}
+      below={extras?.below}
     >
       <Control
         field={field}
@@ -1883,6 +1888,7 @@ function Row({
   help,
   issue,
   warning,
+  below,
   children,
 }: {
   label: React.ReactNode
@@ -1891,6 +1897,8 @@ function Row({
   help?: string
   issue?: string
   warning?: string
+  /** Under its help: a state the setting depends on */
+  below?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -1904,11 +1912,47 @@ function Row({
           <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>
         )}
         <RowNotes warning={warning} issue={issue} />
+        {below}
       </div>
       <div className="flex min-h-7 max-w-full shrink-0 items-center">
         {children}
       </div>
     </div>
+  )
+}
+
+/**
+ * Under Open sessions in, with Desktop app chosen: whether each app is on this
+ * Mac, and what opens when it is not
+ */
+function AppsHere() {
+  const bridge = window.pacenoteDesktop?.tasks
+  const [apps, setApps] = useState<Record<'claude' | 'codex', boolean> | null>()
+  useEffect(() => {
+    void bridge?.apps().then(setApps)
+  }, [bridge])
+  if (!apps) return null
+  return (
+    <ul className="mt-1.5 flex flex-col gap-0.5 text-meta">
+      {(['claude', 'codex'] as const).map((tool) => (
+        <li key={tool} data-app={tool} className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              apps[tool] ? 'bg-status-succeeded' : 'bg-muted-foreground/40'
+            )}
+          />
+          <span>
+            {tool === 'claude' ? 'Claude app' : 'Codex app'}
+            <span className="text-muted-foreground">
+              {apps[tool]
+                ? ' · on this Mac'
+                : ' · not on this Mac, so your terminal opens instead'}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ul>
   )
 }
 

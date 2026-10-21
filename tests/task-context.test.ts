@@ -200,6 +200,42 @@ describe("a task's next step and what came before", () => {
     expect(readWork(data).entries.map((e) => e.id)).toEqual(['w3'])
   })
 
+  it('leaves out a session opened in a desktop app and never sent, once another came after it or a day went by', () => {
+    const at = (offset: number) => new Date(NOW + offset).toISOString()
+    const app = (id: string, startedAt: string, session?: string) =>
+      ({
+        kind: 'session',
+        id,
+        task: 'C1:1.0',
+        tool: 'claude',
+        cwd: '/w',
+        startedAt,
+        app: true,
+        ...(session ? { session } : {}),
+      }) satisfies WorkEntry
+    const draft: WorkEntry = {
+      kind: 'draft',
+      id: 'd1',
+      task: 'C1:1.0',
+      at: at(3 * 60_000),
+      text: 'On it.',
+    }
+    const ids = (entries: WorkEntry[], now = NOW + 4 * 60_000) =>
+      workFor(entries, 'C1:1.0', now).map((e) => e.id)
+    // Not sent yet, a draft after it: still waiting
+    expect(ids([app('a1', at(0)), draft])).toEqual(['d1', 'a1'])
+    // Opened again: the first one goes, the one sent stays
+    expect(ids([app('a1', at(0)), app('a2', at(60_000), 's2'), draft])).toEqual(
+      ['d1', 'a2']
+    )
+    expect(ids([app('a1', at(0), 's1'), app('a2', at(60_000))])).toEqual([
+      'a2',
+      'a1',
+    ])
+    // A day on, never sent
+    expect(ids([app('a1', at(0))], NOW + DAY + 60_000)).toEqual([])
+  })
+
   it('groups earlier tasks by thread, repository and person, with how each ended', () => {
     const data = dir('context')
     const { earlier, refund, current } = seed(data)

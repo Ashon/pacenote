@@ -119,6 +119,14 @@ A collection is told who you are, so it can tell what is asked of you from what 
 task and what came before it as the first prompt. Pacenote names the session, so the task's work log has it from the
 start, and opening it again later (the terminal icon, `claude --resume`, the Claude app) keeps it there.
 
+With **Open sessions in: Desktop app** (Settings > Todo), Continue opens the Claude app's Code tab or the Codex app
+instead, in the folder, with the task written in for you to send there. Neither app sends it by itself, and the Claude
+app asks you to confirm the folder first. The work log shows the session as waiting until you send it, then finds it by
+the marker in its first prompt. A Codex session continues in the Codex app; a Claude Code session continues in your
+terminal (`claude --resume`), as the Claude app has no link to continue one. Without the app on this Mac, Continue opens
+your terminal instead and says so. A link carries a prompt of up to 12,000 characters; a longer one leaves what came
+before to `task_context`.
+
 With "Show sessions you start yourself" on (Settings > Todo), the work log also has the sessions you started on your
 own, from Claude Code's and Codex's logs on this Mac (the last 14 days; Claude Code's in the Claude app and IDE
 extensions too), checked every 30 seconds or so while the Todo screen is open:
