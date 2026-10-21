@@ -207,7 +207,9 @@ const paths = resolveAppPaths(distDir, app.isPackaged)
 // the ops broker's bundle.
 process.env.PACENOTE_VM_BIN ??= paths.vmBin
 process.env.PACENOTE_SANDBOX_DIR ??= paths.sandboxDir
-const webDistDir = paths.webDist
+// End-to-end tests put a copy of the UI in its place
+// (PACENOTE_DESKTOP_WEB_DIST).
+const webDistDir = process.env.PACENOTE_DESKTOP_WEB_DIST || paths.webDist
 /**
  * The settings file lives outside the repository. (PACENOTE_HOME, default
  * ~/.pacenote)
@@ -2374,8 +2376,28 @@ async function capture(window: BrowserWindow, file: string): Promise<void> {
   app.quit()
 }
 
-function reportStartupError(error: unknown): void {
+/**
+ * The app could not start: it says why, unless an upgrade is under way. A
+ * copy opened by Homebrew's late quit request runs from the old bundle, and
+ * its window fails to load as the upgrade moves the bundle's files away. That
+ * copy, or one told to quit, goes quietly, on to the new version once the
+ * bundle on disk names one (waited for while it is being swapped).
+ */
+async function reportStartupError(error: unknown): Promise<void> {
   const message = error instanceof Error ? error.message : String(error)
+  log.warn(`The window could not open: ${message}`)
+  const onDisk = await bundleWatch?.onDisk()
+  const upgraded = bundleWatch !== undefined && onDisk !== app.getVersion()
+  if (isQuitting || upgraded) {
+    log.info(
+      upgraded
+        ? 'An upgrade was replacing the app as it started: no error to show'
+        : 'Quitting as it started: no error to show'
+    )
+    if (onDisk && onDisk !== app.getVersion()) restartInto(onDisk)
+    app.quit()
+    return
+  }
   log.error(`Could not start: ${message}`)
   dialog.showErrorBox(`${appName} could not start`, message)
   app.quit()

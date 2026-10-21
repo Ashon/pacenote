@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -2964,6 +2965,56 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       readFileSync(path.join(world.home, 'logs/desktop.log'), 'utf8')
     ).toMatch(/The app on disk is 99\.0\.0 now; restarting into it/)
     expect(world.status()).toBeUndefined()
+  })
+
+  it('goes quietly, on to the new version, when an upgrade moves its files away as it starts', async () => {
+    world = await World.create()
+    const plist = (v: string) =>
+      `<plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>${v}</string></dict></plist>`
+    // Opened by Homebrew's late quit request from a bundle the upgrade is
+    // swapping: its Info.plist gone for the moment, and its screen's files
+    // going (one that cannot be read fails as one moved away does).
+    const info = path.join(world.root, 'Info.plist')
+    const web = path.join(world.root, 'web')
+    cpSync(path.join(REPO, 'apps/web/dist'), web, { recursive: true })
+    chmodSync(path.join(web, 'index.html'), 0o000)
+    mkdirSync(world.home, { recursive: true })
+    const logFile = path.join(world.home, 'logs/desktop.log')
+    const desktopLog = () =>
+      existsSync(logFile) ? readFileSync(logFile, 'utf8') : ''
+    // Spawned as is: a dialog would keep it from ever exiting.
+    const started = spawn(ELECTRON, [path.join(REPO, 'apps/desktop')], {
+      env: appEnv(world, {
+        PACENOTE_DESKTOP_BUNDLE_INFO: info,
+        PACENOTE_DESKTOP_NO_RELAUNCH: '1',
+        PACENOTE_DESKTOP_WEB_DIST: web,
+      }),
+      stdio: 'ignore',
+    })
+    const exited = once(started, 'exit') as Promise<[number | null]>
+    try {
+      await eventually('the window failing to open', () =>
+        /The window could not open/.test(desktopLog())
+      )
+      // The new version moves in.
+      writeFileSync(info, plist('99.0.0'))
+      const [code] = await Promise.race([
+        exited,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('It did not quit: an error was shown')),
+            30_000
+          )
+        ),
+      ])
+      expect(code).toBe(0)
+    } finally {
+      // A dialog holds off a polite quit.
+      started.kill('SIGKILL')
+    }
+    const text = desktopLog()
+    expect(text).toMatch(/The app on disk is 99\.0\.0 now; restarting into it/)
+    expect(text).not.toMatch(/ERROR \[desktop\] Could not start/)
   })
 
   it("holds each screen's place while its data comes, so nothing moves when it does", async () => {
