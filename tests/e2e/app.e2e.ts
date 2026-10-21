@@ -1659,6 +1659,10 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       await expect
         .poll(() => world?.status()?.reasoner, { timeout: 60_000 })
         .toBe('claude@vm')
+      // Its reasoner is known before its Slack connection opens.
+      await expect
+        .poll(() => world?.status()?.socket.state, { timeout: 30_000 })
+        .toBe('connected')
 
       const ts = await slack.mention({
         channel: ops.id,
