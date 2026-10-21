@@ -1,6 +1,6 @@
 {
   "name": "@pacenote/web",
-  "version": "0.5.31",
+  "version": "0.5.32",
   "private": true,
   "license": "Apache-2.0",
   "description": "Pacenote UI for status, settings and run history (bundled into the desktop app)",
