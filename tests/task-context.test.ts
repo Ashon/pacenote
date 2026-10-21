@@ -10,9 +10,10 @@ import { registerTaskTools } from '../src/tasks/mcp.js'
 import type { TasksSettings } from '../src/tasks/settings.js'
 import {
   allTaskViews,
+  buildView,
   decide,
+  readDecisions,
   readTasks,
-  tasksView,
 } from '../src/tasks/store.js'
 import type { RelatedRun, WorkEntry } from '../src/tasks/types.js'
 import { addWork, readWork, updateWork, workFor } from '../src/tasks/work.js'
@@ -130,7 +131,9 @@ describe("a task's next step and what came before", () => {
     const data = dir('history')
     const { earlier, refund, current } = seed(data)
     decide(data, refund.id, { status: 'done' }, new Date(NOW - 14.5 * DAY))
-    const listed = tasksView(data).tasks.map((t) => t.id)
+    const listed = buildView(readTasks(data), readDecisions(data), {
+      now: NOW,
+    }).tasks.map((t) => t.id)
     // The refund task was settled more than 14 days ago: out of the list.
     expect(listed).toEqual([current.id, earlier.id])
     expect(
