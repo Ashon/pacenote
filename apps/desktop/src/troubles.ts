@@ -60,6 +60,7 @@ export function currentTroubles(
   const since = Date.parse(status.socket.since)
   if (
     status.state === 'running' &&
+    !status.standby &&
     status.socket.state !== 'connected' &&
     now - since >= SOCKET_LOST_MS
   ) {

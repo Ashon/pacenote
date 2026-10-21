@@ -79,6 +79,17 @@ hold a Slack token.
 
 More: [Team hub](team-hub.md).
 
+## Your Macs
+
+With Pacenote on more than one Mac and your own Slack app, the Macs find each other (Bonjour, or an address you add)
+and talk over a channel only they can open, keyed by the Slack app token they share (`src/macs/channel.ts`). One of
+them holds Pace's Slack connection: each claims a lease when the rules say so, the one you're using after you leave
+the other, and all settle on the latest claim (`lease.ts`, `macs.ts`). The desktop app tells its Pace to open or close
+its connection, and Pace keeps running either way. Your Todo files are merged between them as they change
+(`sync.ts`, `todo-sync.ts`); sessions and run history stay on their Mac.
+
+More: [Your Macs](macs.md).
+
 ## Layers
 
 Three interfaces keep the mention pipeline apart from everything it could be swapped for:

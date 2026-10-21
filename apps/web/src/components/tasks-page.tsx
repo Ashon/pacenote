@@ -6,6 +6,7 @@ import {
   ArrowRightLeft,
   ChevronRight,
   History,
+  LoaderCircle,
   RefreshCw,
   Settings,
   SquareTerminal,
@@ -37,6 +38,7 @@ import {
   useTasks,
   useTasksLive,
 } from '@/lib/tasks'
+import { macNamed, useMacs } from '@/lib/macs'
 import { cn } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
@@ -109,6 +111,8 @@ export function TasksPage({
   const live = useTasksLive().data
   // Where you contribute: shown once above the tasks after a collection
   const you = useYou().data
+  // Your other Macs, by name, for what they did
+  const macs = useMacs()
   const decide = useDecide()
   const [tab, setTab] = useState<Tab>('open')
   const [declined, setDeclined] = useState(declinedOffers)
@@ -253,10 +257,19 @@ export function TasksPage({
         <>
           {open.length} open
           {data.collectedAt &&
-            ` · collected ${formatRelative(data.collectedAt)}`}
+            ` · collected ${formatRelative(data.collectedAt)}${
+              data.collect.last?.mac
+                ? ` on ${macNamed(macs, data.collect.last.mac)}`
+                : ''
+            }`}
         </>
       }
-      action={<CollectButton running={Boolean(data.collect.running)} />}
+      action={
+        <CollectButton
+          running={Boolean(data.collect.running)}
+          elsewhere={data.collect.elsewhere?.name}
+        />
+      }
     >
       <StatusLine
         collect={data.collect}
@@ -534,9 +547,26 @@ function Banner({ children }: { tone: 'note'; children: React.ReactNode }) {
   )
 }
 
-/** Collect now, or Stop while a collection runs */
-function CollectButton({ running }: { running: boolean }) {
+/**
+ * Collect now, or Stop while a collection runs. While another of your Macs
+ * collects, it waits for that one.
+ */
+function CollectButton({
+  running,
+  elsewhere,
+}: {
+  running: boolean
+  /** Another of your Macs collecting now */
+  elsewhere?: string
+}) {
   const { collect, stop } = useCollect()
+  if (elsewhere && !running)
+    return (
+      <Button size="sm" variant="secondary" disabled>
+        <LoaderCircle className="animate-spin" />
+        Collecting on {elsewhere}
+      </Button>
+    )
   if (running)
     return (
       <div className="flex items-center gap-1">
@@ -653,7 +683,8 @@ function StatusLine({
  * the words swap: Pace's mark keeps looking.
  */
 function CollectStatus({ collect }: { collect: TasksCollect }) {
-  const { running, last } = collect
+  const { running, last, elsewhere } = collect
+  const macs = useMacs()
   // Why the terminal did not open, for the collection it was opened for
   const [signIn, setSignIn] = useState<{ at: string; error: string }>()
   const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : 'Your AI')
@@ -663,14 +694,17 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
     text = running.reads
       ? `${name(running.by)} is reading Slack, read only: ${running.reads} lookups so far.`
       : `Starting ${name(running.by)}: Pacenote gives the collection its rules.`
+  else if (elsewhere)
+    text = `Collecting on ${elsewhere.name}. Its tasks come here when it is done.`
   else if (last?.ok) {
     const found = [
       last.added && `${last.added} ${last.added === 1 ? 'task' : 'tasks'}`,
       last.maybe && `${last.maybe} ${last.maybe === 1 ? 'Maybe' : 'Maybes'}`,
     ].filter(Boolean)
+    const where = last.mac ? ` on ${macNamed(macs, last.mac)}` : ''
     text = found.length
-      ? `Added ${found.join(' and ')}.`
-      : 'Nothing new to add.'
+      ? `Added ${found.join(' and ')}${where}.`
+      : `Nothing new to add${where}.`
     if (last.skipped) text += ` ${last.skipped} left out by your settings.`
     if (last.usage)
       spent = `${formatTokens(newTokens(last.usage))} new tokens over ${last.reads ?? 0} Slack lookups${last.by ? ` by ${CLI_NAMES[last.by]}` : ''}.`
@@ -697,7 +731,10 @@ function CollectStatus({ collect }: { collect: TasksCollect }) {
             : 'text-muted-foreground'
         )}
       >
-        <PaceSpinner active={Boolean(running)} className="size-6" />
+        <PaceSpinner
+          active={Boolean(running || elsewhere)}
+          className="size-6"
+        />
         <Swap
           id={running ? `run:${running.by ?? ''}` : 'last'}
           className={cn('min-w-0', running && 'text-shimmer')}
@@ -839,7 +876,8 @@ function CollectionRow({
   entry: CollectionRecord
   children: React.ReactNode
 }) {
-  if (!entry.runId)
+  // Another Mac's run is in that Mac's history
+  if (!entry.runId || entry.mac)
     return (
       <div className={ROW}>
         {children}

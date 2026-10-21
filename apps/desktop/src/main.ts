@@ -16,6 +16,7 @@ import {
   nativeTheme,
   net,
   Notification,
+  powerMonitor,
   powerSaveBlocker,
   protocol,
   shell,
@@ -58,6 +59,7 @@ import { diagnosticsText, tailFile } from './diagnostics.js'
 import { resolveAppPaths } from './app-paths.js'
 import { isMcpClientId } from '../../../src/history/mcp-clients.js'
 import {
+  collectionRow,
   latestCollection,
   recentCollections,
 } from '../../../src/tasks/collections.js'
@@ -79,6 +81,7 @@ import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
   Proposal,
   TaskDecision,
+  TasksCollect,
   WorkEntry,
   WorkTool,
 } from '../../../src/tasks/types.js'
@@ -152,6 +155,9 @@ import {
   type Session,
 } from './handoff.js'
 import { KeepAwake } from './keep-awake.js'
+import { Macs } from '../../../src/macs/macs.js'
+import { TodoSync } from '../../../src/macs/todo-sync.js'
+import { MacUseWatch, macName } from './macs.js'
 import { McpClients } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
@@ -473,6 +479,34 @@ const taskCollector = new TaskCollector({
   last: latestCollection(dataDir, collectionRuns(90)),
 })
 
+/** When Collect now started here, while it runs */
+function taskCollectorRunning(): string | undefined {
+  return taskCollector.state.running?.startedAt
+}
+
+/**
+ * Collect now as Todo shows it: this Mac's, or one another of your Macs ran
+ * since, or runs now
+ */
+function collectState(): TasksCollect {
+  const state = taskCollector.state
+  if (state.running) return state
+  const elsewhere = macs?.view().macs.find((mac) => !mac.here && mac.collecting)
+  const latest = recentCollections(dataDir, collectionRuns(7))[0]
+  const last =
+    latest?.mac &&
+    (!state.last || Date.parse(latest.at) > Date.parse(state.last.at))
+      ? latest
+      : state.last
+  return {
+    ...state,
+    ...(last ? { last } : {}),
+    ...(elsewhere?.collecting
+      ? { elsewhere: { name: elsewhere.name, since: elsewhere.collecting } }
+      : {}),
+  }
+}
+
 /** Sandbox status, allowed domains, apply jobs */
 const sandbox = new SandboxService({
   sandboxDir: paths.sandboxDir,
@@ -482,6 +516,13 @@ const sandbox = new SandboxService({
   env: process.env,
   toolPath,
 })
+
+/** Your Macs: whether Pace answers here or on another of them (macs.ts) */
+let macs: Macs | undefined
+/** How this Mac is used, once the app is ready (powerMonitor) */
+let macUse: MacUseWatch | undefined
+/** Your Todo, the same on your other Macs */
+let todoSync: TodoSync | undefined
 
 const supervisor = manageBot
   ? new BotSupervisor({
@@ -493,8 +534,70 @@ const supervisor = manageBot
       dataDir,
       toolPath,
       log: (message) => log.info(message),
+      standby: () => macs?.answers === false,
     })
   : undefined
+
+if (supervisor) {
+  macs = new Macs({
+    dataDir,
+    // Your own Slack app's token, which your Macs know each other by; none
+    // with the team hub
+    appToken: () => {
+      try {
+        const values = readSettingsValues(settingsFile)
+        return values.HUB_URL ? undefined : values.SLACK_APP_TOKEN || undefined
+      } catch {
+        return undefined
+      }
+    },
+    // End-to-end tests name their two Macs
+    name: process.env.PACENOTE_MACS_NAME || macName(),
+    version: app.getVersion(),
+    use: () => macUse?.current() ?? { idle: 0, locked: false, asleep: false },
+    pace: () => {
+      const view = readBotStatus(dataDir)
+      const status = view.alive ? view.status : undefined
+      return {
+        ready: status?.state === 'running',
+        answering:
+          status?.state === 'running' &&
+          !status.standby &&
+          status.socket.state === 'connected',
+        ...(status?.reasoner ? { reasoner: status.reasoner } : {}),
+      }
+    },
+    onAnswer: (here) => supervisor.answer(here),
+    // Read when the app is ready: Collect now is set up further down
+    collecting: () => taskCollectorRunning(),
+    log: (message) => log.info(message),
+    bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
+    ...(process.env.PACENOTE_MACS_PORT
+      ? { port: Number(process.env.PACENOTE_MACS_PORT) }
+      : {}),
+  })
+  macs.on('change', () => {
+    mainWindow?.webContents.send('pacenote:macs:changed', macs?.view())
+    // Todo says when another Mac collects
+    mainWindow?.webContents.send('pacenote:tasks:changed')
+  })
+  todoSync = new TodoSync({
+    dataDir,
+    macs,
+    // This Mac's own collections lately, from its runs
+    collections: () =>
+      collectionRuns(7).flatMap((run) => collectionRow(run) ?? []),
+    log: (message) => log.info(message),
+    changed: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
+  })
+  // Pace started or stopped here: the others hear of it at once.
+  let phase = supervisor.current.phase
+  supervisor.on('change', (state) => {
+    if (state.phase === phase) return
+    phase = state.phase
+    macs?.refresh()
+  })
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -604,7 +707,12 @@ function botSummary(): {
   const phase = supervisor?.current.phase
   let label = phase ? PHASE_LABEL[phase] : status ? 'Running' : 'Stopped'
   if (supervisor?.current.retryAt !== undefined) label += ', starting again'
-  if (status?.state === 'running' && status.socket.state !== 'connected') {
+  if (status?.state === 'running' && status.standby) {
+    label = 'Standing by (another of your Macs answers)'
+  } else if (
+    status?.state === 'running' &&
+    status.socket.state !== 'connected'
+  ) {
     label = `Socket Mode ${status.socket.state === 'reconnecting' ? 'reconnecting' : 'disconnected'}`
   } else if (
     status?.state === 'running' &&
@@ -678,6 +786,14 @@ let lastTrayKey = ''
 function updateTray(): void {
   const summary = botSummary()
   keepAwake.set(summary.active > 0)
+  // Pace's Slack connection as your Macs decided, told again until it is
+  if (
+    macs &&
+    supervisor?.managing &&
+    summary.status?.state === 'running' &&
+    Boolean(summary.status.standby) === macs.answers
+  )
+    supervisor.answer(macs.answers)
   const troubles = supervisor
     ? currentTroubles(supervisor.current, summary.status)
     : []
@@ -860,6 +976,36 @@ function registerBotIpc(): void {
     if (fromMainWindow(event) && typeof value === 'boolean')
       supervisor?.setAutoStart(value)
   })
+  // Settings > Macs: your Macs, and where Pace answers
+  ipcMain.handle('pacenote:macs:view', (event) =>
+    fromMainWindow(event) && macs ? macs.view() : null
+  )
+  ipcMain.handle('pacenote:macs:answer-here', (event) => {
+    if (fromMainWindow(event)) macs?.answerHere()
+  })
+  ipcMain.handle('pacenote:macs:follow', async (event, on: unknown) => {
+    if (fromMainWindow(event) && typeof on === 'boolean')
+      await macs?.setFollow(on)
+    return macs?.view() ?? null
+  })
+  ipcMain.handle('pacenote:macs:add-address', (event, address: unknown) =>
+    fromMainWindow(event) && typeof address === 'string'
+      ? (macs?.addAddress(address) ?? false)
+      : false
+  )
+  ipcMain.handle('pacenote:macs:remove-address', (event, address: unknown) => {
+    if (fromMainWindow(event) && typeof address === 'string')
+      macs?.removeAddress(address)
+  })
+  ipcMain.handle('pacenote:macs:ignore', (event, id: unknown) => {
+    if (fromMainWindow(event) && typeof id === 'string') macs?.ignore(id)
+  })
+  ipcMain.handle('pacenote:macs:open-privacy', (event) => {
+    if (fromMainWindow(event))
+      void shell.openExternal(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork'
+      )
+  })
   // The window's error screen reports what broke, for the log.
   ipcMain.handle('pacenote:app:report-error', (event, report: unknown) => {
     if (!fromMainWindow(event)) return
@@ -920,7 +1066,7 @@ function registerBotIpc(): void {
     const areas = readYou(dataDir).areas
     return {
       settings: current,
-      collect: taskCollector.state,
+      collect: collectState(),
       ai: ownAi.now(),
       collections: recentCollections(dataDir, collectionRuns(7)),
       ...view,
@@ -1390,7 +1536,7 @@ function registerBotIpc(): void {
       const latest = workFor(work, task.id).find(
         (e): e is Session => e.kind === 'session' && !!e.session
       )
-      const at = latest && sessionNow(latest).lastActiveAt
+      const at = latest && !latest.mac && sessionNow(latest).lastActiveAt
       if (latest && at) rows[task.id] = { tool: latest.tool, at }
     }
     return rows
@@ -1404,7 +1550,8 @@ function registerBotIpc(): void {
       if (
         entry.kind === 'session' &&
         entry.tool === 'codex' &&
-        !entry.session
+        !entry.session &&
+        !entry.mac
       ) {
         const session = findCodexSession(homedir(), entry)
         if (session) updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
@@ -1424,8 +1571,9 @@ function registerBotIpc(): void {
       task,
       context,
       outcome: outcomeOf(task, work),
+      // A session on another of your Macs has its log there
       work: workFor(work, id).map((entry) =>
-        entry.kind === 'session'
+        entry.kind === 'session' && !entry.mac
           ? {
               ...entry,
               ...sessionNow(entry),
@@ -1581,6 +1729,10 @@ function registerBotIpc(): void {
     if (!fromMainWindow(event)) return undefined
     const entry = sessionEntry(entryId)
     if (!entry) return { error: 'There is no such session.' }
+    if (entry.mac)
+      return {
+        error: `That session is on ${macs?.view().macs.find((mac) => mac.id === entry.mac)?.name ?? 'your other Mac'}. Start one here instead.`,
+      }
     try {
       await resumeSession(handoff(), entry)
       updateWork(dataDir, entry.id, (e) =>
@@ -2135,6 +2287,20 @@ if (!app.requestSingleInstanceLock()) {
         app.dock?.setIcon(nativeImage.createFromPath(appIcon))
       }
       if (!captureFile) createTray()
+      // Your Macs first: whether Pace starts answering or standing by
+      if (macs) {
+        macUse = new MacUseWatch(
+          powerMonitor,
+          () => macs?.refresh(),
+          process.env.PACENOTE_MACS_USE_FILE
+        )
+        await macs
+          .start()
+          .catch((err: unknown) =>
+            log.warn(`Macs could not start: ${(err as Error).message}`)
+          )
+        todoSync?.start()
+      }
       // The bot starts independently of the window and does not wait for it.
       if (
         supervisor?.current.autoStart &&
@@ -2173,6 +2339,8 @@ app.on('before-quit', (event) => {
   stopTasksWatch?.()
   taskCollector.cancel()
   void stopClaim()
+  todoSync?.stop()
+  void macs?.stop()
   supervisor?.dispose()
   // A bot started by the app finishes active requests before it stops. (up to
   // 30 seconds)

@@ -122,6 +122,24 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
   },
   // Pacenote's own work: the CLIs that do it, and what each last did
+  // Settings > Macs: your other Macs, and where Pace answers
+  macs: {
+    view: () => ipcRenderer.invoke('pacenote:macs:view'),
+    answerHere: () => ipcRenderer.invoke('pacenote:macs:answer-here'),
+    follow: (on: boolean) => ipcRenderer.invoke('pacenote:macs:follow', on),
+    addAddress: (address: string) =>
+      ipcRenderer.invoke('pacenote:macs:add-address', address),
+    removeAddress: (address: string) =>
+      ipcRenderer.invoke('pacenote:macs:remove-address', address),
+    ignore: (id: string) => ipcRenderer.invoke('pacenote:macs:ignore', id),
+    openPrivacy: () => ipcRenderer.invoke('pacenote:macs:open-privacy'),
+    onChange: (callback: (view: unknown) => void) => {
+      const listener = (_event: IpcRendererEvent, view: unknown) =>
+        callback(view)
+      ipcRenderer.on('pacenote:macs:changed', listener)
+      return () => ipcRenderer.removeListener('pacenote:macs:changed', listener)
+    },
+  },
   ai: {
     state: () => ipcRenderer.invoke('pacenote:ai:state'),
     now: () => ipcRenderer.invoke('pacenote:ai:now'),

@@ -185,7 +185,32 @@ plistSet(infoPlist, {
   CFBundleVersion: version,
   CFBundleShortVersionString: version,
   LSApplicationCategoryType: 'public.app-category.developer-tools',
+  // Settings > Macs: macOS asks once before Pacenote looks for your other Macs
+  NSLocalNetworkUsageDescription:
+    'Pacenote finds your other Macs on this network, so Pace answers on the one you are using.',
 })
+// The Bonjour service your Macs find each other by (src/macs/bonjour.ts)
+try {
+  execFileSync(
+    '/usr/libexec/PlistBuddy',
+    ['-c', 'Delete :NSBonjourServices', infoPlist],
+    {
+      stdio: 'ignore',
+    }
+  )
+} catch {
+  // The key was not there.
+}
+run('/usr/libexec/PlistBuddy', [
+  '-c',
+  'Add :NSBonjourServices array',
+  infoPlist,
+])
+run('/usr/libexec/PlistBuddy', [
+  '-c',
+  'Add :NSBonjourServices:0 string _pacenote._tcp',
+  infoPlist,
+])
 try {
   execFileSync(
     '/usr/libexec/PlistBuddy',

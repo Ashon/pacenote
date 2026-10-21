@@ -54,6 +54,7 @@ import { motionItem, useFlash, usePresence } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
+import { macNamed, useMacs } from '@/lib/macs'
 import {
   taskDetailQuery,
   taskHash,
@@ -618,6 +619,7 @@ export function TaskRow({
             onDraft={() => void draft()}
             onCopy={(text) => void act.copyReply(text).then(setError)}
             onResume={(entryId) => void act.resume(entryId).then(setError)}
+            onStartHere={(tool) => void continueIn(tool)}
             onAnswer={(entryId, yes) => void act.answer(entryId, yes)}
             proposal={task.status === 'open' ? proposal : undefined}
             onProposal={(answer) => void proposed.answer(answer).then(setError)}
@@ -710,6 +712,7 @@ function TaskOpen({
   onDraft,
   onCopy,
   onResume,
+  onStartHere,
   onAnswer,
   proposal,
   onProposal,
@@ -722,6 +725,8 @@ function TaskOpen({
   onDraft: () => void
   onCopy: (text: string) => void
   onResume: (entryId: string) => void
+  /** A session on another of your Macs: a new one here instead */
+  onStartHere: (tool: WorkTool) => void
   /** A suggested session: the task's work, or not */
   onAnswer: (entryId: string, yes: boolean) => void
   /** What its quiet session looked like, waiting for you */
@@ -822,6 +827,7 @@ function TaskOpen({
                 line={{ ...earlier.last, label: 'Last time' }}
                 taskId={task.id}
                 onResume={onResume}
+                onStartHere={onStartHere}
               />
             )}
             {sessions[0] && (
@@ -834,6 +840,7 @@ function TaskOpen({
                 }}
                 taskId={task.id}
                 onResume={onResume}
+                onStartHere={onStartHere}
               />
             )}
             {suggested.map((suggestion) => (
@@ -851,6 +858,7 @@ function TaskOpen({
                   line={line}
                   taskId={task.id}
                   onResume={onResume}
+                  onStartHere={onStartHere}
                 />
               ))}
             {!earlier.last && !sessions[0] && !suggested.length && (
@@ -991,38 +999,60 @@ function EarlierLine({
   line,
   taskId,
   onResume,
+  onStartHere,
 }: {
   line: Earlier
   taskId: string
   onResume: (entryId: string) => void
+  onStartHere?: (tool: WorkTool) => void
 }) {
   const { task, run } = line
   const session = line.session ?? task?.session
-  const log = session?.session
-    ? taskHash(taskId, `/log/${encodeURIComponent(session.id)}`)
-    : undefined
+  const macs = useMacs()
+  // A session on another of your Macs continues there; its log is there too
+  const elsewhere = session?.mac ? macNamed(macs, session.mac) : undefined
+  const log =
+    session?.session && !elsewhere
+      ? taskHash(taskId, `/log/${encodeURIComponent(session.id)}`)
+      : undefined
   // The terminal icon of the row's own Continue button: it opens there too.
   // Its name is a tooltip at its left, clear of the lines' icons above.
   const resume = session?.session
     ? `Continue ${task ? 'its' : 'this'} session in ${TOOL[session.tool]}`
     : ''
-  const action = session?.session ? (
-    <Tooltip content={resume} side="left">
-      <Button
-        size="icon-sm"
-        variant="outline"
-        aria-label={resume}
-        className="text-primary"
-        onClick={() => onResume(session.id)}
+  const action =
+    elsewhere && session ? (
+      <Tooltip
+        content={`It is on ${elsewhere}. Start a ${TOOL[session.tool]} session for the task on this Mac.`}
+        side="left"
       >
-        <SquareTerminal />
-      </Button>
-    </Tooltip>
-  ) : line.session ? (
-    <span className="text-meta text-muted-foreground">
-      Waiting for {TOOL[line.session.tool]} to start it
-    </span>
-  ) : undefined
+        <Button
+          size="xs"
+          variant="outline"
+          className="text-primary"
+          onClick={() => onStartHere?.(session.tool)}
+        >
+          <SquareTerminal />
+          Start here
+        </Button>
+      </Tooltip>
+    ) : session?.session ? (
+      <Tooltip content={resume} side="left">
+        <Button
+          size="icon-sm"
+          variant="outline"
+          aria-label={resume}
+          className="text-primary"
+          onClick={() => onResume(session.id)}
+        >
+          <SquareTerminal />
+        </Button>
+      </Tooltip>
+    ) : line.session ? (
+      <span className="text-meta text-muted-foreground">
+        Waiting for {TOOL[line.session.tool]} to start it
+      </span>
+    ) : undefined
   const name = (text: string, href?: string, hint?: string) =>
     href ? (
       <a
@@ -1072,6 +1102,7 @@ function EarlierLine({
       {name(`${TOOL[own.tool]} session`, log, 'Read the session')}
       {quiet(
         [
+          elsewhere && `On ${elsewhere}`,
           own.branch,
           own.lastActiveAt
             ? `last active ${formatRelative(own.lastActiveAt)}`

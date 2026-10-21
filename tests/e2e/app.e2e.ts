@@ -92,6 +92,9 @@ function appEnv(
     PACENOTE_DATA_DIR: world.home,
     PACENOTE_DESKTOP_USER_DATA: path.join(world.root, 'user-data'),
     PACENOTE_DESKTOP_THEME: 'light',
+    // Settings > Macs looks on the network only in its own test (macs.e2e.ts)
+    PACENOTE_MACS_BONJOUR: 'off',
+    PACENOTE_MACS_PORT: '0',
     ...extra,
   }
 }

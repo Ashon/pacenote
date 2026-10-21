@@ -259,6 +259,11 @@ export type CollectOutcome = (
   by?: OwnCli
   /** The CLI chosen could not, so the other one did */
   switched?: Switch
+  /**
+   * Another of your Macs ran it, by id (Settings > Macs): its run is in that
+   * Mac's history
+   */
+  mac?: string
 }
 
 /**
@@ -287,6 +292,8 @@ export interface TasksCollect {
     switched?: Switch
   }
   last?: CollectOutcome
+  /** Another of your Macs is collecting now: Collect now waits for it */
+  elsewhere?: { name: string; since: string }
 }
 
 /** Where a task's work went on: Claude Code or Codex on this Mac */
@@ -324,6 +331,11 @@ export type WorkEntry =
       foundBy?: FoundBy
       /** The git branch it worked on, when it was found by it */
       branch?: string
+      /**
+       * Another of your Macs it runs on, by id (Settings > Macs): it
+       * continues there, not here
+       */
+      mac?: string
     }
   | {
       kind: 'draft'

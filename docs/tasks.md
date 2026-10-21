@@ -80,7 +80,8 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
   (`add_tasks`), each with the permalink of its message. A message is never a task twice, and messages from channels left
   out, or DMs while they do not count, are skipped whatever the tool sends.
 - The messages go to the tool's model, as anything the tool reads does. Pacenote keeps the tasks in
-  `PACENOTE_DATA_DIR/tasks.json` and your decisions in `tasks-decisions.json`.
+  `PACENOTE_DATA_DIR/tasks.json` and your decisions in `tasks-decisions.json`. With Pacenote on another of your Macs,
+  both are the same there too ([Your Macs](macs.md)).
 
 ## Who you are in Slack
 

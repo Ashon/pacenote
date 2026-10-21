@@ -80,6 +80,12 @@ where it went. It counts your tasks and your own commits as they are, has your A
 a model of your own) write it up in a few sentences only when you ask, and copies it as a standup or an update for you
 to post.
 
+### Move between your Macs
+
+With Pacenote on two Macs, Pace answers on the one you're using and moves with you when you leave it for the other, and
+Todo is the same on both. Turn it on in Settings > Macs on each: Macs with the same Slack app find each other on your
+network, with nothing to pair and no server in between. See [Your Macs](docs/macs.md).
+
 ### Share the history with your AI tools
 
 Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did, what is on your list
@@ -97,9 +103,10 @@ and where you contribute. You add it to each tool with one click, and only if yo
 - **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With ops tools on, SSH keys and
   cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only lookups, draft PRs, and
   Jira issues or comments.
-- **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet.
-  Besides Slack (or your hub), your AI service and the services you connect as ops tools, it talks only to GitHub to
-  check for updates, and downloads the sandbox's images when you set it up. There is no telemetry.
+- **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
+  only your other Macs with the same Slack app reach it, on your own network. Besides Slack (or your hub), your AI
+  service and the services you connect as ops tools, it talks only to GitHub to check for updates, and downloads the
+  sandbox's images when you set it up. There is no telemetry.
 - **Bill you or hold your AI account.** Answers use the subscription you already have, through its official CLI.
 
 How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Ops tools](docs/ops-tools.md) and
@@ -162,6 +169,7 @@ Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 | [Reasoner sandbox](docs/sandbox.md) | Where answers run: on your Mac and what the CLI may read there, or the built-in VM sandbox, its allowed domains and login |
 | [Ops tools](docs/ops-tools.md) | Read-only lookups on hosts, k8s, a work directory, GitHub and Jira, and code changes as draft PRs |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
+| [Your Macs](docs/macs.md) | Pace answering on the Mac you're using, Todo the same on each, and how the Macs know each other |
 | [Your tasks from Slack](docs/tasks.md) | What people ask of you, collected on the Todo screen, and continuing it in Claude Code or Codex |
 | [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: your AI tools reading what Pace did and your tasks |
 | [Installation](docs/installation.md) | Homebrew in detail, running from source, restarts and the run lock |

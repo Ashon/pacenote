@@ -69,6 +69,8 @@ export function describeBot(
   }
   if (status.state === 'starting') return { tone: 'busy', label: 'Starting' }
   if (status.state === 'stopping') return { tone: 'busy', label: 'Stopping' }
+  // Another of your Macs answers (Settings > Macs)
+  if (status.standby) return { tone: 'off', label: 'Standing by' }
   switch (status.socket.state) {
     case 'connected':
       return { tone: 'ok', label: 'Connected' }

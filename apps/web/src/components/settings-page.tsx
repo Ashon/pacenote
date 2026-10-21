@@ -29,11 +29,13 @@ import {
   Copy,
   FolderOpen,
   History,
+  Laptop,
   ListChecks,
   LoaderCircle,
   MessagesSquare,
   Monitor,
   Moon,
+  MoreHorizontal,
   Plug,
   PlugZap,
   RotateCcw,
@@ -43,6 +45,7 @@ import {
   Sun,
   TriangleAlert,
   Wrench,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -54,6 +57,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
@@ -65,6 +74,8 @@ import {
   useUpdate,
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
+import { macsControl, useMacs } from '@/lib/macs'
+import type { MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './code-block'
@@ -91,7 +102,7 @@ const bridge = () => window.pacenoteDesktop?.settings
  * Settings sections: the bot's own (the settings file), then the desktop app's
  * preferences.
  */
-type Section = SettingSection | 'general'
+type Section = SettingSection | 'general' | 'macs'
 
 const SECTION_ICON: Record<SettingSection, LucideIcon> = {
   messengers: MessagesSquare,
@@ -120,6 +131,11 @@ const SECTION_INFO: Record<
     help: 'Preferences for this app, and where Pacenote keeps its settings and run history.',
     icon: SlidersHorizontal,
   },
+  macs: {
+    label: 'Macs',
+    help: 'Where Pace answers when you use more than one Mac.',
+    icon: Laptop,
+  },
 }
 
 /**
@@ -127,7 +143,7 @@ const SECTION_INFO: Record<
  * General first)
  */
 const NAV: { label: string; items: Section[] }[] = [
-  { label: 'App', items: ['general'] },
+  { label: 'App', items: ['general', 'macs'] },
   { label: 'Pace', items: SETTING_SECTIONS.map((info) => info.id) },
 ]
 
@@ -742,6 +758,7 @@ export function SettingsPage() {
         {card('logs')}
       </>
     ),
+    macs: <MacsSection />,
     general: (
       <>
         <section className="surface-group">
@@ -1998,6 +2015,253 @@ function Segmented({
  * the app; the logs can still name channels and people, so it says to read it
  * first.
  */
+/**
+ * Settings > Macs: Pace answers on the Mac you're using. Pacenote on your
+ * other Macs with the same Slack app joins in on this network by itself
+ * (src/macs), and you can add one on another network by its address.
+ */
+function MacsSection() {
+  const view = useMacs()
+  const control = macsControl()
+  const [adding, setAdding] = useState(false)
+  const [address, setAddress] = useState('')
+  const [addIssue, setAddIssue] = useState<string>()
+  if (!view) return <SectionSkeleton />
+  const header = (
+    <CardHeader
+      title="Your Macs"
+      help="Pace answers on the Mac you're using. Pacenote on your other Mac, set up with the same Slack app, joins in on this network by itself, and Todo is the same on both."
+    />
+  )
+  if (!view.available)
+    return (
+      <section className="surface-group" data-macs="unavailable">
+        {header}
+        <p className="px-4 py-3 text-meta text-muted-foreground">
+          Your Macs follow you only with your own Slack app (Settings &gt;
+          Messengers). With the team hub, Pace answers on the Mac you connected.
+        </p>
+      </section>
+    )
+  const others = view.macs.filter((mac) => !mac.here)
+  const add = () =>
+    void control?.addAddress(address).then((ok) => {
+      if (!ok) return setAddIssue('Enter a name or address, like 100.68.0.12.')
+      setAddress('')
+      setAddIssue(undefined)
+      setAdding(false)
+    })
+  return (
+    <section className="surface-group" data-macs={view.follow ? 'on' : 'off'}>
+      {header}
+      <div className="divide-y divide-border">
+        <Row
+          label="Follow the Mac you're using"
+          help={
+            view.follow
+              ? 'Pace moves to the Mac you use when you lock, sleep or leave the other one for 5 minutes. Off, Pace answers on this Mac as on a Mac of its own.'
+              : 'Turn it on here and on your other Mac. macOS asks once whether Pacenote may look on your local network.'
+          }
+        >
+          <Switch
+            checked={view.follow}
+            onChange={(on) => void control?.follow(on)}
+          />
+        </Row>
+        {view.follow && (
+          <>
+            {view.macs.map((mac) => (
+              <MacRow key={mac.id} mac={mac} />
+            ))}
+            {view.blocked ? (
+              <div className="flex items-center gap-3 px-4 py-3">
+                <TriangleAlert className="size-4 shrink-0 text-status-interrupted" />
+                <p className="min-w-0 flex-1 text-meta text-muted-foreground">
+                  Pacenote can't look on this network. Turn on Local Network for
+                  Pacenote in System Settings &gt; Privacy &amp; Security.
+                </p>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void control?.openPrivacy()}
+                >
+                  Open System Settings
+                </Button>
+              </div>
+            ) : (
+              others.length === 0 && (
+                <p
+                  className="flex items-center gap-2 px-4 py-3 text-meta text-muted-foreground"
+                  data-macs-looking
+                >
+                  <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
+                  Looking for your other Mac on this network…
+                </p>
+              )
+            )}
+            <div className="space-y-2 px-4 py-3">
+              {view.addresses.map((entry) => (
+                <div
+                  key={entry}
+                  className="flex items-center gap-2 text-meta text-muted-foreground"
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono select-text">
+                    {entry}
+                  </span>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={`Remove ${entry}`}
+                    onClick={() => void control?.removeAddress(entry)}
+                  >
+                    <X />
+                  </Button>
+                </div>
+              ))}
+              {adding ? (
+                <form
+                  className="flex items-center gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    add()
+                  }}
+                >
+                  <Input
+                    autoFocus
+                    aria-label="Address of your other Mac"
+                    placeholder="100.68.0.12 or macbook-air.local"
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                    className="h-8 flex-1"
+                  />
+                  <Button size="sm" type="submit" disabled={!address.trim()}>
+                    Add
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    onClick={() => {
+                      setAdding(false)
+                      setAddIssue(undefined)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  className="text-meta text-muted-foreground hover:text-foreground hover:underline"
+                  onClick={() => setAdding(true)}
+                >
+                  Add by address
+                </button>
+              )}
+              {addIssue && (
+                <p className="text-meta text-status-failed">{addIssue}</p>
+              )}
+              {adding && (
+                <p className="text-meta text-muted-foreground">
+                  For a Mac on another network, such as over Tailscale.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
+const MAC_DOT: Record<MacView['status'], string> = {
+  answering: 'bg-status-succeeded',
+  moving: 'bg-status-running',
+  'standing-by': 'bg-muted-foreground/50',
+  'out-of-reach': 'bg-border',
+}
+
+/** What a Mac is doing, in a few words */
+export function macWords(mac: MacView): string {
+  if (mac.notReady) return "Pace isn't running there"
+  switch (mac.status) {
+    case 'answering':
+      return mac.here ? 'Answering here' : 'Answering'
+    case 'moving':
+      return 'Moving…'
+    case 'standing-by':
+      return mac.asleep ? 'Asleep' : 'Standing by'
+    case 'out-of-reach':
+      return mac.lastSeen
+        ? `Out of reach · seen ${formatRelative(mac.lastSeen)}`
+        : 'Out of reach'
+  }
+}
+
+function MacRow({ mac }: { mac: MacView }) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3"
+      data-mac={mac.here ? 'here' : mac.name}
+      data-status={mac.status}
+    >
+      <Laptop className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-row">
+          <span className="truncate">{mac.name}</span>
+          {mac.here && (
+            <span className="shrink-0 text-caption text-muted-foreground">
+              This Mac
+            </span>
+          )}
+        </div>
+        <p className="flex items-center gap-1.5 text-meta text-muted-foreground">
+          <span
+            aria-hidden="true"
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              MAC_DOT[mac.status]
+            )}
+          />
+          <span className="truncate">
+            {macWords(mac)}
+            {mac.reasoner ? ` · ${mac.reasoner}` : ''}
+          </span>
+        </p>
+      </div>
+      {mac.here && mac.status === 'standing-by' && !mac.notReady && (
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => void macsControl()?.answerHere()}
+        >
+          Answer here
+        </Button>
+      )}
+      {!mac.here && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={`More for ${mac.name}`}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem
+              onSelect={() => void macsControl()?.ignore(mac.id)}
+            >
+              Stop following to this Mac
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  )
+}
+
 function HelpCard() {
   const diagnostics = window.pacenoteDesktop?.diagnostics
   const [copied, setCopied] = useState<'yes' | 'failed'>()

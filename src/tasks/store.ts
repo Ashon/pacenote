@@ -32,6 +32,11 @@ import type {
  */
 export const TASKS_FILE = 'tasks.json'
 export const DECISIONS_FILE = 'tasks-decisions.json'
+/**
+ * Decisions you took back, by task, with when: so your other Macs drop them
+ * too rather than bring them back (src/macs/sync.ts)
+ */
+export const TAKEN_BACK_FILE = 'tasks-taken-back.json'
 
 const DAY = 24 * 60 * 60_000
 /** An open task this old is shown faded */
@@ -137,8 +142,21 @@ export function decide(
 ): void {
   const decisions = readDecisions(dataDir)
   if (decision) decisions[id] = { ...decision, at: now.toISOString() }
-  else delete decisions[id]
+  else if (decisions[id]) {
+    delete decisions[id]
+    const takenBack = readTakenBack(dataDir)
+    takenBack[id] = now.toISOString()
+    writeJson(path.join(dataDir, TAKEN_BACK_FILE), takenBack)
+  }
   writeJson(path.join(dataDir, DECISIONS_FILE), decisions)
+}
+
+export function readTakenBack(dataDir: string): Record<string, string> {
+  const value = readJson<Record<string, string>>(
+    path.join(dataDir, TAKEN_BACK_FILE),
+    {}
+  )
+  return value && typeof value === 'object' ? value : {}
 }
 
 /**

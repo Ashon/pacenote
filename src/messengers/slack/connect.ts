@@ -105,12 +105,16 @@ export async function connectSlack(
   // file).
   const socketLog = log.child('socket')
   let stopping = false
+  /** Closed on purpose while another of your Macs answers */
+  let standingBy = false
   const states = slack.kind === 'hub' ? HUB_STATES : SOCKET_STATES
   const onState = (state: SocketState) => {
     options.onState(state)
     const { level, text } = states[state]
-    // Disconnecting during shutdown is expected.
-    socketLog[stopping && level === 'warn' ? 'info' : level](text)
+    // Disconnecting during shutdown, or to stand by, is expected.
+    socketLog[(stopping || standingBy) && level === 'warn' ? 'info' : level](
+      text
+    )
   }
   const receiver =
     slack.kind === 'hub'
@@ -135,6 +139,8 @@ export async function connectSlack(
     },
   })
   const auth = await app.client.auth.test()
+  /** Standing by and back, one after another */
+  let changing: Promise<void> = Promise.resolve()
   const botUserId = auth.user_id
   if (!botUserId) throw new Error('Could not determine the bot user ID.')
 
@@ -162,7 +168,7 @@ export async function connectSlack(
       team: auth.team ?? '',
     },
     limits: () => messenger.limits,
-    async start(onMention) {
+    async start(onMention, startOptions) {
       app.event('app_mention', async ({ event }) => {
         const mention = SlackMessenger.mention(event, auth.team_id)
         if (mention) await onMention(mention)
@@ -170,11 +176,39 @@ export async function connectSlack(
       app.error(async (err) => {
         log.error('Slack event handling error', err)
       })
+      if (startOptions?.standby && receiver instanceof SocketModeReceiver) {
+        standingBy = true
+        socketLog.info('Standing by: another of your Macs answers')
+        return
+      }
       await app.start()
     },
+    ...(receiver instanceof SocketModeReceiver
+      ? {
+          standby: (on: boolean) => {
+            // One change at a time, in the order asked
+            changing = changing.then(async () => {
+              if (stopping || on === standingBy) return
+              standingBy = on
+              socketLog.info(
+                on
+                  ? 'Standing by: another of your Macs answers'
+                  : 'Answering on this Mac again'
+              )
+              await (on ? app.stop() : app.start()).catch((err: unknown) =>
+                socketLog.warn(
+                  `Could not ${on ? 'close' : 'open'} the Slack connection: ${(err as Error).message}`
+                )
+              )
+            })
+            return changing
+          },
+        }
+      : {}),
     async stop() {
       stopping = true
-      await app.stop()
+      await changing
+      if (!standingBy) await app.stop()
     },
   }
 }

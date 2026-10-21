@@ -5,17 +5,21 @@ import type {
 } from '@runtime/types'
 import { setupSettingsRoute } from '@src/settings/fields'
 import type { TasksCollect } from '@src/tasks/types'
+import type { MacsView } from '@src/macs/types'
 import {
+  ArrowRightLeft,
   CircleArrowUp,
   Clock,
   Cpu,
   FolderOpen,
+  Laptop,
   Plug,
   TriangleAlert,
 } from 'lucide-react'
 import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useBotStatus } from '@/lib/api'
+import { useMacs, whereAnswers } from '@/lib/macs'
 import { useSupervisor, useUpdate } from '@/lib/desktop'
 import { useTasks } from '@/lib/tasks'
 import { formatRelative } from '@/lib/format'
@@ -42,12 +46,14 @@ export function StatusBar({
   // it still shows. (the sidebar already keeps the tasks query fresh)
   const collecting = useTasks().data?.collect.running
   const update = useUpdate()
+  const macs = useMacs()
   return (
     <StatusBarView
       bot={data}
       supervisor={supervisor}
       collecting={collecting}
       update={update}
+      macs={macs}
       onOpenRoute={onOpenRoute}
     />
   )
@@ -59,7 +65,9 @@ export function StatusBarView({
   supervisor,
   collecting,
   update,
+  macs,
   onOpenRoute,
+  now = Date.now(),
 }: {
   bot?: BotStatusView
   supervisor?: SupervisorState
@@ -67,8 +75,17 @@ export function StatusBarView({
   collecting?: TasksCollect['running']
   /** A newer Pacenote, if there is one */
   update?: UpdateState
+  /** Your Macs, when another one runs Pace too */
+  macs?: MacsView
   onOpenRoute: (route: string) => void
+  now?: number
 }) {
+  const where = whereAnswers(macs)
+  // Pace just moved here: said for a few seconds where it came from
+  const moved =
+    where?.here && macs?.moved && now - Date.parse(macs.moved.at) < 15_000
+      ? macs.moved
+      : undefined
   const { tone, label } = describeBot(data, supervisor)
   const status = data?.alive ? data.status : undefined
   const active = status?.requests.active ?? 0
@@ -114,6 +131,26 @@ export function StatusBarView({
           {botKnown(data, supervisor) ? label : <SkeletonWord width="4rem" />}
         </span>
       </Item>
+      {where && (
+        <Item
+          tip="Where Pace answers: the Mac you're using (Settings > Macs)"
+          onClick={() => onOpenRoute('#/settings/macs')}
+          className={cn(moved && 'text-primary')}
+        >
+          {moved ? <ArrowRightLeft /> : <Laptop />}
+          <span data-where-answers={where.here ? 'here' : 'other'}>
+            {moved
+              ? `Pace moved here from ${moved.from}`
+              : where.moving
+                ? where.here
+                  ? 'Moving here…'
+                  : `Moving to ${where.other?.name ?? 'your other Mac'}…`
+                : where.here
+                  ? 'Answering here'
+                  : `${where.other?.name ?? 'Your other Mac'} answers`}
+          </span>
+        </Item>
+      )}
       {status?.reasoner && (
         <Item
           tip="Reasoner backend"

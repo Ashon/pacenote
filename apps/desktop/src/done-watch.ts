@@ -63,7 +63,8 @@ export function dueForJudging(input: {
       (e): e is Session & { session: string } =>
         e.kind === 'session' && Boolean(e.session)
     )
-    if (!entry) continue
+    // A session on another of your Macs is judged there, where its log is
+    if (!entry || entry.mac) continue
     const activeAt = input.activeAt(entry)
     if (!activeAt) continue
     const idle = input.now - Date.parse(activeAt)

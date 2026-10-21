@@ -9,6 +9,7 @@ import {
 } from 'node:fs'
 import path from 'node:path'
 import { utilityProcess, type UtilityProcess } from 'electron'
+import { ANSWER_HERE } from '../../../src/macs/types.js'
 import { RECHECK_SANDBOX } from '../../../src/runtime/sandbox-health.js'
 import { readRunningBot } from '../../../src/runtime/status.js'
 import { botLockDirs } from '../../../src/settings/home.js'
@@ -58,6 +59,14 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     this.child?.postMessage({ type: RECHECK_SANDBOX })
   }
 
+  /**
+   * Opens (here) or closes Pace's Slack connection, as another of your Macs
+   * answers or this one should (Settings > Macs)
+   */
+  answer(here: boolean): void {
+    this.child?.postMessage({ type: ANSWER_HERE, here })
+  }
+
   private child?: UtilityProcess
   private childStartedAt = 0
   private stopRequested = false
@@ -91,6 +100,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
        */
       toolPath: () => string
       log: (message: string) => void
+      /** Another of your Macs answers: Pace starts with its connection shut */
+      standby?: () => boolean
     }
   ) {
     super()
@@ -269,6 +280,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     env.PATH = this.options.toolPath()
     env.PACENOTE_MANAGED_BY = 'desktop'
     env.PACENOTE_DATA_DIR = this.options.dataDir
+    if (this.options.standby?.()) env.PACENOTE_STANDBY = '1'
+    else delete env.PACENOTE_STANDBY
     env.NODE_ENV = 'production'
     return env
   }

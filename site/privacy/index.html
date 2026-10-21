@@ -81,8 +81,9 @@
         </div>
         <div class="claim">
           <h2>Open a public endpoint or phone home</h2>
-          <p>It connects out to Slack over Socket Mode, so nothing on your Mac accepts connections from the internet.
-            There is no telemetry; everything it contacts is listed below.</p>
+          <p>It connects out to Slack over Socket Mode, so nothing on your Mac accepts connections from the internet:
+            only your other Macs with the same Slack app reach it, on your own network, once you turn that on. There is
+            no telemetry; everything it contacts is listed below.</p>
           <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">How it works</a></p>
         </div>
         <div class="claim">
@@ -109,6 +110,7 @@
               <tr><td>Slack messages read while collecting tasks</td><td>Anthropic, through Claude Code's Slack connector</td><td>When you press Collect now; off until you turn it on</td></tr>
               <tr><td>Task titles and commit lines for a recap</td><td>Anthropic, through Claude Code</td><td>When you press Write it up</td></tr>
               <tr><td>Lookups with ops tools</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
+              <tr><td>Your tasks, decisions, work log, recaps and areas</td><td>Your other Macs with the same Slack app, directly and encrypted, on your own network</td><td>Only if you turn on Settings &gt; Macs on each</td></tr>
               <tr><td>An update check</td><td>GitHub</td><td>Shortly after start, then every 12 hours</td></tr>
               <tr><td>Sandbox images</td><td>GitHub's container registry and the hosts the images are built from</td><td>When you set up the sandbox</td></tr>
             </tbody>
@@ -119,7 +121,8 @@
       <section class="block" id="stays" aria-labelledby="stays-title">
         <h2 id="stays-title">What stays on your Mac</h2>
         <p>Settings, run history, your tasks and recaps live in <code>~/.pacenote</code>, a folder only you can read. Run
-          history is kept for 30 days unless you change it. Uninstalling keeps the folder; delete it to remove them.</p>
+          history is kept for 30 days unless you change it. With Settings &gt; Macs on, your tasks and recaps are kept on
+          your other Mac too. Uninstalling keeps the folder; delete it to remove them.</p>
       </section>
 
       <section class="block" id="report" aria-labelledby="report-title">

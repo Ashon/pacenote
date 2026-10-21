@@ -24,6 +24,7 @@ import type {
   SetupView,
 } from '@src/settings/setup'
 import type { OwnAiNow, OwnAiView, OwnCli } from '@src/tasks/own-ai'
+import type { MacsView } from '@src/macs/types'
 import type {
   CollectionRecord,
   CollectOutcome,
@@ -222,6 +223,21 @@ declare global {
         ): Promise<{ items?: SessionItem[]; error?: string } | undefined>
       }
       /** Pacenote's own work: the CLIs that do it (Settings > Todo) */
+      /** Settings > Macs (src/macs): your other Macs, and where Pace answers */
+      macs: {
+        view(): Promise<MacsView | null>
+        /** Pace answers on this Mac from now */
+        answerHere(): Promise<void>
+        follow(on: boolean): Promise<MacsView | null>
+        /** false for an address that is not one */
+        addAddress(address: string): Promise<boolean>
+        removeAddress(address: string): Promise<void>
+        /** Stop following to that Mac */
+        ignore(id: string): Promise<void>
+        /** System Settings > Privacy & Security > Local Network */
+        openPrivacy(): Promise<void>
+        onChange(callback: (view: MacsView) => void): () => void
+      }
       ai: {
         /** Each CLI checked on this Mac, with what it last did */
         state(): Promise<OwnAiView | null>

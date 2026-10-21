@@ -214,7 +214,20 @@ export interface MessengerConnection {
    * bar does not count it.
    */
   limits(): string[]
-  start(onMention: (mention: Mention) => Promise<void>): Promise<void>
+  /**
+   * Starts receiving mentions. standby: wait with the connection closed until
+   * standby(false), as another of your Macs answers (Settings > Macs)
+   */
+  start(
+    onMention: (mention: Mention) => Promise<void>,
+    options?: { standby?: boolean }
+  ): Promise<void>
+  /**
+   * Closes the connection while another of your Macs answers, and opens it
+   * again when this one should (your own Slack app only; mentions in progress
+   * finish either way)
+   */
+  standby?(on: boolean): Promise<void>
   stop(): Promise<void>
 }
 

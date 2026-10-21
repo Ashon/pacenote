@@ -31,6 +31,7 @@ import { secretValues } from './settings/fields.js'
 import { loadSettings } from './settings/load-settings.js'
 import { moveEnvSettings } from './settings/settings-file.js'
 import { readTasksSettings } from './tasks/settings.js'
+import { ANSWER_HERE } from './macs/types.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -288,16 +289,24 @@ async function main(): Promise<void> {
       reasonerProblem = `${failureAdvice('auth', 'claude', sandbox.kind)?.text} (checked at startup)`
       status.update({ problems: allProblems() })
     })
-  await connection.start((mention) => responder.handle(mention))
-  status.update({ state: 'running' })
+  // Another of your Macs answers: start with the Slack connection closed
+  const standby =
+    process.env.PACENOTE_STANDBY === '1' && connection.standby !== undefined
+  await connection.start((mention) => responder.handle(mention), { standby })
+  status.update({ state: 'running', standby })
   running = true
   // The CLI's sign-in and the sandbox's parts change rarely.
   sandboxHealth.start(5 * 60_000)
   imageHealth.start(5 * 60_000)
   // Messages from the desktop app
   parentPort()?.on('message', (event) => {
-    const type = (event.data as { type?: string } | undefined)?.type
-    if (type !== RECHECK_SANDBOX) return
+    const data = event.data as { type?: string; here?: unknown } | undefined
+    if (data?.type === ANSWER_HERE && connection.standby) {
+      const on = data.here === false
+      void connection.standby(on).then(() => status.update({ standby: on }))
+      return
+    }
+    if (data?.type !== RECHECK_SANDBOX) return
     void sandboxHealth.check()
     void imageHealth.check()
   })
