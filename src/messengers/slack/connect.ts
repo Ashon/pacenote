@@ -10,10 +10,10 @@ import { HubReceiver } from './hub-receiver.js'
 import { slackLogger } from './logger.js'
 import { SlackMessenger } from './messenger.js'
 
-const SOCKET_STATES: Record<
-  SocketState,
-  { level: 'info' | 'warn'; text: string }
-> = {
+/** How each state of the connection is logged */
+type States = Record<SocketState, { level: 'info' | 'warn'; text: string }>
+
+const SOCKET_STATES: States = {
   connecting: { level: 'info', text: 'Connecting to Slack' },
   connected: { level: 'info', text: 'Socket Mode connected, receiving events' },
   reconnecting: { level: 'warn', text: 'Socket Mode reconnecting' },
@@ -21,10 +21,7 @@ const SOCKET_STATES: Record<
   disconnected: { level: 'warn', text: 'Socket Mode disconnected' },
 }
 
-const HUB_STATES: Record<
-  SocketState,
-  { level: 'info' | 'warn'; text: string }
-> = {
+const HUB_STATES: States = {
   connecting: { level: 'info', text: 'Connecting to the team hub' },
   connected: {
     level: 'info',

@@ -74,15 +74,11 @@ export function renderSlackText(
   return text
     .replace(
       /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>/g,
-      (_, id: string, label?: string) => {
-        return `@${userNames.get(id) ?? label ?? id}`
-      }
+      (_, id: string, label?: string) => `@${userNames.get(id) ?? label ?? id}`
     )
     .replace(
       /<#([CG][A-Z0-9]+)(?:\|([^>]*))?>/g,
-      (_, id: string, name?: string) => {
-        return `#${name || id}`
-      }
+      (_, id: string, name?: string) => `#${name || id}`
     )
     .replace(
       /<!subteam\^[A-Z0-9]+(?:\|([^>]*))?>/g,

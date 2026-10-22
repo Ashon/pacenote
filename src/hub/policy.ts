@@ -74,7 +74,7 @@ export class Grants {
    * it already has).
    */
   add(event: MentionEvent): Grant {
-    this.prune()
+    this.grants = this.live()
     const thread = event.thread_ts ?? event.ts
     let grant = this.find(event.channel, thread)
     if (!grant) {
@@ -245,10 +245,6 @@ export class Grants {
   private live(): Grant[] {
     const now = this.now()
     return this.grants.filter((g) => g.expiresAt > now)
-  }
-
-  private prune(): void {
-    this.grants = this.live()
   }
 }
 

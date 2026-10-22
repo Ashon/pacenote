@@ -51,6 +51,14 @@ export interface SlackCheckItem {
   missing?: string[]
 }
 
+/** A check's line: what it checked, whether it is fine, and what it found */
+export const checkItem = (
+  id: SlackCheckItem['id'],
+  label: string,
+  ok: boolean,
+  detail: string | undefined
+): SlackCheckItem => ({ id, label, ok, detail })
+
 interface SlackResponse {
   ok: boolean
   error?: string
@@ -93,29 +101,16 @@ export async function checkSlackTokens(
   const items: SlackCheckItem[] = []
   const { botToken, appToken } = tokens
   const base = slackApiBase(tokens.apiUrl)
-  if (!botToken || !appToken) {
-    return [
-      {
-        id: 'tokens',
-        label: t.tokens,
-        ok: false,
-        detail: t.bothTokens,
-      },
-    ]
-  }
+  if (!botToken || !appToken)
+    return [checkItem('tokens', t.tokens, false, t.bothTokens)]
   const failure = (err: unknown) => (err as Error).message
 
   let botId: string | undefined
   try {
     const { body, headers } = await call(fetchImpl, base, 'auth.test', botToken)
-    if (!body.ok) {
-      items.push({
-        id: 'botToken',
-        label: t.botToken,
-        ok: false,
-        detail: body.error,
-      })
-    } else {
+    if (!body.ok)
+      items.push(checkItem('botToken', t.botToken, false, body.error))
+    else {
       botId = body.bot_id as string | undefined
       items.push({
         id: 'botToken',
@@ -143,12 +138,7 @@ export async function checkSlackTokens(
       })
     }
   } catch (err) {
-    items.push({
-      id: 'botToken',
-      label: t.botToken,
-      ok: false,
-      detail: failure(err),
-    })
+    items.push(checkItem('botToken', t.botToken, false, failure(err)))
   }
 
   const appIdFromToken = appToken.split('-')[2]
@@ -165,12 +155,7 @@ export async function checkSlackTokens(
         detail: t.appIds(appId ?? '?', appIdFromToken ?? '?'),
       })
     } catch (err) {
-      items.push({
-        id: 'sameApp',
-        label: t.sameApp,
-        ok: false,
-        detail: failure(err),
-      })
+      items.push(checkItem('sameApp', t.sameApp, false, failure(err)))
     }
   }
 
@@ -188,12 +173,7 @@ export async function checkSlackTokens(
       detail: body.ok ? t.urlIssued : body.error,
     })
   } catch (err) {
-    items.push({
-      id: 'socketMode',
-      label: t.socketMode,
-      ok: false,
-      detail: failure(err),
-    })
+    items.push(checkItem('socketMode', t.socketMode, false, failure(err)))
   }
   return items
 }

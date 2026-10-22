@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { localized } from '../i18n/locale.js'
-import type { SlackCheckItem } from '../messengers/slack/check.js'
+import { checkItem, type SlackCheckItem } from '../messengers/slack/check.js'
 import { text } from './client.text.js'
 import {
   HUB_PATHS,
@@ -90,36 +90,22 @@ export async function checkHub(
   fetchImpl: typeof fetch = fetch
 ): Promise<SlackCheckItem[]> {
   const t = localized(text)
-  if (!url) return [{ id: 'hub', label: t.hub, ok: false, detail: t.enterUrl }]
+  if (!url) return [checkItem('hub', t.hub, false, t.enterUrl)]
   const client = new HubClient(url, fetchImpl)
   try {
     const res = await fetchImpl(
       `${url.replace(/\/+$/, '')}${HUB_PATHS.health}`,
-      {
-        signal: AbortSignal.timeout(10_000),
-      }
+      { signal: AbortSignal.timeout(10_000) }
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
   } catch (err) {
     return [
-      {
-        id: 'hub',
-        label: t.hub,
-        ok: false,
-        detail: t.notReachable((err as Error).message),
-      },
+      checkItem('hub', t.hub, false, t.notReachable((err as Error).message)),
     ]
   }
-  const items: SlackCheckItem[] = [
-    { id: 'hub', label: t.hub, ok: true, detail: t.reachable },
-  ]
+  const items = [checkItem('hub', t.hub, true, t.reachable)]
   if (!token) {
-    items.push({
-      id: 'pairing',
-      label: t.pairing,
-      ok: false,
-      detail: t.notPaired,
-    })
+    items.push(checkItem('pairing', t.pairing, false, t.notPaired))
     return items
   }
   try {
@@ -139,12 +125,7 @@ export async function checkHub(
       }
     )
   } catch (err) {
-    items.push({
-      id: 'pairing',
-      label: t.pairing,
-      ok: false,
-      detail: (err as Error).message,
-    })
+    items.push(checkItem('pairing', t.pairing, false, (err as Error).message))
   }
   return items
 }
