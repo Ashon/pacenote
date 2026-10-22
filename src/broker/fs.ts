@@ -48,7 +48,7 @@ export function isDenied(relativePath: string): boolean {
  * case-insensitively via --iglob). Globs cannot match the regexes exactly, so
  * filterRgOutput filters search results once more with isDenied.
  */
-export const RG_EXCLUDE_GLOBS = [
+const RG_EXCLUDE_GLOBS = [
   ...[...DENY_DIRS].map((dir) => `!**/${dir}/**`),
   '!**/.env',
   '!**/.env.*',

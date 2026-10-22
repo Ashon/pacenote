@@ -42,7 +42,7 @@ function base(cluster: string, clusters: readonly string[]): string[] {
   return ['--context', cluster, '--request-timeout=20s']
 }
 
-export interface GetArgs {
+interface GetArgs {
   cluster: string
   kind: string
   namespace?: string
@@ -78,7 +78,7 @@ export function describeArgs(
   return args
 }
 
-export interface LogsArgs {
+interface LogsArgs {
   cluster: string
   namespace: string
   pod: string

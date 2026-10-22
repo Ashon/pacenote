@@ -236,7 +236,7 @@ function issueLine(issue: Issue): string {
   return `${issue.key} [${f.status?.name ?? '?'}] ${f.summary ?? ''}`
 }
 
-export function formatIssue(
+function formatIssue(
   issue: Issue,
   siteUrl: string,
   maxComments: number
@@ -289,7 +289,7 @@ export function formatIssue(
   return lines.join('\n')
 }
 
-export interface JiraOptions {
+interface JiraOptions {
   /** Site URL (https://your-site.atlassian.net) */
   baseUrl: string
   email: string
@@ -300,7 +300,7 @@ export interface JiraOptions {
   now?: () => number
 }
 
-export interface CreateIssueInput {
+interface CreateIssueInput {
   project: string
   issueType?: string
   summary: string

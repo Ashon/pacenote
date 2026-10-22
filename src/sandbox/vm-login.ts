@@ -26,13 +26,13 @@ import { text } from './vm-login.text.js'
  * keeps (Claude Code's terms: no collecting, storing or passing on claude.ai
  * credentials; sign-in completes through Anthropic's own flow).
  */
-export type LoginCli = 'claude' | 'codex'
+type LoginCli = 'claude' | 'codex'
 
 /** Where the login folder is in the VM */
-export const LOGIN_AT = '/run/login'
+const LOGIN_AT = '/run/login'
 
 /** The variable that makes the folder the CLI's config folder */
-export const LOGIN_ENV: Record<LoginCli, string> = {
+const LOGIN_ENV: Record<LoginCli, string> = {
   claude: 'CLAUDE_CONFIG_DIR',
   codex: 'CODEX_HOME',
 }
@@ -53,7 +53,7 @@ const KEEP: Record<LoginCli, readonly string[]> = {
 }
 
 /** The hosts each login reaches from the VM, and nothing else */
-export const LOGIN_DOMAINS: Record<LoginCli, readonly string[]> = {
+const LOGIN_DOMAINS: Record<LoginCli, readonly string[]> = {
   claude: ['platform.claude.com', 'api.anthropic.com'],
   codex: ['auth.openai.com'],
 }
@@ -74,7 +74,7 @@ export function signedIn(vmRoot: string, cli: LoginCli): boolean {
  * The login folder, made if missing. Codex in it puts the images it generates
  * in generated_images, which links to the run's output folder in the VM.
  */
-export function prepareLoginDir(dir: string, cli: LoginCli): void {
+function prepareLoginDir(dir: string, cli: LoginCli): void {
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   if (cli !== 'codex') return
   const images = path.join(dir, 'generated_images')
@@ -89,7 +89,7 @@ export function prepareLoginDir(dir: string, cli: LoginCli): void {
 }
 
 /** Takes away all but what the CLI keeps between runs */
-export function tidyLoginDir(dir: string, cli: LoginCli): void {
+function tidyLoginDir(dir: string, cli: LoginCli): void {
   let names: string[]
   try {
     names = readdirSync(dir)

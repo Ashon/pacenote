@@ -24,10 +24,9 @@ import { readSettingsValues } from '../settings/settings-file.js'
  *   and existing environment variables take precedence.
  */
 export const JOB_KINDS = ['vm', 'kubeconfig'] as const
-export type JobKind = (typeof JOB_KINDS)[number]
+type JobKind = (typeof JOB_KINDS)[number]
 
-export type JobStep =
-  { kind: 'allowlist' } | { kind: 'kubeconfig' } | { kind: 'vm' }
+type JobStep = { kind: 'allowlist' } | { kind: 'kubeconfig' } | { kind: 'vm' }
 
 /** Turns a job into steps. (Does not run them) */
 export function planJob(kind: JobKind): JobStep[] {

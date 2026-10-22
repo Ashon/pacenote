@@ -3,7 +3,7 @@
  * fixed formats. The model can only pick a check name and arguments; it cannot
  * run arbitrary commands.
  */
-export interface CheckArgs {
+interface CheckArgs {
   lines?: number
   unit?: string
   vendor?: string

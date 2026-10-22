@@ -36,22 +36,18 @@ export const VERSIONS = {
 /** What the images are built on */
 export const VM_BASE_IMAGE = 'docker.io/library/node:24-bookworm-slim'
 /** Where the image build may go: Debian's and npm's package hosts */
-export const BUILD_DOMAINS = ['deb.debian.org', 'registry.npmjs.org']
+const BUILD_DOMAINS = ['deb.debian.org', 'registry.npmjs.org']
 /** The renderer's build: those, and Python's packages */
-export const RENDERER_BUILD_DOMAINS = [
+const RENDERER_BUILD_DOMAINS = [
   ...BUILD_DOMAINS,
   'pypi.org',
   'files.pythonhosted.org',
 ]
 /** The broker image's build: Debian's packages and kubectl's downloads */
-export const BROKER_BUILD_DOMAINS = [
-  'deb.debian.org',
-  'dl.k8s.io',
-  'cdn.dl.k8s.io',
-]
+const BROKER_BUILD_DOMAINS = ['deb.debian.org', 'dl.k8s.io', 'cdn.dl.k8s.io']
 
 /** pacenote-vm build options: the reasoner image's settings from then on */
-export const VM_IMAGE_SETTINGS = [
+const VM_IMAGE_SETTINGS = [
   '--set-user',
   '1000:1000',
   '--set-workdir',
@@ -71,7 +67,7 @@ export const VM_IMAGE_SETTINGS = [
 /** The label (pacenote-vm build --label) an image keeps its recipe's hash in */
 export const RECIPE_LABEL = 'pacenote.recipe'
 
-export interface ImageRecipe {
+interface ImageRecipe {
   /** What the setup's log and the check issues call it */
   title: string
   /** The pinned versions, for the setup's log */

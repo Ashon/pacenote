@@ -4,7 +4,7 @@
  * no token and cannot reach GitHub. PR and repository lookups go through
  * these tools only.
  */
-export interface RepoRef {
+interface RepoRef {
   owner?: string
   repo: string
   number?: number
@@ -94,7 +94,7 @@ interface Pull {
   requested_reviewers?: { login: string }[]
 }
 
-export function formatPullLine(pull: Pull): string {
+function formatPullLine(pull: Pull): string {
   const state = pull.merged_at ? 'merged' : pull.draft ? 'draft' : pull.state
   const labels = pull.labels?.length
     ? ` [${pull.labels.map((l) => l.name).join(', ')}]`
@@ -216,7 +216,7 @@ export function filterDiff(diff: string, path: string): string {
   return picked.join('')
 }
 
-export interface GitHubReaderOptions {
+interface GitHubReaderOptions {
   token: string
   allowedOwners: string[]
   fetchImpl?: typeof fetch

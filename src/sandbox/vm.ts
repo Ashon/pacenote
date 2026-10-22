@@ -59,7 +59,7 @@ export interface VmSandboxOptions {
 }
 
 /** What pacenote-vm says and takes (its formatVersion) */
-export const VM_FORMAT = 1
+const VM_FORMAT = 1
 
 /** HOME and /tmp: empty tmpfs on every run */
 const TMPFS = [

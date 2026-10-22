@@ -8,7 +8,7 @@ import { text } from './vm-progress.text.js'
  * the UI reads it too; the titles are IMAGE_RECIPES' (tests/vm-progress.test).
  */
 
-export type SetupPartState = 'waiting' | 'working' | 'done' | 'failed'
+type SetupPartState = 'waiting' | 'working' | 'done' | 'failed'
 
 export interface SetupPart {
   id: 'kernel' | 'init' | 'reasoner' | 'renderer' | 'broker'

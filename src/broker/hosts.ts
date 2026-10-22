@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 
-export function ipv4ToInt(ip: string): number | undefined {
+function ipv4ToInt(ip: string): number | undefined {
   const parts = ip.split('.')
   if (parts.length !== 4) return undefined
   let value = 0

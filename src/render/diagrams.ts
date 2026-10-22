@@ -10,7 +10,7 @@ import { text } from './diagrams.text.js'
  * Rendering runs in a VM of its own with no way out (the built-in sandbox's
  * renderer image, sandbox/vm/renderer).
  */
-export type DiagramFormat = 'mermaid' | 'dot' | 'vega-lite' | 'svg'
+type DiagramFormat = 'mermaid' | 'dot' | 'vega-lite' | 'svg'
 
 const LANGUAGES: Record<string, DiagramFormat> = {
   mermaid: 'mermaid',
@@ -31,7 +31,7 @@ export const MAX_DIAGRAMS = 3
 const MAX_SOURCE_CHARS = 20_000
 const MAX_PNG_BYTES = 10 * 1024 * 1024
 
-export interface DiagramBlock {
+interface DiagramBlock {
   format: DiagramFormat
   source: string
   /** Raw code block text in the answer (including the ```) */
@@ -77,7 +77,7 @@ export function composeAnswer(
 }
 
 /** Where the renderer runs: its VM's helper, folder and image */
-export interface RendererVm {
+interface RendererVm {
   /** pacenote-vm */
   bin: string
   /** pacenote-vm's folder: kernel, init filesystem, images */
@@ -137,7 +137,7 @@ function vmArgs(
   )
 }
 
-export interface DiagramRendererOptions extends RendererVm {
+interface DiagramRendererOptions extends RendererVm {
   timeoutMs: number
 }
 

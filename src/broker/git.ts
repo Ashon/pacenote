@@ -41,7 +41,7 @@ const WORKSPACE_TTL_MS = 24 * 3_600_000
  */
 const PROTECTED_PATHS: RegExp[] = [/^\.github\/workflows\//, /^\.gitmodules$/]
 
-export interface RepoSlug {
+interface RepoSlug {
   owner: string
   repo: string
 }
@@ -121,7 +121,7 @@ interface Workspace {
   prUrl?: string
 }
 
-export interface GitWorkspaceOptions {
+interface GitWorkspaceOptions {
   /**
    * Local repository root (read-only mount). Remote URLs are looked up by
    * repository name.

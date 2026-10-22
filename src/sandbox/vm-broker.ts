@@ -102,7 +102,7 @@ export function brokerDestinations(input: {
  * The headers the broker reads as who is asking (TRUST_REQUESTER): set by
  * the door in front of it (openBrokerDoor), never by the reasoner
  */
-export const REQUESTER_HEADERS: Record<
+const REQUESTER_HEADERS: Record<
   Exclude<keyof Requester, 'message' | 'permalink'>,
   string
 > = {
@@ -124,7 +124,7 @@ export type OwnTools = (
 ) => Promise<void>
 
 /** Where a door serves Pace's own tools; anything else goes to the broker */
-export const OWN_TOOLS_PATH = '/pace/'
+const OWN_TOOLS_PATH = '/pace/'
 
 /**
  * A door for one run: a socket of its own that passes each request on to the

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
-export interface RunOptions {
+interface RunOptions {
   cwd: string
   input: string
   timeoutMs: number

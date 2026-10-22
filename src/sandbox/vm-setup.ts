@@ -54,7 +54,7 @@ export const KERNEL = {
   },
 }
 
-export interface VmSetupOptions {
+interface VmSetupOptions {
   bin: string
   root: string
   /** The repository's (or the app's) sandbox folder, with vm/ */
@@ -276,7 +276,7 @@ async function kernelFromArchive(
  * Builds an image from its recipe (vm-images.ts) in a VM, its way out open
  * only to the recipe's package hosts, and labels it with the recipe's hash
  */
-export async function buildVmImage(
+async function buildVmImage(
   options: VmSetupOptions,
   name: string
 ): Promise<void> {
