@@ -66,14 +66,17 @@ const field = (line: string, name: string): string | undefined => {
   }
 }
 
-function textOf(content: unknown): string {
+/** A message's text: as written, or its parts of these types */
+export function textOf(
+  content: unknown,
+  /** What you typed, unless told otherwise */
+  types: readonly string[] = ['text', 'input_text']
+): string {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return ''
   return content
     .map((part: { type?: string; text?: string }) =>
-      part.type === 'text' || part.type === 'input_text'
-        ? (part.text ?? '')
-        : ''
+      part.type && types.includes(part.type) ? (part.text ?? '') : ''
     )
     .filter(Boolean)
     .join('\n')
@@ -245,13 +248,8 @@ export class SessionIndex {
     const since = now - (this.options.windowMs ?? SESSION_WINDOW_MS)
     const seen = new Set<string>()
     for (const { file, tool } of await this.logs(since, now)) {
-      let info
-      try {
-        info = await stat(file)
-      } catch {
-        continue
-      }
-      if (info.mtimeMs < since) continue
+      const info = await stat(file).catch(() => undefined)
+      if (!info || info.mtimeMs < since) continue
       seen.add(file)
       let state = this.files.get(file)
       if (state && state.size === info.size && state.mtimeMs === info.mtimeMs)

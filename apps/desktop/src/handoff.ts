@@ -31,6 +31,7 @@ import type {
   WorkTool,
 } from '../../../src/tasks/types.js'
 import { text } from './handoff.text.js'
+import { textOf } from './session-index.js'
 
 /**
  * Continuing a task where its work happens: Claude Code or Codex opened in a
@@ -651,21 +652,8 @@ function findSessionFile(home: string, entry: Session): string | undefined {
 }
 
 const ITEM_CHARS = 2000
-
-function textOf(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-  return content
-    .map((part: { type?: string; text?: string }) =>
-      part.type === 'text' ||
-      part.type === 'input_text' ||
-      part.type === 'output_text'
-        ? (part.text ?? '')
-        : ''
-    )
-    .filter(Boolean)
-    .join('\n')
-}
+/** The parts of a message that are text, the model's answers among them */
+const SAID = ['text', 'input_text', 'output_text']
 
 /** What a tool step was about, in a line: its command, file or task */
 function stepLine(input: unknown): string {
@@ -710,7 +698,7 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
       if (Array.isArray(message.content))
         for (const block of message.content as Record<string, unknown>[])
           if (block.type === 'tool_use') step(block.name, block.input, at)
-      const text = textOf(message.content)
+      const text = textOf(message.content, SAID)
       if (text)
         push({ role: event.type === 'user' ? 'user' : 'assistant', text, at })
       continue
@@ -719,7 +707,7 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
     const payload = event.payload as Record<string, unknown> | undefined
     if (event.type !== 'response_item' || !payload) continue
     if (payload.type === 'message') {
-      const text = textOf(payload.content)
+      const text = textOf(payload.content, SAID)
       // Codex's own context (environment, instructions) is not the session.
       if (/^<(environment_context|user_instructions)>/.test(text.trim()))
         continue
