@@ -296,8 +296,9 @@ function finish(output: string): string {
     : clean
 }
 
+const KUBECONFIG = ['--kubeconfig', env.KUBECONFIG_FILE]
 const kubectl = (tool: string, args: string[], meta: Record<string, unknown>) =>
-  exec(tool, 'kubectl', ['--kubeconfig', env.KUBECONFIG_FILE, ...args], meta)
+  exec(tool, 'kubectl', [...KUBECONFIG, ...args], meta)
 
 /** The named fields of a tool's input, in that order, for its audit line */
 const pick = <T extends object, K extends keyof T>(a: T, ...keys: K[]) =>
@@ -420,19 +421,16 @@ function registerHostTools(server: McpServer): void {
         const sshArgs = [
           '-F',
           '/dev/null',
-          '-o',
-          'BatchMode=yes',
-          '-o',
-          'ConnectTimeout=8',
-          '-o',
-          'IdentitiesOnly=yes',
-          '-o',
-          'StrictHostKeyChecking=accept-new',
-          '-o',
-          `UserKnownHostsFile=${KNOWN_HOSTS}`,
-          ...(env.SSH_PROXY_COMMAND
-            ? ['-o', `ProxyCommand=${env.SSH_PROXY_COMMAND}`]
-            : []),
+          ...[
+            'BatchMode=yes',
+            'ConnectTimeout=8',
+            'IdentitiesOnly=yes',
+            'StrictHostKeyChecking=accept-new',
+            `UserKnownHostsFile=${KNOWN_HOSTS}`,
+            ...(env.SSH_PROXY_COMMAND
+              ? [`ProxyCommand=${env.SSH_PROXY_COMMAND}`]
+              : []),
+          ].flatMap((option) => ['-o', option]),
           '-i',
           KEY,
           '-l',
@@ -1178,14 +1176,7 @@ async function start(): Promise<void> {
   if (k8sEnabled) {
     const { stdout } = await runProcess(
       'kubectl',
-      [
-        '--kubeconfig',
-        env.KUBECONFIG_FILE,
-        'config',
-        'get-contexts',
-        '-o',
-        'name',
-      ],
+      [...KUBECONFIG, 'config', 'get-contexts', '-o', 'name'],
       { cwd: '/tmp', timeoutMs: 10_000, env: TOOL_ENV }
     )
     clusters = stdout

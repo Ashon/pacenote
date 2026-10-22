@@ -229,39 +229,23 @@ export class GitWorkspaces {
       `${slug.owner}__${slug.repo}.git`
     )
     const url = `https://github.com/${slug.owner}/${slug.repo}.git`
+    const inMirror = (...args: string[]) => this.git(['-C', mirror, ...args])
     if (!existsSync(mirror)) {
       await mkdir(path.dirname(mirror), { recursive: true })
       await this.git(['clone', '--bare', '--filter=blob:none', url, mirror])
     } else {
-      await this.git([
-        '-C',
-        mirror,
-        'fetch',
-        '--prune',
-        'origin',
-        '+refs/heads/*:refs/heads/*',
-      ])
-      await this.git(['-C', mirror, 'worktree', 'prune'])
+      await inMirror('fetch', '--prune', 'origin', '+refs/heads/*:refs/heads/*')
+      await inMirror('worktree', 'prune')
     }
     const baseBranch =
-      base ??
-      (await this.git(['-C', mirror, 'symbolic-ref', '--short', 'HEAD'])).trim()
+      base ?? (await inMirror('symbolic-ref', '--short', 'HEAD')).trim()
 
     const id = randomBytes(4).toString('hex')
     const date = new Date().toISOString().slice(0, 10).replaceAll('-', '')
     const branch = `${BRANCH_PREFIX}${date}-${id}`
     const dir = path.join(this.options.workRoot, 'ws', id)
     await mkdir(path.dirname(dir), { recursive: true })
-    await this.git([
-      '-C',
-      mirror,
-      'worktree',
-      'add',
-      '-b',
-      branch,
-      dir,
-      baseBranch,
-    ])
+    await inMirror('worktree', 'add', '-b', branch, dir, baseBranch)
 
     const workspace: Workspace = {
       id,
@@ -288,10 +272,8 @@ export class GitWorkspaces {
    * Write target path inside the workspace. New files are allowed, but paths
    * outside the root, restricted paths, and protected paths are rejected.
    */
-  private target(
-    workspace: Workspace,
-    requested: string
-  ): { abs: string; rel: string } {
+  private target(id: string, requested: string): { abs: string; rel: string } {
+    const { dir } = this.get(id)
     const rel = path.posix.normalize(requested.trim().replace(/^\/+/, ''))
     if (!rel || rel === '.' || rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Specify a path relative to the workspace.')
@@ -299,12 +281,11 @@ export class GitWorkspaces {
     if (isDenied(rel)) throw new Error(`Restricted path: ${rel}`)
     if (PROTECTED_PATHS.some((p) => p.test(rel)))
       throw new Error(`Protected path: ${rel}`)
-    return { abs: path.join(workspace.dir, rel), rel }
+    return { abs: path.join(dir, rel), rel }
   }
 
   async write(id: string, requested: string, content: string): Promise<string> {
-    const workspace = this.get(id)
-    const { abs, rel } = this.target(workspace, requested)
+    const { abs, rel } = this.target(id, requested)
     if (Buffer.byteLength(content) > MAX_WRITE_BYTES)
       throw new Error('File is too large.')
     await mkdir(path.dirname(abs), { recursive: true })
@@ -319,8 +300,7 @@ export class GitWorkspaces {
     newText: string,
     replaceAll?: boolean
   ): Promise<string> {
-    const workspace = this.get(id)
-    const { abs, rel } = this.target(workspace, requested)
+    const { abs, rel } = this.target(id, requested)
     const content = await readFile(abs, 'utf8').catch(() => {
       throw new Error(`File not found: ${rel}`)
     })
@@ -329,8 +309,7 @@ export class GitWorkspaces {
   }
 
   async remove(id: string, requested: string): Promise<string> {
-    const workspace = this.get(id)
-    const { abs, rel } = this.target(workspace, requested)
+    const { abs, rel } = this.target(id, requested)
     if (!(await stat(abs).catch(() => undefined))?.isFile())
       throw new Error(`File not found: ${rel}`)
     await unlink(abs)

@@ -173,15 +173,11 @@ export function formatPullDetail(
       `Requested reviewers: ${pull.requested_reviewers.map((r) => `@${r.login}`).join(', ')}`
     )
   }
-  lines.push(
-    `Reviews: ${latest.size ? [...latest].map(([login, r]) => `@${login} ${r.state}`).join(', ') : 'none'}`
-  )
-  lines.push(
-    `Checks: ${conclusions.size ? [...conclusions].map(([k, names]) => `${k} ${names.length}${k === 'success' ? '' : ` (${names.slice(0, 5).join(', ')})`}`).join(', ') : 'none'}`
-  )
-  lines.push(`Link: ${pull.html_url}`)
   const body = (pull.body ?? '').trim()
   lines.push(
+    `Reviews: ${latest.size ? [...latest].map(([login, r]) => `@${login} ${r.state}`).join(', ') : 'none'}`,
+    `Checks: ${conclusions.size ? [...conclusions].map(([k, names]) => `${k} ${names.length}${k === 'success' ? '' : ` (${names.slice(0, 5).join(', ')})`}`).join(', ') : 'none'}`,
+    `Link: ${pull.html_url}`,
     '',
     'Body:',
     body
@@ -190,17 +186,15 @@ export function formatPullDetail(
         : body
       : '(none)'
   )
-  if (files.length) {
+  if (files.length)
     lines.push(
       '',
-      `Changed files (${files.length}${files.length >= 100 ? ', first 100' : ''}):`
-    )
-    for (const file of files) {
-      lines.push(
-        `${FILE_STATUS[file.status] ?? '?'} ${file.filename} (+${file.additions} -${file.deletions})`
+      `Changed files (${files.length}${files.length >= 100 ? ', first 100' : ''}):`,
+      ...files.map(
+        (file) =>
+          `${FILE_STATUS[file.status] ?? '?'} ${file.filename} (+${file.additions} -${file.deletions})`
       )
-    }
-  }
+    )
   return lines.join('\n')
 }
 
@@ -267,9 +261,7 @@ export class GitHubReader {
     const pulls = await this.json<Pull[]>(
       `/repos/${slug}/pulls?state=${state}&sort=created&direction=desc&per_page=${clamp(limit, 1, 50)}`
     )
-    const label = { open: 'open', closed: 'closed', all: 'open or closed' }[
-      state
-    ]
+    const label = state === 'all' ? 'open or closed' : state
     if (pulls.length === 0) return `${slug}: no ${label} PRs.`
     return [
       `${slug}: ${pulls.length} ${label} ${pulls.length === 1 ? 'PR' : 'PRs'} (newest first)`,

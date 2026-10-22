@@ -252,17 +252,16 @@ function formatIssue(
     lines.push(
       `- parent ${f.parent.key}${f.parent.fields?.summary ? ` ${f.parent.fields.summary}` : ''}`
     )
-  lines.push(`- link ${siteUrl}/browse/${issue.key}`)
-
   const description = adfToText(f.description)
   lines.push(
+    `- link ${siteUrl}/browse/${issue.key}`,
     '',
     'Description:',
     description ? description.slice(0, 6000) : '(none)'
   )
   if (f.subtasks?.length)
     lines.push('', 'Subtasks:', ...f.subtasks.map(issueLine))
-  if (f.issuelinks?.length) {
+  if (f.issuelinks?.length)
     lines.push(
       '',
       'Linked issues:',
@@ -272,19 +271,17 @@ function formatIssue(
           : `${link.type.inward} ${link.inwardIssue ? issueLine(link.inwardIssue) : '?'}`
       )
     )
-  }
   const comments = f.comment?.comments ?? []
   if (comments.length) {
     const shown = comments.slice(-maxComments)
     lines.push(
       '',
-      `Comments (latest ${shown.length} of ${f.comment?.total ?? comments.length}):`
-    )
-    for (const c of shown) {
-      lines.push(
-        `[${day(c.created)} ${name(c.author)}] ${adfToText(c.body).slice(0, 1500)}`
+      `Comments (latest ${shown.length} of ${f.comment?.total ?? comments.length}):`,
+      ...shown.map(
+        (c) =>
+          `[${day(c.created)} ${name(c.author)}] ${adfToText(c.body).slice(0, 1500)}`
       )
-    }
+    )
   }
   return lines.join('\n')
 }

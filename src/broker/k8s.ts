@@ -111,21 +111,22 @@ export function logsArgs(a: LogsArgs, clusters: readonly string[]): string[] {
   return args
 }
 
+/** One namespace, or all of them */
+const namespaced = (namespace: string | undefined) =>
+  namespace ? ['--namespace', namespace] : ['--all-namespaces']
+
 export function eventsArgs(
   a: { cluster: string; namespace?: string },
   clusters: readonly string[]
 ): string[] {
   check(a.namespace, NAME, 'namespace')
-  const args = [
+  return [
     ...base(a.cluster, clusters),
     'get',
     'events',
     '--sort-by=.lastTimestamp',
+    ...namespaced(a.namespace),
   ]
-  args.push(
-    ...(a.namespace ? ['--namespace', a.namespace] : ['--all-namespaces'])
-  )
-  return args
 }
 
 export function topArgs(
@@ -133,15 +134,10 @@ export function topArgs(
   clusters: readonly string[]
 ): string[] {
   check(a.namespace, NAME, 'namespace')
-  const args = [
+  return [
     ...base(a.cluster, clusters),
     'top',
     a.target === 'nodes' ? 'nodes' : 'pods',
+    ...(a.target === 'pods' ? namespaced(a.namespace) : []),
   ]
-  if (a.target === 'pods') {
-    args.push(
-      ...(a.namespace ? ['--namespace', a.namespace] : ['--all-namespaces'])
-    )
-  }
-  return args
 }
