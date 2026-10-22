@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  statSync,
   truncateSync,
   utimesSync,
   writeFileSync,
@@ -23,7 +24,12 @@ import {
 } from '../apps/desktop/src/session-links.js'
 import { yourFolder } from '../src/tasks/folders.js'
 import type { TaskView, WorkEntry, WorkFile } from '../src/tasks/types.js'
-import { answerSuggestion, changeWork, readWork } from '../src/tasks/work.js'
+import {
+  answerSuggestion,
+  changeWork,
+  readWork,
+  WORK_FILE,
+} from '../src/tasks/work.js'
 
 /**
  * The sessions you start yourself, linked to the task they worked on from
@@ -552,6 +558,35 @@ describe('answering a suggestion', () => {
     ])
     expect(file.entries[0]).not.toHaveProperty('shares')
     expect(file.notIt).toMatchObject([{ task: 'C1:1.000100', session: 's2' }])
+  })
+})
+
+describe('the work file', () => {
+  it('is not written again by a change that changes nothing', () => {
+    const data = dir('unchanged-data')
+    const entry = {
+      id: 'w1',
+      kind: 'session' as const,
+      task: 'C1:1.000100',
+      tool: 'claude' as const,
+      session: 's1',
+      cwd: '/w/payments',
+      startedAt: new Date().toISOString(),
+    }
+    changeWork(data, (file) => ({ ...file, entries: [entry] }))
+    const file = path.join(data, WORK_FILE)
+    const then = new Date(Date.now() - 60_000)
+    utimesSync(file, then, then)
+    const before = statSync(file).mtimeMs
+    // A session-link pass that finds nothing new
+    changeWork(data, (work) => work)
+    expect(statSync(file).mtimeMs).toBe(before)
+    changeWork(data, (work) => ({
+      ...work,
+      entries: [{ ...entry, session: 's2' }],
+    }))
+    expect(statSync(file).mtimeMs).toBeGreaterThan(before)
+    expect(readWork(data).entries).toMatchObject([{ session: 's2' }])
   })
 })
 

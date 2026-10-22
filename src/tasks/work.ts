@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { HISTORY_MS, readJson, writeJson } from './store.js'
+import { readJson, writeJsonIfChanged } from '../json-file.js'
+import { HISTORY_MS } from './store.js'
 import type {
   Proposal,
   SessionSuggestion,
@@ -34,7 +35,9 @@ export const entryAt = (entry: WorkEntry): string =>
 function save(dataDir: string, file: WorkFile, now: number): void {
   // As long as the tasks they belong to are kept
   const kept = (at: string) => now - Date.parse(at) < HISTORY_MS
-  writeJson(path.join(dataDir, WORK_FILE), {
+  // Left alone when nothing changed, as most session-link passes leave it,
+  // so the app and your other Macs do not read it again for nothing
+  writeJsonIfChanged(path.join(dataDir, WORK_FILE), {
     version: 1,
     entries: file.entries.filter((entry) => kept(entryAt(entry))),
     suggested: (file.suggested ?? []).filter((s) => kept(s.startedAt)),
