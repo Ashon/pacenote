@@ -303,6 +303,7 @@ export function TaskRow({
         ? t.settled[task.dismissReason ?? 'dismissed']
         : t.settled[task.status]
   const settled = !['open', 'maybe'].includes(task.status)
+  const acting = task.status === 'open' && !dismissing
   const change = settled ? undefined : lastChange(task)
   const recent =
     change && Date.now() - Date.parse(change.at) < WEEK ? change : undefined
@@ -527,34 +528,48 @@ export function TaskRow({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {task.status === 'open' && !dismissing && (
+            {acting && task.action === 'code' && (
+              <OpensIn
+                folder={folder}
+                app={opensIn?.[cli] === 'app' ? cli : undefined}
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void continueIn(cli)}
+                >
+                  <SquareTerminal />
+                  {t.continueIn(CLI_NAMES[cli])}
+                </Button>
+              </OpensIn>
+            )}
+            {acting && task.action === 'reply' && !local && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={drafting}
+                onClick={() => void draft()}
+              >
+                <MessageSquare />
+                {t.draftReply}
+              </Button>
+            )}
+            {/* Before the task's own buttons, so they keep their place in
+                rows with no link */}
+            {task.source.permalink && (
+              <Button size="icon-sm" variant="outline" asChild>
+                <a
+                  href={task.source.permalink}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t.openIn(sourceLabel)}
+                >
+                  <ExternalLink />
+                </a>
+              </Button>
+            )}
+            {acting && (
               <>
-                {task.action === 'code' && (
-                  <OpensIn
-                    folder={folder}
-                    app={opensIn?.[cli] === 'app' ? cli : undefined}
-                  >
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void continueIn(cli)}
-                    >
-                      <SquareTerminal />
-                      {t.continueIn(CLI_NAMES[cli])}
-                    </Button>
-                  </OpensIn>
-                )}
-                {task.action === 'reply' && !local && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={drafting}
-                    onClick={() => void draft()}
-                  >
-                    <MessageSquare />
-                    {t.draftReply}
-                  </Button>
-                )}
                 <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
                   <CircleCheck />
                   {t.done}
@@ -611,18 +626,6 @@ export function TaskRow({
               >
                 <Undo2 />
                 {t.reopen}
-              </Button>
-            )}
-            {task.source.permalink && (
-              <Button size="icon-sm" variant="ghost" asChild>
-                <a
-                  href={task.source.permalink}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={t.openIn(sourceLabel)}
-                >
-                  <ExternalLink />
-                </a>
               </Button>
             )}
           </div>
