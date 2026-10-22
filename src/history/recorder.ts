@@ -3,6 +3,7 @@ import { readdirSync, rmSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { writeJson } from '../json-file.js'
+import { clip } from './events.js'
 import type { Logger } from '../logger.js'
 import {
   ARTIFACTS_DIR,
@@ -34,11 +35,6 @@ const MAX_TEXT_CHARS = 20_000
 const MAX_PROMPT_CHARS = 200_000
 /** Interval for writing an in-progress record to the file */
 const WRITE_DELAY_MS = 400
-
-const clip = (text: string, max: number) =>
-  text.length > max
-    ? `${text.slice(0, max)}\n... (truncated, ${text.length} chars total)`
-    : text
 
 export type RunInit = Pick<RunRecord, 'origin' | 'request' | 'backend'>
 
@@ -122,7 +118,7 @@ export class HistoryStore {
     now = new Date(),
     kind: RunKind = 'mention'
   ): number {
-    const who = kind === 'mention' ? 'the bot' : 'the app'
+    const who = kind === 'mention' ? 'bot' : 'app'
     let count = 0
     for (const day of dayDirs(this.root).slice(0, 7)) {
       const dayDir = path.join(this.root, RUNS_DIR, day)
@@ -139,13 +135,11 @@ export class HistoryStore {
         handle.event({
           kind: 'note',
           at: now.toISOString(),
-          text: `Interrupted because ${who} restarted`,
+          text: `Interrupted because the ${who} restarted`,
         })
         handle.finish(
           'interrupted',
-          {
-            error: `Interrupted by ${kind === 'mention' ? 'bot' : 'app'} restart`,
-          },
+          { error: `Interrupted by ${who} restart` },
           now
         )
         count += 1
@@ -234,10 +228,7 @@ export class RunHandle<R extends HistoryRecord = RunRecord> {
       const id = `${this.idPrefix}${event.id}`
       const kind = event.kind
       const index = events.findIndex(
-        (e) =>
-          (e.kind === 'tool' || e.kind === 'command') &&
-          e.kind === kind &&
-          e.id === id
+        (e) => e.kind === kind && 'id' in e && e.id === id
       )
       if (index >= 0) {
         const merged = { ...events[index] } as Record<string, unknown>

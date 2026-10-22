@@ -164,30 +164,17 @@ export function taskContext(
           other.askedBy?.toLowerCase() === person
       )
     : []
+  const shown = (tasks: TaskView[]) =>
+    tasks.slice(0, SHOWN).map((other) => related(other, work, locale))
   return {
-    thread: {
-      runs: runs.slice(0, SHOWN),
-      tasks: inThread
-        .slice(0, SHOWN)
-        .map((other) => related(other, work, locale)),
-    },
+    thread: { runs: runs.slice(0, SHOWN), tasks: shown(inThread) },
     repo:
       task.repo && inRepo.length
-        ? {
-            name: task.repo,
-            tasks: inRepo
-              .slice(0, SHOWN)
-              .map((other) => related(other, work, locale)),
-          }
+        ? { name: task.repo, tasks: shown(inRepo) }
         : undefined,
     person:
       task.askedBy && fromPerson.length
-        ? {
-            name: task.askedBy,
-            tasks: fromPerson
-              .slice(0, SHOWN)
-              .map((other) => related(other, work, locale)),
-          }
+        ? { name: task.askedBy, tasks: shown(fromPerson) }
         : undefined,
   }
 }

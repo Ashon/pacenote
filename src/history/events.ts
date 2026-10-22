@@ -8,9 +8,9 @@ import type { RunEvent, StepStatus } from './types.js'
 /** Records tool results and command output only up to this length. */
 const MAX_OUTPUT_CHARS = 8_000
 
-export const clip = (text: string) =>
-  text.length > MAX_OUTPUT_CHARS
-    ? `${text.slice(0, MAX_OUTPUT_CHARS)}\n... (truncated, ${text.length} chars total)`
+export const clip = (text: string, max = MAX_OUTPUT_CHARS) =>
+  text.length > max
+    ? `${text.slice(0, max)}\n... (truncated, ${text.length} chars total)`
     : text
 
 export const stepStatus = (status: unknown): StepStatus =>
