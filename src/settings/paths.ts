@@ -21,27 +21,23 @@ export function pacenoteHome(
     : path.resolve(value)
 }
 
+/** A path in the Pacenote folder, for an environment and a home */
+const inHome =
+  (...parts: string[]) =>
+  (env: NodeJS.ProcessEnv = process.env, home = homedir()): string =>
+    path.join(pacenoteHome(env, home), ...parts)
+
 /**
  * Settings file shared by the bot, desktop app, and sandbox jobs
  * (settings-file.ts)
  */
-export function settingsFilePath(
-  env: NodeJS.ProcessEnv = process.env,
-  home = homedir()
-): string {
-  return path.join(pacenoteHome(env, home), 'settings.json')
-}
+export const settingsFilePath = inHome('settings.json')
 
 /**
  * Egress allowlist the built-in sandbox's proxy reads on each request. Created
  * from sandbox/allowed-domains.txt if missing.
  */
-export function allowlistPath(
-  env: NodeJS.ProcessEnv = process.env,
-  home = homedir()
-): string {
-  return path.join(pacenoteHome(env, home), 'sandbox', 'allowed-domains.txt')
-}
+export const allowlistPath = inHome('sandbox', 'allowed-domains.txt')
 
 /**
  * The built-in VM sandbox's folder: kernel, init filesystem, images
@@ -59,9 +55,4 @@ export function vmRootPath(
  * Generated files the broker mounts (hosts.json, kubeconfig) and empty
  * placeholders for unset mounts (unset/)
  */
-export function brokerRuntimeDir(
-  env: NodeJS.ProcessEnv = process.env,
-  home = homedir()
-): string {
-  return path.join(pacenoteHome(env, home), 'ops-broker')
-}
+export const brokerRuntimeDir = inHome('ops-broker')

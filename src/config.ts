@@ -391,17 +391,24 @@ class SettingError extends Error {
   }
 }
 
+/** A valid value for each required setting, to check the rules behind it */
+const STAND_INS = {
+  MENTION_ALLOWED_USERS: 'U0STANDIN',
+  HUB_URL: 'https://hub.invalid',
+  HUB_TOKEN: '0000000000000000000000000000000000000000000000000000000000000000',
+  SLACK_BOT_TOKEN: 'xoxb-stand-in',
+  SLACK_APP_TOKEN: 'xapp-stand-in',
+}
+
 /**
  * A required setting that is still empty. Carries a valid stand-in so the
  * remaining rules can still be checked.
  */
 class MissingSettingError extends SettingError {
-  constructor(
-    key: string,
-    message: string,
-    readonly standIn: string
-  ) {
+  readonly standIn: string
+  constructor(key: keyof typeof STAND_INS, message: string) {
     super(key, message)
+    this.standIn = STAND_INS[key]
   }
 }
 
@@ -455,12 +462,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   const e = parsed.data
 
-  const workspace = e.MENTION_WORKSPACE
-    ? expandHome(e.MENTION_WORKSPACE)
-    : undefined
-  if (workspace && !isDirectory(workspace)) {
+  const workspace = e.MENTION_WORKSPACE && expandHome(e.MENTION_WORKSPACE)
+  if (workspace && !isDirectory(workspace))
     throw new SettingError('MENTION_WORKSPACE', t.referenceDir(workspace))
-  }
 
   const slack = slackConnection(e)
   // Pace answers only you: it runs on your Mac with your login, and a mention
@@ -470,11 +474,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new SettingError('MENTION_ALLOWED_USERS', t.mentionAnyone)
   const owners = [...new Set(e.MENTION_ALLOWED_USERS)]
   if (slack.kind === 'app' && owners.length === 0)
-    throw new MissingSettingError(
-      'MENTION_ALLOWED_USERS',
-      t.whoYouAre,
-      'U0STANDIN'
-    )
+    throw new MissingSettingError('MENTION_ALLOWED_USERS', t.whoYouAre)
   if (slack.kind === 'app' && owners.length > 1)
     throw new SettingError('MENTION_ALLOWED_USERS', t.oneMember)
 
@@ -534,14 +534,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
   const t = localized(text)
   if (e.SLACK_CONNECTION === 'hub') {
-    if (!e.HUB_URL)
-      throw new MissingSettingError('HUB_URL', t.hubUrl, 'https://hub.invalid')
-    if (!e.HUB_TOKEN)
-      throw new MissingSettingError(
-        'HUB_TOKEN',
-        t.notPaired,
-        '0000000000000000000000000000000000000000000000000000000000000000'
-      )
+    if (!e.HUB_URL) throw new MissingSettingError('HUB_URL', t.hubUrl)
+    if (!e.HUB_TOKEN) throw new MissingSettingError('HUB_TOKEN', t.notPaired)
     return {
       kind: 'hub',
       hubUrl: e.HUB_URL.replace(/\/+$/, ''),
@@ -549,17 +543,9 @@ function slackConnection(e: z.infer<typeof EnvSchema>): Config['slack'] {
     }
   }
   if (!e.SLACK_BOT_TOKEN)
-    throw new MissingSettingError(
-      'SLACK_BOT_TOKEN',
-      t.botToken,
-      'xoxb-stand-in'
-    )
+    throw new MissingSettingError('SLACK_BOT_TOKEN', t.botToken)
   if (!e.SLACK_APP_TOKEN)
-    throw new MissingSettingError(
-      'SLACK_APP_TOKEN',
-      t.appToken,
-      'xapp-stand-in'
-    )
+    throw new MissingSettingError('SLACK_APP_TOKEN', t.appToken)
   return {
     kind: 'app',
     botToken: e.SLACK_BOT_TOKEN,

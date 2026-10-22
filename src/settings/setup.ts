@@ -106,6 +106,20 @@ export function reopened(record: SetupRecord): SetupRecord {
   return next
 }
 
+/** The step that sets a setting, by the setting's name */
+const KEY_STEPS: [RegExp, SetupStep][] = [
+  [/^(SLACK_|HUB_|MENTION_)/, 'slack'],
+  [/^(REASONER|CLAUDE_|CODEX_)/, 'ai'],
+  [/^(SANDBOX_|RENDER_)/, 'runtime'],
+]
+
+/** In either language the app words it in (Korean keeps the product names) */
+const MESSAGE_STEPS: [RegExp, SetupStep][] = [
+  [/\b(slack|hub|token|who you are|member id)\b|허브|토큰|멤버 ID/i, 'slack'],
+  [/\b(sandbox|vm)\b|샌드박스/i, 'runtime'],
+  [/\b(claude|codex|sign(?:ed)?[- ]in|login)\b|로그인/i, 'ai'],
+]
+
 /**
  * The step that fixes what keeps Pace from starting: the settings it names,
  * or the words of its message when it names none (the glossary in
@@ -115,30 +129,11 @@ export function stepToFix(
   issues: readonly { key?: string }[] | undefined,
   message = ''
 ): SetupStep | undefined {
-  const keys = (issues ?? []).flatMap((issue) => (issue.key ? [issue.key] : []))
-  const step = (key: string): SetupStep | undefined =>
-    /^(SLACK_|HUB_|MENTION_)/.test(key)
-      ? 'slack'
-      : /^(REASONER|CLAUDE_|CODEX_)/.test(key)
-        ? 'ai'
-        : /^(SANDBOX_|RENDER_)/.test(key)
-          ? 'runtime'
-          : undefined
-  for (const key of keys) {
-    const found = step(key)
-    if (found) return found
+  for (const { key } of issues ?? []) {
+    const found = key && KEY_STEPS.find(([pattern]) => pattern.test(key))
+    if (found) return found[1]
   }
-  // In either language the app words it in (Korean keeps the product names)
-  if (
-    /\b(slack|hub|token|who you are|member id)\b|허브|토큰|멤버 ID/i.test(
-      message
-    )
-  )
-    return 'slack'
-  if (/\b(sandbox|vm)\b|샌드박스/i.test(message)) return 'runtime'
-  if (/\b(claude|codex|sign(?:ed)?[- ]in|login)\b|로그인/i.test(message))
-    return 'ai'
-  return undefined
+  return MESSAGE_STEPS.find(([pattern]) => pattern.test(message))?.[1]
 }
 
 /** The step after a change, never going back from the furthest one reached */
