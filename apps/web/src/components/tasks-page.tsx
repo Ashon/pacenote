@@ -861,34 +861,26 @@ function Setup() {
     <div className="mt-2">
       <p className="text-copy text-muted-foreground">{t.setup}</p>
       <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
-        <SetupPart title={t.needsTitle}>{t.needs}</SetupPart>
-        <SetupPart title={t.readTitle}>{t.read}</SetupPart>
-        <SetupPart title={t.howTitle}>{t.how}</SetupPart>
+        {[
+          [t.needsTitle, t.needs],
+          [t.readTitle, t.read],
+          [t.howTitle, t.how],
+        ].map(([title, body]) => (
+          <section
+            key={title}
+            className="rounded-xl border border-border px-4 py-3.5"
+          >
+            <h2 className="text-section">{title}</h2>
+            <p className="mt-1.5 text-copy leading-relaxed text-muted-foreground">
+              {body}
+            </p>
+          </section>
+        ))}
       </div>
-      <Button
-        className="mt-6"
-        onClick={() => (window.location.hash = '#/settings/tasks')}
-      >
+      <Button className="mt-6" onClick={() => go('#/settings/tasks')}>
         <Settings />
         {t.turnOn}
       </Button>
     </div>
-  )
-}
-
-function SetupPart({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="rounded-xl border border-border px-4 py-3.5">
-      <h2 className="text-section">{title}</h2>
-      <p className="mt-1.5 text-copy leading-relaxed text-muted-foreground">
-        {children}
-      </p>
-    </section>
   )
 }
