@@ -105,10 +105,13 @@ export function runProcess(
     const onAbort = () => kill(aborted().message)
     options.signal?.addEventListener('abort', onAbort, { once: true })
 
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8')
+    // Decoded as a stream, so a character cut across two reads stays whole.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk
       if (options.onStdoutLine) {
-        pending += chunk.toString('utf8')
+        pending += chunk
         const lines = pending.split('\n')
         pending = lines.pop() ?? ''
         for (const line of lines) if (line.trim()) options.onStdoutLine(line)
@@ -116,8 +119,8 @@ export function runProcess(
       if (stdout.length > MAX_OUTPUT_BYTES)
         kill(`${command} output is too large.`)
     })
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr = (stderr + chunk.toString('utf8')).slice(-64 * 1024)
+    child.stderr.on('data', (chunk: string) => {
+      stderr = (stderr + chunk).slice(-64 * 1024)
     })
     child.on('error', (err) => {
       const hint =

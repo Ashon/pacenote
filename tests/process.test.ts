@@ -36,6 +36,20 @@ describe('runProcess', () => {
     expect(lines).toBe(0)
   })
 
+  it('keeps a character cut across two reads whole', async () => {
+    // 가 (EA B0 80), its bytes written apart
+    const script =
+      'process.stdout.write(Buffer.from([0xea, 0xb0]));' +
+      'setTimeout(() => process.stdout.write(Buffer.from([0x80, 0x0a])), 200)'
+    const lines: string[] = []
+    const result = await runProcess(process.execPath, ['-e', script], {
+      ...options,
+      onStdoutLine: (line) => lines.push(line),
+    })
+    expect(result.stdout).toBe('가\n')
+    expect(lines).toEqual(['가'])
+  })
+
   it('stops a process past its time', async () => {
     await expect(
       runProcess('sh', ['-c', 'sleep 30'], { ...options, timeoutMs: 100 })
