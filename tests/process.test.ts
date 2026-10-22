@@ -1,7 +1,8 @@
 import { tmpdir } from 'node:os'
+import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import { isAlive } from '../src/runtime/status.js'
-import { runProcess } from '../src/sandbox/process.js'
+import { forwardLines, runProcess } from '../src/sandbox/process.js'
 
 const options = { cwd: tmpdir(), input: '', timeoutMs: 60_000 }
 
@@ -54,5 +55,20 @@ describe('runProcess', () => {
     await expect(
       runProcess('sh', ['-c', 'sleep 30'], { ...options, timeoutMs: 100 })
     ).rejects.toThrow('sh timed out')
+  })
+})
+
+describe('forwardLines', () => {
+  it('passes lines on whole across reads, skips blank ones and ends with the rest', async () => {
+    const stream = new PassThrough()
+    const lines: string[] = []
+    forwardLines(stream, (line) => lines.push(line))
+    const ended = new Promise((resolve) => stream.on('end', resolve))
+    stream.write('{"tool":"ssh_')
+    stream.write(Buffer.from('exec"}\n\n  \n\xea\xb0', 'latin1'))
+    stream.write(Buffer.from([0x80, 0x0a]))
+    stream.end('last')
+    await ended
+    expect(lines).toEqual(['{"tool":"ssh_exec"}', '가', 'last'])
   })
 })

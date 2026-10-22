@@ -14,6 +14,7 @@ import path from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { EgressProxy } from './egress.js'
+import { forwardLines } from './process.js'
 import { readVmReport, type VmReport } from './vm.js'
 import {
   IMAGE_RECIPES,
@@ -332,12 +333,8 @@ function helper(
     const child = spawn(options.bin, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    const forward = (chunk: Buffer) => {
-      for (const line of chunk.toString().split('\n'))
-        if (line.trim()) options.log(line)
-    }
-    child.stdout.on('data', forward)
-    child.stderr.on('data', forward)
+    forwardLines(child.stdout, options.log)
+    forwardLines(child.stderr, options.log)
     child.on('error', (err) =>
       reject(
         new Error(

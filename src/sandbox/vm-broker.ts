@@ -8,6 +8,7 @@ import type { Logger } from '../logger.js'
 import { EgressProxy } from './egress.js'
 import { brokerExpected, loadBrokerEnv } from './env.js'
 import { prepareBrokerFiles } from './prepare.js'
+import { forwardLines } from './process.js'
 import type { Requester } from './runtime.js'
 import { jobHint } from './types.js'
 import { localized } from '../i18n/locale.js'
@@ -371,15 +372,12 @@ export class VmBroker {
     })
     this.child = child
     // The broker's audit log, one JSON line per call
-    const forward = (chunk: Buffer) => {
-      for (const line of chunk.toString().split('\n'))
-        if (line.trim()) {
-          this.lastLine = line.trim().slice(0, 300)
-          options.log?.info(line)
-        }
+    const forward = (line: string) => {
+      this.lastLine = line.trim().slice(0, 300)
+      options.log?.info(line)
     }
-    child.stdout?.on('data', forward)
-    child.stderr?.on('data', forward)
+    forwardLines(child.stdout, forward)
+    forwardLines(child.stderr, forward)
     child.on('exit', (code) => {
       if (this.stopping) return
       this.problem = `The ops broker's VM stopped (code ${code}).`

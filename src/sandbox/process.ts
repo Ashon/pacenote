@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import type { Readable } from 'node:stream'
 
 export interface RunOptions {
   cwd: string
@@ -166,5 +167,25 @@ export function runProcess(
       // event.
     })
     child.stdin.end(options.input)
+  })
+}
+
+/**
+ * Passes a stream's output on line by line, skipping blank lines. A line cut
+ * across two reads comes out whole; the last one without a newline, at the end.
+ */
+export function forwardLines(
+  stream: Readable,
+  onLine: (line: string) => void
+): void {
+  let pending = ''
+  stream.setEncoding('utf8')
+  stream.on('data', (chunk: string) => {
+    const lines = (pending + chunk).split('\n')
+    pending = lines.pop() ?? ''
+    for (const line of lines) if (line.trim()) onLine(line)
+  })
+  stream.on('end', () => {
+    if (pending.trim()) onLine(pending)
   })
 }
