@@ -5,8 +5,14 @@
 <h1 align="center">Pacenote</h1>
 
 <p align="center">
-  <b>You drive. Pace reads the notes.</b><br>
-  Your work context, kept on your Mac, for whichever AI does the work.
+  <b>Ask in Slack. Pick it up in your terminal.</b><br>
+  A free Mac app for developers whose work arrives in Slack and gets done in Claude Code or Codex.
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="https://pacenote.dev">pacenote.dev</a> ·
+  <a href="https://github.com/Ashon/pacenote/issues/new?template=design-partner.yml">Become a design partner</a>
 </p>
 
 <p align="center">
@@ -21,13 +27,13 @@
 </picture>
 </p>
 
-Work reaches you in Slack and gets done in Claude Code, Codex, or a quick question to an assistant. Each of those keeps
-its own memory, so the thread, what you found last time and where you stopped end up scattered across tools and vendors.
+Mention **Pace** in a Slack thread and it answers there, from your Mac, with the Claude Code or Codex you are signed in
+to, on the subscription you already have. It keeps a list of what people ask of you, and when you pick a task up, it
+opens Claude Code or Codex with the thread, what Pace found and how related work ended last time, even when that work
+was done in the other tool.
 
-Pacenote keeps that context on your Mac. Its assistant, **Pace**, answers you in Slack with your own Claude or ChatGPT
-login, keeps a list of what people ask of you, and carries each task, with what came before, into Claude Code or Codex.
-In rallying, the co-driver reads the pace notes so the driver can keep their eyes on the road. Pace does that for your
-work.
+Pace answers only you, keeps its history in `~/.pacenote` on your Mac, and sends no telemetry. In rallying, the
+co-driver reads the pace notes so the driver can keep their eyes on the road. You drive; Pace reads the notes.
 
 ## What you can do
 
