@@ -116,4 +116,14 @@ describe('in Korean', () => {
       formatRelative(new Date(Date.now() - 5 * 60_000).toISOString())
     ).toBe('5분 전')
   })
+
+  it('formats in the language of the moment after a switch', () => {
+    const now = new Date(2026, 9, 11, 15)
+    const friday = new Date(2026, 9, 9, 9).toISOString()
+    expect(formatShortDay(friday, now)).toBe('Fri')
+    setLocale('ko')
+    expect(formatShortDay(friday, now)).toBe('금요일')
+    setLocale('en')
+    expect(formatShortDay(friday, now)).toBe('Fri')
+  })
 })

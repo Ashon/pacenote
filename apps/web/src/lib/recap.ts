@@ -4,8 +4,9 @@ import type {
   RecapPeriod,
   RecapView,
 } from '@src/you/types'
-import { getLocale, LOCALE_TAGS, localized } from '@src/i18n/locale'
+import { localized } from '@src/i18n/locale'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { dateFormat } from './format'
 import { text } from './recap.text'
 
 /** A period's recap from the desktop app; the current one without a key */
@@ -41,7 +42,7 @@ export const recapHash = (period: RecapPeriod, key?: string) =>
 
 /** A date in the app's language */
 const day = (iso: string, options: Intl.DateTimeFormatOptions) =>
-  new Date(iso).toLocaleDateString(LOCALE_TAGS[getLocale()], options)
+  dateFormat(options).format(new Date(iso))
 const short = { weekday: 'short', month: 'short', day: 'numeric' } as const
 const monthDay = { month: 'short', day: 'numeric' } as const
 

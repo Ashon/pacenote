@@ -20,10 +20,10 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { formatHourMinute } from '@/lib/format'
+import { dateFormat, formatHourMinute } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { getLocale, LOCALE_TAGS, localized } from '@src/i18n/locale'
+import { getLocale, localized } from '@src/i18n/locale'
 import { text } from './own-ai-status.text'
 
 /**
@@ -58,7 +58,7 @@ export function useOwnAi() {
 export function untilWords(iso: string, now = new Date()): string {
   const at = new Date(iso)
   if (at.toDateString() === now.toDateString()) return formatHourMinute(iso)
-  const weekday = new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+  const weekday = dateFormat({
     weekday: getLocale() === 'ko' ? 'long' : 'short',
   }).format(at)
   return `${weekday} ${formatHourMinute(iso)}`

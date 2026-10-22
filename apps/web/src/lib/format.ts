@@ -34,13 +34,29 @@ export function daysAgo(iso: string, now = new Date()): number {
   return Math.round((day(now) - day(d)) / 86_400_000)
 }
 
+const dateFormats = new Map<string, Intl.DateTimeFormat>()
+
+/** A date format in the app's language, made once per language and options */
+export function dateFormat(
+  options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormat {
+  const tag = LOCALE_TAGS[getLocale()]
+  const key = `${tag} ${JSON.stringify(options)}`
+  let format = dateFormats.get(key)
+  if (!format) {
+    format = new Intl.DateTimeFormat(tag, options)
+    dateFormats.set(key, format)
+  }
+  return format
+}
+
 /** List group label: Today, Yesterday, Mon, Oct 6 (오늘, 어제, 10월 6일 (월)) */
 export function formatDayGroup(iso: string, now = new Date()): string {
   const t = localized(text)
   const diff = daysAgo(iso, now)
   if (diff === 0) return t.today
   if (diff === 1) return t.yesterday
-  return new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+  return dateFormat({
     month: getLocale() === 'ko' ? 'long' : 'short',
     day: 'numeric',
     weekday: 'short',
@@ -53,7 +69,7 @@ export function formatShortDay(iso: string, now = new Date()): string {
   const diff = daysAgo(iso, now)
   if (diff === 0) return t.today
   if (diff === 1) return t.yesterday
-  return new Intl.DateTimeFormat(LOCALE_TAGS[getLocale()], {
+  return dateFormat({
     weekday: getLocale() === 'ko' ? 'long' : 'short',
   }).format(new Date(iso))
 }
