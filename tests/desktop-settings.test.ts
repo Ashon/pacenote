@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -129,6 +135,41 @@ describe('settings store', () => {
       },
     ])
     expect(readFileSync(settingsFile, 'utf8')).toBe(before)
+  })
+
+  it('reads the file again once it changes, and keeps what callers change to themselves', () => {
+    const { settingsFile, store: s } = store({ LOG_LEVEL: 'debug' })
+    const env = s.effectiveEnv()
+    expect(env).toMatchObject({ REASONER: 'claude', LOG_LEVEL: 'debug' })
+    env.REASONER = 'changed'
+    s.fileValues().REASONER = 'changed'
+    expect(s.effectiveEnv().REASONER).toBe('claude')
+    expect(s.fileValues().REASONER).toBe('claude')
+
+    // The same size, written in place: its time tells it apart.
+    const edited = SETTINGS.replace(
+      'xoxb-1111-2222-abcd',
+      'xoxb-1111-2222-wxyz'
+    )
+    expect(edited.length).toBe(SETTINGS.length)
+    writeFileSync(settingsFile, edited)
+    const later = new Date(Date.now() + 5_000)
+    utimesSync(settingsFile, later, later)
+    expect(s.effectiveEnv().SLACK_BOT_TOKEN).toBe('xoxb-1111-2222-wxyz')
+    expect(s.fileValues().SLACK_BOT_TOKEN).toBe('xoxb-1111-2222-wxyz')
+    expect(s.view().secrets.SLACK_BOT_TOKEN).toEqual({
+      set: true,
+      hint: 'xoxb-...wxyz',
+    })
+
+    // Saved through the store
+    expect(s.save({ TIMEZONE: 'UTC' })).toEqual([])
+    expect(s.effectiveEnv().TIMEZONE).toBe('UTC')
+
+    // Gone: none, and the view says there is no file
+    rmSync(settingsFile)
+    expect(s.effectiveEnv()).toEqual({ LOG_LEVEL: 'debug' })
+    expect(s.view().exists).toBe(false)
   })
 
   it('validates with app environment variables taking precedence over the file', () => {

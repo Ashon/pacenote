@@ -1,3 +1,4 @@
+import { statSync, type Stats } from 'node:fs'
 import { checkConfig } from '../../../src/config.js'
 import { localized } from '../../../src/i18n/locale.js'
 import { checkBrokerEnv } from '../../../src/sandbox/env.js'
@@ -24,6 +25,34 @@ import { text } from './settings.text.js'
 const FIELDS = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
 
 /**
+ * The file's values. One that cannot be read counts as empty, with why:
+ * saving then fails rather than write over it.
+ */
+interface Read {
+  values: Record<string, string>
+  problem?: string
+  /** The file's size; 0 when there is none */
+  size: number
+}
+
+/** The file as last read, kept while it stays the same */
+interface Kept extends Read {
+  /** The file's inode, size and modification time when read */
+  stat: string
+  /** The values under the app's environment, once asked for */
+  env?: NodeJS.ProcessEnv
+}
+
+/** The file's stat; none when it cannot be looked at */
+function statOf(file: string): Stats | undefined {
+  try {
+    return statSync(file, { throwIfNoEntry: false })
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Reads and writes the settings file for the Settings screen. The file outside
  * the repository (src/settings/paths.ts, default ~/.pacenote/settings.json) is
  * the single source of settings for the bot (both app and terminal).
@@ -35,6 +64,8 @@ const FIELDS = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
  * - Entries the Settings screen does not handle are left as is.
  */
 export class SettingsStore {
+  private kept?: Kept
+
   constructor(
     private readonly options: {
       settingsFile: string
@@ -44,10 +75,10 @@ export class SettingsStore {
   ) {}
 
   view(): SettingsView {
-    const { values, problem } = this.read()
+    const { values, problem, size } = this.load()
     const view: SettingsView = {
       file: this.options.settingsFile,
-      exists: readSettingsText(this.options.settingsFile) !== '',
+      exists: size > 0,
       ...(problem ? { problem } : {}),
       dataDir: this.options.dataDir,
       values: {},
@@ -122,25 +153,47 @@ export class SettingsStore {
     })
   }
 
-  /** The settings in effect: the settings file under the app's environment */
+  /**
+   * The settings in effect: the settings file under the app's environment,
+   * which does not change once the app has started
+   */
   effectiveEnv(): NodeJS.ProcessEnv {
-    return { ...this.candidate({}), ...this.options.env }
+    const read = this.load()
+    if (!('stat' in read)) return { ...read.values, ...this.options.env }
+    read.env ??= { ...read.values, ...this.options.env }
+    return { ...read.env }
+  }
+
+  /** The settings file's own values; none when it cannot be read */
+  fileValues(): Record<string, string> {
+    return { ...this.load().values }
   }
 
   /**
-   * The file's values. One that cannot be read counts as empty, with why:
-   * saving then fails rather than write over it.
+   * The file's values, read again only once the file changed (its stat), as
+   * the app asks for them every few seconds. A missing file, whose values are
+   * the earlier .env's, and one that cannot be read are read each time.
+   * Callers copy what they change.
    */
-  private read(): { values: Record<string, string>; problem?: string } {
+  private load(): Read | Kept {
+    const file = this.options.settingsFile
+    const info = statOf(file)
+    const size = info?.size ?? 0
+    const stat = info && `${info.ino}:${info.size}:${info.mtimeMs}`
+    if (stat && this.kept?.stat === stat) return this.kept
+    this.kept = undefined
     try {
-      return { values: readSettingsValues(this.options.settingsFile) }
+      const values = readSettingsValues(file)
+      if (!stat) return { values, size }
+      this.kept = { stat, values, size }
+      return this.kept
     } catch (err) {
-      return { values: {}, problem: (err as Error).message }
+      return { values: {}, problem: (err as Error).message, size }
     }
   }
 
   private candidate(changes: SettingsChanges): Record<string, string> {
-    const { values } = this.read()
+    const values = { ...this.load().values }
     for (const [key, value] of Object.entries(changes)) {
       if (value === null) delete values[key]
       else values[key] = value

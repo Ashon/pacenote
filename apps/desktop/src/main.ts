@@ -590,12 +590,8 @@ if (supervisor) {
     // Your own Slack app's token, which your Macs know each other by; none
     // with the team hub
     appToken: () => {
-      try {
-        const values = readSettingsValues(settingsFile)
-        return values.HUB_URL ? undefined : values.SLACK_APP_TOKEN || undefined
-      } catch {
-        return undefined
-      }
+      const values = settings.fileValues()
+      return values.HUB_URL ? undefined : values.SLACK_APP_TOKEN || undefined
     },
     // End-to-end tests name their two Macs
     name: process.env.PACENOTE_MACS_NAME || macName(),
@@ -1041,13 +1037,7 @@ function diagnostics(): string {
     },
     supervisor: supervisor?.current,
     bot: readBotStatus(dataDir),
-    settings: (() => {
-      try {
-        return readSettingsValues(settingsFile)
-      } catch {
-        return {}
-      }
-    })(),
+    settings: settings.fileValues(),
     secrets: secretValues(settings.effectiveEnv()),
     logs: [
       {
