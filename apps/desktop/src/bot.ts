@@ -39,9 +39,6 @@ export type { SupervisorState }
  * - Stopping sends SIGTERM. The bot gives active requests up to 15 seconds,
  *   stops the reasoner runs left, and resumes them on the next start.
  */
-interface Settings {
-  autoStartBot: boolean
-}
 
 const OUTPUT_LINES = 200
 const STOP_TIMEOUT_MS = 30_000
@@ -104,10 +101,11 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   ) {
     super()
     this.prefsFile = path.join(options.dataDir, DESKTOP_PREFS_FILE)
+    const { autoStartBot } = readPrefs(this.prefsFile)
     this.state = {
       phase: 'idle',
       output: [],
-      autoStart: this.readSettings().autoStartBot,
+      autoStart: typeof autoStartBot === 'boolean' ? autoStartBot : true,
       restarts: 0,
       canBuild: options.repoRoot !== undefined,
     }
@@ -413,13 +411,6 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
         return Math.max(max, mtime)
       }, 0)
     return newest(path.join(repoRoot, 'src')) > built
-  }
-
-  private readSettings(): Settings {
-    const { autoStartBot } = readPrefs(this.prefsFile)
-    return {
-      autoStartBot: typeof autoStartBot === 'boolean' ? autoStartBot : true,
-    }
   }
 
   private set(patch: Partial<SupervisorState>): void {

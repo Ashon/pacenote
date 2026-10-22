@@ -127,13 +127,7 @@ export class McpClients {
     let added: CommandResult
     if (id === 'claude') {
       // Claude Code does not replace a server of the same name.
-      await this.run('claude', [
-        'mcp',
-        'remove',
-        MCP_SERVER_NAME,
-        '--scope',
-        'user',
-      ])
+      await this.remove(id)
       added = await this.run('claude', [
         'mcp',
         'add-json',
@@ -162,20 +156,23 @@ export class McpClients {
 
   /** Takes Pacenote out of the tool */
   async disconnect(id: McpClientId): Promise<McpClientStatus> {
-    const removed =
-      id === 'claude'
-        ? await this.run('claude', [
-            'mcp',
-            'remove',
-            MCP_SERVER_NAME,
-            '--scope',
-            'user',
-          ])
-        : await this.run('codex', ['mcp', 'remove', MCP_SERVER_NAME])
+    const removed = await this.remove(id)
     const status = await this.check(id)
     return removed.code === 0 || status.state === 'absent'
       ? status
       : { ...status, error: firstLine(removed) }
+  }
+
+  private remove(id: McpClientId): Promise<CommandResult> {
+    return id === 'claude'
+      ? this.run('claude', [
+          'mcp',
+          'remove',
+          MCP_SERVER_NAME,
+          '--scope',
+          'user',
+        ])
+      : this.run('codex', ['mcp', 'remove', MCP_SERVER_NAME])
   }
 
   private ourLaunch(): McpLaunch {
