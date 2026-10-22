@@ -48,11 +48,7 @@ export function commandRunner(env: NodeJS.ProcessEnv, cwd: string): Run {
         args,
         { env, cwd, timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
         (err, stdout, stderr) => {
-          const code = err
-            ? typeof (err as { code?: unknown }).code === 'number'
-              ? (err as { code: number }).code
-              : 1
-            : 0
+          const code = !err ? 0 : typeof err.code === 'number' ? err.code : 1
           resolve({ code, stdout: String(stdout), stderr: String(stderr) })
         }
       )

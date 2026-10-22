@@ -90,10 +90,7 @@ export const codexAdapter: CliAdapter = {
   answer: (stdout) => parseCodexOutput(stdout),
 
   // The cause is in the error events on stdout.
-  failure(stdout) {
-    const reason = codexError(stdout)
-    return reason ? `codex run failed: ${reason}` : undefined
-  },
+  failure: codexFailure,
 }
 
 /** The permission profile codex runs its shell under on this Mac */
@@ -170,19 +167,16 @@ export function codexArgs(options: {
   if (options.reasoningEffort) {
     args.push('-c', `model_reasoning_effort="${options.reasoningEffort}"`)
   }
-  for (const server of options.mcpServers ?? []) {
+  // With approval_policy=never, MCP tools that are not read-only are
+  // rejected. The broker's policy check decides allow/deny, so each server's
+  // tools are approved automatically.
+  for (const server of options.mcpServers ?? [])
     args.push(
       '-c',
-      `mcp_servers.${server.name}.url=${JSON.stringify(server.url)}`
-    )
-    // With approval_policy=never, MCP tools that are not read-only are
-    // rejected. The broker's policy check decides allow/deny, so this server's
-    // tools are approved automatically.
-    args.push(
+      `mcp_servers.${server.name}.url=${JSON.stringify(server.url)}`,
       '-c',
       `mcp_servers.${server.name}.default_tools_approval_mode="approve"`
     )
-  }
   // --image takes multiple values, so each is passed in = form to keep it from
   // consuming the trailing -.
   for (const image of options.images ?? []) args.push(`--image=${image}`)
@@ -195,18 +189,17 @@ export function parseCodexOutput(stdout: string): string {
   const events = stdout.split('\n').flatMap((line) => codexLineToEvents(line))
   const answer = lastMessage(events)
   if (answer) return answer
-  const reason = codexError(stdout)
-  throw new Error(
-    reason ? `codex run failed: ${reason}` : 'codex returned an empty response.'
-  )
+  throw new Error(codexFailure(stdout) ?? 'codex returned an empty response.')
 }
 
-function codexError(stdout: string): string | undefined {
-  const errors = stdout
+/** Why a run failed: the last error event in its output */
+function codexFailure(stdout: string): string | undefined {
+  const reason = stdout
     .split('\n')
     .flatMap((line) => codexLineToEvents(line))
     .flatMap((event) => (event.kind === 'error' ? [event.message] : []))
-  return errors.at(-1)
+    .at(-1)
+  return reason ? `codex run failed: ${reason}` : undefined
 }
 
 /**
