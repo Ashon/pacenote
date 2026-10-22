@@ -41,6 +41,17 @@ export function redactSecrets(text: string): string {
   )
 }
 
+/** Every string in a value, however deep, with secrets redacted */
+export function redactDeep<T>(value: T): T {
+  if (typeof value === 'string') return redactSecrets(value) as T
+  if (Array.isArray(value)) return value.map(redactDeep) as T
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, redactDeep(item)])
+    ) as T
+  return value
+}
+
 /** Values shorter than this are not redacted by value: they match too much. */
 const MIN_KNOWN_LENGTH = 12
 

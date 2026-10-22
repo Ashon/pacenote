@@ -3,8 +3,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { redactSecrets } from '../broker/redact.js'
 import type { HistoryReader } from '../history/reader.js'
+import { errorResult, jsonResult } from '../mcp-result.js'
 import type { Requester } from '../sandbox/runtime.js'
 import type { OwnTools } from '../sandbox/vm-broker.js'
 import { recordActivity } from '../tasks/activity.js'
@@ -125,20 +125,9 @@ export function createOwnToolsServer(
   ): Promise<CallToolResult> => {
     const owner = options.owner()
     if (!requester || !owner || requester.user !== owner)
-      return { content: [{ type: 'text', text: NOT_OWNER }], isError: true }
-    if (todo && !options.settings().on)
-      return { content: [{ type: 'text', text: OFF }], isError: true }
-    try {
-      const body = redact({ note: NOTE, ...(await build()) })
-      return {
-        content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
-      }
-    } catch (error) {
-      return {
-        content: [{ type: 'text', text: (error as Error).message }],
-        isError: true,
-      }
-    }
+      return errorResult(NOT_OWNER)
+    if (todo && !options.settings().on) return errorResult(OFF)
+    return jsonResult(NOTE, build)
   }
   const track = (kind: 'add' | 'close', more: object) =>
     recordActivity(options.dataDir, {
@@ -383,15 +372,4 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req) chunks.push(chunk as Buffer)
   const text = Buffer.concat(chunks).toString('utf8')
   return text ? JSON.parse(text) : undefined
-}
-
-/** Secrets redacted in every string, as in the other Pacenote tools */
-function redact<T>(value: T): T {
-  if (typeof value === 'string') return redactSecrets(value) as T
-  if (Array.isArray(value)) return value.map(redact) as T
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, redact(item)])
-    ) as T
-  return value
 }

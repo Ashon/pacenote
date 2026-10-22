@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { redactSecrets } from '../broker/redact.js'
+import { errorResult, jsonResult } from '../mcp-result.js'
 import type { Audience } from '../you/areas.js'
 import { countRecap, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
@@ -1034,26 +1034,6 @@ async function respond(
   options: TaskToolsOptions,
   build: () => object | Promise<object>
 ): Promise<CallToolResult> {
-  if (!options.settings().on)
-    return { content: [{ type: 'text', text: OFF }], isError: true }
-  try {
-    const body = redact({ note: NOTE, ...(await build()) })
-    return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] }
-  } catch (error) {
-    return {
-      content: [{ type: 'text', text: (error as Error).message }],
-      isError: true,
-    }
-  }
-}
-
-/** Secrets redacted in every string, as in the run history's tools */
-function redact<T>(value: T): T {
-  if (typeof value === 'string') return redactSecrets(value) as T
-  if (Array.isArray(value)) return value.map(redact) as T
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, redact(item)])
-    ) as T
-  return value
+  if (!options.settings().on) return errorResult(OFF)
+  return jsonResult(NOTE, build)
 }

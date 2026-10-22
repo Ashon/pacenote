@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { redactSecrets } from '../broker/redact.js'
+import { errorResult, jsonResult } from '../mcp-result.js'
 import {
   registerTaskTools,
   taskInstructions,
@@ -172,18 +172,12 @@ export function createHistoryServer({
   return server
 }
 
-function respond(enabled: () => boolean, build: () => object): CallToolResult {
-  if (!enabled())
-    return { content: [{ type: 'text', text: OFF }], isError: true }
-  try {
-    const body = redact({ note: NOTE, ...build() })
-    return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] }
-  } catch (error) {
-    return {
-      content: [{ type: 'text', text: (error as Error).message }],
-      isError: true,
-    }
-  }
+async function respond(
+  enabled: () => boolean,
+  build: () => object
+): Promise<CallToolResult> {
+  if (!enabled()) return errorResult(OFF)
+  return jsonResult(NOTE, build)
 }
 
 function summary(run: RunSummary) {
@@ -295,15 +289,4 @@ function step(event: RunEvent): Step[] {
 function cut<T extends string | undefined>(text: T, max: number): T {
   if (text === undefined || text.length <= max) return text
   return `${text.slice(0, max)}… (${text.length - max} more characters)` as T
-}
-
-/** Every string in the result, with secrets replaced */
-function redact<T>(value: T): T {
-  if (typeof value === 'string') return redactSecrets(value) as T
-  if (Array.isArray(value)) return value.map(redact) as T
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, redact(item)])
-    ) as T
-  return value
 }
