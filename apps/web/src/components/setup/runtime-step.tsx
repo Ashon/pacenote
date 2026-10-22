@@ -315,16 +315,10 @@ function Preparing({
             {t.back}
           </Button>
           <span className="flex-1" />
-          {failed ? (
-            <>
-              <Button variant="ghost" onClick={onDone}>
-                {t.continueSetup}
-              </Button>
-              <Button onClick={retry}>{t.tryAgain}</Button>
-            </>
-          ) : (
-            <Button onClick={onDone}>{t.continueSetup}</Button>
-          )}
+          <Button variant={failed ? 'ghost' : undefined} onClick={onDone}>
+            {t.continueSetup}
+          </Button>
+          {failed && <Button onClick={retry}>{t.tryAgain}</Button>}
         </>
       }
     >

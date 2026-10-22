@@ -64,15 +64,12 @@ export function AiStep({
   const cli = detect.detected?.cli
   const saved = settings?.values.REASONER as Backend | undefined
   const [chosen, setChosen] = useState<Backend>()
-  const choice: Backend | undefined =
+  // Unless one was picked here: the saved one, Claude or Codex, the first ready
+  const choice =
     chosen ??
-    (saved && cliReady(cli?.[saved])
-      ? saved
-      : cliReady(cli?.claude)
-        ? 'claude'
-        : cliReady(cli?.codex)
-          ? 'codex'
-          : undefined)
+    ([saved, 'claude', 'codex'] as const).find(
+      (backend) => backend && cliReady(cli?.[backend])
+    )
   const [model, setModel] = useState<string>()
   const [timeout, setTimeoutSec] = useState<string>()
   const [saving, setSaving] = useState(false)
