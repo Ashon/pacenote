@@ -3,7 +3,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { errorResult, jsonResult } from '../mcp-result.js'
 import type { Audience } from '../you/areas.js'
-import { countRecap, periodKey } from '../you/recap.js'
+import { countRecap, periodCommits, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
 import type { AreaRole } from '../you/types.js'
 import { recordActivity } from './activity.js'
@@ -944,9 +944,6 @@ export async function recapSummary(
   })
   if (!counted) throw new Error(`No ${period} for ${date}`)
   const { view, commits } = counted
-  const inPeriod = (at: string) =>
-    Date.parse(at) >= Date.parse(view.start) &&
-    Date.parse(at) < Date.parse(view.end)
   const title = (item: { title: string; note?: string }) =>
     item.note ? `${item.title} (${item.note})` : item.title
   return {
@@ -959,10 +956,7 @@ export async function recapSummary(
     areas: view.areas.map((area) => ({
       name: area.name,
       done: area.items.filter((item) => item.task).map(title),
-      commits: commits
-        .filter((c) => area.repos.includes(c.repo) && inPeriod(c.at))
-        .slice(0, 80)
-        .map((c) => c.subject),
+      commits: periodCommits(view, area, commits),
       commitCount: area.commits,
       sessionDays: area.days,
       newAsks: area.asks,

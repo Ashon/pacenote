@@ -553,7 +553,7 @@ export function areaViews(
             outcome:
               task.status === 'dismissed'
                 ? outcomeWords({ kind: 'done-already' }, locale)
-                : outcomeOf(task, [...work], locale),
+                : outcomeOf(task, work, locale),
           })),
         latelyMore: Math.max(0, unique(settled).length - LATELY),
         people: askers.slice(0, PEOPLE),

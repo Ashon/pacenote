@@ -155,7 +155,7 @@ const unsent = (entry: WorkEntry, superseded: boolean, now: number) =>
  * app that were never sent there
  */
 export function workFor(
-  entries: WorkEntry[],
+  entries: readonly WorkEntry[],
   task: string,
   now = Date.now()
 ): WorkEntry[] {

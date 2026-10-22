@@ -37,7 +37,7 @@ type Session = Extract<WorkEntry, { kind: 'session' }>
 
 /** A task's latest session, the one to continue */
 export function lastSession(
-  work: WorkEntry[],
+  work: readonly WorkEntry[],
   task: string
 ): Session | undefined {
   return workFor(work, task).find(
@@ -48,7 +48,7 @@ export function lastSession(
 /** How a task ended (or where it stands); undefined when open */
 export function outcomeFacts(
   task: TaskView,
-  work: WorkEntry[]
+  work: readonly WorkEntry[]
 ): Outcome | undefined {
   const session = lastSession(work, task.id)
   if (task.status === 'closed' && task.closed) {
@@ -103,7 +103,7 @@ export function outcomeWords(
 /** How a task ended (or where it stands), in words; undefined when open */
 export const outcomeOf = (
   task: TaskView,
-  work: WorkEntry[],
+  work: readonly WorkEntry[],
   locale: Locale = getLocale()
 ): string | undefined => outcomeWords(outcomeFacts(task, work), locale)
 

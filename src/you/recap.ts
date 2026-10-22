@@ -348,7 +348,7 @@ export function recapOf(input: {
     const outcome: Outcome | undefined =
       task.status === 'dismissed'
         ? { kind: 'done-already' }
-        : outcomeFacts(task, [...input.work])
+        : outcomeFacts(task, input.work)
     return {
       title: task.title,
       at: doneOf(task),
@@ -419,11 +419,11 @@ export function recapOf(input: {
   }
   // Every commit given, by repository: a day's standup reaches back a day
   const commitsByRepo = new Map<string, Commit[]>()
-  for (const commit of input.commits)
-    commitsByRepo.set(commit.repo, [
-      ...(commitsByRepo.get(commit.repo) ?? []),
-      commit,
-    ])
+  for (const commit of input.commits) {
+    const commits = commitsByRepo.get(commit.repo)
+    if (commits) commits.push(commit)
+    else commitsByRepo.set(commit.repo, [commit])
+  }
   for (const commit of input.commits) {
     if (!within(commit.at)) continue
     const area = asArea(byRepo(commit.repo))
@@ -782,8 +782,27 @@ const SENTENCES: Record<RecapPeriod, string> = {
   month: 'up to five sentences',
 }
 
-/** Commit subjects a write-up is given at most, per area */
+/** Commit subjects a write-up or an AI tool is given at most, per area */
 const COMMITS_GIVEN = 80
+
+/** An area's commits' subjects in a view's period, as many as are given */
+export function periodCommits(
+  view: Pick<RecapView, 'start' | 'end'>,
+  area: Pick<RecapArea, 'repos'>,
+  commits: readonly Commit[]
+): string[] {
+  const start = Date.parse(view.start)
+  const end = Date.parse(view.end)
+  return commits
+    .filter(
+      (c) =>
+        area.repos.includes(c.repo) &&
+        Date.parse(c.at) >= start &&
+        Date.parse(c.at) < end
+    )
+    .slice(0, COMMITS_GIVEN)
+    .map((c) => c.subject)
+}
 
 /**
  * The prompt Write it up gives your CLI, with no tools: the period's lines,
@@ -809,16 +828,8 @@ export function recapPrompt(
       lines.push(
         `- Done: ${item.title}${note(outcomeWords(item.outcome, 'en'))}`
       )
-    const subjects = commits
-      .filter(
-        (c) =>
-          Date.parse(c.at) >= Date.parse(view.start) &&
-          Date.parse(c.at) < Date.parse(view.end) &&
-          area.repos.includes(c.repo)
-      )
-      .slice(0, COMMITS_GIVEN)
-      .map((c) => c.subject)
-    for (const subject of subjects) lines.push(`- Commit: ${subject}`)
+    for (const subject of periodCommits(view, area, commits))
+      lines.push(`- Commit: ${subject}`)
     for (const item of area.items.filter((i) => i.run))
       lines.push(`- ${en.askedPace(item.request ?? '')}`)
     for (const item of area.carried)
