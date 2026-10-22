@@ -443,7 +443,8 @@ export function checkConfig(env: NodeJS.ProcessEnv): ConfigIssue[] {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const t = localized(text)
-  const parsed = EnvSchema.safeParse(providedValues(env), inLanguage())
+  const provided = providedValues(env)
+  const parsed = EnvSchema.safeParse(provided, inLanguage())
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map(
@@ -480,6 +481,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const dataDir = e.PACENOTE_DATA_DIR
     ? path.resolve(expandHome(e.PACENOTE_DATA_DIR))
     : defaultHome()
+  const vmBin = defaultVmBin(env)
+  const vmRoot = vmRootPath(env)
 
   return {
     slack,
@@ -497,13 +500,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         ? expandHome(env.CODEX_HOME)
         : path.join(homedir(), '.codex'),
       vm: {
-        bin: defaultVmBin(env),
-        root: vmRootPath(env),
+        bin: vmBin,
+        root: vmRoot,
         allowlistFile: allowlistPath(env),
         broker: {
           image: VM_BROKER_IMAGE,
           bundleDir: path.join(defaultSandboxDir(env), 'ops-broker/dist'),
-          workDir: path.join(vmRootPath(env), 'broker-work'),
+          workDir: path.join(vmRoot, 'broker-work'),
           env,
         },
       },
@@ -511,10 +514,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     render: {
       enabled: e.RENDER_DIAGRAMS === 'on',
       // Set by name, not left at its default
-      asked: providedValues(env).RENDER_DIAGRAMS === 'on',
+      asked: provided.RENDER_DIAGRAMS === 'on',
       vm: {
-        bin: defaultVmBin(env),
-        root: vmRootPath(env),
+        bin: vmBin,
+        root: vmRoot,
         image: VM_RENDERER_IMAGE,
       },
       generatedMaxPx: e.GENERATED_IMAGE_MAX_PX,
@@ -613,19 +616,16 @@ function buildReasonerConfig(
     // The broker is relayed into each VM at this address (vm-broker.ts).
     base.mcpServers = [{ name: 'ops', url: 'http://127.0.0.1:8080/mcp' }]
   }
-  if (e.REASONER_SANDBOX === 'none') {
-    // codex on this Mac does not load the user's config.toml (its MCP servers
-    // and sandbox settings stay out of answers), so the model it names comes
-    // along as arguments, as in the sandbox.
-    if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
-      const defaults = readCodexDefaults(
-        path.join(host.codexHome, 'config.toml')
-      )
-      base.model = defaults.model
-      base.reasoningEffort = defaults.reasoningEffort
-    }
-    return { ...base, deniedReads: host.deniedReads }
+  // codex does not load the user's config.toml, on this Mac or in the sandbox
+  // (its MCP servers and sandbox settings stay out of answers), so the model
+  // it names comes along as arguments.
+  if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
+    const defaults = readCodexDefaults(path.join(host.codexHome, 'config.toml'))
+    base.model = defaults.model
+    base.reasoningEffort = defaults.reasoningEffort
   }
+  if (e.REASONER_SANDBOX === 'none')
+    return { ...base, deniedReads: host.deniedReads }
 
   // The VM has no host keychain or config: the CLI signs in there itself, into
   // a login folder of its own (vm-login.ts), and Pacenote never reads what it
@@ -639,11 +639,6 @@ function buildReasonerConfig(
     auth = { env: { CLAUDE_CODE_OAUTH_TOKEN: e.SANDBOX_CLAUDE_OAUTH_TOKEN } }
   else if (e.REASONER === 'claude' && e.SANDBOX_ANTHROPIC_API_KEY)
     auth = { env: { ANTHROPIC_API_KEY: e.SANDBOX_ANTHROPIC_API_KEY } }
-  if (e.REASONER === 'codex' && !e.REASONER_MODEL) {
-    const defaults = readCodexDefaults(path.join(host.codexHome, 'config.toml'))
-    base.model = defaults.model
-    base.reasoningEffort = defaults.reasoningEffort
-  }
 
   const { broker, ...vm } = host.vm
   return {

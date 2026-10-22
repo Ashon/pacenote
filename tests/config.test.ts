@@ -141,6 +141,10 @@ describe('loadConfig', () => {
       model: 'gpt-x',
       reasoningEffort: 'high',
     })
+    // The same in the sandbox
+    expect(
+      loadConfig({ ...codex, REASONER_SANDBOX: 'vm' }).reasoner
+    ).toMatchObject({ model: 'gpt-x', reasoningEffort: 'high' })
     expect(loadConfig({ ...codex, REASONER_MODEL: 'm' }).reasoner.model).toBe(
       'm'
     )
