@@ -513,6 +513,8 @@ export function SettingsPage() {
       saving={saving}
     />
   )
+  // Their words in the app's language; keys and values as saved
+  const localizedFields = settingFields()
   /**
    * A group's card with only the fields the current values call for. Nothing
    * when none are left.
@@ -524,8 +526,7 @@ export function SettingsPage() {
       'info' | 'fields' | 'row'
     > = {}
   ) => {
-    // Their words in the app's language; keys and values as saved
-    const fields = settingFields().filter(
+    const fields = localizedFields.filter(
       (field) => field.group === id && shown(field)
     )
     if (fields.length === 0 && !extra.children && !extra.after) return null
@@ -564,10 +565,11 @@ export function SettingsPage() {
   }
 
   /**
-   * Each messenger's cards, shown under its heading in the Messengers section
+   * Each messenger's cards, shown under its heading in the Messengers section;
+   * like the sections below, built only when shown
    */
-  const messengerCards: Record<MessengerId, React.ReactNode> = {
-    slack: (
+  const messengerCards: Record<MessengerId, () => React.ReactNode> = {
+    slack: () => (
       <>
         {card('slack', {
           action: (
@@ -622,21 +624,22 @@ export function SettingsPage() {
     ),
   }
 
-  const content: Record<Section, React.ReactNode> = {
-    messengers: MESSENGER_IDS.map((id) => (
-      <div key={id} className="space-y-3">
-        <SubHeading title={MESSENGER_NAMES[id]} chip={messengerChips[id]} />
-        {messengerCards[id]}
-      </div>
-    )),
-    answers: (
+  const content: Record<Section, () => React.ReactNode> = {
+    messengers: () =>
+      MESSENGER_IDS.map((id) => (
+        <div key={id} className="space-y-3">
+          <SubHeading title={MESSENGER_NAMES[id]} chip={messengerChips[id]} />
+          {messengerCards[id]()}
+        </div>
+      )),
+    answers: () => (
       <>
         {card('reasoner')}
         {card('requests')}
         {card('diagrams')}
       </>
     ),
-    sandbox: (
+    sandbox: () => (
       <>
         {card('environment', {
           // Settings Pace picks up on its restart, such as the limits here
@@ -672,7 +675,7 @@ export function SettingsPage() {
         {builtIn && sandbox.available && <AllowlistCard sandbox={sandbox} />}
       </>
     ),
-    ops: (
+    ops: () => (
       <>
         {card('ops', {
           after: (
@@ -720,7 +723,7 @@ export function SettingsPage() {
         {integration('ssh')}
       </>
     ),
-    tasks: (
+    tasks: () => (
       <>
         {card('ownWork', {
           after: (
@@ -754,7 +757,7 @@ export function SettingsPage() {
         })}
       </>
     ),
-    logs: (
+    logs: () => (
       <>
         {card('history', {
           after: valueOf('HISTORY_SHARE') === 'on' && (
@@ -764,8 +767,8 @@ export function SettingsPage() {
         {card('logs')}
       </>
     ),
-    macs: <MacsSection />,
-    general: (
+    macs: () => <MacsSection />,
+    general: () => (
       <>
         <section className="surface-group">
           <CardHeader title={t.app} help={t.appHelp} />
@@ -900,7 +903,7 @@ export function SettingsPage() {
             )}
 
             <Placeholder key="body" ready skeleton={<SectionSkeleton />}>
-              <div className="space-y-8">{content[section]}</div>
+              <div className="space-y-8">{content[section]()}</div>
             </Placeholder>
             <div className="h-10" />
           </div>
