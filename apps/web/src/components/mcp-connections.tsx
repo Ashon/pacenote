@@ -116,20 +116,11 @@ const ACTION: Record<
   connected: 'disconnect',
 }
 
+/** A tool's state in words; connected, with how many tools it reaches */
 function describe(client: McpClientStatus): string {
   const t = localized(text)
-  switch (client.state) {
-    case 'missing':
-      return t.missing
-    case 'absent':
-      return t.absent
-    case 'elsewhere':
-      return t.elsewhere
-    case 'connected':
-      return client.tools ? t.connectedTools(client.tools.length) : t.connected
-    case 'failed':
-      return t.failed
-  }
+  if (client.state !== 'connected') return t[client.state]
+  return client.tools ? t.connectedTools(client.tools.length) : t.connected
 }
 
 function StateIcon({

@@ -80,6 +80,9 @@ const MARK_STATES: Partial<Record<BotStateName, BotTone>> = {
   reconnecting: 'warn',
   stopping: 'busy',
 }
+/** Numbers to pick from, each named by itself */
+const counts = (...ns: number[]) =>
+  ns.map((n) => ({ value: n, label: String(n) }))
 /** A table's state names, in its order */
 const names = (table: Partial<Record<BotStateName, unknown>>) =>
   Object.keys(table) as BotStateName[]
@@ -394,11 +397,7 @@ function MarkBench() {
           onChange={setPace}
         />
         <span className="self-center">{t.requestsInProgress}</span>
-        <Choice
-          options={[0, 1, 3].map((n) => ({ value: n, label: String(n) }))}
-          value={active}
-          onChange={setActive}
-        />
+        <Choice options={counts(0, 1, 3)} value={active} onChange={setActive} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-8 border-y border-border py-6">
         <div className="flex items-start gap-4">
@@ -470,12 +469,7 @@ function StatusBench() {
     canBuild: true,
     issues:
       phase === 'setup'
-        ? [
-            {
-              key: 'SLACK_BOT_TOKEN',
-              message: t.tokenMissing,
-            },
-          ]
+        ? [{ key: 'SLACK_BOT_TOKEN', message: t.tokenMissing }]
         : undefined,
   }
   const collecting: TasksCollect['running'] =
@@ -501,11 +495,7 @@ function StatusBench() {
           ))}
         </select>
         <span className="self-center">{t.requestsInProgress}</span>
-        <Choice
-          options={[0, 1, 3].map((n) => ({ value: n, label: String(n) }))}
-          value={active}
-          onChange={setActive}
-        />
+        <Choice options={counts(0, 1, 3)} value={active} onChange={setActive} />
         <span className="self-center">{t.taskCollection}</span>
         <Choice
           options={(['off', 'starting', 'reading'] as const).map((value) => ({
@@ -516,11 +506,7 @@ function StatusBench() {
           onChange={setCollect}
         />
         <span className="self-center">{t.checkIssues}</span>
-        <Choice
-          options={[0, 1, 2].map((n) => ({ value: n, label: String(n) }))}
-          value={issues}
-          onChange={setIssues}
-        />
+        <Choice options={counts(0, 1, 2)} value={issues} onChange={setIssues} />
         <span className="self-center">{t.width}</span>
         <Choice
           options={WIDTHS.map((w) => ({

@@ -103,8 +103,6 @@ import {
 } from './sandbox-panel'
 import { text } from './settings-page.text'
 
-const bridge = () => window.pacenoteDesktop?.settings
-
 /**
  * Settings sections: the bot's own (the settings file), then the desktop app's
  * preferences.
@@ -185,7 +183,7 @@ interface Hint {
  */
 export function SettingsPage() {
   const t = useText(text)
-  const settings = bridge()
+  const settings = window.pacenoteDesktop?.settings
   const supervisor = useSupervisor()
   const loginItem = useLoginItem()
   const update = useUpdate()
@@ -712,9 +710,7 @@ export function SettingsPage() {
             </>
           ),
         })}
-        {card('work', {
-          after: valueOf('TASKS') === 'on' && <RepoFolders />,
-        })}
+        {card('work', { after: valueOf('TASKS') === 'on' && <RepoFolders /> })}
       </>
     ),
     logs: () => (

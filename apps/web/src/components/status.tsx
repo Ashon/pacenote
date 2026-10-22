@@ -6,12 +6,7 @@ import { text } from './status.text'
 
 const STATUS_META: Record<
   RunStatus,
-  {
-    text: string
-    bg: string
-    dot: string
-    Icon: typeof CircleCheck
-  }
+  { text: string; bg: string; dot: string; Icon: typeof CircleCheck }
 > = {
   running: {
     text: 'text-status-running',

@@ -44,6 +44,7 @@ export function BotPage() {
   const control = botControl()
   const status = view?.alive ? view.status : undefined
   const { tone, label } = describeBot(view, supervisor)
+  const known = botKnown(view, supervisor)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -52,7 +53,7 @@ export function BotPage() {
           <div className="flex items-start gap-4">
             {/* Until Pace's state can be told, its mark's place, not a stop
                 sign */}
-            {botKnown(view, supervisor) ? (
+            {known ? (
               <BotMark
                 tone={tone}
                 answering={(status?.requests.active ?? 0) > 0}
@@ -67,11 +68,7 @@ export function BotPage() {
               <h1 className="flex items-center gap-2 text-title">
                 Pace
                 <span className={cn('text-row', TONE_CLASS[tone].text)}>
-                  {botKnown(view, supervisor) ? (
-                    label
-                  ) : (
-                    <SkeletonWord width="5rem" />
-                  )}
+                  {known ? label : <SkeletonWord width="5rem" />}
                 </span>
               </h1>
               <p className="mt-0.5 text-copy text-muted-foreground">
