@@ -840,19 +840,12 @@ function botSummary(): {
   const phase = supervisor?.current.phase
   let label = t.phase[phase ?? (status ? 'running' : 'idle')]
   if (supervisor?.current.retryAt !== undefined) label = t.retrying(label)
-  if (status?.state === 'running' && status.standby) {
-    label = t.standingBy
-  } else if (
-    status?.state === 'running' &&
-    status.socket.state !== 'connected'
-  ) {
+  const running = status?.state === 'running'
+  if (running && status.standby) label = t.standingBy
+  else if (running && status.socket.state !== 'connected')
     label = t.socket(status.socket.state === 'reconnecting')
-  } else if (
-    status?.state === 'running' &&
-    (phase === 'running' || phase === 'external')
-  ) {
+  else if (running && (phase === 'running' || phase === 'external'))
     label = t.connected(phase === 'external', status.reasoner ?? '?')
-  }
   return { label, active: status?.requests.active ?? 0, status }
 }
 
