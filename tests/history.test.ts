@@ -266,6 +266,54 @@ describe('run history', () => {
   })
 })
 
+describe("a thread's runs", () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'pacenote-history-thread-'))
+  afterAll(() => rmSync(root, { recursive: true, force: true }))
+  const store = new HistoryStore(root)
+  const reader = new HistoryReader(root)
+  // The thread's first message, a Slack ts
+  const thread = `${new Date(2026, 9, 8, 9).getTime() / 1000}.000100`
+  const run = (at: Date, request: string, where = { thread }) =>
+    store
+      .start(
+        {
+          origin: {
+            messenger: 'slack',
+            conversation: 'C1',
+            conversationLabel: '#ops',
+            message: where.thread,
+            userId: 'U1',
+            ...where,
+          },
+          request,
+          backend: { reasoner: 'claude', sandbox: 'vm' },
+        },
+        at
+      )
+      .finish('succeeded', { answer: 'ok' }, at)
+
+  it('are read from the days since it began, newest first', () => {
+    // Before the thread began: no run of it can be there, so it is not read
+    run(new Date(2026, 9, 1, 9), 'from before the thread')
+    run(new Date(2026, 9, 8, 10), 'first')
+    run(new Date(2026, 9, 8, 11), 'elsewhere', { thread: '1791000000.000100' })
+    run(new Date(2026, 9, 9, 11), 'second')
+    expect(
+      reader.inThread('C1', thread).map((related) => related.request)
+    ).toEqual(['second', 'first'])
+    expect(reader.inThread('C2', thread)).toEqual([])
+    // A thread that is no Slack ts is looked for in every day
+    run(new Date(2026, 9, 1, 10), 'old', { thread: 'local' })
+    expect(reader.inThread('C1', 'local')).toHaveLength(1)
+    // Runs since a time: only the days it can be in are read
+    expect(
+      reader
+        .list({ since: new Date(2026, 9, 8, 10, 30).getTime() })
+        .map((summary) => summary.request)
+    ).toEqual(['second', 'elsewhere'])
+  })
+})
+
 describe('normalizeRunRecord', () => {
   it("reads a version 1 record's Slack fields as its origin", () => {
     const record = normalizeRunRecord({

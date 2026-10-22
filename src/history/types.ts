@@ -202,6 +202,11 @@ export interface RunQuery {
   status?: RunStatus
   /** Text to search for in the request, conversation, user, and answer */
   q?: string
+  /**
+   * Only runs started at or after this time (epoch ms), of the newest 1000
+   * that match the rest
+   */
+  since?: number
   limit?: number
 }
 

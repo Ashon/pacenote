@@ -122,12 +122,13 @@ export function createHistoryServer({
         const from = since ? Date.parse(since) : undefined
         if (from !== undefined && Number.isNaN(from))
           throw new Error(`since is not a date: ${since}`)
-        const runs = reader
-          .list({ kind: 'mention', q: query, status, limit: 1000 })
-          .filter(
-            (run) => from === undefined || Date.parse(run.startedAt) >= from
-          )
-          .slice(0, limit ?? 10)
+        const runs = reader.list({
+          kind: 'mention',
+          q: query,
+          status,
+          since: from,
+          limit: limit ?? 10,
+        })
         return { runs: runs.map(summary) }
       })
   )

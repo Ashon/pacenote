@@ -26,6 +26,14 @@ import {
 import { addUsage, NO_USAGE, runUsage, type TokenUsage } from './usage.js'
 
 /**
+ * The first day folder a run started at or after a time can be in: its folder
+ * is the day where it started, which time zones (and clocks) put a day or two
+ * either side of the day here
+ */
+const firstDayFrom = (from: number) =>
+  dayDirFor(new Date(from - 3 * 86_400_000))
+
+/**
  * Reads run history. Used by the desktop app. Uses the cache when a file has
  * not changed.
  */
@@ -40,11 +48,19 @@ export class HistoryReader {
   list(query: RunQuery = {}): RunSummary[] {
     const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000)
     const q = query.q?.trim().toLowerCase()
+    const { since } = query
+    const firstDay = since === undefined ? '' : firstDayFrom(since)
     const result: RunSummary[] = []
+    let matched = 0
     for (const record of this.records()) {
+      if ((dayOf(record.id) ?? '') < firstDay) break
       if (query.kind && (record.kind ?? 'mention') !== query.kind) continue
       if (query.status && record.status !== query.status) continue
       if (q && !matches(record, q)) continue
+      if (since !== undefined) {
+        if (++matched > 1000) break
+        if (Date.parse(record.startedAt) < since) continue
+      }
       result.push(summarize(record))
       if (result.length >= limit) break
     }
@@ -69,8 +85,13 @@ export class HistoryReader {
    * from that thread follows on
    */
   inThread(conversation: string, thread: string, limit = 3): RelatedRun[] {
+    // Its runs started after its first message, whose Slack ts is the thread's
+    const firstDay = /^\d+\.\d+$/.test(thread)
+      ? firstDayFrom(Number(thread) * 1000)
+      : ''
     const result: RelatedRun[] = []
     for (const record of this.records()) {
+      if ((dayOf(record.id) ?? '') < firstDay) break
       if (isCollection(record)) continue
       const { origin } = record
       if (origin.conversation !== conversation || origin.thread !== thread)
