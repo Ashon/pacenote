@@ -150,14 +150,8 @@ export function vmRunArgs(
       '--mount',
       `${mount.host}:${mount.at}${mount.writable ? ':rw' : ''}`
     )
-  if (run.cwd)
-    args.push(
-      '--mount',
-      `${run.cwd.host}:${run.cwd.at}`,
-      '--workdir',
-      run.cwd.at
-    )
-  else args.push('--workdir', SANDBOX_PATHS.empty)
+  if (run.cwd) args.push('--mount', `${run.cwd.host}:${run.cwd.at}`)
+  args.push('--workdir', run.cwd?.at ?? SANDBOX_PATHS.empty)
   args.push('--', run.command, ...run.args)
   return args
 }
@@ -451,12 +445,8 @@ export async function vmOutdated(
   }
 ): Promise<string[]> {
   if (options.images.length === 0) return []
-  let report: VmReport
-  try {
-    report = await readVmReport(options)
-  } catch {
-    return []
-  }
+  const report = await readVmReport(options).catch(() => undefined)
+  if (report === undefined) return []
   const outdated = options.images.filter((name) => {
     const image = report.images?.[name]
     return (
