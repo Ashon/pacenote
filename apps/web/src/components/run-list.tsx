@@ -6,6 +6,7 @@ import {
 } from '@history/types'
 import { AtSign, ImageIcon, ListChecks, Search, Wrench } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
+import type * as React from 'react'
 import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
@@ -35,9 +36,7 @@ const FILTERS: (RunStatus | undefined)[] = [
 ]
 
 /** Groups runs by day. (the list is newest first) */
-function groupByDay(
-  runs: RunSummary[]
-): { day: string; today: boolean; runs: RunSummary[] }[] {
+function groupByDay(runs: RunSummary[]) {
   const groups: { day: string; today: boolean; runs: RunSummary[] }[] = []
   for (const run of runs) {
     const day = formatDayGroup(run.startedAt)
@@ -206,6 +205,12 @@ function RunListItem({
   const t = useText(text)
   const locale = useLocale()
   const collection = run.kind === 'collection'
+  const count = (icon: React.ReactNode, n: number) => (
+    <span className="flex items-center gap-0.5">
+      {icon}
+      {n}
+    </span>
+  )
   return (
     <button
       type="button"
@@ -252,24 +257,11 @@ function RunListItem({
               : formatHourMinute(run.startedAt)}
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2 tabular-nums">
-            {collection && (
-              <span className="flex items-center gap-0.5">
-                <Search />
-                {run.reads ?? 0}
-              </span>
-            )}
-            {!collection && run.toolCalls > 0 && (
-              <span className="flex items-center gap-0.5">
-                <Wrench />
-                {run.toolCalls}
-              </span>
-            )}
-            {run.outputs > 0 && (
-              <span className="flex items-center gap-0.5">
-                <ImageIcon />
-                {run.outputs}
-              </span>
-            )}
+            {collection && count(<Search />, run.reads ?? 0)}
+            {!collection &&
+              run.toolCalls > 0 &&
+              count(<Wrench />, run.toolCalls)}
+            {run.outputs > 0 && count(<ImageIcon />, run.outputs)}
             {run.status !== 'running' && (
               <span>{formatDuration(run.durationMs)}</span>
             )}

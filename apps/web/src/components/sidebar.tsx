@@ -87,17 +87,12 @@ export function Sidebar({
         {/* Larger than the icons below, but on their center line and taking
             their width, so "Pacenote" starts where the labels do. */}
         <PacenoteMark className="-mx-[5px] size-7 max-w-none shrink-0" />
-        <span
-          data-hidden={compact || undefined}
-          aria-hidden={compact || undefined}
-          className="motion-layout-label text-heading"
-        >
+        <span {...hidden(compact)} className="motion-layout-label text-heading">
           Pacenote
         </span>
         {window.pacenoteDesktop?.dev && (
           <span
-            data-hidden={compact || undefined}
-            aria-hidden={compact || undefined}
+            {...hidden(compact)}
             className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-caption font-semibold text-status-interrupted"
           >
             {t.dev}
@@ -114,6 +109,12 @@ export function Sidebar({
     </nav>
   )
 }
+
+/** What the compact sidebar hides: its labels, faded out and unread */
+const hidden = (compact: boolean) => ({
+  'data-hidden': compact || undefined,
+  'aria-hidden': compact || undefined,
+})
 
 function NavItem({
   label,
@@ -137,7 +138,6 @@ function NavItem({
   const name = count > 0 ? t.withCount(label, count) : label
   // The label and its badge, or the badge on the icon's corner, are always
   // there and only hidden, so they can fade as the sidebar changes width.
-  const labeled = { 'data-hidden': compact || undefined }
   const iconOnly = { 'data-hidden': !compact || undefined }
   return (
     <Tooltip content={name} side="right" disabled={!compact}>
@@ -157,17 +157,12 @@ function NavItem({
           className={cn('size-[18px] shrink-0', current && 'text-primary')}
           strokeWidth={1.75}
         />
-        <span
-          {...labeled}
-          aria-hidden={compact || undefined}
-          className="motion-layout-label"
-        >
+        <span {...hidden(compact)} className="motion-layout-label">
           {label}
         </span>
         {count > 0 && (
           <span
-            {...labeled}
-            aria-hidden={compact || undefined}
+            {...hidden(compact)}
             className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
           >
             {count}
