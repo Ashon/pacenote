@@ -29,6 +29,7 @@ import {
 } from './sandbox/vm-images.js'
 import { REQUIRED_DOMAINS } from './sandbox/allowlist.js'
 import { loginDir, signedIn } from './sandbox/vm-login.js'
+import { SETTING_FIELDS } from './settings/fields.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 import { settingName } from './settings/settings-file.js'
 import { text } from './config.text.js'
@@ -334,27 +335,16 @@ const providedValues = (env: NodeJS.ProcessEnv) =>
 
 /**
  * Values a bot restart does not need: the data location, which the desktop app
- * passes as an absolute path when launching the bot, and sharing the history
- * and the tasks settings, which the MCP server and the app read where used.
+ * passes as an absolute path when launching the bot, opencode, which only the
+ * app runs, and the settings that apply in the app (sharing the history, the
+ * tasks settings), which the MCP server and the app read where used.
  */
 const OUTSIDE_FINGERPRINT = new Set([
   'PACENOTE_DATA_DIR',
-  'HISTORY_SHARE',
-  'TASKS',
-  'TASKS_DMS',
-  'TASKS_EXCLUDE_CHANNELS',
-  'TASKS_NAMES',
-  'TASKS_GROUPS',
-  'TASKS_CLI',
-  'TASKS_OPEN_IN',
-  'TASKS_TERMINAL',
-  'TASKS_PLAN_FIRST',
-  'TASKS_LINK_SESSIONS',
-  'TASKS_SUGGEST_DONE',
-  'TASKS_AI',
-  'TASKS_AI_FALLBACK',
-  'TASKS_AI_OPENCODE_MODEL',
   'OPENCODE_BIN',
+  ...SETTING_FIELDS.filter((field) => field.applies === 'app').map(
+    (field) => field.key
+  ),
 ])
 
 /**
