@@ -71,6 +71,8 @@ export interface NewTask {
 
 /** owner/name, as GitHub names a repository */
 const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/
+/** A repository named as owner/name, trimmed; undefined for anything else */
+const repoOf = (repo = '') => (REPO.test(repo.trim()) ? repo.trim() : undefined)
 
 export interface Skipped {
   link: string
@@ -170,10 +172,7 @@ export function addTasks(
             : (item.confidence ?? 'maybe'),
         reason: (item.reason ?? '').trim().slice(0, 300),
         action: item.action,
-        repo:
-          item.repo && REPO.test(item.repo.trim())
-            ? item.repo.trim()
-            : undefined,
+        repo: repoOf(item.repo),
         summary: item.summary?.trim().slice(0, 600) || undefined,
         postedAt: new Date(
           Number.isNaN(posted)
@@ -262,7 +261,6 @@ export function addThreadTasks(
         continue
       }
       const askedBy = item.asked_by?.trim()
-      const repo = item.repo?.trim()
       added.push({
         id,
         source: {
@@ -280,7 +278,7 @@ export function addThreadTasks(
         confidence: 'sure',
         reason: item.why?.trim().slice(0, 300) || 'You asked Pace to keep it',
         action: item.action,
-        repo: repo && REPO.test(repo) ? repo : undefined,
+        repo: repoOf(item.repo),
         summary: item.summary?.trim().slice(0, 600) || undefined,
         postedAt: new Date(
           SOURCES.slack.postedAt?.({
@@ -421,18 +419,15 @@ export function updateTask(
       next.summary = changes.summary.trim().slice(0, 600)
     if (changes.action) next.action = changes.action
     if (changes.repo === null) next.repo = undefined
-    else if (changes.repo !== undefined && REPO.test(changes.repo.trim()))
-      next.repo = changes.repo.trim()
+    else if (repoOf(changes.repo)) next.repo = repoOf(changes.repo)
     // A Maybe you kept is yours: a collection does not make it a Maybe again.
     if (changes.confidence && decision?.status !== 'kept')
       next.confidence = changes.confidence
 
     const changed: TaskUpdate['changed'] = []
-    for (const [field, to] of Object.entries(next) as [
-      TaskField,
-      string | undefined,
-    ][]) {
+    for (const field of Object.keys(next) as TaskField[]) {
       const from = task[field] as string | undefined
+      const to = next[field]
       if (from !== to) changed.push({ field, from, to })
     }
     if (!changed.length) return { task, changed }
@@ -484,9 +479,7 @@ export function addFollowUp(
     const afterId = item.after ? taskIdOf(item.after) : undefined
     const after = afterId ? file.tasks.find((t) => t.id === afterId) : undefined
     if (item.after && !after) return { error: `No task ${item.after}` }
-    const named = item.repo?.trim()
-    const repo =
-      named && REPO.test(named) ? named : (after?.repo ?? options.repo)
+    const repo = repoOf(item.repo) ?? after?.repo ?? options.repo
     const same = file.tasks.find(
       (t) =>
         t.source.app === 'local' &&
