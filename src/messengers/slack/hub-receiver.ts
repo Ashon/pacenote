@@ -47,6 +47,8 @@ export class HubReceiver implements Receiver {
   private stopped = false
   private attempt = 0
   private timers: NodeJS.Timeout[] = []
+  /** The latest PING's PONG check; each PING replaces it */
+  private pong?: NodeJS.Timeout
   /**
    * When anything last arrived from the hub; a PING unanswered past
    * PONG_TIMEOUT_MS drops the connection
@@ -208,11 +210,10 @@ export class HubReceiver implements Receiver {
       if (ws.readyState !== ws.OPEN) return
       const sentAt = Date.now()
       ws.send(PING)
-      this.timers.push(
-        setTimeout(() => {
-          if (this.lastHeard < sentAt) ws.terminate()
-        }, PONG_TIMEOUT_MS)
-      )
+      clearTimeout(this.pong)
+      this.pong = setTimeout(() => {
+        if (this.lastHeard < sentAt) ws.terminate()
+      }, PONG_TIMEOUT_MS)
     }, PING_EVERY_MS)
     this.timers.push(ping)
   }
@@ -223,5 +224,7 @@ export class HubReceiver implements Receiver {
       clearInterval(timer)
     }
     this.timers = []
+    clearTimeout(this.pong)
+    this.pong = undefined
   }
 }

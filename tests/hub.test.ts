@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -16,7 +17,7 @@ import { createLogger } from '../src/logger.js'
 import { normalizeCode, Pairings, PAIRING_TTL_MS } from '../src/hub/pairing.js'
 import { fileIdOf, Grants } from '../src/hub/policy.js'
 import { slackFilesOrigin } from '../src/messengers/slack/api.js'
-import { HUB_CLOSE, type HubMessage } from '../src/hub/protocol.js'
+import { HUB_CLOSE, type HubMessage, PING, PONG } from '../src/hub/protocol.js'
 import {
   HubServer,
   type SlackGateway,
@@ -599,6 +600,58 @@ describe('desktop side of the hub', () => {
     expect(processed.map((body) => body.event.text)).toEqual(['from alice'])
     await receiver.stop()
     await new Promise((resolve) => server.close(resolve))
+  })
+
+  it('keeps one PONG check however long the connection lasts', async () => {
+    vi.useFakeTimers()
+    try {
+      const sent: string[] = []
+      const socket = Object.assign(new EventEmitter(), {
+        OPEN: WebSocket.OPEN,
+        readyState: WebSocket.OPEN,
+        send: (data: string) => void sent.push(data),
+        terminate: vi.fn(),
+        close: vi.fn(),
+      })
+      const receiver = new HubReceiver({
+        url: 'http://hub.test',
+        token: 'a'.repeat(64),
+        log: quietLog,
+        onState: () => undefined,
+        onFatal: () => undefined,
+        createSocket: () => socket as unknown as WebSocket,
+      })
+      const started = receiver.start()
+      socket.emit(
+        'message',
+        JSON.stringify({
+          type: 'ready',
+          user: alice,
+          team: { id: 'T1', name: 'ashon' },
+        } satisfies HubMessage)
+      )
+      await started
+
+      // A day of answered PINGs leaves the PING interval as the only timer.
+      for (let i = 0; i < 2880; i++) {
+        await vi.advanceTimersByTimeAsync(30_000)
+        socket.emit('message', PONG)
+      }
+      expect(sent.filter((data) => data === PING)).toHaveLength(2880)
+      expect(
+        (receiver as unknown as { timers: unknown[] }).timers
+      ).toHaveLength(1)
+      expect(vi.getTimerCount()).toBe(2)
+      expect(socket.terminate).not.toHaveBeenCalled()
+
+      // A PING left unanswered still drops the connection.
+      await vi.advanceTimersByTimeAsync(30_000 + 10_000)
+      expect(socket.terminate).toHaveBeenCalledOnce()
+      await receiver.stop()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('refuses to start with a token the hub does not know', async () => {
