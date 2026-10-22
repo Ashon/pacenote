@@ -72,9 +72,9 @@ const codexBase = (codex: CodexDefaults = {}) =>
   })
 
 /** Pacenote's config for opencode runs, kept in the data folder */
-export const OPENCODE_CONFIG_FILE = 'opencode-pacenote.json'
+const OPENCODE_CONFIG_FILE = 'opencode-pacenote.json'
 /** The agent with no tools, for work that needs none */
-export const OPENCODE_PLAIN_AGENT = 'pacenote-plain'
+const OPENCODE_PLAIN_AGENT = 'pacenote-plain'
 
 /**
  * Pacenote's opencode config: an agent with no tools at all, denied
@@ -116,7 +116,7 @@ export function writeOpencodeConfig(dataDir: string): string {
 }
 
 /** What an opencode run needs: Pacenote's config, the model, where it runs */
-export interface OpencodeRun {
+interface OpencodeRun {
   config: string
   /** provider/model; opencode's own default without one */
   model?: string
@@ -125,7 +125,7 @@ export interface OpencodeRun {
 }
 
 /** A headless run: its command, what it reads on stdin, and its environment */
-export interface Invocation {
+interface Invocation {
   command: [string, string[]]
   input: string
   env?: Record<string, string>
@@ -334,7 +334,7 @@ interface OpencodeEvent {
 }
 
 /** The session an opencode run made, to take out of its history after */
-export function opencodeSession(stdout: string): string | undefined {
+function opencodeSession(stdout: string): string | undefined {
   for (const line of stdout.split('\n')) {
     try {
       const id = (JSON.parse(line) as OpencodeEvent).sessionID
@@ -382,7 +382,7 @@ function opencodeOutput(stdout: string): Output | undefined {
 }
 
 /** How a headless run ended, as the process left it */
-export interface Exit {
+interface Exit {
   stdout: string
   stderr: string
   /** The command could not be started: ENOENT when it is not on this Mac */

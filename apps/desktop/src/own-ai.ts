@@ -23,7 +23,7 @@ import { readJson, writeJson } from '../../../src/tasks/store.js'
  */
 
 /** How a piece of work went: its result, which CLI gave it, and any switch */
-export interface Ran<R> {
+interface Ran<R> {
   result: R
   by: OwnCli
   switched?: Switch

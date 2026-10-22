@@ -13,7 +13,7 @@ import type { WorkTool } from '../../../src/tasks/types.js'
  */
 
 /** How far back sessions are kept: the last two weeks' */
-export const SESSION_WINDOW_MS = 14 * 86_400_000
+const SESSION_WINDOW_MS = 14 * 86_400_000
 
 /** What you typed in a session, at most this many, each cut this short */
 const PROMPTS = 300

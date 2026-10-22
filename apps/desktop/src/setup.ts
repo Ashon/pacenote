@@ -11,7 +11,7 @@ import {
 } from '../../../src/settings/setup.js'
 
 /** A change to the setup record from the wizard */
-export interface SetupPatch {
+interface SetupPatch {
   step?: SetupStep
   slack?: 'hub' | 'app'
   me?: { id: string; name: string } | null

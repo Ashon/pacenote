@@ -51,12 +51,12 @@ export type Session = Extract<WorkEntry, { kind: 'session' }>
  * file it is opened with. Their bundle id, and the executable ps shows while
  * one is open.
  */
-export const TERMINALS = {
+const TERMINALS = {
   iterm: { name: 'iTerm2', bundle: 'com.googlecode.iterm2', exe: 'iTerm2' },
   ghostty: { name: 'Ghostty', bundle: 'com.mitchellh.ghostty', exe: 'ghostty' },
   terminal: { name: 'Terminal', bundle: 'com.apple.Terminal', exe: 'Terminal' },
 } as const
-export type TerminalApp = keyof typeof TERMINALS
+type TerminalApp = keyof typeof TERMINALS
 /** auto: the terminal you use (yourTerminal) */
 export type Terminal = TerminalApp | 'auto'
 
@@ -235,7 +235,7 @@ export function chooseTerminal(
  * was used here and when (an app writes it as you use it), and ps which are
  * open now. Terminal is always there.
  */
-export async function yourTerminal(home: string): Promise<TerminalApp> {
+async function yourTerminal(home: string): Promise<TerminalApp> {
   const processes = await run('ps', ['-axo', 'comm=']).then(
     ({ stdout }) => stdout.split('\n'),
     () => []
@@ -261,10 +261,7 @@ export async function yourTerminal(home: string): Promise<TerminalApp> {
  * Opens a .command file in the terminal, which runs it with your shell.
  * Automatic falls back to Terminal when the one it chose is gone.
  */
-export async function openInTerminal(
-  file: string,
-  terminal: Terminal
-): Promise<void> {
+async function openInTerminal(file: string, terminal: Terminal): Promise<void> {
   const opener = process.env.PACENOTE_HANDOFF_OPENER
   if (!opener) {
     const app = terminal === 'auto' ? await yourTerminal(homedir()) : terminal
@@ -377,7 +374,7 @@ export const codexThreadLink = (session: string) =>
   `codex://threads/${encodeURIComponent(session)}`
 
 /** Opens a link in its app (no shell reads it) */
-export async function openLink(url: string): Promise<void> {
+async function openLink(url: string): Promise<void> {
   const opener = process.env.PACENOTE_HANDOFF_OPENER
   if (opener) return standIn(opener, url)
   await run('open', [url])
@@ -388,7 +385,7 @@ export async function openLink(url: string): Promise<void> {
  * in for you to send, and returns its work log entry: its session is found by
  * the marker once you send it
  */
-export async function startInApp(
+async function startInApp(
   options: HandoffOptions,
   task: TaskView,
   context: TaskContext,
@@ -449,7 +446,7 @@ export async function openSession(
  * Where a session continues: a Codex session opened in the Codex app goes back
  * there; any other in the terminal (the Claude app has no link to continue one)
  */
-export const resumesInApp = (
+const resumesInApp = (
   options: Pick<HandoffOptions, 'hasApp'>,
   entry: Session
 ) => !!entry.app && entry.tool === 'codex' && !!options.hasApp?.('codex')

@@ -18,7 +18,7 @@ import { text } from './recap-writer.text.js'
  */
 
 /** The sentences in what the CLI wrote; undefined when there are none */
-export function writtenFrom(answer: string): string | undefined {
+function writtenFrom(answer: string): string | undefined {
   const text = redactSecrets(
     answer
       .replace(/^#+\s.*$/gm, '')
@@ -41,9 +41,7 @@ export function usageFrom(
  * What the CLI wrote, or why it did not (unable: whether the other CLI may
  * write it instead), and the tokens it spent
  */
-export type WriteResult = (
-  { text: string } | { error: string; unable?: Unable }
-) & {
+type WriteResult = ({ text: string } | { error: string; unable?: Unable }) & {
   usage?: TokenUsage
 }
 

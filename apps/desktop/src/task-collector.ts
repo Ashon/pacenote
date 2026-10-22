@@ -108,7 +108,7 @@ export function collectCommand(
 }
 
 /** A collection's stdin: nothing for claude, the prompt for codex */
-export const collectInput = (cli: OwnCli): string | undefined =>
+const collectInput = (cli: OwnCli): string | undefined =>
   cli === 'codex' ? collectPrompt() : undefined
 
 interface ClaudeEvent {
@@ -404,7 +404,7 @@ export class CollectionEvents {
 }
 
 /** Where a collection's run goes, as it runs (the run history in the app) */
-export interface CollectionRecorder {
+interface CollectionRecorder {
   event(event: RunEvent): void
   /** stopped: it was stopped from the app, and ended so */
   finish(outcome: CollectOutcome, attempts?: number, stopped?: boolean): void

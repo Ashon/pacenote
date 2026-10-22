@@ -10,7 +10,7 @@ import path from 'node:path'
  * In both cases settings and history live outside the repository
  * (PACENOTE_HOME, PACENOTE_DATA_DIR).
  */
-export interface AppPaths {
+interface AppPaths {
   packaged: boolean
   /** UI (apps/web build) */
   webDist: string

@@ -85,7 +85,7 @@ export function startFailureProblem(
 }
 
 /** The first wait before Pace starts again after an exit no one asked for */
-export const RETRY_FIRST_MS = 3_000
+const RETRY_FIRST_MS = 3_000
 /** The longest wait between tries */
 export const RETRY_MAX_MS = 5 * 60_000
 /** A run this long went well: the waits start over after it */

@@ -7,7 +7,7 @@ import type {
 import { isSecretKey } from '../../../src/settings/fields.js'
 
 /** What a bug report needs to know, as the app gathers it */
-export interface DiagnosticsInput {
+interface DiagnosticsInput {
   app: {
     version: string
     packaged: boolean

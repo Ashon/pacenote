@@ -22,10 +22,7 @@ export interface CommandResult {
   missing?: boolean
 }
 
-export type RunCommand = (
-  command: string,
-  args: string[]
-) => Promise<CommandResult>
+type RunCommand = (command: string, args: string[]) => Promise<CommandResult>
 
 export type ProbeResult =
   { ok: true; tools: string[] } | { ok: false; error: string }

@@ -176,7 +176,7 @@ interface Clue {
  * issues, issue keys, PR numbers, file names and code-like words from its
  * title, summary and reason, then its title's plain words
  */
-export function cluesOf(task: TaskView): Clue[] {
+function cluesOf(task: TaskView): Clue[] {
   const text = [task.title, task.summary ?? '', task.reason].join('\n')
   const clues = new Map<string, Clue>()
   const add = (shown: string, weight: number, test: RegExp) => {
@@ -232,7 +232,7 @@ export function cluesOf(task: TaskView): Clue[] {
 }
 
 /** What of a task's a session's text has: the score and what matched */
-export function shared(
+function shared(
   clues: Clue[],
   text: string
 ): { score: number; strong: boolean; shares: string[] } {

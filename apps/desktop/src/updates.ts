@@ -2,10 +2,10 @@ import { EventEmitter } from 'node:events'
 import type { UpdateState } from '../../../src/runtime/types.js'
 
 /** Where Pacenote's releases are published */
-export const RELEASES_URL =
+const RELEASES_URL =
   'https://api.github.com/repos/Ashon/pacenote/releases/latest'
 /** How often the installed app looks for a new release */
-export const CHECK_EVERY_MS = 12 * 60 * 60_000
+const CHECK_EVERY_MS = 12 * 60 * 60_000
 
 /** A release version as numbers (v0.4.10 → [0, 4, 10]) */
 export function parseVersion(text: string): number[] | undefined {

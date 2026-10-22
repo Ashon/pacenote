@@ -127,7 +127,7 @@ export function judgePrompt(
   )
 }
 
-export interface Judgement {
+interface Judgement {
   done: boolean
   summary?: string
   left?: string[]
