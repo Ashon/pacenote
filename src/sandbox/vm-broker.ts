@@ -1,4 +1,4 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import http from 'node:http'
 import type net from 'node:net'
@@ -8,7 +8,7 @@ import type { Logger } from '../logger.js'
 import { EgressProxy } from './egress.js'
 import { brokerExpected, loadBrokerEnv } from './env.js'
 import { prepareBrokerFiles } from './prepare.js'
-import { forwardLines } from './process.js'
+import { forwardLines, runProcess } from './process.js'
 import type { Requester } from './runtime.js'
 import { jobHint } from './types.js'
 import { localized } from '../i18n/locale.js'
@@ -241,11 +241,12 @@ export class VmBroker {
       log: options.log,
     })
     await this.egress.listen()
+    const values = await this.values(expected)
     // Stopped while it got ready (a bot told to stop as it starts): no VM
     // or way out that nothing would stop
     if (this.stopping) return this.egress.close()
     mkdirSync(options.workDir, { recursive: true })
-    this.launch(this.values(expected), [
+    this.launch(values, [
       `${options.bundleDir}:/app`,
       `${expected.sshKey}:/run/secrets/ssh-key`,
       `${expected.knownHosts}:/run/secrets/known_hosts`,
@@ -291,30 +292,36 @@ export class VmBroker {
    * The broker's settings, and the credentials it gets from this Mac: the gh
    * login's token and the git author
    */
-  private values(
+  private async values(
     expected: ReturnType<typeof brokerExpected>
-  ): Record<string, string> {
+  ): Promise<Record<string, string>> {
     const env = this.options.env
-    const capture = (command: string, args: string[]) => {
-      const result = spawnSync(command, args, {
+    const capture = (command: string, args: string[]) =>
+      runProcess(command, args, {
+        cwd: process.cwd(),
+        input: '',
+        timeoutMs: 15_000,
         env,
-        encoding: 'utf8',
-        timeout: 15_000,
-      })
-      return result.status === 0 ? result.stdout.trim() : ''
-    }
+      }).then(
+        ({ stdout }) => stdout.trim(),
+        () => ''
+      )
     const github = Boolean(expected.allowedOwners)
+    // Together, and without holding up the bot meanwhile
+    const [token, name, email] = await Promise.all([
+      github ? env.GH_TOKEN || capture('gh', ['auth', 'token']) : '',
+      env.OPS_GIT_AUTHOR_NAME ||
+        (github ? capture('git', ['config', '--global', 'user.name']) : ''),
+      env.OPS_GIT_AUTHOR_EMAIL ||
+        (github ? capture('git', ['config', '--global', 'user.email']) : ''),
+    ])
     const values: Record<string, string> = {
       SSH_USER: expected.sshUser,
       ALLOWED_CIDR: expected.allowedCidr,
       GIT_ALLOWED_OWNERS: expected.allowedOwners,
-      GH_TOKEN: github ? env.GH_TOKEN || capture('gh', ['auth', 'token']) : '',
-      GIT_AUTHOR_NAME:
-        env.OPS_GIT_AUTHOR_NAME ||
-        (github ? capture('git', ['config', '--global', 'user.name']) : ''),
-      GIT_AUTHOR_EMAIL:
-        env.OPS_GIT_AUTHOR_EMAIL ||
-        (github ? capture('git', ['config', '--global', 'user.email']) : ''),
+      GH_TOKEN: token,
+      GIT_AUTHOR_NAME: name,
+      GIT_AUTHOR_EMAIL: email,
       JIRA_URL: expected.jiraUrl,
       JIRA_EMAIL: expected.jiraEmail,
       JIRA_TOKEN: env.OPS_JIRA_TOKEN ?? '',
