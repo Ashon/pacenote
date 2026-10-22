@@ -293,29 +293,6 @@ export class SlackMessenger implements Messenger {
     return res.ts!
   }
 
-  async update(mention: Mention, message: string, text: string): Promise<void> {
-    await this.options.client.chat.update({
-      channel: mention.conversation,
-      ts: message,
-      text,
-    })
-  }
-
-  async remove(mention: Mention, message: string): Promise<boolean> {
-    try {
-      await this.options.client.chat.delete({
-        channel: mention.conversation,
-        ts: message,
-      })
-      return true
-    } catch (err) {
-      this.options.log.warn(
-        `Could not delete the placeholder message (${slackError(err)}).`
-      )
-      return false
-    }
-  }
-
   async upload(mention: Mention, files: Upload[]): Promise<void> {
     await this.options.client.files.uploadV2({
       channel_id: mention.conversation,

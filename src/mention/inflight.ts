@@ -10,8 +10,7 @@ import type { Mention } from '../messengers/types.js'
 
 /**
  * Record of in-progress mentions. When a bot restart (deploy, tsx watch, crash)
- * cuts off an answer, the next start resumes it (in the same placeholder
- * message, if it had one) or reports the failure.
+ * cuts off an answer, the next start resumes it or reports the failure.
  */
 export interface InflightEntry {
   /** mentionKey(mention) */
@@ -19,11 +18,6 @@ export interface InflightEntry {
   mention: Mention
   /** Where it was asked, as the run history shows it ("#ops") */
   label: string
-  /**
-   * A placeholder message ("Working on it...") from an older version, which a
-   * resume takes away. Entries written now have none.
-   */
-  placeholder?: string
   /** Run id. When resuming, writing continues in the same run. */
   runId?: string
   /**

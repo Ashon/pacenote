@@ -41,7 +41,6 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
         posts.push(text)
         return { ok: true, ts: '1791453237.582449' }
       },
-      update: async () => ({ ok: true }),
       postEphemeral: async () => ({ ok: true }),
     },
     reactions: {
@@ -218,7 +217,6 @@ class MemoryMessenger implements Messenger {
     public: false,
   }
   readonly posts: string[] = []
-  readonly updates: string[] = []
   readonly notices: string[] = []
   readonly uploads: Upload[][] = []
   answerable = true
@@ -257,9 +255,6 @@ class MemoryMessenger implements Messenger {
     this.posts.push(text)
     return `p${this.posts.length}`
   }
-  async update(_mention: Mention, _message: string, text: string) {
-    this.updates.push(text)
-  }
   async upload(_mention: Mention, files: Upload[]) {
     if (this.failUpload) throw new Error('upload refused')
     this.uploads.push(files)
@@ -272,15 +267,10 @@ class MemoryMessenger implements Messenger {
   }
 }
 
-/**
- * A messenger that can react and delete its messages, like Slack (with
- * reactions:write)
- */
+/** A messenger that can react, like Slack (with reactions:write) */
 class MarkingMessenger extends MemoryMessenger {
   readonly marks: string[] = []
-  readonly removed: string[] = []
   canMark = true
-  canRemove = true
 
   async mark(_mention: Mention, mark: Mark) {
     if (!this.canMark) return false
@@ -289,11 +279,6 @@ class MarkingMessenger extends MemoryMessenger {
   }
   async unmark(_mention: Mention, mark: Mark) {
     this.marks.push(`-${mark}`)
-  }
-  async remove(_mention: Mention, message: string) {
-    if (!this.canRemove) return false
-    this.removed.push(message)
-    return true
   }
 }
 
@@ -346,7 +331,6 @@ describe('answering through any messenger', () => {
       expect.stringMatching(/^Working on it\.\.\./),
     ])
     expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(45)))
-    expect(messenger.updates).toEqual([])
   })
 
   it('redacts the secrets it holds and secret formats before posting the answer', async () => {
@@ -515,7 +499,6 @@ describe('marking a mention instead of posting a placeholder', () => {
     await bot.handle(ask())
     expect(await bot.drain(5_000)).toBe(true)
     expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
-    expect(messenger.updates).toEqual([])
     expect(messenger.marks).toEqual(['+working', '-working'])
   })
 
@@ -648,41 +631,6 @@ describe('marking a mention instead of posting a placeholder', () => {
     expect(failing.posts).toEqual([])
   })
 
-  it('takes away a placeholder an older version left, when it resumes the request', async () => {
-    const inflight = new InflightStore(path.join(root, 'legacy.json'))
-    const mention = ask()
-    inflight.upsert({
-      key: mentionKey(mention),
-      mention,
-      label: 'room-1',
-      placeholder: 'p0',
-      attempts: 1,
-      startedAt: Date.now(),
-    })
-    const messenger = new MarkingMessenger()
-    const bot = responder(messenger, { inflight })
-    await bot.resumePending()
-    expect(await bot.drain(5_000)).toBe(true)
-    expect(messenger.removed).toEqual(['p0'])
-    expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
-
-    // Where it cannot delete it, the placeholder points to the answer.
-    const stuck = new MarkingMessenger()
-    stuck.canRemove = false
-    inflight.upsert({
-      key: mentionKey(mention),
-      mention,
-      label: 'room-1',
-      placeholder: 'p0',
-      attempts: 1,
-      startedAt: Date.now(),
-    })
-    const again = responder(stuck, { inflight })
-    await again.resumePending()
-    expect(await again.drain(5_000)).toBe(true)
-    expect(stuck.updates).toEqual(['I restarted; the ans'])
-  })
-
   it('does not take up, after a restart, a request someone else left waiting', async () => {
     const inflight = new InflightStore(path.join(root, 'not-owner.json'))
     const mention = { ...ask(), userId: 'u2' }
@@ -724,7 +672,6 @@ describe('marking a mention instead of posting a placeholder', () => {
     await bot.resumePending()
     expect(await bot.drain(5_000)).toBe(true)
     expect(messenger.posts).toEqual(answered(messenger, 'a'.repeat(25)))
-    expect(messenger.updates).toEqual([])
     // The 👀 from before the restart is still there; marking again is a no-op.
     // It starts over, so a 📥 or ⏳ it had goes.
     expect(messenger.marks).toEqual([

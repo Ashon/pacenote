@@ -29,7 +29,6 @@ const entry = (
     files: [],
   },
   label: '#general',
-  placeholder: '1.1',
   attempts: 1,
   startedAt: 1_000_000,
   ...extra,

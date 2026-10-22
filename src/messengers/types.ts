@@ -152,7 +152,7 @@ export interface Messenger {
   request(mention: Mention): Promise<Request>
   /**
    * Earlier messages for context, oldest first, without the given message IDs
-   * (the mention, the placeholder)
+   * (the mention)
    */
   context(
     mention: Mention,
@@ -172,12 +172,6 @@ export interface Messenger {
   notice(mention: Mention, text: string): Promise<void>
   /** Posts to the mention's thread and returns the new message's ID */
   post(mention: Mention, text: string): Promise<string>
-  update(mention: Mention, message: string, text: string): Promise<void>
-  /**
-   * Deletes a message the bot posted: a placeholder ("Working on it...") an
-   * older version left in a request it resumes. False when it could not.
-   */
-  remove?(mention: Mention, message: string): Promise<boolean>
   upload(mention: Mention, files: Upload[]): Promise<void>
   /**
    * Puts a reaction on the mention: the quiet way to say how the bot is doing,
@@ -210,8 +204,8 @@ export interface MessengerConnection {
   readonly bot: { user: string; userId: string; team: string }
   /**
    * What works in a reduced way and why, for the status file (Slack: without
-   * reactions:write, a placeholder instead of 👀). Not a fault, so the status
-   * bar does not count it.
+   * reactions:write, notes to the asker alone instead of 👀). Not a fault, so
+   * the status bar does not count it.
    */
   limits(): string[]
   /**

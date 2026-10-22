@@ -21,7 +21,6 @@ const en = {
     resumed: (where: string) =>
       `I restarted, so I'm picking this up again... (${where})`,
   },
-  restarted: 'I restarted; the answer comes below.',
   cutShort:
     'I restarted while posting my answer, so it may be cut short. Please mention me again if it is.',
   cutOff:
@@ -51,7 +50,6 @@ const ko: typeof en = {
     resumed: (where) =>
       `다시 시작해서 이 요청을 이어서 처리하고 있어요... (${where})`,
   },
-  restarted: '다시 시작했어요. 답변은 아래에 올라와요.',
   cutShort:
     '답변을 올리는 중에 다시 시작해서 답변이 잘렸을 수 있어요. 잘렸다면 다시 멘션해 주세요.',
   cutOff:

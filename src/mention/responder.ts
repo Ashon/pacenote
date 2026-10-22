@@ -275,15 +275,6 @@ export class MentionResponder {
     const { reasoner } = this.deps
     const { mention } = entry
     const t = this.notes()
-    // A placeholder message an older version posted, cut off by the upgrade:
-    // it goes, since the answer comes as a new reply.
-    if (entry.placeholder)
-      await this.dropPlaceholder(
-        messenger,
-        mention,
-        entry.placeholder,
-        t.restarted
-      )
     const mark: Mark = waits ? 'waiting' : 'working'
     const marked = Boolean(
       await messenger.mark?.(mention, mark).catch(() => false)
@@ -371,11 +362,7 @@ export class MentionResponder {
       reading.catch(() => undefined)
       const request = await messenger.request(mention)
       run = this.openRun(messenger, mention, label, request, taken.runId)
-      note({
-        runId: run?.id,
-        attempts: taken.attempts + 1,
-        placeholder: undefined,
-      })
+      note({ runId: run?.id, attempts: taken.attempts + 1 })
       const { context, left } = recent(await reading)
       run?.patch({ context: { messages: context.length } })
       const time = (at: number) => formatTime(at, config.timezone)
@@ -595,10 +582,9 @@ export class MentionResponder {
   }
 
   /**
-   * Cleans up interrupted requests at startup. Each is resumed once (in the
-   * same placeholder message, if it had one), and requests that were already
-   * retried or are too old are reported as failed. One whose answer was
-   * already posting is not answered again.
+   * Cleans up interrupted requests at startup. Each is resumed once, and
+   * requests that were already retried or are too old are reported as failed.
+   * One whose answer was already posting is not answered again.
    */
   async resumePending(): Promise<void> {
     const { inflight, log, history } = this.deps
@@ -673,12 +659,12 @@ export class MentionResponder {
         log.warn(
           `Giving up on interrupted request ${entry.key} (${entry.attempts} ${entry.attempts === 1 ? 'attempt' : 'attempts'})`
         )
-        await this.giveUp(messenger, entry.mention, entry.placeholder)
+        await this.giveUp(messenger, entry.mention)
         continue
       }
       if (this.limiter.full) {
         this.forget(entry.key)
-        await this.giveUp(messenger, entry.mention, entry.placeholder)
+        await this.giveUp(messenger, entry.mention)
         if (entry.runId) {
           history?.reopen(entry.runId)?.finish('interrupted', {
             error: 'Could not resume because the queue was full',
@@ -782,33 +768,13 @@ export class MentionResponder {
   }
 
   /** A request cut off by a restart that will not be answered after all */
-  private async giveUp(
-    messenger: Messenger,
-    mention: Mention,
-    placeholder: string | undefined
-  ): Promise<void> {
-    const notice = messenger.render(this.notes().cutOff)[0] ?? ''
-    if (placeholder)
-      await this.dropPlaceholder(messenger, mention, placeholder, notice)
+  private async giveUp(messenger: Messenger, mention: Mention): Promise<void> {
     await this.clearMarks(messenger, mention)
-    await this.fail(messenger, mention, notice)
-  }
-
-  /**
-   * Takes away a placeholder message an older version posted ("Working on
-   * it..."), or, where it cannot, leaves it saying the text instead
-   */
-  private async dropPlaceholder(
-    messenger: Messenger,
-    mention: Mention,
-    placeholder: string,
-    text: string
-  ): Promise<void> {
-    if (await messenger.remove?.(mention, placeholder).catch(() => false))
-      return
-    await messenger
-      .update(mention, placeholder, messenger.render(text)[0] ?? '')
-      .catch(() => undefined)
+    await this.fail(
+      messenger,
+      mention,
+      messenger.render(this.notes().cutOff)[0] ?? ''
+    )
   }
 
   /** Takes the marks off a mention that will not be answered after all */
