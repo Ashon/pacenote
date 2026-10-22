@@ -89,13 +89,11 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
   async connect(
     target: { instance: string } | { address: string }
   ): Promise<void> {
+    const parsed = 'instance' in target ? undefined : hostPort(target.address)
     const where =
       'instance' in target
         ? this.found.get(target.instance)
-        : (() => {
-            const parsed = hostPort(target.address)
-            return parsed ? { ...parsed, name: target.address } : undefined
-          })()
+        : parsed && { ...parsed, name: target.address }
     if (!where)
       return this.set({ step: 'error', message: localized(text).enterAddress })
     const attempt = ++this.attempt
@@ -104,17 +102,14 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     // The first try often meets macOS still asking for Local Network access,
     // or the other Mac not waiting yet: tried again quietly for a while
     const started = Date.now()
-    let opened: Awaited<ReturnType<typeof setupDial>> | undefined
+    let result: Awaited<ReturnType<typeof setupDial>> | { error: string }
     for (let tries = 0; ; tries++) {
-      const result = await this.tryOnce(where)
+      result = await this.tryOnce(where)
       if (attempt !== this.attempt) {
-        if (result && 'channel' in result) result.channel.close()
+        if ('channel' in result) result.channel.close()
         return
       }
-      if ('channel' in result) {
-        opened = result
-        break
-      }
+      if ('channel' in result) break
       if (Date.now() - started >= (this.options.retryMs ?? RETRY_MS))
         return this.set({ step: 'error', message: result.error })
       this.set({ step: 'connecting', name: where.name, retrying: true })
@@ -123,8 +118,7 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
       )
       if (attempt !== this.attempt) return
     }
-    if (attempt !== this.attempt) return opened.channel.close()
-    const { channel, code } = opened
+    const { channel, code } = result
     const name = channel.peer.name
     this.channel = channel
     this.stopLooking()

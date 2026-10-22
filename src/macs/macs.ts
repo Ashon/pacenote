@@ -246,6 +246,7 @@ export class Macs extends EventEmitter<{
     const now = this.now()
     const lease = this.file.lease
     const pace = this.options.pace()
+    const adding = this.adding
     const me: MacView = {
       id: this.id,
       name: this.options.name,
@@ -290,9 +291,7 @@ export class Macs extends EventEmitter<{
         lastSeen: known?.lastSeen,
         reasoner: state?.reasoner,
         address: link?.address ?? known?.address,
-        ...(reachable && state?.collecting
-          ? { collecting: state.collecting }
-          : {}),
+        ...(reachable && state?.collecting && { collecting: state.collecting }),
       })
     }
     return {
@@ -306,22 +305,15 @@ export class Macs extends EventEmitter<{
       addresses: this.file.addresses,
       blocked: this.blocked,
       moved: this.moved,
-      ...(this.adding
-        ? {
-            adding: {
-              until: new Date(this.adding.until).toISOString(),
-              ...(this.adding.request
-                ? {
-                    request: {
-                      name: this.adding.request.name,
-                      code: this.adding.request.code,
-                    },
-                  }
-                : {}),
-              ...(this.adding.result ? { result: this.adding.result } : {}),
-            },
-          }
-        : {}),
+      ...(adding && {
+        adding: {
+          until: new Date(adding.until).toISOString(),
+          ...(adding.request && {
+            request: { name: adding.request.name, code: adding.request.code },
+          }),
+          ...(adding.result && { result: adding.result }),
+        },
+      }),
     }
   }
 
@@ -740,9 +732,7 @@ export class Macs extends EventEmitter<{
   }
 
   private async listen(): Promise<void> {
-    const server = createServer((_req, res) => {
-      res.writeHead(426).end()
-    })
+    const server = createServer((_req, res) => res.writeHead(426).end())
     const wss = new WebSocketServer({
       noServer: true,
       maxPayload: MAX_MESSAGE,
@@ -767,11 +757,8 @@ export class Macs extends EventEmitter<{
     this.port = await new Promise<number>((resolve, reject) => {
       const onError = (err: NodeJS.ErrnoException) => {
         // Taken by something else: any free port, which Bonjour tells
-        if (err.code === 'EADDRINUSE' && wanted !== 0) {
-          server.listen(0, '::')
-          return
-        }
-        reject(err)
+        if (err.code === 'EADDRINUSE' && wanted !== 0) server.listen(0, '::')
+        else reject(err)
       }
       server.on('error', onError)
       server.listen(wanted, '::', () => {
@@ -882,17 +869,12 @@ export class Macs extends EventEmitter<{
   /** A channel the handshake opened: one per Mac, the lower id's dial kept */
   private linked(channel: MacChannel, address?: string, target?: string): void {
     const id = channel.peer.id
-    if (this.file.ignored.includes(id) || !this.enabled()) {
-      channel.close()
-      return
-    }
+    if (this.file.ignored.includes(id) || !this.enabled())
+      return channel.close()
     const existing = this.links.get(id)
     if (existing) {
       const dialer = (link: MacChannel) => (link.dialed ? this.id : id)
-      if (dialer(existing.channel) <= dialer(channel)) {
-        channel.close()
-        return
-      }
+      if (dialer(existing.channel) <= dialer(channel)) return channel.close()
       existing.channel.close()
     }
     const link: Link = { channel, heardAt: this.now(), address, target }
