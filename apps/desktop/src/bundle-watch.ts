@@ -60,6 +60,16 @@ export class BundleWatch {
     }
   }
 
+  /** True while the bundle is being swapped: its Info.plist is not there */
+  swapping(): boolean {
+    try {
+      readFileSync(this.options.file)
+      return false
+    } catch {
+      return true
+    }
+  }
+
   /** Looks now; true when another version has taken this one's place */
   check(): boolean {
     if (this.replaced) return true

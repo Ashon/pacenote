@@ -100,6 +100,11 @@ Bot management:
 - The installed app looks for a new release on GitHub twice a day (`PACENOTE_DESKTOP_UPDATE_CHECK=off` turns it off). When one
   is out, the status bar shows "Update" and the menu bar menu "Pacenote x.y.z is out...", both leading to Settings > General,
   which shows `brew upgrade --cask pacenote` to copy and the release notes. The app never replaces itself; Homebrew does.
+- A screen that does not load never ends the app with an error dialog, whatever the cause (an upgrade swapping the app's
+  files as it opens, or anything else). The window tries again, quickly at first and then every 30 seconds at most, and
+  after a few tries says why in the screen's place with "Try again" (`apps/desktop/src/screen.ts`). Pace and the menu bar
+  go on meanwhile. While the bundle is being swapped it waits quietly, and a new version put in place opens instead.
+  Opened again while it quits (Pace finishing a request), the app opens once it is gone.
 - When Pace needs attention, the app tells you once with a macOS notification, unless its window is in front: Pace stopped
   (until it runs again), it needs setup, it lost Slack for 2 minutes or more, or a problem the Pace screen lists (a sign-in
   the reasoner rejected, a usage limit, the built-in sandbox's setup). Clicking it opens the screen to look at. While any of it lasts,

@@ -3027,7 +3027,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const exited = once(started, 'exit') as Promise<[number | null]>
     try {
       await eventually('the window failing to open', () =>
-        /The window could not open/.test(desktopLog())
+        /The window could not load/.test(desktopLog())
       )
       // The new version moves in.
       writeFileSync(info, plist('99.0.0'))
@@ -3048,6 +3048,37 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const text = desktopLog()
     expect(text).toMatch(/The app on disk is 99\.0\.0 now; restarting into it/)
     expect(text).not.toMatch(/ERROR \[desktop\] Could not start/)
+  })
+
+  it('keeps going when its screen will not load: it says why in the window, and loads it once it can', async () => {
+    world = await World.create()
+    // The screen's page cannot be read, as one moved away cannot.
+    const web = path.join(world.root, 'web')
+    cpSync(path.join(REPO, 'apps/web/dist'), web, { recursive: true })
+    const index = path.join(web, 'index.html')
+    chmodSync(index, 0o000)
+    const page = await launch(world, {
+      env: { PACENOTE_DESKTOP_WEB_DIST: web },
+    })
+    // No dialog that ends the app: the window says why in the screen's place,
+    // and the app goes on.
+    await page
+      .getByRole('heading', { name: 'The screen did not load' })
+      .waitFor()
+    await page
+      .getByText('Pacenote Dev is still running in the menu bar')
+      .waitFor()
+    await page
+      .getByText(/^ERR_\w+ \(-\d+\) loading 'pacenote:\/\/app\/'$/)
+      .waitFor()
+
+    chmodSync(index, 0o644)
+    await page.getByRole('link', { name: 'Try again' }).click()
+    await page.getByRole('heading', { name: 'Overview' }).waitFor()
+    const log = readFileSync(path.join(world.home, 'logs/desktop.log'), 'utf8')
+    expect(log).toMatch(/The window could not load \(try 1\)/)
+    expect(log).toMatch(/The window loaded on try \d+/)
+    expect(log).not.toMatch(/Could not start/)
   })
 
   it("holds each screen's place while its data comes, so nothing moves when it does", async () => {

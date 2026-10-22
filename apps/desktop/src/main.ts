@@ -193,6 +193,7 @@ import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
+import { ScreenLoader, unavailablePage } from './screen.js'
 import { setupProblem } from './bot-readiness.js'
 import {
   listenForClaim,
@@ -299,12 +300,16 @@ const bundleWatch = bundleInfo
     })
   : undefined
 let restarting = false
-/** Opens the version on disk once this copy is gone, once however asked */
-function restartInto(version: string): void {
+/** Opens the app again once this copy is gone, once however asked */
+function relaunch(why: string): void {
   if (restarting) return
   restarting = true
-  log.info(`The app on disk is ${version} now; restarting into it`)
+  log.info(why)
   if (process.env.PACENOTE_DESKTOP_NO_RELAUNCH !== '1') app.relaunch()
+}
+/** Opens the version on disk once this copy is gone */
+function restartInto(version: string): void {
+  relaunch(`The app on disk is ${version} now; restarting into it`)
 }
 /** Pace has stopped: an upgrade that went on meanwhile is opened as it goes */
 async function reopenIfReplaced(): Promise<void> {
@@ -367,6 +372,8 @@ let isQuitting = false
 /** Stops telling the window about task files changing on disk */
 let stopTasksWatch: (() => void) | undefined
 let mainWindow: BrowserWindow | undefined
+/** Loads the window's screen, and again while it fails (screen.ts) */
+let mainScreen: ScreenLoader | undefined
 let tray: Tray | undefined
 let toolPathCache: string | undefined
 
@@ -733,37 +740,74 @@ function registerAppProtocol(): void {
     if (url.pathname.startsWith('/api/')) {
       return handleLocalApi(reader, request.method, url)
     }
-    const pathname =
-      url.pathname === '/'
-        ? 'index.html'
-        : decodeURIComponent(url.pathname).replace(/^\/+/, '')
-    const filePath = path.resolve(webDistDir, pathname)
-    const relative = path.relative(webDistDir, filePath)
-    if (
-      relative.startsWith('..') ||
-      path.isAbsolute(relative) ||
-      !existsSync(filePath) ||
-      !statSync(filePath).isFile()
-    ) {
-      return new Response('Not found', { status: 404 })
+    try {
+      return await screenFile(url.pathname)
+    } catch (error) {
+      if (url.pathname === '/')
+        log.warn(`The screen's page could not be read: ${errorText(error)}`)
+      throw error
     }
-    const response = await net.fetch(pathToFileURL(filePath).toString())
-    if (!filePath.endsWith('.html')) return response
-    const headers = new Headers(response.headers)
-    headers.set('content-security-policy', CSP)
-    return new Response(response.body, { status: response.status, headers })
   })
 }
+
+/**
+ * A file of the screen, by its path under pacenote://app. The page itself
+ * fails when it cannot be read, rather than reading "Not found", so the window
+ * tries again (ScreenLoader): an upgrade may be swapping it.
+ */
+async function screenFile(pathname: string): Promise<Response> {
+  const page = pathname === '/'
+  const filePath = path.resolve(
+    webDistDir,
+    page ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '')
+  )
+  const relative = path.relative(webDistDir, filePath)
+  if (relative.startsWith('..') || path.isAbsolute(relative))
+    return new Response('Not found', { status: 404 })
+  if (!page && (!existsSync(filePath) || !statSync(filePath).isFile()))
+    return new Response('Not found', { status: 404 })
+  const response = await net.fetch(pathToFileURL(filePath).toString())
+  if (!filePath.endsWith('.html')) return response
+  const headers = new Headers(response.headers)
+  headers.set('content-security-policy', CSP)
+  return new Response(response.body, { status: response.status, headers })
+}
+
+/** Rejects with why the screen would not load now (ScreenLoader's probe) */
+async function probeScreen(): Promise<void> {
+  const response = webDevUrl
+    ? await fetch(webDevUrl, { signal: AbortSignal.timeout(5_000) })
+    : await screenFile('/')
+  if (!response.ok)
+    throw new Error(
+      `The screen answered ${response.status} ${response.statusText}`
+    )
+  await response.arrayBuffer()
+}
+
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
 
 /**
  * Shows the window; with a route (e.g. "#/settings") it also switches to that
  * screen.
  */
 function showMainWindow(route?: string): void {
-  if (!mainWindow) {
-    void createWindow(route).catch(reportStartupError)
+  // Asked for while quitting, such as opened again right after Quit while Pace
+  // stops: a window now would go with this copy, so the app opens again once
+  // it is gone.
+  if (isQuitting) {
+    relaunch('Opened while quitting; opening again once gone')
     return
   }
+  if (!mainWindow) {
+    void createWindow(route).catch((error: unknown) =>
+      log.error(`The window could not open: ${errorText(error)}`)
+    )
+    return
+  }
+  // A screen that would not load is tried again at once.
+  mainScreen?.retryNow()
   if (route)
     void mainWindow.webContents.executeJavaScript(
       `location.hash = ${JSON.stringify(route)}`
@@ -2394,7 +2438,36 @@ async function createWindow(route = ''): Promise<void> {
     if (/^https:\/\//.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
+  const screenUrl = webDevUrl ?? 'pacenote://app/'
+  const screen = new ScreenLoader({
+    load: () => window.loadURL(`${screenUrl}${route}`),
+    probe: probeScreen,
+    showUnavailable: (reason) =>
+      window.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(
+          unavailablePage({ app: appName, reason, retryUrl: screenUrl })
+        )}`
+      ),
+    // An upgrade put a new version in place: that one opens instead.
+    gone: () =>
+      window.isDestroyed() ||
+      isQuitting ||
+      restarting ||
+      (bundleWatch?.check() ?? false),
+    passing: () => bundleWatch?.swapping() ?? false,
+    log,
+  })
+  mainScreen = screen
+  window.on('closed', () => {
+    if (mainScreen === screen) mainScreen = undefined
+  })
   window.webContents.on('will-navigate', (event, url) => {
+    // "Try again" on the page that says why the screen is not there
+    if (screen.unavailable) {
+      event.preventDefault()
+      screen.retryNow()
+      return
+    }
     if (
       !url.startsWith('pacenote://app/') &&
       !(webDevUrl && url.startsWith(webDevUrl))
@@ -2402,14 +2475,26 @@ async function createWindow(route = ''): Promise<void> {
       event.preventDefault()
     }
   })
+  // The screen failing later, such as reloaded while an upgrade swaps its
+  // files, is loaded again the same way, on the screen it was on. One
+  // navigation cut short by the next (-3) is no failure.
+  window.webContents.on(
+    'did-fail-load',
+    (_event, code, _description, url, isMainFrame) => {
+      if (!isMainFrame || code === -3 || url.startsWith('data:')) return
+      route = URL.canParse(url) ? new URL(url).hash : route
+      void screen.load()
+    }
+  )
   if (webDevUrl) await waitForUrl(webDevUrl)
-  await window.loadURL(`${webDevUrl ?? 'pacenote://app/'}${route}`)
-  if (captureFile) await capture(window, captureFile)
+  // Not waited for: the screen may take its time, and the app goes on.
+  const loaded = screen.load()
+  if (captureFile) await loaded.then(() => capture(window, captureFile))
 }
 
 /**
  * Waits until the dev server is up. (pnpm desktop:dev starts the UI and the app
- * together)
+ * together) One that stays down is the screen's to try again for.
  */
 async function waitForUrl(url: string): Promise<void> {
   for (let attempt = 0; attempt < 120; attempt += 1) {
@@ -2420,7 +2505,6 @@ async function waitForUrl(url: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
-  throw new Error(localized(text).couldNotConnect(url))
 }
 
 async function capture(window: BrowserWindow, file: string): Promise<void> {
@@ -2442,30 +2526,38 @@ async function capture(window: BrowserWindow, file: string): Promise<void> {
 }
 
 /**
- * The app could not start: it says why, unless an upgrade is under way. A
- * copy opened by Homebrew's late quit request runs from the old bundle, and
- * its window fails to load as the upgrade moves the bundle's files away. That
- * copy, or one told to quit, goes quietly, on to the new version once the
- * bundle on disk names one (waited for while it is being swapped).
+ * Something the app starts with failed. No dialog: one would only end the app,
+ * which could do nothing about it then. The log says why, and the app goes on
+ * from where it got to, with its window, whose screen tries again while it
+ * will not load (ScreenLoader). A copy told to quit as it started, or opened
+ * from a bundle an upgrade is replacing, goes quietly, on to the new version
+ * once the bundle on disk names one (waited for while it is being swapped).
  */
 async function reportStartupError(error: unknown): Promise<void> {
-  const message = error instanceof Error ? error.message : String(error)
-  log.warn(`The window could not open: ${message}`)
+  const message = errorText(error)
   const onDisk = await bundleWatch?.onDisk()
   const upgraded = bundleWatch !== undefined && onDisk !== app.getVersion()
   if (isQuitting || upgraded) {
     log.info(
       upgraded
-        ? 'An upgrade was replacing the app as it started: no error to show'
-        : 'Quitting as it started: no error to show'
+        ? `An upgrade was replacing the app as it started: ${message}`
+        : `Quitting as it started: ${message}`
     )
     if (onDisk && onDisk !== app.getVersion()) restartInto(onDisk)
     app.quit()
     return
   }
   log.error(`Could not start: ${message}`)
-  dialog.showErrorBox(localized(text).couldNotStart(appName), message)
-  app.quit()
+  openOnActivate()
+  showMainWindow()
+}
+
+let opensOnActivate = false
+/** From when the app has started, the Dock icon and opening it again show it */
+function openOnActivate(): void {
+  if (opensOnActivate) return
+  opensOnActivate = true
+  app.on('activate', () => showMainWindow())
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -2519,7 +2611,7 @@ if (!app.requestSingleInstanceLock()) {
       updates?.start(updateUrl ? 1_000 : 30_000)
       if (atLogin) log.info('Opened at login; the window waits')
       else await createWindow(setup.view().open ? '#/setup' : '')
-      app.on('activate', () => showMainWindow())
+      openOnActivate()
     })
     .catch(reportStartupError)
 }

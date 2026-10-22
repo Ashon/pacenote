@@ -32,8 +32,6 @@ const en = {
     `${n} active ${n === 1 ? 'request' : 'requests'}`,
   updateOut: (version: string) => `Pacenote ${version} is out...`,
   quit: (app: string) => `Quit ${app}`,
-  couldNotStart: (app: string) => `${app} could not start`,
-  couldNotConnect: (url: string) => `Could not connect to ${url}.`,
   /** Errors the window shows */
   notAllowed: 'Not allowed.',
   denied: 'Denied',
@@ -95,8 +93,6 @@ const ko: typeof en = {
   activeRequests: (n) => `처리 중인 요청 ${n}개`,
   updateOut: (version) => `Pacenote ${version} 업데이트가 나왔어요...`,
   quit: (app) => `${app} 종료`,
-  couldNotStart: (app) => `${josa(app, '을/를')} 시작할 수 없어요`,
-  couldNotConnect: (url) => `${url}에 연결할 수 없어요.`,
   notAllowed: '허용되지 않아요.',
   denied: '거부됨',
   noSlackAppToShare: (mac) => `${mac}에는 공유할 자체 Slack 앱이 없어요.`,

@@ -38,8 +38,10 @@ describe('the app bundle replaced while it runs', () => {
     })
     // Its own version, or no file while the bundle is being swapped: nothing.
     expect(watch.check()).toBe(false)
+    expect(watch.swapping()).toBe(false)
     rmSync(file)
     expect(watch.check()).toBe(false)
+    expect(watch.swapping()).toBe(true)
     writeFileSync(file, '<plist><dict></dict></plist>')
     expect(watch.check()).toBe(false)
 
