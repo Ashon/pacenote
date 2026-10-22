@@ -248,35 +248,22 @@ export function claudeLineToEvents(
       },
     ]
   }
-  const blocks = event.message?.content ?? []
   const events: RunEvent[] = []
-  for (const block of blocks) {
-    if (
-      event.type === 'assistant' &&
-      block.type === 'text' &&
-      block.text?.trim()
-    ) {
-      events.push({ kind: 'message', at, text: block.text.trim() })
-    } else if (
-      event.type === 'assistant' &&
-      block.type === 'thinking' &&
-      block.thinking?.trim()
-    ) {
-      events.push({ kind: 'reasoning', at, text: block.thinking.trim() })
-    } else if (
-      event.type === 'assistant' &&
-      block.type === 'tool_use' &&
-      block.id &&
-      block.name
-    ) {
-      events.push({
-        kind: 'tool',
-        id: block.id,
-        at,
-        ...splitToolName(block.name),
-        arguments: block.input,
-        status: 'running',
-      })
+  for (const block of event.message?.content ?? []) {
+    if (event.type === 'assistant') {
+      if (block.type === 'text' && block.text?.trim())
+        events.push({ kind: 'message', at, text: block.text.trim() })
+      else if (block.type === 'thinking' && block.thinking?.trim())
+        events.push({ kind: 'reasoning', at, text: block.thinking.trim() })
+      else if (block.type === 'tool_use' && block.id && block.name)
+        events.push({
+          kind: 'tool',
+          id: block.id,
+          at,
+          ...splitToolName(block.name),
+          arguments: block.input,
+          status: 'running',
+        })
     } else if (
       event.type === 'user' &&
       block.type === 'tool_result' &&
