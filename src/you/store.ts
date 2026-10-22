@@ -68,7 +68,8 @@ export async function countYou(options: {
     : []
   // Read after the sessions, all at once, so a fix made meanwhile is kept
   const { audience } = options
-  const tasks = allTaskViews(dataDir, now).filter(
+  const tasksFile = readTasks(dataDir)
+  const tasks = allTaskViews(dataDir, now, tasksFile).filter(
     (task) => !audience || audience.task(task)
   )
   const signals = signalsOf(tasks, sessions, now)
@@ -86,7 +87,7 @@ export async function countYou(options: {
     now,
     options.locale
   )
-  const slack = readTasks(dataDir).you
+  const slack = tasksFile.you
   return {
     areas,
     firstLook: areas.length > 0 && !file.confirmedAt,

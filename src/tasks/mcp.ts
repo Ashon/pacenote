@@ -11,8 +11,14 @@ import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
 import { yourRepos } from './folders.js'
 import type { TasksSettings } from './settings.js'
 import { SOURCE_IDS, sourceNames, sourceOf, taskIdOf } from './sources.js'
-import { allTaskViews, readTasks, tasksView } from './store.js'
-import type { RelatedRun, TaskActivity, TaskView } from './types.js'
+import {
+  allTaskViews,
+  buildView,
+  readDecisions,
+  readTasks,
+  tasksView,
+} from './store.js'
+import type { RelatedRun, TaskActivity, TasksView, TaskView } from './types.js'
 import { readWork } from './work.js'
 import { LANGUAGE_FOR_AI, type Locale } from '../i18n/locale.js'
 import { userLocale } from '../i18n/user.js'
@@ -329,7 +335,9 @@ export function registerTaskTools(
         const since =
           file.collectedAt ??
           new Date(Date.now() - FIRST_WINDOW_MS).toISOString()
-        const { tasks } = tasksView(options.dataDir, settings.exclude)
+        const { tasks } = buildView(file, readDecisions(options.dataDir), {
+          excluded: settings.exclude,
+        })
         const work = readWork(options.dataDir).entries
         return {
           how: collectPrompt(),
@@ -843,25 +851,28 @@ export function registerTaskTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ limit }) =>
-      respond(options, () => ({
-        collectedAt: tasksView(options.dataDir, options.settings().exclude)
-          .collectedAt,
-        tasks: openTasks(options, limit ?? 20),
-      }))
+      respond(options, () => {
+        const view = tasksView(options.dataDir, options.settings().exclude)
+        return {
+          collectedAt: view.collectedAt,
+          tasks: openTasks(options, limit ?? 20, undefined, view),
+        }
+      })
   )
 }
 
 /**
  * The user's open tasks, newest first, as my_tasks gives them (and Pace's own
- * tools); keep says which ones to give
+ * tools); keep says which ones to give, view is the tasks when already read
  */
 export function openTasks(
   options: Pick<TaskToolsOptions, 'dataDir' | 'settings'>,
   limit: number,
-  keep: (task: TaskView) => boolean = () => true
+  keep: (task: TaskView) => boolean = () => true,
+  view: TasksView = tasksView(options.dataDir, options.settings().exclude)
 ) {
-  return tasksView(options.dataDir, options.settings().exclude)
-    .tasks.filter((task) => task.status === 'open' && keep(task))
+  return view.tasks
+    .filter((task) => task.status === 'open' && keep(task))
     .slice(0, limit)
     .map((task) => ({
       id: task.id,

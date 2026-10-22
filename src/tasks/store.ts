@@ -239,7 +239,14 @@ export function tasksView(
  * Every task kept, the history included, as the screen shows them: what a
  * task's detail and its session read earlier tasks from
  */
-export function allTaskViews(dataDir: string, now = Date.now()): TaskView[] {
+export function allTaskViews(
+  dataDir: string,
+  now = Date.now(),
+  /** tasks.json, when already read */
+  file?: TasksFile
+): TaskView[] {
   const decisions = readDecisions(dataDir)
-  return readTasks(dataDir).tasks.map((task) => viewOf(task, decisions, now))
+  return (file ?? readTasks(dataDir)).tasks.map((task) =>
+    viewOf(task, decisions, now)
+  )
 }
