@@ -118,7 +118,6 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     sessionLog: (entryId: string) =>
       ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
   },
-  // Pacenote's own work: the CLIs that do it, and what each last did
   // Settings > Macs: your other Macs, and where Pace answers
   macs: {
     view: () => ipcRenderer.invoke('pacenote:macs:view'),
@@ -138,6 +137,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     openPrivacy: () => ipcRenderer.invoke('pacenote:macs:open-privacy'),
     onChange: subscribe<unknown>('pacenote:macs:changed'),
   },
+  // Pacenote's own work: the CLIs that do it, and what each last did
   ai: {
     state: () => ipcRenderer.invoke('pacenote:ai:state'),
     now: () => ipcRenderer.invoke('pacenote:ai:now'),

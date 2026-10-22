@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   app,
@@ -2333,7 +2334,7 @@ async function waitForUrl(url: string): Promise<void> {
     } catch {
       // Still starting.
     }
-    await new Promise((resolve) => setTimeout(resolve, 250))
+    await sleep(250)
   }
 }
 
@@ -2343,12 +2344,7 @@ async function capture(window: BrowserWindow, file: string): Promise<void> {
     await window.webContents.executeJavaScript(
       `location.hash = ${JSON.stringify(hash)}`
     )
-  await new Promise((resolve) =>
-    setTimeout(
-      resolve,
-      Number(process.env.PACENOTE_DESKTOP_CAPTURE_DELAY) || 2_500
-    )
-  )
+  await sleep(Number(process.env.PACENOTE_DESKTOP_CAPTURE_DELAY) || 2_500)
   const image = await window.webContents.capturePage()
   writeFileSync(file, image.toPNG())
   isQuitting = true
