@@ -13,6 +13,7 @@ import type {
   TaskView,
   WorkTool,
 } from '@src/tasks/types'
+import type { MacsView } from '@src/macs/types'
 import type { TaskArea } from '@src/you/types'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -770,6 +771,7 @@ function TaskOpen({
 }) {
   const t = useText(text)
   const detail = useTaskDetail(task.id).data
+  const macs = useMacs()
   const [all, setAll] = useState(false)
   const replyId = useId()
   const summary = task.summary ?? task.reason
@@ -860,6 +862,7 @@ function TaskOpen({
               <EarlierLine
                 line={{ ...earlier.last, label: t.lastTime }}
                 taskId={task.id}
+                macs={macs}
                 onResume={onResume}
                 onStartHere={onStartHere}
               />
@@ -873,6 +876,7 @@ function TaskOpen({
                   session: sessions[0],
                 }}
                 taskId={task.id}
+                macs={macs}
                 onResume={onResume}
                 onStartHere={onStartHere}
               />
@@ -891,6 +895,7 @@ function TaskOpen({
                   key={line.key}
                   line={line}
                   taskId={task.id}
+                  macs={macs}
                   onResume={onResume}
                   onStartHere={onStartHere}
                 />
@@ -1029,18 +1034,19 @@ function Line({
 function EarlierLine({
   line,
   taskId,
+  macs,
   onResume,
   onStartHere,
 }: {
   line: Earlier
   taskId: string
+  macs: MacsView | undefined
   onResume: (entryId: string) => void
   onStartHere?: (tool: WorkTool) => void
 }) {
   const t = useText(text)
   const { task, run } = line
   const session = line.session ?? task?.session
-  const macs = useMacs()
   // A session on another of your Macs continues there; its log is there too
   const elsewhere = session?.mac ? macNamed(macs, session.mac) : undefined
   const log =

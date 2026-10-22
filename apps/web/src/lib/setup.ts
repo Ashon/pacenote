@@ -11,7 +11,7 @@ import {
   type VmSetupProgress,
 } from '@src/sandbox/vm-progress'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSandbox } from './desktop'
+import { desktopValue, useDesktopValue, useSandbox } from './desktop'
 import type { FromMacState } from '@src/macs/types'
 import { localized } from '@src/i18n/locale'
 import { text } from './setup.text'
@@ -116,18 +116,20 @@ export function useSandboxSetup(options: { renderer: boolean }) {
   }
 }
 
+const fromMac = desktopValue(() => {
+  const bridge = window.pacenoteDesktop?.setup
+  return (
+    bridge && { read: () => bridge.macState(), onChange: bridge.onMacChanged }
+  )
+})
+
 /**
  * Connect to your other Mac (setup's Slack step): finding it, the number to
  * compare, and what came from it, as the desktop app tells
  */
 export function useFromMac() {
   const bridge = window.pacenoteDesktop?.setup
-  const [state, setState] = useState<FromMacState>({ step: 'idle' })
-  useEffect(() => {
-    if (!bridge) return
-    void bridge.macState().then((value) => value && setState(value))
-    return bridge.onMacChanged(setState)
-  }, [bridge])
+  const state: FromMacState = useDesktopValue(fromMac) ?? { step: 'idle' }
   return {
     state,
     look: () => void bridge?.macLook(),

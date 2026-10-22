@@ -1,21 +1,19 @@
 import { localized } from '@src/i18n/locale'
 import type { MacsView, MacView } from '@src/macs/types'
-import { useEffect, useState } from 'react'
+import { desktopValue, useDesktopValue } from './desktop'
 import { text } from './macs.text'
+
+const macs = desktopValue(() => {
+  const bridge = window.pacenoteDesktop?.macs
+  return bridge && { read: () => bridge.view(), onChange: bridge.onChange }
+})
 
 /**
  * Your Macs and where Pace answers (Settings > Macs, the status bar), from
  * the desktop app as it changes. undefined outside the app.
  */
 export function useMacs(): MacsView | undefined {
-  const bridge = window.pacenoteDesktop?.macs
-  const [view, setView] = useState<MacsView>()
-  useEffect(() => {
-    if (!bridge) return
-    void bridge.view().then((value) => value && setView(value))
-    return bridge.onChange(setView)
-  }, [bridge])
-  return view
+  return useDesktopValue(macs)
 }
 
 export const macsControl = () => window.pacenoteDesktop?.macs

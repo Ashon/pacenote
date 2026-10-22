@@ -8,6 +8,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
+import { desktopValue, useDesktopValue } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import { useTasksPush } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -256,16 +257,14 @@ export default function App() {
   )
 }
 
+const fullScreen = desktopValue(() => {
+  const bridge = window.pacenoteDesktop?.fullScreen
+  return bridge && { read: () => bridge.get(), onChange: bridge.onChange }
+})
+
 /** Whether the window is in macOS full screen, where its traffic lights hide */
 function useFullScreen(): boolean {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    const bridge = window.pacenoteDesktop?.fullScreen
-    if (!bridge) return
-    void bridge.get().then(setOn)
-    return bridge.onChange(setOn)
-  }, [])
-  return on
+  return useDesktopValue(fullScreen) ?? false
 }
 
 /**

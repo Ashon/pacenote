@@ -1,5 +1,6 @@
 import { newTokens } from '@history/usage'
 import { localized } from '@src/i18n/locale'
+import type { MacsView } from '@src/macs/types'
 import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
 import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
@@ -262,6 +263,7 @@ export function TasksPage({
     >
       <StatusLine
         collect={data.collect}
+        macs={macs}
         live={live}
         titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
       />
@@ -632,10 +634,12 @@ function liveLine(
  */
 function StatusLine({
   collect,
+  macs,
   live,
   titleOf,
 }: {
   collect: TasksCollect
+  macs: MacsView | undefined
   live: TasksLive | null | undefined
   titleOf: (id: string) => string | undefined
 }) {
@@ -657,7 +661,7 @@ function StatusLine({
           </span>
         </p>
       ) : (
-        <CollectStatus collect={collect} />
+        <CollectStatus collect={collect} macs={macs} />
       )}
     </Swap>
   )
@@ -669,10 +673,15 @@ function StatusLine({
  * sign-in in your terminal. When the work goes to the other AI mid-run, only
  * the words swap: Pace's mark keeps looking.
  */
-function CollectStatus({ collect }: { collect: TasksCollect }) {
+function CollectStatus({
+  collect,
+  macs,
+}: {
+  collect: TasksCollect
+  macs: MacsView | undefined
+}) {
   const t = useText(text)
   const { running, last, elsewhere } = collect
-  const macs = useMacs()
   // Why the terminal did not open, for the collection it was opened for
   const [signIn, setSignIn] = useState<{ at: string; error: string }>()
   const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : t.yourAi)
