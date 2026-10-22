@@ -17,7 +17,6 @@ import { readTasksSettings, type TasksSettings } from '../src/tasks/settings.js'
 import {
   buildView,
   decide,
-  prune,
   readDecisions,
   readTasks,
 } from '../src/tasks/store.js'
@@ -147,21 +146,6 @@ describe('the tasks view', () => {
     expect(
       buildView(file([task('z')]), {}, { now: NOW }).dismissRate
     ).toBeUndefined()
-  })
-
-  it('drops open tasks after 14 days and settled ones 14 days after settling', () => {
-    const old = new Date(NOW - 15 * DAY).toISOString()
-    const { tasks } = prune(
-      file([
-        task('open-old', { postedAt: old }),
-        task('open-new'),
-        task('closed-old', { closed: { at: old, why: 'replied' } }),
-        task('done-new', { postedAt: old }),
-      ]),
-      { 'done-new': { status: 'done', at: new Date(NOW - DAY).toISOString() } },
-      NOW
-    )
-    expect(tasks.tasks.map((t) => t.id)).toEqual(['open-new', 'done-new'])
   })
 
   it('keeps decisions in their own file, which a collection never writes', () => {

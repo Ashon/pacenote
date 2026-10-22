@@ -159,35 +159,6 @@ export function readTakenBack(dataDir: string): Record<string, string> {
   return value && typeof value === 'object' ? value : {}
 }
 
-/**
- * Drops what is past keeping: open tasks too old to matter, and settled ones
- * after a while. Decisions for tasks that are gone go too.
- */
-export function prune(
-  tasks: TasksFile,
-  decisions: TaskDecisions,
-  now = Date.now()
-): { tasks: TasksFile; decisions: TaskDecisions } {
-  const kept = tasks.tasks.filter((task) => {
-    const decision = decisions[task.id]
-    const settledAt =
-      decision && decision.status !== 'kept'
-        ? Date.parse(decision.at)
-        : task.closed
-          ? Date.parse(task.closed.at)
-          : undefined
-    if (settledAt !== undefined) return now - settledAt < KEEP_SETTLED_MS
-    return now - Date.parse(task.postedAt) < DROP_OPEN_AFTER_MS
-  })
-  const ids = new Set(kept.map((task) => task.id))
-  return {
-    tasks: { ...tasks, tasks: kept },
-    decisions: Object.fromEntries(
-      Object.entries(decisions).filter(([id]) => ids.has(id))
-    ),
-  }
-}
-
 /** A task as the screen shows it: your decision over what was found */
 export function viewOf(
   task: Task,
