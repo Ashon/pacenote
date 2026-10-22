@@ -119,10 +119,7 @@ export class McpClients {
   async connect(id: McpClientId): Promise<McpClientStatus> {
     const launch = this.options.launch()
     if (!launch.ready)
-      return {
-        ...(await this.check(id)),
-        error: localized(text).notBuilt,
-      }
+      return { ...(await this.check(id)), error: localized(text).notBuilt }
     const ours = this.ourLaunch()
     let added: CommandResult
     if (id === 'claude') {
@@ -238,11 +235,7 @@ export function probeMcp(
     }
     const timeoutMs = options.timeoutMs ?? PROBE_TIMEOUT_MS
     const timer = setTimeout(
-      () =>
-        finish({
-          ok: false,
-          error: t.noAnswer(timeoutMs / 1000),
-        }),
+      () => finish({ ok: false, error: t.noAnswer(timeoutMs / 1000) }),
       timeoutMs
     )
     const send = (message: object) =>

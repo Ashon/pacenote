@@ -427,11 +427,7 @@ function toolPath(): string {
  * Settings screen that edits the settings file. Works even when the bot is not
  * managed.
  */
-const settings = new SettingsStore({
-  settingsFile,
-  dataDir,
-  env: process.env,
-})
+const settings = new SettingsStore({ settingsFile, dataDir, env: process.env })
 const hubPairing = new HubPairing(settings)
 /**
  * The first-run wizard's progress. A Pacenote that could already start Pace,
