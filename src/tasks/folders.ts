@@ -396,22 +396,13 @@ export async function suggestFolders(
     const usedAt = used.get(real(check.path))
     return usedAt ? { ...check, usedAt } : check
   }
-  const once = (folders: string[]) => {
-    const seen = new Set<string>()
-    return folders.filter((folder) => {
-      const key = real(folder)
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  }
   const { repo } = task
   if (repo) {
     const remembered = repoFolder(options.dataDir, repo)
-    const folders = once([
-      ...(remembered ? [remembered] : []),
-      ...recent.map((folder) => folder.path),
-    ])
+    const folders = onceBy(
+      [...(remembered ? [remembered] : []), ...recent.map((f) => f.path)],
+      real
+    )
     const found = (
       await Promise.all(folders.map((folder) => checkFolder(folder, repo)))
     ).filter((check) => check.matches)
@@ -473,13 +464,14 @@ export async function yourRepos(
       if (repo) repos.push(repo)
     }
   }
+  return onceBy(repos, (repo) => repo.toLowerCase()).slice(0, limit)
+}
+
+/** Each item once, by its key: the first one kept */
+function onceBy<T>(items: T[], key: (item: T) => string): T[] {
   const seen = new Set<string>()
-  return repos
-    .filter((repo) => {
-      const key = repo.toLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    .slice(0, limit)
+  return items.filter((item) => {
+    const k = key(item)
+    return !seen.has(k) && seen.add(k)
+  })
 }
