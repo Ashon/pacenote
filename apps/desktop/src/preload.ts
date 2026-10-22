@@ -1,5 +1,17 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
+/**
+ * Listens to what the app sends on a channel; the function returned stops
+ * listening
+ */
+const subscribe =
+  <T>(channel: string) =>
+  (callback: (value: T) => void) => {
+    const listener = (_event: IpcRendererEvent, value: T) => callback(value)
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
+  }
+
 // Exposes only the platform (window button placement), bot control, settings
 // read/write, and sandbox management to the UI. History queries go through
 // pacenote://app/api.
@@ -23,26 +35,12 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
   // A newer Pacenote, when there is one (Homebrew installs it)
   updates: {
     state: () => ipcRenderer.invoke('pacenote:app:update'),
-    onChange: (callback: (state: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, state: unknown) =>
-        callback(state)
-      ipcRenderer.on('pacenote:app:update-changed', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:app:update-changed', listener)
-    },
+    onChange: subscribe<unknown>('pacenote:app:update-changed'),
   },
   // macOS full screen, where the window's traffic lights hide
   fullScreen: {
     get: () => ipcRenderer.invoke('pacenote:window:full-screen'),
-    onChange: (callback: (on: boolean) => void) => {
-      const listener = (_event: IpcRendererEvent, on: boolean) => callback(on)
-      ipcRenderer.on('pacenote:window:full-screen-changed', listener)
-      return () =>
-        ipcRenderer.removeListener(
-          'pacenote:window:full-screen-changed',
-          listener
-        )
-    },
+    onChange: subscribe<boolean>('pacenote:window:full-screen-changed'),
   },
   // Opening the app when you log in (macOS Login Items)
   loginItem: {
@@ -60,12 +58,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     setAutoStart: (value: boolean) =>
       ipcRenderer.invoke('pacenote:bot:auto-start', value),
     openLogs: () => ipcRenderer.invoke('pacenote:bot:open-logs'),
-    onChange: (callback: (state: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, state: unknown) =>
-        callback(state)
-      ipcRenderer.on('pacenote:bot:changed', listener)
-      return () => ipcRenderer.removeListener('pacenote:bot:changed', listener)
-    },
+    onChange: subscribe<unknown>('pacenote:bot:changed'),
   },
   settings: {
     get: () => ipcRenderer.invoke('pacenote:settings:get'),
@@ -85,12 +78,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     trend: () => ipcRenderer.invoke('pacenote:tasks:trend'),
     live: () => ipcRenderer.invoke('pacenote:tasks:live'),
     // A task file changed on disk: an AI tool over MCP, a collection, you
-    onChanged: (callback: () => void) => {
-      const listener = () => callback()
-      ipcRenderer.on('pacenote:tasks:changed', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:tasks:changed', listener)
-    },
+    onChanged: (callback: () => void) =>
+      subscribe('pacenote:tasks:changed')(() => callback()),
     decide: (id: string, decision: unknown) =>
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     leaveOut: (label: string) =>
@@ -147,12 +136,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     addDecline: () => ipcRenderer.invoke('pacenote:macs:add-decline'),
     addClose: () => ipcRenderer.invoke('pacenote:macs:add-close'),
     openPrivacy: () => ipcRenderer.invoke('pacenote:macs:open-privacy'),
-    onChange: (callback: (view: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, view: unknown) =>
-        callback(view)
-      ipcRenderer.on('pacenote:macs:changed', listener)
-      return () => ipcRenderer.removeListener('pacenote:macs:changed', listener)
-    },
+    onChange: subscribe<unknown>('pacenote:macs:changed'),
   },
   ai: {
     state: () => ipcRenderer.invoke('pacenote:ai:state'),
@@ -209,30 +193,12 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     macConnect: (target: { instance: string } | { address: string }) =>
       ipcRenderer.invoke('pacenote:setup:mac-connect', target),
     macCancel: () => ipcRenderer.invoke('pacenote:setup:mac-cancel'),
-    onMacChanged: (callback: (state: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, state: unknown) =>
-        callback(state)
-      ipcRenderer.on('pacenote:setup:mac-changed', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:setup:mac-changed', listener)
-    },
+    onMacChanged: subscribe<unknown>('pacenote:setup:mac-changed'),
     claimConfirm: (user: unknown) =>
       ipcRenderer.invoke('pacenote:setup:claim-confirm', user),
     claimStop: () => ipcRenderer.invoke('pacenote:setup:claim-stop'),
-    onClaim: (callback: (user: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, user: unknown) =>
-        callback(user)
-      ipcRenderer.on('pacenote:setup:claimed', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:setup:claimed', listener)
-    },
-    onClaimEnded: (callback: (message: string) => void) => {
-      const listener = (_event: IpcRendererEvent, message: string) =>
-        callback(message)
-      ipcRenderer.on('pacenote:setup:claim-ended', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:setup:claim-ended', listener)
-    },
+    onClaim: subscribe<unknown>('pacenote:setup:claimed'),
+    onClaimEnded: subscribe<string>('pacenote:setup:claim-ended'),
   },
   sandbox: {
     status: () => ipcRenderer.invoke('pacenote:sandbox:status'),
@@ -248,18 +214,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     cancelLogin: () => ipcRenderer.invoke('pacenote:sandbox:login-cancel'),
     signOut: (cli: string) =>
       ipcRenderer.invoke('pacenote:sandbox:sign-out', cli),
-    onLoginPrompt: (callback: (prompt: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, prompt: unknown) =>
-        callback(prompt)
-      ipcRenderer.on('pacenote:sandbox:login-prompt', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:sandbox:login-prompt', listener)
-    },
-    onJob: (callback: (job: unknown) => void) => {
-      const listener = (_event: IpcRendererEvent, job: unknown) => callback(job)
-      ipcRenderer.on('pacenote:sandbox:job-changed', listener)
-      return () =>
-        ipcRenderer.removeListener('pacenote:sandbox:job-changed', listener)
-    },
+    onLoginPrompt: subscribe<unknown>('pacenote:sandbox:login-prompt'),
+    onJob: subscribe<unknown>('pacenote:sandbox:job-changed'),
   },
 })
