@@ -4,12 +4,13 @@ import {
   OWN_CLIS,
   type CliReadiness,
   type CliState,
+  type OwnAiNow,
   type OwnAiView,
   type OwnCli,
   type Switch,
 } from '@src/tasks/own-ai'
 import { SOURCES } from '@src/tasks/sources'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CircleCheck,
   CircleDashed,
@@ -38,6 +39,7 @@ export const OWN_AI_KEY = ['own-ai']
 
 export function useOwnAi() {
   const bridge = window.pacenoteDesktop?.ai
+  const client = useQueryClient()
   const query = useQuery({
     queryKey: OWN_AI_KEY,
     queryFn: async () => (await bridge?.state()) ?? null,
@@ -45,14 +47,27 @@ export function useOwnAi() {
     staleTime: 15_000,
     refetchOnMount: 'always',
   })
-  // A CLI that just worked or could not changes what its line says.
+  // A CLI that just worked or could not changes what its line says. Tasks
+  // change often, so the CLIs are checked again only when the choice or what
+  // one last did is not what is shown.
   const { refetch } = query
   useEffect(
-    () => window.pacenoteDesktop?.tasks.onChanged(() => void refetch()),
-    [refetch]
+    () =>
+      window.pacenoteDesktop?.tasks.onChanged(() => {
+        void bridge?.now().then((now) => {
+          const shown = client.getQueryData<OwnAiView | null>(OWN_AI_KEY)
+          if (!now || !shown || !sameNow(now, shown)) void refetch()
+        })
+      }),
+    [bridge, client, refetch]
   )
   return query
 }
+
+const sameNow = (a: OwnAiNow, b: OwnAiNow) =>
+  a.chosen === b.chosen &&
+  a.fallback === b.fallback &&
+  JSON.stringify(a.state) === JSON.stringify(b.state)
 
 /** When a rest ends: 14:00 today, "Tue 14:00" (화요일 14:00) on another day */
 export function untilWords(iso: string, now = new Date()): string {
