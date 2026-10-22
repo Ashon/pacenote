@@ -205,7 +205,6 @@ export function TaskRow({
   const t = useText(text)
   const client = useQueryClient()
   const act = useTaskWork(task.id)
-  const proposed = useProposal(task.id)
   // Looks done: a mark on the closed row that fades in and out
   const looksDone = usePresence<HTMLSpanElement>(
     Boolean(proposal) && task.status === 'open' && !open
@@ -635,13 +634,9 @@ export function TaskRow({
             reply={reply}
             onReply={setReply}
             onDraft={() => void draft()}
-            onCopy={(text) => void act.copyReply(text).then(setError)}
-            onResume={(entryId) => void act.resume(entryId).then(setError)}
             onStartHere={(tool) => void continueIn(tool)}
-            onAnswer={(entryId, yes) => void act.answer(entryId, yes)}
             proposal={task.status === 'open' ? proposal : undefined}
-            onProposal={(answer) => void proposed.answer(answer).then(setError)}
-            onKeep={(text) => void proposed.keep(text).then(setError)}
+            onError={setError}
           />
         </CollapsibleContent>
       </Collapsible>
@@ -688,32 +683,22 @@ type Earlier = {
  */
 function earlierOf(detail: TaskDetail): { last?: Earlier; rest: Earlier[] } {
   const t = localized(text)
-  const { context } = detail
-  const lines: Earlier[] = [
-    ...context.thread.tasks.map((task) => ({
-      key: task.id,
-      group: 'thread' as const,
-      label: t.inThread,
-      task,
-    })),
-    ...context.thread.runs.map((run) => ({
+  const { thread, repo, person } = detail.context
+  const tasks = (
+    group: Earlier['group'],
+    label: string,
+    list: RelatedTask[] = []
+  ) => list.map((task): Earlier => ({ key: task.id, group, label, task }))
+  const lines = [
+    ...tasks('thread', t.inThread, thread.tasks),
+    ...thread.runs.map((run): Earlier => ({
       key: run.id,
-      group: 'thread' as const,
+      group: 'thread',
       label: t.inThread,
       run,
     })),
-    ...(context.repo?.tasks ?? []).map((task) => ({
-      key: task.id,
-      group: 'repo' as const,
-      label: t.sameRepo,
-      task,
-    })),
-    ...(context.person?.tasks ?? []).map((task) => ({
-      key: task.id,
-      group: 'person' as const,
-      label: t.fromPerson(context.person!.name),
-      task,
-    })),
+    ...tasks('repo', t.sameRepo, repo?.tasks),
+    ...(person ? tasks('person', t.fromPerson(person.name), person.tasks) : []),
   ]
   const last =
     lines.find((line) => line.task?.session?.session) ??
@@ -730,33 +715,27 @@ function TaskOpen({
   reply,
   onReply,
   onDraft,
-  onCopy,
-  onResume,
   onStartHere,
-  onAnswer,
   proposal,
-  onProposal,
-  onKeep,
+  onError,
 }: {
   task: TaskView
   drafting: boolean
   reply?: string
   onReply: (text: string) => void
   onDraft: () => void
-  onCopy: (text: string) => void
-  onResume: (entryId: string) => void
   /** A session on another of your Macs: a new one here instead */
   onStartHere: (tool: WorkTool) => void
-  /** A suggested session: the task's work, or not */
-  onAnswer: (entryId: string, yes: boolean) => void
   /** What its quiet session looked like, waiting for you */
   proposal?: Proposal
-  onProposal: (answer: 'close' | 'not-yet') => void
-  /** Keeps a thing left after it as a task of its own */
-  onKeep: (text: string) => void
+  /** What went wrong with something done here, or none */
+  onError: (error: string | undefined) => void
 }) {
   const t = useText(text)
   const detail = useTaskDetail(task.id).data
+  const act = useTaskWork(task.id)
+  const proposed = useProposal(task.id)
+  const copy = (text: string) => void act.copyReply(text).then(onError)
   const macs = useMacs()
   const [all, setAll] = useState(false)
   const replyId = useId()
@@ -784,7 +763,7 @@ function TaskOpen({
       line={line}
       taskId={task.id}
       macs={macs}
-      onResume={onResume}
+      onResume={(entryId) => void act.resume(entryId).then(onError)}
       onStartHere={onStartHere}
     />
   )
@@ -830,8 +809,10 @@ function TaskOpen({
             {proposal && (
               <LooksDone
                 proposal={proposal}
-                onAnswer={onProposal}
-                onKeep={onKeep}
+                onAnswer={(answer) =>
+                  void proposed.answer(answer).then(onError)
+                }
+                onKeep={(text) => void proposed.keep(text).then(onError)}
               />
             )}
             {settled && (task.wrapUp || detail.outcome) && (
@@ -860,7 +841,7 @@ function TaskOpen({
                 key={suggestion.id}
                 suggestion={suggestion}
                 taskId={task.id}
-                onAnswer={onAnswer}
+                onAnswer={(entryId, yes) => void act.answer(entryId, yes)}
               />
             ))}
             {all && rest.map(earlierLine)}
@@ -926,7 +907,7 @@ function TaskOpen({
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Button
                     size="sm"
-                    onClick={() => onCopy(replyText)}
+                    onClick={() => copy(replyText)}
                     disabled={!replyText.trim()}
                   >
                     <Copy />
@@ -956,7 +937,7 @@ function TaskOpen({
             {t.sessionDrafted(waiting)}
           </p>
           <div className="flex gap-1.5">
-            <Button size="sm" onClick={() => onCopy(waiting)}>
+            <Button size="sm" onClick={() => copy(waiting)}>
               <Copy />
               {t.copyAndOpen}
             </Button>
