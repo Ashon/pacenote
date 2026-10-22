@@ -223,6 +223,16 @@ function CopyButton({ view }: { view: RecapView }) {
     setCopied(true)
     setTimeout(() => setCopied(false), 1_500)
   }
+  // Each way to copy it: its name, and what it gives
+  const formats: [CopyFormat, string, string][] = [
+    [
+      'markdown',
+      view.period === 'day' ? t.standup : t.asMarkdown,
+      t.markdownHint,
+    ],
+    ['slack', t.forSlack, t.slackHint],
+  ]
+  if (view.written) formats.push(['summary', t.summaryOnly, t.summaryHint])
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -233,32 +243,14 @@ function CopyButton({ view }: { view: RecapView }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => void copy('markdown')}>
-          <span className="flex flex-col">
-            {view.period === 'day' ? t.standup : t.asMarkdown}
-            <span className="text-meta text-muted-foreground">
-              {t.markdownHint}
-            </span>
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void copy('slack')}>
-          <span className="flex flex-col">
-            {t.forSlack}
-            <span className="text-meta text-muted-foreground">
-              {t.slackHint}
-            </span>
-          </span>
-        </DropdownMenuItem>
-        {view.written && (
-          <DropdownMenuItem onSelect={() => void copy('summary')}>
+        {formats.map(([format, label, hint]) => (
+          <DropdownMenuItem key={format} onSelect={() => void copy(format)}>
             <span className="flex flex-col">
-              {t.summaryOnly}
-              <span className="text-meta text-muted-foreground">
-                {t.summaryHint}
-              </span>
+              {label}
+              <span className="text-meta text-muted-foreground">{hint}</span>
             </span>
           </DropdownMenuItem>
-        )}
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -397,6 +389,10 @@ function WrittenText({ text, arrived }: { text: string; arrived: boolean }) {
   )
 }
 
+/** An area's block: its name and counts, beside its lines when wide */
+const AREA =
+  'grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3.5 first:border-t-0 @xl:grid-cols-[12rem_minmax(0,1fr)]'
+
 /** Widths for skeleton lines, so they do not read as one block */
 const LINE_WIDTHS = ['58%', '72%', '46%', '64%', '52%']
 
@@ -422,16 +418,11 @@ function RecapSkeleton({ period }: { period: RecapPeriod }) {
     return (
       <div>
         {[t.done, t.next].map((title, g) => (
-          <section key={g} className="mt-5">
-            <div className="mb-1.5 flex items-baseline gap-2.5">
-              <h2 className="text-section">{title}</h2>
-            </div>
-            <ul className="flex flex-col gap-2 border-t border-border pt-2.5">
-              {[0, 1].map((i) => (
-                <LineSkeleton key={i} i={g * 2 + i} />
-              ))}
-            </ul>
-          </section>
+          <Group key={g} title={title}>
+            {[0, 1].map((i) => (
+              <LineSkeleton key={i} i={g * 2 + i} />
+            ))}
+          </Group>
         ))}
       </div>
     )
@@ -440,10 +431,7 @@ function RecapSkeleton({ period }: { period: RecapPeriod }) {
       <SkeletonText className="mt-4 text-body" width="44%" />
       <div className="mt-2">
         {[3, 2].map((lines, a) => (
-          <section
-            key={a}
-            className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3.5 first:border-t-0 @xl:grid-cols-[12rem_minmax(0,1fr)]"
-          >
+          <section key={a} className={AREA}>
             <div className="flex flex-col gap-1">
               <SkeletonText className="text-copy" width={a ? '52%' : '66%'} />
               <SkeletonText className="text-meta" width="80%" />
@@ -532,10 +520,7 @@ function AreasBody({ view }: { view: RecapView }) {
 function AreaBlock({ area, view }: { area: RecapArea; view: RecapView }) {
   const t = useText(text)
   return (
-    <section
-      data-recap-area={area.id ?? 'elsewhere'}
-      className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-border py-3.5 first:border-t-0 @xl:grid-cols-[12rem_minmax(0,1fr)]"
-    >
+    <section data-recap-area={area.id ?? 'elsewhere'} className={AREA}>
       <div className="flex flex-col gap-1">
         {area.id ? (
           <a
