@@ -382,7 +382,7 @@ export interface ConfigIssue {
 }
 
 /** A setting that keeps Pace from starting, and the problem in words */
-export class SettingError extends Error {
+class SettingError extends Error {
   constructor(
     readonly key: string,
     message: string
@@ -395,7 +395,7 @@ export class SettingError extends Error {
  * A required setting that is still empty. Carries a valid stand-in so the
  * remaining rules can still be checked.
  */
-export class MissingSettingError extends SettingError {
+class MissingSettingError extends SettingError {
   constructor(
     key: string,
     message: string,

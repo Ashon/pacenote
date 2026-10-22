@@ -194,7 +194,7 @@ export function settingsText(values: Record<string, string>): string {
 }
 
 /** The .env an earlier version kept settings in, next to settings.json */
-export function legacyEnvFile(file: string): string {
+function legacyEnvFile(file: string): string {
   return path.join(path.dirname(file), '.env')
 }
 

@@ -68,7 +68,7 @@ export function aiNote(
   )
 }
 
-export interface MentionResponderDeps {
+interface MentionResponderDeps {
   config: Config
   /**
    * The connected messengers; each mention is answered through the one it came

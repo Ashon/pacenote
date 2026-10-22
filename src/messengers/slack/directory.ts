@@ -4,7 +4,7 @@ import type { Logger } from '../../logger.js'
 const TTL_MS = 60 * 60 * 1000
 const FAILURE_TTL_MS = 60 * 1000
 
-export interface ChannelInfo {
+interface ChannelInfo {
   id: string
   /** Display name in "#name" form */
   label: string

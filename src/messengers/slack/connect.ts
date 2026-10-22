@@ -74,7 +74,7 @@ function socketModeReceiver(
   return receiver
 }
 
-export interface SlackConnectOptions {
+interface SlackConnectOptions {
   config: Config
   log: Logger
   /**

@@ -94,7 +94,7 @@ const REDIAL_MS = 2_000
 const STARTUP_MS = 15_000
 const MAX_MESSAGE = 16 * 1024 * 1024
 /** How long Add a Mac waits for the new Mac */
-export const ADDING_MS = 10 * 60_000
+const ADDING_MS = 10 * 60_000
 /** Setup just finished: how long the new Mac waits to hear the others */
 const CLAIM_WAIT_MS = 30_000
 
@@ -124,7 +124,7 @@ interface Target {
   address?: string
 }
 
-export interface MacsOptions {
+interface MacsOptions {
   dataDir: string
   /** Your Slack app's app-level token, which the Macs know each other by */
   appToken: () => string | undefined

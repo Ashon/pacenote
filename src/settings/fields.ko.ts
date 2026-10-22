@@ -5,7 +5,7 @@ import type { SettingGroup, SettingSection } from './fields.js'
  * and groups by id, fields by key (their options by value). A field or option
  * missing here stays English (tests/settings-ko.test.ts asks for every field).
  */
-export interface FieldWords {
+interface FieldWords {
   label?: string
   help?: string
   placeholder?: string

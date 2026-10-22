@@ -91,7 +91,7 @@ export interface ReasonerOptions {
 }
 
 /** What an adapter asks the sandbox to run for one request */
-export interface CliInvocation extends Omit<
+interface CliInvocation extends Omit<
   SandboxRun,
   'timeoutMs' | 'signal' | 'onOutputLine' | 'requester'
 > {

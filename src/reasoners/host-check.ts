@@ -12,10 +12,10 @@ export type { CliCheck }
  * The first codex with permission profiles, which keep its shell to the
  * reference directory (codexArgs in codex.ts)
  */
-export const CODEX_MIN_VERSION = '0.138.0'
+const CODEX_MIN_VERSION = '0.138.0'
 
 /** Runs one CLI command the way an answer would, without its secrets */
-export type CliRunner = (args: string[]) => Promise<RunResult>
+type CliRunner = (args: string[]) => Promise<RunResult>
 
 /**
  * Whether the CLI can answer on this Mac: installed, signed in, and for codex
@@ -72,7 +72,7 @@ export async function checkCli(
  * The first opencode that runs with a private server (--standalone) and
  * reports its run as JSON events, as Pacenote's own work runs it
  */
-export const OPENCODE_MIN_VERSION = '2.0.0'
+const OPENCODE_MIN_VERSION = '2.0.0'
 
 /**
  * Whether opencode can do Pacenote's own work on this Mac: installed and new

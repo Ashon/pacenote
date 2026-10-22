@@ -57,7 +57,7 @@ export interface SlackGateway {
   userName(userId: string): Promise<string>
 }
 
-export interface HubOptions {
+interface HubOptions {
   store: DesktopStore
   pairings: Pairings
   slack: SlackGateway
@@ -535,10 +535,7 @@ export function withoutToken(raw: string, contentType: string): string {
   return params.toString()
 }
 
-export function parseArgs(
-  raw: string,
-  contentType: string
-): Record<string, string> {
+function parseArgs(raw: string, contentType: string): Record<string, string> {
   if (contentType.includes('application/json')) {
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>

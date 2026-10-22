@@ -49,7 +49,7 @@ function duration(ms: number, t: (typeof text)[Locale]): string {
   return t.minutes(Math.round(seconds / 60))
 }
 
-export interface FailureReplyOptions {
+interface FailureReplyOptions {
   /**
    * The asker runs this Pace (the team hub routes each member's mentions to
    * their own Mac), so what to fix is theirs
@@ -89,7 +89,7 @@ export function failureReply(
 }
 
 /** What the operator reads: what happened, what to do, and where */
-export interface FailureAdvice {
+interface FailureAdvice {
   text: string
   /** The screen that fixes it (#/settings/sandbox, #/bot) */
   route?: string

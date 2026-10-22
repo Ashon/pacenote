@@ -48,7 +48,7 @@ export const MAX_ATTEMPTS = 2
 /** Requests older than this are not resumed. */
 export const MAX_RESUME_AGE_MS = 30 * 60_000
 
-export type ResumeDecision = 'resume' | 'give_up'
+type ResumeDecision = 'resume' | 'give_up'
 
 export function resumeDecision(
   entry: InflightEntry,

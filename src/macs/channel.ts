@@ -35,7 +35,7 @@ import { text } from './channel.text.js'
 const PROTOCOL = 1
 const ALGORITHM = 'aes-256-gcm'
 /** How long a Mac has to finish the handshake */
-export const HANDSHAKE_MS = 5_000
+const HANDSHAKE_MS = 5_000
 
 /** The key two Macs with this Slack app token share */
 export function macsKey(appToken: string): Buffer {
@@ -90,7 +90,7 @@ const same = (a: string, b: string) => {
  * A handshake that did not go through, and why, in the app's language (as
  * Settings > Macs and the setup show it)
  */
-export class HandshakeError extends Error {}
+class HandshakeError extends Error {}
 
 /** A channel the handshake opened: sealed messages, both ways */
 export class MacChannel extends EventEmitter<{
@@ -415,7 +415,7 @@ interface SetupHello {
 }
 
 /** A setup channel, with the number both Macs show */
-export interface SetupOpened {
+interface SetupOpened {
   channel: MacChannel
   code: string
 }

@@ -7,7 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
  * whether Pacenote may look on the local network.
  */
 
-export const SERVICE = '_pacenote._tcp'
+const SERVICE = '_pacenote._tcp'
 const DNS_SD = '/usr/bin/dns-sd'
 const RESOLVE_MS = 5_000
 

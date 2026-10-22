@@ -59,7 +59,7 @@ function isReactionLimit(error: string): error is ReactionLimit {
   return Object.hasOwn(text.en.reactionLimits, error)
 }
 
-export interface SlackMessengerOptions {
+interface SlackMessengerOptions {
   client: WebClient
   directory: Directory
   botUserId: string

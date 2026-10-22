@@ -1,7 +1,7 @@
 import type { MessengerProfile } from '../messengers/types.js'
 import { getLocale, LANGUAGE_FOR_AI, type Locale } from '../i18n/locale.js'
 
-export interface PromptAbilities {
+interface PromptAbilities {
   /** The reasoner can read the reference directory (MENTION_WORKSPACE) */
   canReadWorkspace?: boolean
   /** The ops MCP server is attached */

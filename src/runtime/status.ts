@@ -66,9 +66,7 @@ const confirmed = new Map<string, number>()
  * process can get the same pid. A process that started after the bot wrote
  * startedAt is not the bot.
  */
-export function isBotRunning(
-  status: Pick<BotStatus, 'pid' | 'startedAt'>
-): boolean {
+function isBotRunning(status: Pick<BotStatus, 'pid' | 'startedAt'>): boolean {
   if (!isAlive(status.pid)) return false
   const startedAt = Date.parse(status.startedAt)
   if (Number.isNaN(startedAt)) return true

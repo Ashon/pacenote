@@ -3,7 +3,7 @@
  * that ends in a consonant or a vowel. Messages that put a value before a
  * particle use these, so 'Slack을' and 'Codex를' both read right.
  */
-export type Particle =
+type Particle =
   | '은/는'
   | '이/가'
   | '을/를'

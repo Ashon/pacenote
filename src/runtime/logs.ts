@@ -17,7 +17,7 @@ export function parseLogLine(raw: string): LogLine {
   }
 }
 
-export interface LogQuery {
+interface LogQuery {
   /** Max number of lines (from the end) */
   lines?: number
   /** Scope prefix (e.g. pacenote:socket) */

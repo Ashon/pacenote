@@ -20,7 +20,7 @@ const GRANT_TTL_MS = 2 * 60 * 60_000
  */
 const MAX_HISTORY = 20
 
-export interface Grant {
+interface Grant {
   channel: string
   /**
    * thread_ts of the mention's thread, or the mention's ts when it is not in a
@@ -49,7 +49,7 @@ export interface MentionEvent {
 
 type Args = Record<string, string | undefined>
 
-export type Decision = { ok: true } | { ok: false; error: string }
+type Decision = { ok: true } | { ok: false; error: string }
 
 const deny = (error: string): Decision => ({ ok: false, error })
 const allow: Decision = { ok: true }

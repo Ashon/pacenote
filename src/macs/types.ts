@@ -50,9 +50,9 @@ export interface MacState {
 export const ANSWER_HERE = 'pacenote:answer-here'
 
 /** Input this recent makes a Mac the one you're using */
-export const IN_USE_IDLE_S = 60
+const IN_USE_IDLE_S = 60
 /** No input for this long and you have left a Mac */
-export const AWAY_IDLE_S = 5 * 60
+const AWAY_IDLE_S = 5 * 60
 
 export const inUse = (use: MacUse) =>
   !use.asleep && !use.locked && use.idle < IN_USE_IDLE_S

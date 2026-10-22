@@ -14,7 +14,7 @@ const PING_EVERY_MS = 30_000
 const PONG_TIMEOUT_MS = 10_000
 const MAX_BACKOFF_MS = 30_000
 
-export interface HubReceiverOptions {
+interface HubReceiverOptions {
   /** The hub's URL (https://...), without a trailing slash */
   url: string
   token: string

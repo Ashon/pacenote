@@ -29,7 +29,7 @@ export interface Logger {
 /**
  * Receives one log line. Line format: <ISO time> <LEVEL> [<scope>] <message>
  */
-export type LogSink = (level: LogLevel, line: string, args: unknown[]) => void
+type LogSink = (level: LogLevel, line: string, args: unknown[]) => void
 
 export const consoleSink: LogSink = (level, line, args) => {
   const sink =

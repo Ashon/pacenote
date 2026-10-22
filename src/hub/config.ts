@@ -59,7 +59,7 @@ const HubEnvSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
 
-export interface HubConfig {
+interface HubConfig {
   botToken: string
   appToken: string
   /** Web API base, with a trailing slash */

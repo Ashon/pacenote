@@ -14,7 +14,7 @@ import type { Download, MessageFile } from '../messengers/types.js'
  *   not be read.
  */
 
-export const IMAGE_TYPES: Record<string, string> = {
+const IMAGE_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/gif': 'gif',
@@ -92,7 +92,7 @@ const TEXT_FILETYPES = new Set([
 const TEXT_EXTENSION =
   /\.(txt|log|out|md|json|jsonl|ya?ml|csv|tsv|conf|cfg|ini|toml|sh|bash|py|js|mjs|ts|go|rs|java|kt|c|h|cc|cpp|hpp|sql|xml|html|css|diff|patch|properties|tf|hcl|jsonnet|libsonnet|j2|tpl|service|svg)$/i
 
-export type AttachmentKind = 'image' | 'text' | 'pdf' | 'unsupported'
+type AttachmentKind = 'image' | 'text' | 'pdf' | 'unsupported'
 
 export interface FileCandidate {
   file: MessageFile
@@ -103,7 +103,7 @@ export interface FileCandidate {
   source: string
 }
 
-export interface PlannedFile extends FileCandidate {
+interface PlannedFile extends FileCandidate {
   kind: Exclude<AttachmentKind, 'unsupported'>
 }
 
@@ -215,7 +215,7 @@ export function safeFileName(
 }
 
 /** Whether the content looks like text (no NUL bytes near the start) */
-export function looksLikeText(buffer: Buffer): boolean {
+function looksLikeText(buffer: Buffer): boolean {
   return !buffer.subarray(0, 8192).includes(0)
 }
 
@@ -224,7 +224,7 @@ export function escapeBoundary(text: string): string {
   return text.replace(/<\/attached_file/gi, '</attached_file_')
 }
 
-export interface LoadDeps {
+interface LoadDeps {
   dir: string
   /** The messenger's download (Messenger.download) */
   download(file: MessageFile): Promise<Download>
