@@ -332,10 +332,11 @@ export class MentionResponder {
     // Its turn came: the mention shows it working instead of waiting.
     let working = put === 'working'
     if (put === 'waiting') {
-      working = Boolean(
-        await messenger.mark?.(mention, 'working').catch(() => false)
-      )
-      await messenger.unmark?.(mention, 'waiting')
+      const [marked] = await Promise.all([
+        messenger.mark?.(mention, 'working').catch(() => false),
+        messenger.unmark?.(mention, 'waiting'),
+      ])
+      working = Boolean(marked)
     }
     // Marks to take off when done. The slow mark comes once the answer takes
     // long, counted from when it started working.
@@ -364,6 +365,10 @@ export class MentionResponder {
     let kept = false
 
     try {
+      // Read alongside the request and the run; a failure surfaces where it
+      // is awaited.
+      const reading = messenger.context(mention, [mention.message])
+      reading.catch(() => undefined)
       const request = await messenger.request(mention)
       run = this.openRun(messenger, mention, label, request, taken.runId)
       note({
@@ -371,9 +376,7 @@ export class MentionResponder {
         attempts: taken.attempts + 1,
         placeholder: undefined,
       })
-      const { context, left } = recent(
-        await messenger.context(mention, [mention.message])
-      )
+      const { context, left } = recent(await reading)
       run?.patch({ context: { messages: context.length } })
       const time = (at: number) => formatTime(at, config.timezone)
       const render = (line: ContextMessage) => {
@@ -569,7 +572,9 @@ export class MentionResponder {
         // count.
         note({ attempts: taken.attempts })
       } else {
-        for (const mark of marks) await messenger.unmark?.(mention, mark)
+        await Promise.all(
+          marks.map((mark) => messenger.unmark?.(mention, mark))
+        )
         this.forget(key)
         this.requests.handled += 1
       }
