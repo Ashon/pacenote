@@ -260,18 +260,16 @@ export function probeMcp(
       stderr += chunk.toString('utf8')
     })
     child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8')
-      let end: number
-      while ((end = stdout.indexOf('\n')) >= 0) {
-        const line = stdout.slice(0, end).trim()
-        stdout = stdout.slice(end + 1)
+      const lines = (stdout + chunk.toString('utf8')).split('\n')
+      stdout = lines.pop() ?? ''
+      for (const line of lines) {
         let message: {
           id?: number
           error?: { message?: string }
           result?: { tools?: { name: string }[] }
         }
         try {
-          message = JSON.parse(line) as typeof message
+          message = JSON.parse(line.trim()) as typeof message
         } catch {
           continue
         }

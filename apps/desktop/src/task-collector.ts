@@ -376,28 +376,18 @@ export class CollectionEvents {
         : claudeLineToEvents(line, at)
     for (const event of events) {
       if (event.kind === 'message' || event.kind === 'reasoning') continue
-      if (event.kind !== 'tool') {
-        kept.push(event)
-        continue
-      }
       if (
-        event.server.startsWith('claude_ai_') ||
-        event.server === SOURCES.slack.connectors.codex.server
+        event.kind === 'tool' &&
+        (event.server.startsWith('claude_ai_') ||
+          event.server === SOURCES.slack.connectors.codex.server)
       )
         this.connectorCalls.add(event.id)
-      if (!this.connectorCalls.has(event.id)) {
+      if (event.kind !== 'tool' || !this.connectorCalls.has(event.id)) {
         kept.push(event)
         continue
       }
-      kept.push({
-        kind: 'tool',
-        id: event.id,
-        at: event.at,
-        server: event.server,
-        tool: event.tool,
-        status: event.status,
-        finishedAt: event.finishedAt,
-      })
+      const { id, at, server, tool, status, finishedAt } = event
+      kept.push({ kind: 'tool', id, at, server, tool, status, finishedAt })
     }
     return kept
   }
@@ -661,13 +651,9 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
           })
       }
       child.stdout?.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString('utf8')
-        let end: number
-        while ((end = buffer.indexOf('\n')) >= 0) {
-          const line = buffer.slice(0, end)
-          buffer = buffer.slice(end + 1)
-          read(line)
-        }
+        const lines = (buffer + chunk.toString('utf8')).split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) read(line)
       })
       child.on('close', (code) => {
         if (buffer) read(buffer)
