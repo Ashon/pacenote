@@ -49,7 +49,7 @@ import {
   useRecap,
   useWriteRecap,
 } from '@/lib/recap'
-import { cn } from '@/lib/utils'
+import { cn, go } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { taskHash } from '@/lib/tasks'
 import { switchLine } from './own-ai-status'
@@ -64,10 +64,6 @@ const PERIOD_KEY = 'pacenote.recap.period'
 export function lastPeriod(): RecapPeriod {
   const value = readStored(PERIOD_KEY)
   return value === 'week' || value === 'month' ? value : 'day'
-}
-
-const go = (hash: string) => {
-  window.location.hash = hash
 }
 
 /**

@@ -16,7 +16,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Placeholder, usePresence } from '@/components/ui/motion'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   SkeletonBlock,
   SkeletonText,
@@ -25,7 +24,7 @@ import {
 import { formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { readStored, writeStored } from '@/lib/storage'
-import { cn } from '@/lib/utils'
+import { cn, go } from '@/lib/utils'
 import {
   accountsSentence,
   areaHash,
@@ -35,13 +34,10 @@ import {
   useYou,
 } from '@/lib/you'
 import { taskHash } from '@/lib/tasks'
+import { Page } from './page'
 import { text } from './you-page.text'
 
 const TOOL = { claude: 'Claude Code', codex: 'Codex' } as const
-
-const go = (hash: string) => {
-  window.location.hash = hash
-}
 
 /**
  * You: where you contribute and what is going on in each area, from your
@@ -64,7 +60,7 @@ export function YouPage({ openId }: { openId?: string }) {
 
   if (!bridge)
     return (
-      <Page>
+      <Page title={t.title}>
         <p className="mt-6 text-copy text-muted-foreground">{t.desktopOnly}</p>
       </Page>
     )
@@ -73,7 +69,7 @@ export function YouPage({ openId }: { openId?: string }) {
   // be
   if (!data)
     return (
-      <Page meta={<SkeletonWord width="4.5rem" />}>
+      <Page title={t.title} meta={<SkeletonWord width="4.5rem" />}>
         <Intro key="intro" />
         <Placeholder
           key="list"
@@ -109,6 +105,7 @@ export function YouPage({ openId }: { openId?: string }) {
 
   return (
     <Page
+      title={t.title}
       meta={data.areas.length > 0 && t.areas(active.length, resting.length)}
     >
       <Intro key="intro" />
@@ -567,28 +564,5 @@ function Line({
         {children}
       </span>
     </div>
-  )
-}
-
-function Page({
-  meta,
-  children,
-}: {
-  meta?: React.ReactNode
-  children?: React.ReactNode
-}) {
-  const t = useText(text)
-  return (
-    <ScrollArea className="h-full">
-      <div className="@container mx-auto max-w-4xl px-10 py-9">
-        <header className="flex items-center gap-3">
-          <h1 className="text-title">{t.title}</h1>
-          {meta && (
-            <span className="text-copy text-muted-foreground">{meta}</span>
-          )}
-        </header>
-        {children}
-      </div>
-    </ScrollArea>
   )
 }

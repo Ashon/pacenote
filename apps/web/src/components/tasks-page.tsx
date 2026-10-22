@@ -24,7 +24,6 @@ import {
   useListMotion,
   usePresence,
 } from '@/components/ui/motion'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonText, SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -43,11 +42,12 @@ import {
 } from '@/lib/tasks'
 import { macNamed, useMacs } from '@/lib/macs'
 import { readStored, writeStored } from '@/lib/storage'
-import { cn } from '@/lib/utils'
+import { cn, go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 import { TaskRow } from './task-row'
+import { Page } from './page'
 import { text } from './tasks-page.text'
 import {
   lastYourWork,
@@ -61,10 +61,6 @@ type Tab = 'open' | 'maybe' | 'done'
 /** The tab a task is listed under */
 const tabOf = (task: TaskView): Tab =>
   task.status === 'open' ? 'open' : task.status === 'maybe' ? 'maybe' : 'done'
-
-const go = (hash: string) => {
-  window.location.hash = hash
-}
 
 /** The leave-out offers you turned down, per channel, in this browser */
 const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
@@ -146,7 +142,7 @@ export function TasksPage({
 
   if (!bridge)
     return (
-      <Page>
+      <Page title={t.title}>
         <p className="mt-6 text-copy text-muted-foreground">{t.noDesktop}</p>
       </Page>
     )
@@ -158,6 +154,7 @@ export function TasksPage({
     const card = lastYourWork()
     return (
       <Page
+        title={t.title}
         meta={<SkeletonWord width="9rem" />}
         action={<CollectButton running={false} />}
       >
@@ -179,7 +176,7 @@ export function TasksPage({
   }
   if (!data.settings.on)
     return (
-      <Page>
+      <Page title={t.title}>
         <Setup />
       </Page>
     )
@@ -249,6 +246,7 @@ export function TasksPage({
 
   return (
     <Page
+      title={t.title}
       meta={t.meta(
         open.length,
         data.collectedAt && formatRelative(data.collectedAt),
@@ -497,33 +495,6 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
         </button>
       )}
     </div>
-  )
-}
-
-function Page({
-  meta,
-  action,
-  children,
-}: {
-  meta?: React.ReactNode
-  action?: React.ReactNode
-  children?: React.ReactNode
-}) {
-  const t = useText(text)
-  return (
-    <ScrollArea className="h-full">
-      <div className="@container mx-auto max-w-4xl px-10 py-9">
-        <header className="flex items-center gap-3">
-          <h1 className="text-title">{t.title}</h1>
-          {meta && (
-            <span className="text-copy text-muted-foreground">{meta}</span>
-          )}
-          <span className="flex-1" />
-          {action}
-        </header>
-        {children}
-      </div>
-    </ScrollArea>
   )
 }
 

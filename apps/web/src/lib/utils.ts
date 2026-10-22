@@ -25,3 +25,8 @@ const twMerge = extendTailwindMerge({
 })
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))
+
+/** Opens a route: go('#/tasks') */
+export const go = (hash: string) => {
+  window.location.hash = hash
+}
