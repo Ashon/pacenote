@@ -30,6 +30,7 @@ import {
   writeTools,
   type SourceId,
 } from '../../../src/tasks/sources.js'
+import type { TaskView } from '../../../src/tasks/types.js'
 import { text } from './headless.text.js'
 
 /**
@@ -461,6 +462,25 @@ export function exitUnable(exit: Exit, error: string): Unable | undefined {
 }
 
 /**
+ * The task as Pacenote's own work is told it, up to the lines each piece of
+ * work adds before </task>
+ */
+export function taskLines(task: TaskView): string[] {
+  return [
+    `<task id="${task.id}">`,
+    task.title,
+    [
+      task.askedBy && task.kind === 'asked' ? `${task.askedBy} asked` : '',
+      task.source.label,
+      task.due ? `due ${task.due}` : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    task.summary ? `Summary: ${task.summary}` : `Why: ${task.reason}`,
+  ]
+}
+
+/**
  * Runs a piece of work with no tools on a CLI, and for opencode takes its
  * session out of opencode's history after, as claude and codex keep none
  */
@@ -501,4 +521,59 @@ export async function runPlain(options: {
       timeoutMs: 30_000,
     })
   return exit
+}
+
+/** A piece of Pacenote's own work with no tools: Looks done, Write it up */
+export interface PlainWork {
+  cli: OwnCli
+  bin: string
+  codex?: CodexDefaults
+  /** For opencode: Pacenote's config and the model */
+  opencode?: Omit<OpencodeRun, 'cwd'>
+  toolPath: string
+  cwd: string
+  prompt: string
+  timeoutMs?: number
+}
+
+const PLAIN_WORK_MS = 2 * 60_000
+
+/**
+ * Runs a piece of work with no tools, titled so in opencode, for 2 minutes at
+ * most unless told otherwise: the CLI's output, and failed, which says in
+ * what's words why it gave no answer (unable: whether the other CLI may do it
+ * instead)
+ */
+export async function runPlainWork(
+  work: PlainWork & { title: string }
+): Promise<{
+  output: Output | undefined
+  failed: (
+    what: { slow: string; nothing: string },
+    locale?: Locale
+  ) => { error: string; unable?: Unable }
+}> {
+  const exit = await runPlain({
+    cli: work.cli,
+    bin: work.bin,
+    prompt: work.prompt,
+    codex: work.codex,
+    opencode: work.opencode && {
+      title: work.title,
+      cwd: work.cwd,
+      ...work.opencode,
+    },
+    cwd: work.cwd,
+    toolPath: work.toolPath,
+    timeoutMs: work.timeoutMs ?? PLAIN_WORK_MS,
+  })
+  const output = outputOf(work.cli, exit.stdout)
+  return {
+    output,
+    failed: (what, locale) => {
+      const error = exitError(work.cli, exit, output, what, locale)
+      const unable = exitUnable(exit, error)
+      return unable ? { error, unable } : { error }
+    },
+  }
 }

@@ -1,12 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
-import type { CodexDefaults } from '../../../src/reasoners/codex.js'
-import {
-  CLI_NAMES,
-  type OwnCli,
-  type Unable,
-} from '../../../src/tasks/own-ai.js'
+import { CLI_NAMES, type Unable } from '../../../src/tasks/own-ai.js'
 import { workFor } from '../../../src/tasks/work.js'
 import type {
   Proposal,
@@ -15,13 +10,7 @@ import type {
   WorkEntry,
   WorkFile,
 } from '../../../src/tasks/types.js'
-import {
-  exitError,
-  exitUnable,
-  outputOf,
-  runPlain,
-  type OpencodeRun,
-} from './headless.js'
+import { runPlainWork, taskLines, type PlainWork } from './headless.js'
 import {
   getLocale,
   LANGUAGE_FOR_AI,
@@ -47,7 +36,6 @@ export const QUIET_MS = 10 * 60_000
 const STALE_MS = 24 * 60 * 60_000
 /** At most this many sessions are judged at a time */
 const AT_ONCE = 2
-const TIMEOUT_MS = 2 * 60_000
 /** The session's last turns given to the judge, at most this long */
 const EXCERPT_CHARS = 12_000
 const TURN_CHARS = 800
@@ -119,16 +107,7 @@ export function judgePrompt(
     [
       "Decide whether this session finished the user's task. Answer with JSON only.",
       '',
-      `<task id="${task.id}">`,
-      task.title,
-      [
-        task.askedBy && task.kind === 'asked' ? `${task.askedBy} asked` : '',
-        task.source.label,
-        task.due ? `due ${task.due}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      task.summary ? `Summary: ${task.summary}` : `Why: ${task.reason}`,
+      ...taskLines(task),
       '</task>',
       pr
         ? `<pull-request>#${pr.number} is ${pr.state.toLowerCase()}</pull-request>`
@@ -185,47 +164,23 @@ export function judgementFrom(answer: string): Judgement | undefined {
  * unable whether the other CLI may judge instead. The error goes only to the
  * log, so it is in English.
  */
-export async function judge(options: {
-  cli: OwnCli
-  bin: string
-  codex?: CodexDefaults
-  /** For opencode: Pacenote's config and the model */
-  opencode?: Omit<OpencodeRun, 'cwd'>
-  toolPath: string
-  cwd: string
-  prompt: string
-  timeoutMs?: number
-}): Promise<Judgement | { error: string; unable?: Unable }> {
+export async function judge(
+  options: PlainWork
+): Promise<Judgement | { error: string; unable?: Unable }> {
   const name = CLI_NAMES[options.cli]
-  const exit = await runPlain({
-    cli: options.cli,
-    bin: options.bin,
-    prompt: options.prompt,
-    codex: options.codex,
-    opencode: options.opencode && {
-      title: 'Pacenote: looks done',
-      cwd: options.cwd,
-      ...options.opencode,
-    },
-    cwd: options.cwd,
-    toolPath: options.toolPath,
-    timeoutMs: options.timeoutMs ?? TIMEOUT_MS,
+  const { output, failed } = await runPlainWork({
+    ...options,
+    title: 'Pacenote: looks done',
   })
-  const output = outputOf(options.cli, exit.stdout)
   if (output && 'text' in output)
     return judgementFrom(output.text) ?? { error: `${name} gave no judgement.` }
-  const error = exitError(
-    options.cli,
-    exit,
-    output,
+  return failed(
     {
       slow: `${name} did not answer in 2 minutes.`,
       nothing: `${name} gave no judgement.`,
     },
     'en'
   )
-  const unable = exitUnable(exit, error)
-  return unable ? { error, unable } : { error }
 }
 
 const run = promisify(execFile)

@@ -16,6 +16,7 @@ import {
   exitError,
   outputOf,
   runHeadless,
+  taskLines,
 } from './headless.js'
 import { text } from './drafter.text.js'
 
@@ -40,16 +41,7 @@ export function draftPrompt(task: TaskView, context: TaskContext): string {
     [
       'Draft a reply for the user to send in Slack. Do not send anything.',
       '',
-      `<task id="${task.id}">`,
-      task.title,
-      [
-        task.askedBy && task.kind === 'asked' ? `${task.askedBy} asked` : '',
-        task.source.label,
-        task.due ? `due ${task.due}` : '',
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      task.summary ? `Summary: ${task.summary}` : `Why: ${task.reason}`,
+      ...taskLines(task),
       ...earlier.map(
         (t) => `Earlier: ${t.title}${t.outcome ? ` (${t.outcome})` : ''}`
       ),
