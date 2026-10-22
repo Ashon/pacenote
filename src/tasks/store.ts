@@ -1,15 +1,6 @@
-import {
-  closeSync,
-  existsSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
+import { closeSync, mkdirSync, openSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { readJson, writeJson } from '../json-file.js'
 import { sourceOf } from './sources.js'
 import type {
   DismissReason,
@@ -58,22 +49,8 @@ export function emptyTasks(): TasksFile {
   return { version: 1, tasks: [] }
 }
 
-export function readJson<T>(file: string, fallback: T): T {
-  if (!existsSync(file)) return fallback
-  try {
-    return JSON.parse(readFileSync(file, 'utf8')) as T
-  } catch {
-    return fallback
-  }
-}
-
-/** Writes through a temporary file, so no half-written file is left behind */
-export function writeJson(file: string, value: unknown): void {
-  mkdirSync(path.dirname(file), { recursive: true })
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`)
-  renameSync(tmp, file)
-}
+// Re-exported for the modules that import them from here
+export { readJson, writeJson }
 
 export function readTasks(dataDir: string): TasksFile {
   const file = readJson<Partial<TasksFile>>(

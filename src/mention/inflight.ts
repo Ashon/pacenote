@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs'
-import path from 'node:path'
+import { readJson, writeJson } from '../json-file.js'
 import type { Mention } from '../messengers/types.js'
 
 /**
@@ -57,13 +50,8 @@ export class InflightStore {
   constructor(private readonly file: string) {}
 
   list(): InflightEntry[] {
-    if (!existsSync(this.file)) return []
-    try {
-      const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as unknown
-      return Array.isArray(parsed) ? (parsed as InflightEntry[]) : []
-    } catch {
-      return []
-    }
+    const parsed = readJson<unknown>(this.file, [])
+    return Array.isArray(parsed) ? (parsed as InflightEntry[]) : []
   }
 
   upsert(entry: InflightEntry): void {
@@ -76,14 +64,7 @@ export class InflightStore {
     if (rest.length !== entries.length) this.write(rest)
   }
 
-  /**
-   * Writes to a temporary file and renames it so no half-written file is left
-   * behind.
-   */
   private write(entries: InflightEntry[]): void {
-    mkdirSync(path.dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, `${JSON.stringify(entries, null, 2)}\n`)
-    renameSync(tmp, this.file)
+    writeJson(this.file, entries)
   }
 }

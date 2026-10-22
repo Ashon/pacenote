@@ -1,14 +1,8 @@
 import { spawnSync } from 'node:child_process'
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { localized } from '../i18n/locale.js'
+import { writeJson } from '../json-file.js'
 import { text } from './status.text.js'
 import type { BotStatus, BotStatusView, SocketState } from './types.js'
 
@@ -195,12 +189,7 @@ export class BotStatusFile {
   private write(): void {
     this.status.updatedAt = new Date().toISOString()
     try {
-      mkdirSync(path.dirname(this.file), { recursive: true })
-      writeFileSync(
-        `${this.file}.tmp`,
-        `${JSON.stringify(this.status, null, 2)}\n`
-      )
-      renameSync(`${this.file}.tmp`, this.file)
+      writeJson(this.file, this.status)
     } catch {
       // The bot keeps running even if the status file cannot be written.
     }
