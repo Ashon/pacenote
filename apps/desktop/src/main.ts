@@ -1081,22 +1081,31 @@ function loginItem(): LoginItemState {
 function registerBotIpc(): void {
   const fromMainWindow = (event: Electron.IpcMainInvokeEvent) =>
     event.sender === mainWindow?.webContents
-  ipcMain.handle('pacenote:bot:state', (event) =>
-    fromMainWindow(event) && supervisor ? supervisor.current : null
-  )
-  ipcMain.handle('pacenote:bot:start', async (event) => {
-    if (fromMainWindow(event)) await supervisor?.start()
+  /**
+   * A channel only the main window may use: anything else gets denied, the
+   * channel's own empty answer. A channel whose denied answer depends on the
+   * moment (the language, a view) checks fromMainWindow itself.
+   */
+  const handle = (
+    channel: string,
+    denied: unknown,
+    run: (...args: unknown[]) => unknown
+  ) =>
+    ipcMain.handle(channel, (event, ...args: unknown[]) =>
+      fromMainWindow(event) ? run(...args) : denied
+    )
+  handle('pacenote:bot:state', null, () => supervisor?.current ?? null)
+  handle('pacenote:bot:start', undefined, async () => {
+    await supervisor?.start()
   })
-  ipcMain.handle('pacenote:bot:stop', async (event) => {
-    if (fromMainWindow(event)) await supervisor?.stop()
+  handle('pacenote:bot:stop', undefined, async () => {
+    await supervisor?.stop()
   })
-  ipcMain.handle('pacenote:bot:restart', async (event, rebuild: unknown) => {
-    if (fromMainWindow(event))
-      await supervisor?.restart({ rebuild: rebuild === true })
+  handle('pacenote:bot:restart', undefined, async (rebuild) => {
+    await supervisor?.restart({ rebuild: rebuild === true })
   })
-  ipcMain.handle('pacenote:bot:auto-start', (event, value: unknown) => {
-    if (fromMainWindow(event) && typeof value === 'boolean')
-      supervisor?.setAutoStart(value)
+  handle('pacenote:bot:auto-start', undefined, (value) => {
+    if (typeof value === 'boolean') supervisor?.setAutoStart(value)
   })
   // The language, for the window's first paint (asked before it renders)
   ipcMain.on('pacenote:app:language', (event) => {
@@ -1119,54 +1128,49 @@ function registerBotIpc(): void {
     return language
   })
   // Settings > Macs: your Macs, and where Pace answers
-  ipcMain.handle('pacenote:macs:view', (event) =>
-    fromMainWindow(event) && macs ? macs.view() : null
-  )
-  ipcMain.handle('pacenote:macs:answer-here', (event) => {
-    if (fromMainWindow(event)) macs?.answerHere()
+  handle('pacenote:macs:view', null, () => macs?.view() ?? null)
+  handle('pacenote:macs:answer-here', undefined, () => {
+    macs?.answerHere()
   })
   ipcMain.handle('pacenote:macs:follow', async (event, on: unknown) => {
     if (fromMainWindow(event) && typeof on === 'boolean')
       await macs?.setFollow(on)
     return macs?.view() ?? null
   })
-  ipcMain.handle('pacenote:macs:add-address', (event, address: unknown) =>
-    fromMainWindow(event) && typeof address === 'string'
-      ? (macs?.addAddress(address) ?? false)
-      : false
+  handle('pacenote:macs:add-address', false, (address) =>
+    typeof address === 'string' ? (macs?.addAddress(address) ?? false) : false
   )
-  ipcMain.handle('pacenote:macs:remove-address', (event, address: unknown) => {
-    if (fromMainWindow(event) && typeof address === 'string')
-      macs?.removeAddress(address)
+  handle('pacenote:macs:remove-address', undefined, (address) => {
+    if (typeof address === 'string') macs?.removeAddress(address)
   })
-  ipcMain.handle('pacenote:macs:ignore', (event, id: unknown) => {
-    if (fromMainWindow(event) && typeof id === 'string') macs?.ignore(id)
+  handle('pacenote:macs:ignore', undefined, (id) => {
+    if (typeof id === 'string') macs?.ignore(id)
   })
   // Add a Mac: a new Mac's setup takes your Slack app from this one
-  ipcMain.handle('pacenote:macs:add-start', async (event) =>
-    fromMainWindow(event) ? ((await macs?.startAdding()) ?? false) : false
+  handle(
+    'pacenote:macs:add-start',
+    false,
+    async () => (await macs?.startAdding()) ?? false
   )
-  ipcMain.handle('pacenote:macs:add-stop', (event) => {
-    if (fromMainWindow(event)) macs?.stopAdding()
+  handle('pacenote:macs:add-stop', undefined, () => {
+    macs?.stopAdding()
   })
-  ipcMain.handle('pacenote:macs:add-allow', (event) => {
-    if (fromMainWindow(event)) macs?.allowAdding()
+  handle('pacenote:macs:add-allow', undefined, () => {
+    macs?.allowAdding()
   })
-  ipcMain.handle('pacenote:macs:add-decline', (event) => {
-    if (fromMainWindow(event)) macs?.declineAdding()
+  handle('pacenote:macs:add-decline', undefined, () => {
+    macs?.declineAdding()
   })
-  ipcMain.handle('pacenote:macs:add-close', (event) => {
-    if (fromMainWindow(event)) macs?.closeAdding()
+  handle('pacenote:macs:add-close', undefined, () => {
+    macs?.closeAdding()
   })
-  ipcMain.handle('pacenote:macs:open-privacy', (event) => {
-    if (fromMainWindow(event))
-      void shell.openExternal(
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork'
-      )
+  handle('pacenote:macs:open-privacy', undefined, () => {
+    void shell.openExternal(
+      'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork'
+    )
   })
   // The window's error screen reports what broke, for the log.
-  ipcMain.handle('pacenote:app:report-error', (event, report: unknown) => {
-    if (!fromMainWindow(event)) return
+  handle('pacenote:app:report-error', undefined, (report) => {
     const { message, stack } = (report ?? {}) as {
       message?: unknown
       stack?: unknown
@@ -1175,28 +1179,22 @@ function registerBotIpc(): void {
       `The window hit an error: ${String(message).slice(0, 2_000)}${typeof stack === 'string' ? `\n${stack.slice(0, 8_000)}` : ''}`
     )
   })
-  ipcMain.handle('pacenote:app:login-item', (event) =>
-    fromMainWindow(event) ? loginItem() : null
-  )
-  ipcMain.handle('pacenote:app:set-login-item', (event, value: unknown) => {
-    if (!fromMainWindow(event)) return null
+  handle('pacenote:app:login-item', null, () => loginItem())
+  handle('pacenote:app:set-login-item', null, (value) => {
     if (app.isPackaged && typeof value === 'boolean') {
       app.setLoginItemSettings({ openAtLogin: value })
       log.info(`Open at login ${value ? 'on' : 'off'}`)
     }
     return loginItem()
   })
-  ipcMain.handle('pacenote:app:open-login-items', (event) => {
-    if (fromMainWindow(event))
-      void shell.openExternal(
-        'x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
-      )
+  handle('pacenote:app:open-login-items', undefined, () => {
+    void shell.openExternal(
+      'x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
+    )
   })
-  ipcMain.handle('pacenote:app:diagnostics', (event) =>
-    fromMainWindow(event) ? diagnostics() : null
-  )
-  ipcMain.handle('pacenote:bot:open-logs', (event) => {
-    if (fromMainWindow(event)) void shell.openPath(path.join(dataDir, 'logs'))
+  handle('pacenote:app:diagnostics', null, () => diagnostics())
+  handle('pacenote:bot:open-logs', undefined, () => {
+    void shell.openPath(path.join(dataDir, 'logs'))
   })
 
   // Your tasks: AI tools add them through the MCP server; the app shows them
@@ -1225,8 +1223,7 @@ function registerBotIpc(): void {
       } satisfies Record<WorkTool, OpenIn>,
     }
   }
-  ipcMain.handle('pacenote:tasks:list', (event) => {
-    if (!fromMainWindow(event)) return null
+  handle('pacenote:tasks:list', null, () => {
     const current = tasksSettings()
     const view = tasksView(dataDir, current.exclude)
     linkSessionsSoon()
@@ -1260,33 +1257,28 @@ function registerBotIpc(): void {
     }
   })
   // Who you are in Slack, as Collect now last looked you up
-  ipcMain.handle('pacenote:tasks:you', (event) =>
-    fromMainWindow(event) ? (readTasks(dataDir).you ?? null) : null
-  )
+  handle('pacenote:tasks:you', null, () => readTasks(dataDir).you ?? null)
   // Whether a user group means you: one that does goes into Settings, and its
   // Maybes into the list; one that does not is not asked about again.
-  ipcMain.handle(
-    'pacenote:tasks:answer-group',
-    (event, value: unknown, yours: unknown) => {
-      if (!fromMainWindow(event) || typeof value !== 'string') return {}
-      const group = answerGroup(dataDir, value, yours === true)
-      if (!group) return { error: localized(text).notAGroup(value) }
-      if (yours !== true) return {}
-      const current = tasksSettings()
-      if (!yourGroups(current).includes(group)) {
-        const problems = settings.save({
-          TASKS_GROUPS: [...(current.groups ?? []), group].join(', '),
-        })
-        if (problems.length > 0)
-          return { error: problems.map((p) => p.message).join(' ') }
-      }
-      const kept = tasksView(dataDir, current.exclude).tasks.filter(
-        (task) => task.status === 'maybe' && task.group === group
-      )
-      for (const task of kept) decide(dataDir, task.id, { status: 'kept' })
-      return { kept: kept.length }
+  handle('pacenote:tasks:answer-group', {}, (value, yours) => {
+    if (typeof value !== 'string') return {}
+    const group = answerGroup(dataDir, value, yours === true)
+    if (!group) return { error: localized(text).notAGroup(value) }
+    if (yours !== true) return {}
+    const current = tasksSettings()
+    if (!yourGroups(current).includes(group)) {
+      const problems = settings.save({
+        TASKS_GROUPS: [...(current.groups ?? []), group].join(', '),
+      })
+      if (problems.length > 0)
+        return { error: problems.map((p) => p.message).join(' ') }
     }
-  )
+    const kept = tasksView(dataDir, current.exclude).tasks.filter(
+      (task) => task.status === 'maybe' && task.group === group
+    )
+    for (const task of kept) decide(dataDir, task.id, { status: 'kept' })
+    return { kept: kept.length }
+  })
   // You: where you contribute, from your tasks and your sessions on this Mac
   // (src/you). Counted at most every minute, in the background once there is
   // a count to show; a fix applies at once and is counted again with it.
@@ -1306,8 +1298,7 @@ function registerBotIpc(): void {
     })
     return counting
   }
-  ipcMain.handle('pacenote:you:get', (event) => {
-    if (!fromMainWindow(event)) return null
+  handle('pacenote:you:get', null, () => {
     if (!you || you.locale !== getLocale()) return countYouNow()
     if (Date.now() - you.at > YOU_EVERY_MS) void countYouNow()
     return you.view
@@ -1320,40 +1311,29 @@ function registerBotIpc(): void {
   }
   const short = (value: unknown) =>
     typeof value === 'string' && value.length < 200 ? value : undefined
-  ipcMain.handle('pacenote:you:confirm', (event) =>
-    fromMainWindow(event)
-      ? fixYou((file) => ({ ...file, confirmedAt: new Date().toISOString() }))
-      : null
+  handle('pacenote:you:confirm', null, () =>
+    fixYou((file) => ({ ...file, confirmedAt: new Date().toISOString() }))
   )
-  ipcMain.handle('pacenote:you:rename', (event, id: unknown, name: unknown) => {
+  handle('pacenote:you:rename', null, (id, name) => {
     const area = short(id)
     const to = short(name)
-    return fromMainWindow(event) && area && to
-      ? fixYou((file) => renameArea(file, area, to))
-      : null
+    return area && to ? fixYou((file) => renameArea(file, area, to)) : null
   })
-  ipcMain.handle(
-    'pacenote:you:take-out',
-    (event, id: unknown, part: unknown) => {
-      const area = short(id)
-      const key = short(part)
-      return fromMainWindow(event) && area && key
-        ? fixYou((file) => takeOut(file, area, key))
-        : null
-    }
-  )
-  ipcMain.handle('pacenote:you:merge', (event, id: unknown, into: unknown) => {
+  handle('pacenote:you:take-out', null, (id, part) => {
+    const area = short(id)
+    const key = short(part)
+    return area && key ? fixYou((file) => takeOut(file, area, key)) : null
+  })
+  handle('pacenote:you:merge', null, (id, into) => {
     const area = short(id)
     const target = short(into)
-    return fromMainWindow(event) && area && target
+    return area && target
       ? fixYou((file) => mergeAreas(file, area, target))
       : null
   })
-  ipcMain.handle('pacenote:you:leave', (event, id: unknown, left: unknown) => {
+  handle('pacenote:you:leave', null, (id, left) => {
     const area = short(id)
-    return fromMainWindow(event) && area
-      ? fixYou((file) => leaveArea(file, area, left === true))
-      : null
+    return area ? fixYou((file) => leaveArea(file, area, left === true)) : null
   })
   // Recap: what you did in a day, a week or a month (src/you/recap.ts),
   // counted again at most every minute; Write it up asks Claude Code with no
@@ -1390,20 +1370,17 @@ function registerBotIpc(): void {
       })
     return counted
   }
-  ipcMain.handle(
-    'pacenote:recap:get',
-    async (event, period: unknown, key: unknown) => {
-      const which = periodOf(period)
-      if (!fromMainWindow(event) || !which) return null
-      const at =
-        typeof key === 'string' && periodRange(which, key)
-          ? key
-          : periodKey(which, new Date())
-      const kept = recaps.get(`${getLocale()}:${which}:${at}`)
-      if (kept && Date.now() - kept.at < RECAP_EVERY_MS) return kept.view
-      return (await countRecapNow(which, at))?.view ?? null
-    }
-  )
+  handle('pacenote:recap:get', null, async (period, key) => {
+    const which = periodOf(period)
+    if (!which) return null
+    const at =
+      typeof key === 'string' && periodRange(which, key)
+        ? key
+        : periodKey(which, new Date())
+    const kept = recaps.get(`${getLocale()}:${which}:${at}`)
+    if (kept && Date.now() - kept.at < RECAP_EVERY_MS) return kept.view
+    return (await countRecapNow(which, at))?.view ?? null
+  })
   ipcMain.handle(
     'pacenote:recap:write',
     async (event, period: unknown, key: unknown) => {
@@ -1450,25 +1427,22 @@ function registerBotIpc(): void {
     }
   )
   // The Overview's tasks: what you handled over the last 14 days
-  ipcMain.handle('pacenote:tasks:trend', (event) => {
-    if (!fromMainWindow(event)) return null
+  handle('pacenote:tasks:trend', null, () => {
     const current = tasksSettings()
     if (!current.on) return null
     const view = tasksView(dataDir, current.exclude)
     return taskTrend(view.tasks, readWork(dataDir).entries)
   })
   // What AI tools are doing with your tasks now, over MCP
-  ipcMain.handle('pacenote:tasks:live', (event) => {
-    if (!fromMainWindow(event) || !tasksSettings().on) return null
-    return liveTasks(readActivity(dataDir))
-  })
+  handle('pacenote:tasks:live', null, () =>
+    tasksSettings().on ? liveTasks(readActivity(dataDir)) : null
+  )
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
   stopTasksWatch = watchTasks(dataDir, () =>
     mainWindow?.webContents.send('pacenote:tasks:changed')
   )
-  ipcMain.handle('pacenote:tasks:collect', (event) => {
-    if (!fromMainWindow(event)) return undefined
+  handle('pacenote:tasks:collect', undefined, () => {
     if (!tasksSettings().on)
       return {
         at: new Date().toISOString(),
@@ -1477,19 +1451,15 @@ function registerBotIpc(): void {
       }
     return taskCollector.run()
   })
-  ipcMain.handle('pacenote:tasks:collect-stop', (event) => {
-    if (fromMainWindow(event)) taskCollector.cancel()
+  handle('pacenote:tasks:collect-stop', undefined, () => {
+    taskCollector.cancel()
   })
-  ipcMain.handle(
-    'pacenote:tasks:decide',
-    (event, id: unknown, decision: unknown) => {
-      if (!fromMainWindow(event) || typeof id !== 'string') return
-      decide(dataDir, id, taskDecision(decision))
-    }
-  )
-  ipcMain.handle('pacenote:tasks:leave-out', (event, label: unknown) => {
-    if (!fromMainWindow(event) || typeof label !== 'string' || !label.trim())
-      return []
+  handle('pacenote:tasks:decide', undefined, (id, decision) => {
+    if (typeof id !== 'string') return
+    decide(dataDir, id, taskDecision(decision))
+  })
+  handle('pacenote:tasks:leave-out', [], (label) => {
+    if (typeof label !== 'string' || !label.trim()) return []
     const { exclude } = tasksSettings()
     if (exclude.includes(label)) return []
     return settings.save({
@@ -1511,8 +1481,7 @@ function registerBotIpc(): void {
   })
   // Pacenote's own work signed out: claude auth login (or codex login), in
   // your terminal
-  ipcMain.handle('pacenote:tasks:sign-in', async (event, cli: unknown) => {
-    if (!fromMainWindow(event)) return undefined
+  handle('pacenote:tasks:sign-in', undefined, async (cli) => {
     try {
       await signInCli(handoff(), cli === 'codex' ? 'codex' : 'claude')
       return {}
@@ -1788,8 +1757,8 @@ function registerBotIpc(): void {
       file.suggested?.find((s) => s.id === entryId)
     return entry?.kind === 'session' ? entry : undefined
   }
-  ipcMain.handle('pacenote:tasks:detail', (event, id: unknown) =>
-    fromMainWindow(event) && typeof id === 'string' ? taskDetail(id) : null
+  handle('pacenote:tasks:detail', null, (id) =>
+    typeof id === 'string' ? taskDetail(id) : null
   )
   // What a task's quiet session looked like: close the task with how it
   // ended, or not yet; or keep a thing left after it as a task
@@ -1802,126 +1771,104 @@ function registerBotIpc(): void {
         p.task === id && !p.answer ? change(p) : p
       ),
     }))
-  ipcMain.handle(
-    'pacenote:tasks:answer-proposal',
-    (event, id: unknown, answer: unknown) => {
-      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-      const proposal = proposalOf(id)
-      if (!proposal) return { error: localized(text).nothingToAnswer }
-      if (answer === 'close') {
-        // Done in its session; how it ended is the wrap-up, not a note too
-        closeTask(dataDir, id, 'resolved', new Date(), {
-          by: proposal.tool === 'claude' ? 'claude-code' : 'codex',
-          wrapUp: proposal.summary,
-        })
-        answered(id, (p) => ({ ...p, answer: 'closed' }))
-      } else answered(id, (p) => ({ ...p, answer: 'not-yet' }))
-      return {}
-    }
-  )
-  ipcMain.handle(
-    'pacenote:tasks:keep-left',
-    (event, id: unknown, text: unknown) => {
-      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-      if (typeof text !== 'string' || !text.trim()) return undefined
-      const result = addFollowUp(
-        dataDir,
-        { title: text, why: 'Left after it, from its session', after: id },
-        { addedBy: 'pacenote' }
-      )
-      if ('error' in result) return result
-      answered(id, (p) => ({
-        ...p,
-        left: (p.left ?? []).filter((item) => item !== text),
-      }))
-      return { id: result.task.id }
-    }
-  )
+  handle('pacenote:tasks:answer-proposal', undefined, (id, answer) => {
+    if (typeof id !== 'string') return undefined
+    const proposal = proposalOf(id)
+    if (!proposal) return { error: localized(text).nothingToAnswer }
+    if (answer === 'close') {
+      // Done in its session; how it ended is the wrap-up, not a note too
+      closeTask(dataDir, id, 'resolved', new Date(), {
+        by: proposal.tool === 'claude' ? 'claude-code' : 'codex',
+        wrapUp: proposal.summary,
+      })
+      answered(id, (p) => ({ ...p, answer: 'closed' }))
+    } else answered(id, (p) => ({ ...p, answer: 'not-yet' }))
+    return {}
+  })
+  handle('pacenote:tasks:keep-left', undefined, (id, text) => {
+    if (typeof id !== 'string') return undefined
+    if (typeof text !== 'string' || !text.trim()) return undefined
+    const result = addFollowUp(
+      dataDir,
+      { title: text, why: 'Left after it, from its session', after: id },
+      { addedBy: 'pacenote' }
+    )
+    if ('error' in result) return result
+    answered(id, (p) => ({
+      ...p,
+      left: (p.left ?? []).filter((item) => item !== text),
+    }))
+    return { id: result.task.id }
+  })
   // A suggested session: yours for the task, or not
-  ipcMain.handle(
-    'pacenote:tasks:answer-suggestion',
-    (event, entryId: unknown, yes: unknown) => {
-      if (!fromMainWindow(event) || typeof entryId !== 'string') return
-      answerSuggestion(dataDir, entryId, yes === true)
-      // A session that is the task's lends it its branch: look again.
-      linkSessionsSoon(true)
-    }
-  )
+  handle('pacenote:tasks:answer-suggestion', undefined, (entryId, yes) => {
+    if (typeof entryId !== 'string') return
+    answerSuggestion(dataDir, entryId, yes === true)
+    // A session that is the task's lends it its branch: look again.
+    linkSessionsSoon(true)
+  })
   // Where a task may open: its repository's folder and checkouts, or the
   // folders you worked in lately, likeliest first
-  ipcMain.handle('pacenote:tasks:folders', (event, id: unknown) => {
-    if (!fromMainWindow(event) || typeof id !== 'string') return []
+  handle('pacenote:tasks:folders', [], (id) => {
+    if (typeof id !== 'string') return []
     const task = allTaskViews(dataDir).find((t) => t.id === id)
     return task ? suggestFolders(task, { home: homedir(), dataDir }) : []
   })
-  ipcMain.handle(
-    'pacenote:tasks:choose-folder',
-    async (event, repo: unknown) => {
-      if (!fromMainWindow(event) || !mainWindow) return undefined
-      // Next to the folder you worked in last, where your checkouts are
-      const [last] = recentFolders(homedir(), { leaveOut: [dataDir], limit: 1 })
-      const t = localized(text)
-      const result = await dialog.showOpenDialog(mainWindow, {
-        title: typeof repo === 'string' ? t.whereIs(repo) : t.chooseFolder,
-        defaultPath: last ? path.dirname(last.path) : homedir(),
-        properties: ['openDirectory'],
-      })
-      const folder = result.filePaths[0]
-      if (result.canceled || !folder) return undefined
-      return checkFolder(folder, typeof repo === 'string' ? repo : undefined)
-    }
-  )
-  ipcMain.handle('pacenote:tasks:repos', (event) =>
-    fromMainWindow(event) ? readRepos(dataDir) : {}
-  )
+  handle('pacenote:tasks:choose-folder', undefined, async (repo) => {
+    if (!mainWindow) return undefined
+    // Next to the folder you worked in last, where your checkouts are
+    const [last] = recentFolders(homedir(), { leaveOut: [dataDir], limit: 1 })
+    const t = localized(text)
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: typeof repo === 'string' ? t.whereIs(repo) : t.chooseFolder,
+      defaultPath: last ? path.dirname(last.path) : homedir(),
+      properties: ['openDirectory'],
+    })
+    const folder = result.filePaths[0]
+    if (result.canceled || !folder) return undefined
+    return checkFolder(folder, typeof repo === 'string' ? repo : undefined)
+  })
+  handle('pacenote:tasks:repos', {}, () => readRepos(dataDir))
   // Settings > Todo: whether the Claude app and the Codex app are on this Mac
-  ipcMain.handle('pacenote:tasks:apps', (event) =>
-    fromMainWindow(event)
-      ? { claude: hasApp('claude'), codex: hasApp('codex') }
-      : null
-  )
-  ipcMain.handle(
-    'pacenote:tasks:set-repo',
-    (event, repo: unknown, folder: unknown) => {
-      if (!fromMainWindow(event) || typeof repo !== 'string') return {}
-      return saveRepo(
-        dataDir,
-        repo,
-        typeof folder === 'string' && folder ? folder : undefined
+  handle('pacenote:tasks:apps', null, () => ({
+    claude: hasApp('claude'),
+    codex: hasApp('codex'),
+  }))
+  handle('pacenote:tasks:set-repo', {}, (repo, folder) => {
+    if (typeof repo !== 'string') return {}
+    return saveRepo(
+      dataDir,
+      repo,
+      typeof folder === 'string' && folder ? folder : undefined
+    )
+  })
+  handle('pacenote:tasks:continue', undefined, async (id, how) => {
+    if (typeof id !== 'string') return undefined
+    const { tool, folder } = (how ?? {}) as {
+      tool?: unknown
+      folder?: unknown
+    }
+    const t = localized(text)
+    const detail = taskDetail(id, 'en')
+    if (!detail) return { error: t.noSuchTask }
+    if (typeof folder !== 'string' || !folder)
+      return { error: t.chooseFolderFirst }
+    try {
+      if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
+      const { entry, note } = await openSession(
+        handoff(),
+        detail.task,
+        detail.context,
+        tool === 'codex' ? 'codex' : 'claude',
+        folder
       )
+      addWork(dataDir, entry)
+      return { entry, note }
+    } catch (error) {
+      return { error: (error as Error).message }
     }
-  )
-  ipcMain.handle(
-    'pacenote:tasks:continue',
-    async (event, id: unknown, how: unknown) => {
-      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-      const { tool, folder } = (how ?? {}) as {
-        tool?: unknown
-        folder?: unknown
-      }
-      const t = localized(text)
-      const detail = taskDetail(id, 'en')
-      if (!detail) return { error: t.noSuchTask }
-      if (typeof folder !== 'string' || !folder)
-        return { error: t.chooseFolderFirst }
-      try {
-        if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
-        const { entry, note } = await openSession(
-          handoff(),
-          detail.task,
-          detail.context,
-          tool === 'codex' ? 'codex' : 'claude',
-          folder
-        )
-        addWork(dataDir, entry)
-        return { entry, note }
-      } catch (error) {
-        return { error: (error as Error).message }
-      }
-    }
-  )
-  ipcMain.handle('pacenote:tasks:resume', async (event, entryId: unknown) => {
-    if (!fromMainWindow(event)) return undefined
+  })
+  handle('pacenote:tasks:resume', undefined, async (entryId) => {
     const t = localized(text)
     const entry = sessionEntry(entryId)
     if (!entry) return { error: t.noSuchSession }
@@ -1948,8 +1895,8 @@ function registerBotIpc(): void {
     }
   })
   const drafting = new Set<string>()
-  ipcMain.handle('pacenote:tasks:draft', async (event, id: unknown) => {
-    if (!fromMainWindow(event) || typeof id !== 'string') return undefined
+  handle('pacenote:tasks:draft', undefined, async (id) => {
+    if (typeof id !== 'string') return undefined
     const t = localized(text)
     const detail = taskDetail(id, 'en')
     if (!detail) return { error: t.noSuchTask }
@@ -1993,40 +1940,36 @@ function registerBotIpc(): void {
       drafting.delete(id)
     }
   })
-  ipcMain.handle(
-    'pacenote:tasks:copy-reply',
-    (event, id: unknown, reply: unknown) => {
-      if (!fromMainWindow(event) || typeof id !== 'string') return undefined
-      const t = localized(text)
-      if (typeof reply !== 'string' || !reply.trim())
-        return { error: t.emptyReply }
-      const task = allTaskViews(dataDir).find((view) => view.id === id)
-      if (!task) return { error: t.noSuchTask }
-      clipboard.writeText(reply)
-      const at = new Date().toISOString()
-      const latest = workFor(readWork(dataDir).entries, id).find(
-        (entry) => entry.kind === 'draft'
+  handle('pacenote:tasks:copy-reply', undefined, (id, reply) => {
+    if (typeof id !== 'string') return undefined
+    const t = localized(text)
+    if (typeof reply !== 'string' || !reply.trim())
+      return { error: t.emptyReply }
+    const task = allTaskViews(dataDir).find((view) => view.id === id)
+    if (!task) return { error: t.noSuchTask }
+    clipboard.writeText(reply)
+    const at = new Date().toISOString()
+    const latest = workFor(readWork(dataDir).entries, id).find(
+      (entry) => entry.kind === 'draft'
+    )
+    if (latest)
+      updateWork(dataDir, latest.id, (e) =>
+        e.kind === 'draft' ? { ...e, text: reply, copiedAt: at } : e
       )
-      if (latest)
-        updateWork(dataDir, latest.id, (e) =>
-          e.kind === 'draft' ? { ...e, text: reply, copiedAt: at } : e
-        )
-      else
-        addWork(dataDir, {
-          kind: 'draft',
-          id: randomUUID(),
-          task: id,
-          at,
-          text: reply,
-          copiedAt: at,
-        })
-      const link = task.source.permalink
-      if (link && /^https:\/\//.test(link)) void shell.openExternal(link)
-      return {}
-    }
-  )
-  ipcMain.handle('pacenote:tasks:session-log', (event, entryId: unknown) => {
-    if (!fromMainWindow(event)) return undefined
+    else
+      addWork(dataDir, {
+        kind: 'draft',
+        id: randomUUID(),
+        task: id,
+        at,
+        text: reply,
+        copiedAt: at,
+      })
+    const link = task.source.permalink
+    if (link && /^https:\/\//.test(link)) void shell.openExternal(link)
+    return {}
+  })
+  handle('pacenote:tasks:session-log', undefined, (entryId) => {
     const t = localized(text)
     const entry = sessionEntry(entryId)
     if (!entry) return { error: t.noSuchSession }
@@ -2043,14 +1986,12 @@ function registerBotIpc(): void {
       return { error: (error as Error).message }
     }
   })
-  ipcMain.handle('pacenote:settings:get', (event) =>
-    fromMainWindow(event) ? settings.view() : null
+  handle('pacenote:settings:get', null, () => settings.view())
+  handle('pacenote:settings:validate', [], (changes) =>
+    settings.validate(changes)
   )
-  ipcMain.handle('pacenote:settings:validate', (event, changes: unknown) =>
-    fromMainWindow(event) ? settings.validate(changes) : []
-  )
-  ipcMain.handle('pacenote:settings:check-slack', (event, changes: unknown) =>
-    fromMainWindow(event) ? settings.checkSlack(changes) : []
+  handle('pacenote:settings:check-slack', [], (changes) =>
+    settings.checkSlack(changes)
   )
   // New settings take effect only after the bot restarts. A stopped bot is
   // started fresh.
@@ -2068,10 +2009,10 @@ function registerBotIpc(): void {
     else return false
     return true
   }
-  ipcMain.handle(
+  handle(
     'pacenote:settings:save',
-    async (event, changes: unknown, restart: unknown) => {
-      if (!fromMainWindow(event)) return { issues: [], restarted: false }
+    { issues: [], restarted: false },
+    async (changes, restart) => {
       const issues = settings.save(changes)
       if (issues.length > 0 || restart !== true)
         return { issues, restarted: false }
@@ -2110,12 +2051,8 @@ function registerBotIpc(): void {
   )
   // The first-run wizard: where it got to, what this Mac has, and "@Pace
   // it's me" on your own Slack app.
-  ipcMain.handle('pacenote:setup:state', (event) =>
-    fromMainWindow(event) ? setup.view() : null
-  )
-  ipcMain.handle('pacenote:setup:save', (event, patch: unknown) =>
-    fromMainWindow(event) ? setup.save(patch) : null
-  )
+  handle('pacenote:setup:state', null, () => setup.view())
+  handle('pacenote:setup:save', null, (patch) => setup.save(patch))
   /** Whether each CLI is on this Mac and signed in, as you would run it */
   const detectClis = async () => {
     const env = settings.effectiveEnv()
@@ -2149,54 +2086,39 @@ function registerBotIpc(): void {
     )
   }
   // Connect to your other Mac: setup takes your Slack app from it
-  ipcMain.handle('pacenote:setup:mac-state', (event) =>
-    fromMainWindow(event) ? (fromMac?.current ?? null) : null
-  )
-  ipcMain.handle('pacenote:setup:mac-look', (event) => {
-    if (fromMainWindow(event)) fromMac?.look()
+  handle('pacenote:setup:mac-state', null, () => fromMac?.current ?? null)
+  handle('pacenote:setup:mac-look', undefined, () => {
+    fromMac?.look()
   })
-  ipcMain.handle('pacenote:setup:mac-connect', (event, raw: unknown) => {
-    if (!fromMainWindow(event)) return
+  handle('pacenote:setup:mac-connect', undefined, (raw) => {
     const target = (raw ?? {}) as { instance?: unknown; address?: unknown }
     if (typeof target.instance === 'string')
       void fromMac?.connect({ instance: target.instance })
     else if (typeof target.address === 'string')
       void fromMac?.connect({ address: target.address })
   })
-  ipcMain.handle('pacenote:setup:mac-cancel', (event) => {
-    if (fromMainWindow(event)) fromMac?.cancel()
+  handle('pacenote:setup:mac-cancel', undefined, () => {
+    fromMac?.cancel()
   })
-  ipcMain.handle('pacenote:setup:detect', async (event) => {
-    if (!fromMainWindow(event)) return null
-    return {
-      cli: await detectClis(),
-      sandbox: { unsupported: vmUnsupported() },
-    }
-  })
+  handle('pacenote:setup:detect', null, async () => ({
+    cli: await detectClis(),
+    sandbox: { unsupported: vmUnsupported() },
+  }))
   // Which CLI does Pacenote's own work now, without checking them
-  ipcMain.handle('pacenote:ai:now', (event) =>
-    fromMainWindow(event) ? ownAi.now() : null
-  )
+  handle('pacenote:ai:now', null, () => ownAi.now())
   // Settings > Todo: the CLIs that do Pacenote's own work, each with whether
   // it is here and signed in, and what it last did
-  ipcMain.handle(
-    'pacenote:ai:state',
-    async (event): Promise<OwnAiView | null> => {
-      if (!fromMainWindow(event)) return null
-      const [clis, opencode] = await Promise.all([
-        detectClis(),
-        detectOpencode(),
-      ])
-      return {
-        ...ownAi.now(),
-        clis: {
-          claude: cliReadiness(clis.claude),
-          codex: cliReadiness(clis.codex),
-          opencode: cliReadiness(opencode),
-        },
-      }
+  handle('pacenote:ai:state', null, async (): Promise<OwnAiView> => {
+    const [clis, opencode] = await Promise.all([detectClis(), detectOpencode()])
+    return {
+      ...ownAi.now(),
+      clis: {
+        claude: cliReadiness(clis.claude),
+        codex: cliReadiness(clis.codex),
+        opencode: cliReadiness(opencode),
+      },
     }
-  )
+  })
   ipcMain.handle('pacenote:setup:claim-start', (event) =>
     hubCall(event, () =>
       claimStep(async () => {
@@ -2254,19 +2176,17 @@ function registerBotIpc(): void {
     )
   )
   // Left without confirming: Pace runs again if listening stopped it.
-  ipcMain.handle('pacenote:setup:claim-stop', (event) =>
-    fromMainWindow(event)
-      ? claimStep(async () => {
-          await stopClaim()
-          if (claimPaused) {
-            claimPaused = false
-            await supervisor?.start()
-          }
-        })
-      : undefined
+  handle('pacenote:setup:claim-stop', undefined, () =>
+    claimStep(async () => {
+      await stopClaim()
+      if (claimPaused) {
+        claimPaused = false
+        await supervisor?.start()
+      }
+    })
   )
-  ipcMain.handle('pacenote:hub:pair-cancel', (event) => {
-    if (fromMainWindow(event)) hubPairing.cancel()
+  handle('pacenote:hub:pair-cancel', undefined, () => {
+    hubPairing.cancel()
   })
   ipcMain.handle('pacenote:hub:disconnect', (event) =>
     hubCall(event, async () => {
@@ -2275,58 +2195,44 @@ function registerBotIpc(): void {
       return { issues }
     })
   )
-  ipcMain.handle('pacenote:settings:open-data-dir', (event) => {
-    if (fromMainWindow(event)) void shell.openPath(dataDir)
+  handle('pacenote:settings:open-data-dir', undefined, () => {
+    void shell.openPath(dataDir)
   })
-  ipcMain.handle('pacenote:settings:reveal-file', (event) => {
-    if (fromMainWindow(event)) shell.showItemInFolder(settingsFile)
+  handle('pacenote:settings:reveal-file', undefined, () => {
+    shell.showItemInFolder(settingsFile)
   })
   // The settings screen turns the launch into commands to add it by hand.
-  ipcMain.handle('pacenote:settings:history-mcp', (event) =>
-    fromMainWindow(event) ? mcpLaunch() : undefined
+  handle('pacenote:settings:history-mcp', undefined, () => mcpLaunch())
+  handle('pacenote:mcp:status', [], () => mcpClients.status())
+  handle('pacenote:mcp:connect', undefined, (id) =>
+    isMcpClientId(id) ? mcpClients.connect(id) : undefined
   )
-  ipcMain.handle('pacenote:mcp:status', (event) =>
-    fromMainWindow(event) ? mcpClients.status() : []
+  handle('pacenote:mcp:disconnect', undefined, (id) =>
+    isMcpClientId(id) ? mcpClients.disconnect(id) : undefined
   )
-  ipcMain.handle('pacenote:mcp:connect', (event, id: unknown) =>
-    fromMainWindow(event) && isMcpClientId(id)
-      ? mcpClients.connect(id)
-      : undefined
-  )
-  ipcMain.handle('pacenote:mcp:disconnect', (event, id: unknown) =>
-    fromMainWindow(event) && isMcpClientId(id)
-      ? mcpClients.disconnect(id)
-      : undefined
-  )
-  ipcMain.handle('pacenote:sandbox:status', (event) =>
-    fromMainWindow(event) ? sandbox.status() : null
-  )
-  ipcMain.handle('pacenote:sandbox:job', (event) =>
-    fromMainWindow(event) ? (sandbox.job ?? null) : null
-  )
+  handle('pacenote:sandbox:status', null, () => sandbox.status())
+  handle('pacenote:sandbox:job', null, () => sandbox.job ?? null)
   ipcMain.handle('pacenote:sandbox:run', (event, kind: unknown) =>
     fromMainWindow(event)
       ? sandbox.run(kind)
       : { error: localized(text).denied }
   )
-  ipcMain.handle(
-    'pacenote:sandbox:save-allowlist',
-    (event, domains: unknown) =>
-      fromMainWindow(event) ? sandbox.saveAllowlist(domains) : []
+  handle('pacenote:sandbox:save-allowlist', [], (domains) =>
+    sandbox.saveAllowlist(domains)
   )
   ipcMain.handle('pacenote:sandbox:login', (event, cli: unknown) =>
     fromMainWindow(event)
       ? sandboxSignIn.run(cli)
       : { ok: false, error: localized(text).notAllowed }
   )
-  ipcMain.handle('pacenote:sandbox:login-code', (event, code: unknown) => {
-    if (fromMainWindow(event)) sandboxSignIn.submit(code)
+  handle('pacenote:sandbox:login-code', undefined, (code) => {
+    sandboxSignIn.submit(code)
   })
-  ipcMain.handle('pacenote:sandbox:login-cancel', (event) => {
-    if (fromMainWindow(event)) sandboxSignIn.cancel()
+  handle('pacenote:sandbox:login-cancel', undefined, () => {
+    sandboxSignIn.cancel()
   })
-  ipcMain.handle('pacenote:sandbox:sign-out', (event, cli: unknown) => {
-    if (fromMainWindow(event)) sandboxSignIn.signOut(cli)
+  handle('pacenote:sandbox:sign-out', undefined, (cli) => {
+    sandboxSignIn.signOut(cli)
   })
   sandbox.on('job', (job) => {
     mainWindow?.webContents.send('pacenote:sandbox:job-changed', job)
@@ -2352,12 +2258,12 @@ function registerBotIpc(): void {
         )
       })
   })
-  ipcMain.handle('pacenote:window:full-screen', (event) =>
-    fromMainWindow(event) ? (mainWindow?.isFullScreen() ?? false) : false
+  handle(
+    'pacenote:window:full-screen',
+    false,
+    () => mainWindow?.isFullScreen() ?? false
   )
-  ipcMain.handle('pacenote:app:update', (event) =>
-    fromMainWindow(event) ? (updates?.current ?? null) : null
-  )
+  handle('pacenote:app:update', null, () => updates?.current ?? null)
   updates?.on('change', (state) => {
     mainWindow?.webContents.send('pacenote:app:update-changed', state)
     updateTray()
