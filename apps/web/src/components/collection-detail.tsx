@@ -182,118 +182,107 @@ function Result({ run }: { run: CollectionRunRecord }) {
     return <Empty>{t.collecting(run.reads ?? 0)}</Empty>
   if (!run.found) return <Stopped run={run} />
   const { added, closed, updated, wrapped, skipped } = collectionResult(run)
-  if (
-    !added.length &&
-    !closed.length &&
-    !updated.length &&
-    !wrapped.length &&
-    !skipped.length
-  )
+  if ([added, closed, updated, wrapped, skipped].every((list) => !list.length))
     return <p className="text-copy text-muted-foreground">{t.nothingNew}</p>
   const maybes = added.filter((task) => task.confidence === 'maybe').length
+  // A task it touched: what it did to it, and where the task is now
+  const row = (
+    task: { id: string; title: string },
+    meta?: string,
+    key = task.id
+  ) => {
+    const state = now.get(task.id)
+    return (
+      <li
+        key={key}
+        className="flex items-start gap-4 border-t border-border py-3"
+      >
+        <div className="min-w-0 flex-1">
+          <a
+            href={`#/tasks/${encodeURIComponent(task.id)}`}
+            className="text-section underline-offset-2 hover:underline"
+          >
+            {task.title}
+          </a>
+          {meta && (
+            <p className="mt-1 text-meta text-muted-foreground">{meta}</p>
+          )}
+        </div>
+        {state && (
+          <span className={cn('shrink-0 text-meta', STATE[state])}>
+            {t.state[state]}
+          </span>
+        )}
+      </li>
+    )
+  }
   return (
     <div className="space-y-7">
-      {added.length > 0 && (
-        <Section
-          icon={<ListPlus className="text-primary" />}
-          title={t.added}
-          meta={t.addedMeta(added.length - maybes, maybes)}
-        >
-          {added.map((task) => (
-            <TaskRow
-              key={task.id}
-              id={task.id}
-              title={task.title}
-              meta={task.confidence === 'maybe' ? t.maybe : undefined}
-              state={now.get(task.id)}
-            />
-          ))}
-        </Section>
-      )}
-      {closed.length > 0 && (
-        <Section
-          icon={<CircleCheck className="text-primary" />}
-          title={t.closed}
-          meta={t.tasks(closed.length)}
-        >
-          {closed.map((task) => (
-            <TaskRow
-              key={task.id}
-              id={task.id}
-              title={task.title}
-              meta={[t.why[task.why] ?? task.why, task.wrapUp]
-                .filter(Boolean)
-                .join(' · ')}
-              state={now.get(task.id)}
-            />
-          ))}
-        </Section>
-      )}
-      {updated.length > 0 && (
-        <Section
-          icon={<PencilLine className="text-primary" />}
-          title={t.updated}
-          meta={t.tasks(updated.length)}
-        >
-          {updated.map((task, index) => (
-            <TaskRow
-              key={`${task.id}-${index}`}
-              id={task.id}
-              title={task.title}
-              meta={task.why}
-              state={now.get(task.id)}
-            />
-          ))}
-        </Section>
-      )}
-      {wrapped.length > 0 && (
-        <Section
-          icon={<ClipboardCheck className="text-primary" />}
-          title={t.wrappedUp}
-          meta={t.tasks(wrapped.length)}
-        >
-          {wrapped.map((task) => (
-            <TaskRow
-              key={task.id}
-              id={task.id}
-              title={task.title}
-              meta={task.wrapUp}
-              state={now.get(task.id)}
-            />
-          ))}
-        </Section>
-      )}
-      {skipped.length > 0 && (
-        <Section
-          icon={<EyeOff className="text-muted-foreground" />}
-          title={t.leftOut}
-          meta={t.messages(skipped.length)}
-        >
-          {skipped.map((item, index) => (
-            <li
-              key={`${item.link ?? ''}-${index}`}
-              className="border-t border-border py-3 text-body text-muted-foreground"
-            >
-              {item.why ?? t.leftOutInSettings}
-            </li>
-          ))}
-        </Section>
-      )}
+      <Section
+        icon={<ListPlus className="text-primary" />}
+        title={t.added}
+        meta={t.addedMeta(added.length - maybes, maybes)}
+        rows={added.map((task) =>
+          row(task, task.confidence === 'maybe' ? t.maybe : undefined)
+        )}
+      />
+      <Section
+        icon={<CircleCheck className="text-primary" />}
+        title={t.closed}
+        meta={t.tasks(closed.length)}
+        rows={closed.map((task) =>
+          row(
+            task,
+            [t.why[task.why] ?? task.why, task.wrapUp]
+              .filter(Boolean)
+              .join(' · ')
+          )
+        )}
+      />
+      <Section
+        icon={<PencilLine className="text-primary" />}
+        title={t.updated}
+        meta={t.tasks(updated.length)}
+        rows={updated.map((task, index) =>
+          row(task, task.why, `${task.id}-${index}`)
+        )}
+      />
+      <Section
+        icon={<ClipboardCheck className="text-primary" />}
+        title={t.wrappedUp}
+        meta={t.tasks(wrapped.length)}
+        rows={wrapped.map((task) => row(task, task.wrapUp))}
+      />
+      <Section
+        icon={<EyeOff className="text-muted-foreground" />}
+        title={t.leftOut}
+        meta={t.messages(skipped.length)}
+        rows={skipped.map((item, index) => (
+          <li
+            key={`${item.link ?? ''}-${index}`}
+            className="border-t border-border py-3 text-body text-muted-foreground"
+          >
+            {item.why ?? t.leftOutInSettings}
+          </li>
+        ))}
+      />
     </div>
   )
 }
 
+/** A part of the result, left out when it has no rows */
 function Section({
   icon,
   title,
   meta,
-  children,
+  rows,
 }: {
   icon: React.ReactNode
   title: string
   meta: string
-  children: React.ReactNode
+  rows: React.ReactNode[]
 }) {
+  if (!rows.length) return null
   return (
     <section>
       <div className="flex items-center gap-2 [&_svg]:size-4 [&_svg]:shrink-0">
@@ -301,40 +290,8 @@ function Section({
         <h2 className="text-section">{title}</h2>
         <span className="ml-auto text-meta text-muted-foreground">{meta}</span>
       </div>
-      <ul className="mt-2.5">{children}</ul>
+      <ul className="mt-2.5">{rows}</ul>
     </section>
-  )
-}
-
-function TaskRow({
-  id,
-  title,
-  meta,
-  state,
-}: {
-  id: string
-  title: string
-  meta?: string
-  state?: TaskStatus
-}) {
-  const t = useText(text)
-  return (
-    <li className="flex items-start gap-4 border-t border-border py-3">
-      <div className="min-w-0 flex-1">
-        <a
-          href={`#/tasks/${encodeURIComponent(id)}`}
-          className="text-section underline-offset-2 hover:underline"
-        >
-          {title}
-        </a>
-        {meta && <p className="mt-1 text-meta text-muted-foreground">{meta}</p>}
-      </div>
-      {state && (
-        <span className={cn('shrink-0 text-meta', STATE[state])}>
-          {t.state[state]}
-        </span>
-      )}
-    </li>
   )
 }
 

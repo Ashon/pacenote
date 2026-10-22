@@ -89,6 +89,8 @@ function MentionDetail({ run }: { run: RunRecord }) {
   )
 }
 
+const TABS = ['timeline', 'attachments', 'prompt', 'raw'] as const
+
 /**
  * A run's pane while it comes: its header (status, request, tabs), its facts
  * and its first exchange, each as tall as it will be
@@ -108,18 +110,11 @@ function RunDetailSkeleton() {
             width="55%"
           />
           <TabsList className="mt-4 mb-3">
-            <TabsTrigger value="timeline" disabled>
-              {t.tabs.timeline}
-            </TabsTrigger>
-            <TabsTrigger value="attachments" disabled>
-              {t.tabs.attachments}
-            </TabsTrigger>
-            <TabsTrigger value="prompt" disabled>
-              {t.tabs.prompt}
-            </TabsTrigger>
-            <TabsTrigger value="raw" disabled>
-              {t.tabs.raw}
-            </TabsTrigger>
+            {TABS.map((tab) => (
+              <TabsTrigger key={tab} value={tab} disabled>
+                {t.tabs[tab]}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
       </header>

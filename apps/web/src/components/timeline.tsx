@@ -307,11 +307,7 @@ function ToolStep({
   const preview = isTool ? previewArgs(event.arguments) : event.command
   const output = isTool ? (event.error ?? event.result) : event.output
   const failed =
-    event.status === 'failed' ||
-    (!isTool &&
-      event.exitCode !== undefined &&
-      event.exitCode !== null &&
-      event.exitCode !== 0)
+    event.status === 'failed' || (!isTool && (event.exitCode ?? 0) !== 0)
   const icon =
     event.status === 'running' ? (
       <span className="grid size-3.5 place-items-center">
@@ -362,9 +358,7 @@ function ToolStep({
                 ? t.error
                 : isTool
                   ? t.result
-                  : t.commandOutput(
-                      event.kind === 'command' ? event.exitCode : undefined
-                    )
+                  : t.commandOutput(event.exitCode)
             }
             code={output}
           />
