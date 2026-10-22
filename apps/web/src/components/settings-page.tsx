@@ -15,7 +15,6 @@ import {
   type SettingsIssue,
   type SettingsView,
 } from '@src/settings/fields'
-import type { HubUser } from '@src/hub/protocol'
 import type { UpdateState } from '@runtime/types'
 import {
   MESSENGER_IDS,
@@ -79,7 +78,8 @@ import {
 import { formatRelative } from '@/lib/format'
 import { useSettingsView } from '@/lib/setup'
 import { useLanguage, useText, type LanguagePreference } from '@/lib/i18n'
-import { macsControl, useMacs } from '@/lib/macs'
+import { useHubPairing } from '@/lib/hub'
+import { codeWords, macsControl, useMacs } from '@/lib/macs'
 import type { AddingView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -1287,14 +1287,6 @@ function credentialsHelp(reasoner: string): string {
   return localized(text).credentialsHelp(reasoner)
 }
 
-type PairState =
-  | { step: 'idle'; note?: string }
-  | { step: 'starting' }
-  | { step: 'waiting'; code: string }
-  | { step: 'bound'; user: HubUser }
-  | { step: 'confirming'; user: HubUser }
-  | { step: 'error'; message: string }
-
 /**
  * Pairs this desktop with the team hub: get a code, send "@Pace connect
  * <code>" in Slack, then confirm the Slack member who sent it. Confirming is
@@ -1314,55 +1306,17 @@ function HubPairing({
 }) {
   const t = useText(text)
   const hub = window.pacenoteDesktop?.hub
-  const [state, setState] = useState<PairState>({ step: 'idle' })
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (state.step !== 'waiting' || !hub) return
-    const timer = setInterval(() => {
-      void hub.pairStatus().then((res) => {
-        if ('error' in res) setState({ step: 'error', message: res.error })
-        else if (res.status === 'bound')
-          setState({ step: 'bound', user: res.user })
-        else if (res.status === 'expired')
-          setState({ step: 'error', message: t.codeExpired })
-      })
-    }, 2_000)
-    return () => clearInterval(timer)
-  }, [state.step, hub, t])
-  // Leaving the screen cancels a pairing that was not confirmed.
-  useEffect(() => () => void hub?.pairCancel(), [hub])
-
-  if (!hub) return null
-  const start = () => {
-    setState({ step: 'starting' })
-    void hub
-      .pairStart(hubUrl)
-      .then((res) =>
-        setState(
-          'error' in res
-            ? { step: 'error', message: res.error }
-            : { step: 'waiting', code: res.code }
-        )
-      )
-  }
-  const cancel = (note?: string) => {
-    void hub.pairCancel()
-    setState({ step: 'idle', note })
-  }
-  const confirm = (user: HubUser) => {
-    setState({ step: 'confirming', user })
-    void hub.pairConfirm().then((res) => {
-      if ('error' in res) return setState({ step: 'error', message: res.error })
-      if (res.issues.length > 0)
-        return setState({
-          step: 'error',
-          message: res.issues.map((i) => i.message).join(' '),
-        })
+  const { state, setState, start, cancel, confirm } = useHubPairing({
+    pollMs: 2_000,
+    expired: t.codeExpired,
+    onPaired: (res) => {
       setState({ step: 'idle' })
       onPaired(t.pairedWith(res.user.name, res.team.name, res.started))
-    })
-  }
+    },
+  })
+  const [busy, setBusy] = useState(false)
+
+  if (!hub) return null
   const disconnect = () => {
     setBusy(true)
     void hub
@@ -1399,7 +1353,7 @@ function HubPairing({
                 {state.note ?? t.pairHelp}
               </p>
             </div>
-            <Button size="sm" onClick={start} disabled={!hubUrl}>
+            <Button size="sm" onClick={() => start(hubUrl)} disabled={!hubUrl}>
               <Plug />
               {t.connect}
             </Button>
@@ -2207,9 +2161,6 @@ function MacsSection() {
     </section>
   )
 }
-
-/** 482917 as both Macs show it: 482 917 */
-const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
 
 /**
  * Add a Mac, while it waits for the new Mac, when the new Mac asks (compare

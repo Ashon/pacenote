@@ -16,6 +16,8 @@ import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
 import { useText } from '@/lib/i18n'
+import { useHubPairing, type PairState } from '@/lib/hub'
+import { codeWords } from '@/lib/macs'
 import { allowedIds, useFromMac } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { localized } from '@src/i18n/locale'
@@ -102,15 +104,6 @@ export function SlackStep({
   )
 }
 
-type PairState =
-  | { step: 'idle'; note?: string }
-  | { step: 'starting' }
-  | { step: 'waiting'; code: string }
-  | { step: 'bound'; user: HubUser }
-  | { step: 'confirming'; user: HubUser }
-  /** afterCode: it went wrong after a code was given, so a new one is next */
-  | { step: 'error'; message: string; afterCode?: boolean }
-
 function ChooseConnection({
   settings,
   saved,
@@ -131,7 +124,6 @@ function ChooseConnection({
   onFromMac: (me: Me) => void
 }) {
   const t = useText(text)
-  const hub = window.pacenoteDesktop?.hub
   const mac = useFromMac()
   const [chosen, setChosen] = useState<Choice>()
   const connection: Choice =
@@ -142,9 +134,17 @@ function ChooseConnection({
       : 'app')
   const [url, setUrl] = useState<string>()
   const hubUrl = url ?? settings?.values.HUB_URL ?? ''
-  const [pair, setPair] = useState<PairState>({ step: 'idle' })
-  /** The pairing asked for last: one cancelled meanwhile is let go */
-  const attempt = useRef(0)
+  const {
+    state: pair,
+    start: startPairing,
+    cancel,
+    confirm,
+  } = useHubPairing({
+    pollMs: 1_500,
+    expired: t.codeExpired,
+    confirmWith: { start: false },
+    onPaired: ({ user }) => onPaired({ id: user.id, name: user.name }),
+  })
   // Paired here before, with this hub: going on needs no new code.
   const pairedHere =
     paired &&
@@ -154,57 +154,10 @@ function ChooseConnection({
       ? paired
       : undefined
 
-  useEffect(() => {
-    if (pair.step !== 'waiting' || !hub) return
-    const timer = setInterval(() => {
-      void hub.pairStatus().then((res) => {
-        if ('error' in res)
-          setPair({ step: 'error', message: res.error, afterCode: true })
-        else if (res.status === 'bound')
-          setPair({ step: 'bound', user: res.user })
-        else if (res.status === 'expired')
-          setPair({ step: 'error', message: t.codeExpired, afterCode: true })
-      })
-    }, 1_500)
-    return () => clearInterval(timer)
-  }, [pair.step, hub, t])
-  // Leaving cancels a pairing that was not confirmed.
-  useEffect(() => () => void hub?.pairCancel(), [hub])
   // Leaving the step lets your other Mac go
   useEffect(() => () => void window.pacenoteDesktop?.setup?.macCancel(), [])
 
-  const start = () => {
-    const id = ++attempt.current
-    setPair({ step: 'starting' })
-    void hub?.pairStart(hubUrl).then((res) => {
-      if (attempt.current !== id) {
-        if (!('error' in res)) void hub.pairCancel()
-        return
-      }
-      setPair(
-        'error' in res
-          ? { step: 'error', message: res.error }
-          : { step: 'waiting', code: res.code }
-      )
-    })
-  }
-  const cancel = (note?: string) => {
-    attempt.current += 1
-    void hub?.pairCancel()
-    setPair({ step: 'idle', note })
-  }
-  const confirm = (user: HubUser) => {
-    setPair({ step: 'confirming', user })
-    void hub?.pairConfirm({ start: false }).then((res) => {
-      if ('error' in res) return setPair({ step: 'error', message: res.error })
-      if (res.issues.length > 0)
-        return setPair({
-          step: 'error',
-          message: res.issues.map((issue) => issue.message).join(' '),
-        })
-      onPaired({ id: res.user.id, name: res.user.name })
-    })
-  }
+  const start = () => startPairing(hubUrl)
   const choose = (next: Choice) => {
     if (next !== 'hub' && pair.step !== 'idle') cancel()
     if (next === 'mac' && connection !== 'mac') mac.look()
@@ -357,9 +310,6 @@ function ChooseConnection({
     </StepFrame>
   )
 }
-
-/** 482917 as both Macs show it: 482 917 */
-const codeWords = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`
 
 /**
  * 3c. Your other Mac: found waiting in Add a Mac, or by its address; the

@@ -20,6 +20,10 @@ export function useMacs(): MacsView | undefined {
 
 export const macsControl = () => window.pacenoteDesktop?.macs
 
+/** 482917 as both Macs show it: 482 917 */
+export const codeWords = (code: string) =>
+  `${code.slice(0, 3)} ${code.slice(3)}`
+
 /** Another of your Macs by its id, as you named it */
 export const macNamed = (view: MacsView | undefined, id: string): string =>
   view?.macs.find((mac) => mac.id === id)?.name ?? localized(text).otherMac
