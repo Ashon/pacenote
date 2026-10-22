@@ -86,11 +86,36 @@ const same = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right)
 }
 
+/** This Mac's hello, with its proof once it has one */
+const helloOf = (key: Buffer, me: MacHello, nonce: string, signed?: string) =>
+  JSON.stringify({
+    t: 'hello',
+    v: PROTOCOL,
+    group: macsGroup(key),
+    id: me.id,
+    name: me.name,
+    nonce,
+    proof: signed,
+  } satisfies HelloMessage)
+
 /**
  * A handshake that did not go through, and why, in the app's language (as
  * Settings > Macs and the setup show it)
  */
 class HandshakeError extends Error {}
+
+/** A handshake turned down: the socket closes, and the error says why */
+function refuse(ws: WebSocket, message: string): HandshakeError {
+  ws.close()
+  return new HandshakeError(message)
+}
+
+/** A handshake's next frame, the socket closed if none comes as it should */
+const closing = <T>(ws: WebSocket, frame: Promise<T>) =>
+  frame.catch((err: unknown) => {
+    ws.close()
+    throw err
+  })
 
 /** A channel the handshake opened: sealed messages, both ways */
 export class MacChannel extends EventEmitter<{
@@ -280,20 +305,8 @@ export async function dial(
   const incoming = new Incoming(ws)
   const nonce = randomBytes(16).toString('base64')
   const answer = incoming.next(options.timeoutMs ?? HANDSHAKE_MS)
-  ws.send(
-    JSON.stringify({
-      t: 'hello',
-      v: PROTOCOL,
-      group: macsGroup(key),
-      id: me.id,
-      name: me.name,
-      nonce,
-    } satisfies HelloMessage)
-  )
-  const hello = await answer.catch((err: unknown) => {
-    ws.close()
-    throw err
-  })
+  ws.send(helloOf(key, me, nonce))
+  const hello = await closing(ws, answer)
   const dialer = { id: me.id, nonce }
   if (
     hello.t !== 'hello' ||
@@ -302,25 +315,10 @@ export async function dial(
     typeof hello.nonce !== 'string' ||
     !hello.proof ||
     !same(hello.proof, proof(key, 'listener', dialer, hello))
-  ) {
-    ws.close()
-    throw new HandshakeError(t.otherApp)
-  }
-  if (hello.id === me.id) {
-    ws.close()
-    throw new HandshakeError(t.thisMac)
-  }
-  ws.send(
-    JSON.stringify({
-      t: 'hello',
-      v: PROTOCOL,
-      group: macsGroup(key),
-      id: me.id,
-      name: me.name,
-      nonce,
-      proof: proof(key, 'dialer', dialer, hello),
-    } satisfies HelloMessage)
   )
+    throw refuse(ws, t.otherApp)
+  if (hello.id === me.id) throw refuse(ws, t.thisMac)
+  ws.send(helloOf(key, me, nonce, proof(key, 'dialer', dialer, hello)))
   const keys = sessionKeys(key, nonce, hello.nonce)
   return new MacChannel(
     ws,
@@ -339,49 +337,29 @@ export async function accept(
   const { key, me } = options
   const timeoutMs = options.timeoutMs ?? HANDSHAKE_MS
   const t = localized(text)
-  const fail = (message: string) => {
-    ws.close()
-    return new HandshakeError(message)
-  }
   const incoming = new Incoming(ws)
-  const hello = await incoming.next(timeoutMs).catch((err: unknown) => {
-    ws.close()
-    throw err
-  })
+  const hello = await closing(ws, incoming.next(timeoutMs))
   if (
     hello.t !== 'hello' ||
     hello.v !== PROTOCOL ||
     typeof hello.id !== 'string' ||
     typeof hello.nonce !== 'string'
   )
-    throw fail(t.unexpected)
-  if (hello.group !== macsGroup(key)) throw fail(t.otherApp)
-  if (hello.id === me.id) throw fail(t.thisMac)
+    throw refuse(ws, t.unexpected)
+  if (hello.group !== macsGroup(key)) throw refuse(ws, t.otherApp)
+  if (hello.id === me.id) throw refuse(ws, t.thisMac)
   const nonce = randomBytes(16).toString('base64')
   const listener = { id: me.id, nonce }
   const confirmed = incoming.next(timeoutMs)
-  ws.send(
-    JSON.stringify({
-      t: 'hello',
-      v: PROTOCOL,
-      group: macsGroup(key),
-      id: me.id,
-      name: me.name,
-      nonce,
-      proof: proof(key, 'listener', hello, listener),
-    } satisfies HelloMessage)
-  )
-  const second = await confirmed.catch((err: unknown) => {
-    ws.close()
-    throw err
-  })
+  ws.send(helloOf(key, me, nonce, proof(key, 'listener', hello, listener)))
+  const second = await closing(ws, confirmed)
   if (
     second.id !== hello.id ||
     second.nonce !== hello.nonce ||
     !second.proof ||
     !same(second.proof, proof(key, 'dialer', hello, listener))
   )
-    throw fail(t.otherApp)
+    throw refuse(ws, t.otherApp)
   const keys = sessionKeys(key, hello.nonce, nonce)
   return new MacChannel(
     ws,
@@ -420,11 +398,22 @@ interface SetupOpened {
   code: string
 }
 
-function setupKeys(): { privateKey: KeyObject; key: string } {
+/** This Mac's setup hello, and the private key behind it */
+function setupHello(me: MacHello): {
+  privateKey: KeyObject
+  hello: SetupHello
+} {
   const { publicKey, privateKey } = generateKeyPairSync('x25519')
   return {
     privateKey,
-    key: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    hello: {
+      t: 'setup',
+      v: SETUP_PROTOCOL,
+      id: me.id,
+      name: me.name,
+      key: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+      nonce: randomBytes(16).toString('base64'),
+    },
   }
 }
 
@@ -475,27 +464,13 @@ export async function setupDial(
   options: { me: MacHello; timeoutMs?: number }
 ): Promise<SetupOpened> {
   const incoming = new Incoming(ws)
-  const { privateKey, key } = setupKeys()
-  const hello: SetupHello = {
-    t: 'setup',
-    v: SETUP_PROTOCOL,
-    id: options.me.id,
-    name: options.me.name,
-    key,
-    nonce: randomBytes(16).toString('base64'),
-  }
+  const { privateKey, hello } = setupHello(options.me)
   const answer = incoming.next<Partial<SetupHello>>(
     options.timeoutMs ?? HANDSHAKE_MS
   )
   ws.send(JSON.stringify(hello))
-  const peer = await answer.catch((err: unknown) => {
-    ws.close()
-    throw err
-  })
-  if (!isSetupHello(peer)) {
-    ws.close()
-    throw new HandshakeError(localized(text).notWaiting)
-  }
+  const peer = await closing(ws, answer)
+  if (!isSetupHello(peer)) throw refuse(ws, localized(text).notWaiting)
   const secrets = setupSecrets(privateKey, hello, peer, peer.key)
   return {
     code: secrets.code,
@@ -515,25 +490,12 @@ export async function setupAccept(
   options: { me: MacHello; timeoutMs?: number }
 ): Promise<SetupOpened> {
   const incoming = new Incoming(ws)
-  const peer = await incoming
-    .next<Partial<SetupHello>>(options.timeoutMs ?? HANDSHAKE_MS)
-    .catch((err: unknown) => {
-      ws.close()
-      throw err
-    })
-  if (!isSetupHello(peer)) {
-    ws.close()
-    throw new HandshakeError(localized(text).unexpected)
-  }
-  const { privateKey, key } = setupKeys()
-  const hello: SetupHello = {
-    t: 'setup',
-    v: SETUP_PROTOCOL,
-    id: options.me.id,
-    name: options.me.name,
-    key,
-    nonce: randomBytes(16).toString('base64'),
-  }
+  const peer = await closing(
+    ws,
+    incoming.next<Partial<SetupHello>>(options.timeoutMs ?? HANDSHAKE_MS)
+  )
+  if (!isSetupHello(peer)) throw refuse(ws, localized(text).unexpected)
+  const { privateKey, hello } = setupHello(options.me)
   ws.send(JSON.stringify(hello))
   const secrets = setupSecrets(privateKey, peer, hello, peer.key)
   return {

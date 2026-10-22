@@ -823,9 +823,7 @@ export class Macs extends EventEmitter<{
     const adding = this.adding
     if (!adding || adding.result) return
     if (kind === 'expired') adding.request?.channel.send({ t: 'setup-expired' })
-    adding.advert?.stop()
-    clearTimeout(adding.timer)
-    adding.request?.channel.close()
+    this.clearAdding()
     this.adding = {
       until: adding.until,
       result: { kind, ...(name ? { name } : {}) },
