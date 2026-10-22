@@ -21,7 +21,7 @@ export type OwnCli = (typeof OWN_CLIS)[number]
  * The CLIs that take over when the one chosen cannot: Claude Code and Codex.
  * opencode does the work only when it is the one chosen.
  */
-export const TAKING_OVER: readonly OwnCli[] = ['claude', 'codex']
+const TAKING_OVER: readonly OwnCli[] = ['claude', 'codex']
 
 /** The CLIs that read Slack through their own connector */
 export type ConnectorCli = 'claude' | 'codex'

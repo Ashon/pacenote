@@ -28,7 +28,7 @@ import type { FolderCheck, TaskView } from './types.js'
 const run = promisify(execFile)
 
 /** Each repository's folder on this Mac (tasks-repos.json, the app's) */
-export const REPOS_FILE = 'tasks-repos.json'
+const REPOS_FILE = 'tasks-repos.json'
 
 export function readRepos(dataDir: string): Record<string, string> {
   const file = readJson<{ repos?: Record<string, string> }>(

@@ -285,7 +285,7 @@ export function summarize(run: HistoryRecord): RunSummary {
   }
 }
 
-export const TRIGGER_LABEL: Record<CollectionRunRecord['trigger'], string> = {
+const TRIGGER_LABEL: Record<CollectionRunRecord['trigger'], string> = {
   now: 'Collect now',
 }
 

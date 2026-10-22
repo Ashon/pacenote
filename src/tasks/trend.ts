@@ -8,10 +8,10 @@ import type { HandledHow, TaskTrend, TaskView, WorkEntry } from './types.js'
  * done already. Dismissing one as not yours or not worth it is not handling it.
  */
 
-export const TREND_DAYS = 14
+const TREND_DAYS = 14
 
 /** How a task was handled; undefined when it was not */
-export function handledHow(
+function handledHow(
   task: TaskView,
   work: readonly WorkEntry[]
 ): HandledHow | undefined {

@@ -27,9 +27,9 @@ const DAY = 86_400_000
 /** How far back your work is read: 8 weeks */
 export const WINDOW_MS = 56 * DAY
 /** What lately and roles count */
-export const RECENT_MS = 30 * DAY
+const RECENT_MS = 30 * DAY
 /** An area with nothing for this long is resting */
-export const REST_AFTER_MS = 28 * DAY
+const REST_AFTER_MS = 28 * DAY
 /** A session that wrote this lately is working now */
 const WORKING_MS = 15 * 60_000
 /** A repository needs this much work in it to be an area */
@@ -93,7 +93,7 @@ const yourTask = (task: TaskView) =>
   task.status !== 'maybe' &&
   (task.status !== 'dismissed' || task.dismissReason === 'done-already')
 
-export function taskParts(task: TaskView): AreaPart[] {
+function taskParts(task: TaskView): AreaPart[] {
   const parts: AreaPart[] = []
   if (task.repo && /^[^/\s]+\/[^/\s]+$/.test(task.repo))
     parts.push({ kind: 'repo', id: task.repo.toLowerCase(), label: task.repo })

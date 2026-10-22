@@ -31,11 +31,11 @@ export const TAKEN_BACK_FILE = 'tasks-taken-back.json'
 
 const DAY = 24 * 60 * 60_000
 /** An open task this old is shown faded */
-export const FADE_AFTER_MS = 7 * DAY
+const FADE_AFTER_MS = 7 * DAY
 /** An open task this old is dropped */
-export const DROP_OPEN_AFTER_MS = 14 * DAY
+const DROP_OPEN_AFTER_MS = 14 * DAY
 /** Done, dismissed and closed tasks are kept this long */
-export const KEEP_SETTLED_MS = 14 * DAY
+const KEEP_SETTLED_MS = 14 * DAY
 /**
  * Tasks stay in tasks.json this long after they were found, so a task's
  * detail can show the earlier ones it follows on; the list shows only the

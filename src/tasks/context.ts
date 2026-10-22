@@ -36,7 +36,7 @@ function toolName(client: string | undefined): string | undefined {
 type Session = Extract<WorkEntry, { kind: 'session' }>
 
 /** A task's latest session, the one to continue */
-export function lastSession(
+function lastSession(
   work: readonly WorkEntry[],
   task: string
 ): Session | undefined {

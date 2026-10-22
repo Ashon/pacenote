@@ -62,7 +62,7 @@ const repos = new Map<
   { at: number; repo: Promise<string | undefined> }
 >()
 
-export function repoOf(cwd: string, now = Date.now()) {
+function repoOf(cwd: string, now = Date.now()) {
   const known = repos.get(cwd)
   if (known && now - known.at < 10 * 60_000) return known.repo
   const repo = run('git', ['-C', cwd, 'config', '--get', 'remote.origin.url'], {

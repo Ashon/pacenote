@@ -112,7 +112,7 @@ async function audienceOf(options: OwnToolsOptions): Promise<Audience> {
   }
 }
 
-export function createOwnToolsServer(
+function createOwnToolsServer(
   options: OwnToolsOptions,
   requester: Requester | undefined
 ): McpServer {

@@ -29,7 +29,7 @@ export function readWork(dataDir: string): WorkFile {
 }
 
 /** When an entry happened: a session's start, a draft's time */
-export const entryAt = (entry: WorkEntry): string =>
+const entryAt = (entry: WorkEntry): string =>
   entry.kind === 'session' ? entry.startedAt : entry.at
 
 function save(dataDir: string, file: WorkFile, now: number): void {
