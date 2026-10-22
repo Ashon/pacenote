@@ -77,6 +77,7 @@ import {
   useUpdate,
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
+import { useSettingsView } from '@/lib/setup'
 import { useLanguage, useText, type LanguagePreference } from '@/lib/i18n'
 import { macsControl, useMacs } from '@/lib/macs'
 import type { AddingView, MacView } from '@src/macs/types'
@@ -197,7 +198,7 @@ export function SettingsPage() {
   const update = useUpdate()
   const sandbox = useSandbox()
   const [section, go] = useSection()
-  const [view, setView] = useState<SettingsView>()
+  const { view, refresh: load } = useSettingsView()
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<Set<string>>(new Set())
   const [issues, setIssues] = useState<SettingsIssue[]>([])
@@ -208,11 +209,6 @@ export function SettingsPage() {
     text: string
     restart?: boolean
   }>()
-
-  const load = useCallback(() => {
-    void settings?.get().then((value) => value && setView(value))
-  }, [settings])
-  useEffect(load, [load])
 
   const current = useCallback(
     (field: SettingField) =>
@@ -1241,26 +1237,24 @@ function GroupCard({
   )
 }
 
-const STATE_CHIP = {
-  on: 'bg-status-succeeded/12 text-status-succeeded',
-  partial: 'bg-status-interrupted/12 text-status-interrupted',
-  off: 'bg-muted text-muted-foreground',
-}
-
 const CHIP_TONE = {
   ok: 'bg-status-succeeded/12 text-status-succeeded',
   warn: 'bg-status-interrupted/12 text-status-interrupted',
+  off: 'bg-muted text-muted-foreground',
 }
 
 function Chip({
   tone,
+  title,
   children,
 }: {
   tone: keyof typeof CHIP_TONE
+  title?: string
   children: React.ReactNode
 }) {
   return (
     <span
+      title={title}
       className={cn(
         'rounded-sm px-1.5 text-caption leading-4',
         CHIP_TONE[tone]
@@ -1271,24 +1265,21 @@ function Chip({
   )
 }
 
+/** An integration's state, in the chip's tone */
+const STATE_TONE = { on: 'ok', partial: 'warn', off: 'off' } as const
+
 function StateChip({
   state,
   title,
 }: {
-  state: keyof typeof STATE_CHIP
+  state: keyof typeof STATE_TONE
   title?: string
 }) {
   const t = useText(text)
   return (
-    <span
-      title={title}
-      className={cn(
-        'rounded-sm px-1.5 text-caption leading-4',
-        STATE_CHIP[state]
-      )}
-    >
+    <Chip tone={STATE_TONE[state]} title={title}>
       {t.state[state]}
-    </span>
+    </Chip>
   )
 }
 
