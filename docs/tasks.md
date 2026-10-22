@@ -17,7 +17,7 @@ chosen in Settings > Todo > Pacenote's own work: Claude Code, Codex or opencode.
   tools that change or delete turned off. Its other tools that write need an approval it never gets
   (`approval_policy="never"`), so they are refused. Its shell reads only the platform's basics.
 - **opencode** runs `opencode run --standalone` with the model you set up in it (Settings > Todo > opencode model, or
-  its own default), such as one on your company's GPU server through an OpenAI-compatible API. Its private server loads
+  its own default), such as a local model or one you host yourself, through an OpenAI-compatible API. Its private server loads
   Pacenote's config beside yours (`opencode-pacenote.json` in the data folder): an agent with no tools, denied
   everything it could do on this Mac, and the run's session is deleted after. It reads no Slack yet, so it does Looks
   done and Write it up, and Collect now and drafts go to Claude Code or Codex.

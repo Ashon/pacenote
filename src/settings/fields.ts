@@ -721,7 +721,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.ai.cli',
     group: 'ownWork',
     label: 'Run it with',
-    help: "Claude Code reads Slack through claude.ai's Slack connector, Codex through ChatGPT's Slack app. opencode runs a model you set up in it, such as one on your company's GPU server, and reads no Slack yet.",
+    help: "Claude Code reads Slack through claude.ai's Slack connector, Codex through ChatGPT's Slack app. opencode runs a model you set up in it, such as a local model or one you host yourself, and reads no Slack yet.",
     type: 'select',
     segmented: true,
     options: [

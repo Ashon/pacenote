@@ -310,7 +310,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   TASKS_AI: {
     label: '실행할 AI',
-    help: 'Claude Code는 claude.ai의 Slack 커넥터로, Codex는 ChatGPT의 Slack 앱으로 Slack을 읽어요. opencode는 회사 GPU 서버에 있는 모델처럼 opencode에 설정한 모델로 실행되고, 아직 Slack은 읽지 않아요.',
+    help: 'Claude Code는 claude.ai의 Slack 커넥터로, Codex는 ChatGPT의 Slack 앱으로 Slack을 읽어요. opencode는 로컬 모델이나 직접 호스팅하는 모델처럼 opencode에 설정한 모델로 실행되고, 아직 Slack은 읽지 않아요.',
   },
   TASKS_AI_OPENCODE_MODEL: {
     label: 'opencode 모델',
