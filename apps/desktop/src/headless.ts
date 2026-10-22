@@ -83,16 +83,9 @@ const OPENCODE_PLAIN_AGENT = 'pacenote-plain'
  */
 export function opencodeConfig(): object {
   const deny = Object.fromEntries(
-    [
-      'edit',
-      'read',
-      'bash',
-      'webfetch',
-      'websearch',
-      'external_directory',
-      'question',
-      'task',
-    ].map((action) => [action, 'deny'])
+    'edit read bash webfetch websearch external_directory question task'
+      .split(' ')
+      .map((action) => [action, 'deny'])
   )
   return {
     $schema: 'https://opencode.ai/config.json',
@@ -480,49 +473,6 @@ export function taskLines(task: TaskView): string[] {
   ]
 }
 
-/**
- * Runs a piece of work with no tools on a CLI, and for opencode takes its
- * session out of opencode's history after, as claude and codex keep none
- */
-async function runPlain(options: {
-  cli: OwnCli
-  bin: string
-  prompt: string
-  codex?: CodexDefaults
-  opencode?: OpencodeRun
-  cwd: string
-  toolPath: string
-  timeoutMs: number
-}): Promise<Exit> {
-  const { command, input, env } = plainInvocation(
-    options.cli,
-    options.bin,
-    options.prompt,
-    options
-  )
-  const exit = await runHeadless({
-    command,
-    input,
-    env,
-    cwd: options.cwd,
-    toolPath: options.toolPath,
-    timeoutMs: options.timeoutMs,
-  })
-  const session =
-    options.cli === 'opencode' ? opencodeSession(exit.stdout) : undefined
-  if (session)
-    void runHeadless({
-      // A private server too: Pacenote never starts opencode's background one
-      command: [options.bin, ['session', 'delete', '--standalone', session]],
-      input: '',
-      env,
-      cwd: options.cwd,
-      toolPath: options.toolPath,
-      timeoutMs: 30_000,
-    })
-  return exit
-}
-
 /** A piece of Pacenote's own work with no tools: Looks done, Write it up */
 export interface PlainWork {
   cli: OwnCli
@@ -542,7 +492,8 @@ const PLAIN_WORK_MS = 2 * 60_000
  * Runs a piece of work with no tools, titled so in opencode, for 2 minutes at
  * most unless told otherwise: the CLI's output, and failed, which says in
  * what's words why it gave no answer (unable: whether the other CLI may do it
- * instead)
+ * instead). opencode's session is taken out of its history after, as claude
+ * and codex keep none.
  */
 export async function runPlainWork(
   work: PlainWork & { title: string }
@@ -553,20 +504,34 @@ export async function runPlainWork(
     locale?: Locale
   ) => { error: string; unable?: Unable }
 }> {
-  const exit = await runPlain({
-    cli: work.cli,
-    bin: work.bin,
-    prompt: work.prompt,
-    codex: work.codex,
-    opencode: work.opencode && {
-      title: work.title,
-      cwd: work.cwd,
-      ...work.opencode,
-    },
+  const opencode = work.opencode && {
+    title: work.title,
     cwd: work.cwd,
-    toolPath: work.toolPath,
+    ...work.opencode,
+  }
+  const { command, input, env } = plainInvocation(
+    work.cli,
+    work.bin,
+    work.prompt,
+    { codex: work.codex, opencode }
+  )
+  const where = { env, cwd: work.cwd, toolPath: work.toolPath }
+  const exit = await runHeadless({
+    command,
+    input,
+    ...where,
     timeoutMs: work.timeoutMs ?? PLAIN_WORK_MS,
   })
+  const session =
+    work.cli === 'opencode' ? opencodeSession(exit.stdout) : undefined
+  if (session)
+    void runHeadless({
+      // A private server too: Pacenote never starts opencode's background one
+      command: [work.bin, ['session', 'delete', '--standalone', session]],
+      input: '',
+      ...where,
+      timeoutMs: 30_000,
+    })
   const output = outputOf(work.cli, exit.stdout)
   return {
     output,
