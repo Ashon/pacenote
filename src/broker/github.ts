@@ -315,21 +315,20 @@ export class GitHubReader {
 
   async viewPull(repoInput: string, number?: number): Promise<string> {
     const { slug, number: n } = await this.resolvePull(repoInput, number)
+    // Reviews and files do not need the PR's head, so they go with the PR.
+    const reviews = this.json<Review[]>(
+      `/repos/${slug}/pulls/${n}/reviews?per_page=100`
+    ).catch(() => [])
+    const files = this.json<PullFile[]>(
+      `/repos/${slug}/pulls/${n}/files?per_page=100`
+    ).catch(() => [])
     const pull = await this.json<Pull>(`/repos/${slug}/pulls/${n}`)
-    const [reviews, checks, files] = await Promise.all([
-      this.json<Review[]>(
-        `/repos/${slug}/pulls/${n}/reviews?per_page=100`
-      ).catch(() => []),
-      this.json<{ check_runs: CheckRun[] }>(
-        `/repos/${slug}/commits/${pull.head.sha}/check-runs?per_page=100`
-      )
-        .then((r) => r.check_runs)
-        .catch(() => []),
-      this.json<PullFile[]>(
-        `/repos/${slug}/pulls/${n}/files?per_page=100`
-      ).catch(() => []),
-    ])
-    return formatPullDetail(slug, pull, reviews, checks, files)
+    const checks = await this.json<{ check_runs: CheckRun[] }>(
+      `/repos/${slug}/commits/${pull.head.sha}/check-runs?per_page=100`
+    )
+      .then((r) => r.check_runs)
+      .catch(() => [])
+    return formatPullDetail(slug, pull, await reviews, checks, await files)
   }
 
   async pullDiff(
@@ -361,16 +360,22 @@ export class GitHubReader {
     return { slug: await this.resolve(repoInput), number: n }
   }
 
-  /** When owner is missing, tries each allowed org in turn. */
+  /**
+   * When owner is missing, asks every allowed org at once and takes the first
+   * in their order that has it.
+   */
   private async resolve(repoInput: string): Promise<string> {
     const ref = parseRepoRef(repoInput, this.owners)
     if (ref.owner) return `${ref.owner}/${ref.repo}`
     const cached = this.repoCache.get(ref.repo.toLowerCase())
     if (cached) return cached
-    for (const owner of this.owners) {
-      const found = await this.json<{ full_name: string }>(
-        `/repos/${owner}/${ref.repo}`
-      ).catch(() => undefined)
+    const lookups = this.owners.map((owner) =>
+      this.json<{ full_name: string }>(`/repos/${owner}/${ref.repo}`).catch(
+        () => undefined
+      )
+    )
+    for (const lookup of lookups) {
+      const found = await lookup
       if (found) {
         this.repoCache.set(ref.repo.toLowerCase(), found.full_name)
         return found.full_name

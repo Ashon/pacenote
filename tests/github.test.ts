@@ -176,4 +176,78 @@ describe('PR display', () => {
       /not allowed for lookup/
     )
   })
+
+  it('takes the first allowed org in order that has a bare repository name, whichever answers first', async () => {
+    const reader = new GitHubReader({
+      token: 'ghp_test',
+      allowedOwners: OWNERS,
+      fetchImpl: (async (url: string | URL | Request) => {
+        const path = String(url).replace('https://api.github.com', '')
+        if (path === '/repos/acme/tools') {
+          await new Promise((resolve) => setTimeout(resolve, 50))
+          return new Response(JSON.stringify({ full_name: 'acme/tools' }))
+        }
+        if (path === '/repos/acme-labs/tools')
+          return new Response(JSON.stringify({ full_name: 'acme-labs/tools' }))
+        if (
+          path.endsWith(
+            '/pulls?state=open&sort=created&direction=desc&per_page=20'
+          )
+        )
+          return new Response('[]')
+        return new Response('{}', { status: 404 })
+      }) as typeof fetch,
+    })
+    expect(await reader.listPulls('tools', 'open')).toBe(
+      'acme/tools: no open PRs.'
+    )
+  })
+
+  it("views a PR with its reviews, files and head's checks, asking for reviews and files along with it", async () => {
+    const reviews = [{ user: { login: 'carol' }, state: 'APPROVED' }]
+    const checks = [
+      { name: 'lint', status: 'completed', conclusion: 'failure' },
+    ]
+    const files = [
+      { filename: 'a.yml', status: 'modified', additions: 1, deletions: 2 },
+    ]
+    const calls: string[] = []
+    const reader = (failing: string) =>
+      new GitHubReader({
+        token: 'ghp_test',
+        allowedOwners: OWNERS,
+        fetchImpl: (async (url: string | URL | Request) => {
+          const path = String(url).replace('https://api.github.com', '')
+          calls.push(path)
+          const reply = (body: unknown) =>
+            path.includes(failing)
+              ? new Response('{}', { status: 500 })
+              : new Response(JSON.stringify(body))
+          if (path === '/repos/acme/infra/pulls/20') return reply(pull)
+          if (path.startsWith('/repos/acme/infra/pulls/20/reviews'))
+            return reply(reviews)
+          if (path.startsWith('/repos/acme/infra/pulls/20/files'))
+            return reply(files)
+          if (path.startsWith('/repos/acme/infra/commits/abc/check-runs'))
+            return reply({ check_runs: checks })
+          return new Response('{}', { status: 404 })
+        }) as typeof fetch,
+      })
+    expect(await reader('none').viewPull('acme/infra#20')).toBe(
+      formatPullDetail('acme/infra', pull, reviews, checks, files)
+    )
+    expect(calls).toEqual([
+      '/repos/acme/infra/pulls/20/reviews?per_page=100',
+      '/repos/acme/infra/pulls/20/files?per_page=100',
+      '/repos/acme/infra/pulls/20',
+      '/repos/acme/infra/commits/abc/check-runs?per_page=100',
+    ])
+    // A part that fails is left out; the PR itself failing fails the view.
+    expect(await reader('/reviews').viewPull('acme/infra', 20)).toBe(
+      formatPullDetail('acme/infra', pull, [], checks, files)
+    )
+    await expect(
+      reader('/pulls/20').viewPull('acme/infra', 20)
+    ).rejects.toThrow('GitHub API error 500')
+  })
 })
