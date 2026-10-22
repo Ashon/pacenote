@@ -1,11 +1,9 @@
 import { collectionTitle, type CollectionRunRecord } from '@history/types'
-import { newTokens, runUsage } from '@history/usage'
 import { CLI_NAMES, isOwnCli, unableWords } from '@src/tasks/own-ai'
 import type { TaskStatus } from '@src/tasks/types'
 import {
   CircleCheck,
   ClipboardCheck,
-  Coins,
   Cpu,
   EyeOff,
   ListChecks,
@@ -16,7 +14,6 @@ import {
   Plug,
   Search,
   Smile,
-  Timer,
   TriangleAlert,
   UserRound,
   Wrench,
@@ -31,7 +28,7 @@ import {
   lookupGroups,
   type LookupGroup,
 } from '@history/collection-steps'
-import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
+import { formatDateTime, formatDuration } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
 import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -39,7 +36,7 @@ import { switchLine } from './own-ai-status'
 import { CodeBlock } from './code-block'
 import { text } from './collection-detail.text'
 import { PacenoteMark } from './logo'
-import { Empty, Fact, UsageTip } from './run-facts'
+import { DurationFact, Empty, Fact, RawJson, TokensFact } from './run-facts'
 import { StatusBadge } from './status'
 import { recordText } from '@src/history/record-text'
 
@@ -51,7 +48,6 @@ import { recordText } from '@src/history/record-text'
 export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
   const t = useText(text)
   const locale = useLocale()
-  const lookups = lookupGroups(run)
   return (
     <Tabs defaultValue="result" className="flex h-full min-h-0 flex-col">
       <header className="border-b bg-card/90 px-8 pt-6 pb-0 backdrop-blur">
@@ -104,16 +100,13 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
             <Result run={run} />
           </TabsContent>
           <TabsContent value="lookups" className="select-text">
-            <Lookups run={run} groups={lookups} />
+            <Lookups run={run} />
           </TabsContent>
           <TabsContent value="rules" className="select-text">
             <Rules run={run} />
           </TabsContent>
           <TabsContent value="raw" className="select-text">
-            <CodeBlock
-              code={JSON.stringify(run, null, 2)}
-              maxHeight="max-h-[70vh]"
-            />
+            <RawJson run={run} />
           </TabsContent>
         </div>
       </ScrollArea>
@@ -124,33 +117,17 @@ export function CollectionDetail({ run }: { run: CollectionRunRecord }) {
 /** Duration, lookups, tokens, the reasoner, and how it read Slack */
 function CollectionFacts({ run }: { run: CollectionRunRecord }) {
   const t = useText(text)
-  const usage = runUsage(run.events)
-  const duration = run.durationMs ?? Date.now() - Date.parse(run.startedAt)
   const reads = run.reads ?? 0
   return (
     <div className="mb-8 grid grid-cols-2 gap-y-4 border-b border-border pb-6 @min-[40rem]:grid-cols-5">
-      <Fact
-        icon={<Timer />}
-        label={run.status === 'running' ? t.elapsed : t.duration}
-        value={formatDuration(duration)}
-      />
+      <DurationFact run={run} label={t.duration} />
       <Fact
         icon={<Search />}
         label={t.lookups}
         value={String(reads)}
         hint={t.lookupsHint}
       />
-      <Fact
-        icon={<Coins />}
-        label={t.tokens}
-        value={usage ? t.newTokens(formatTokens(newTokens(usage))) : '-'}
-        hint={
-          usage?.cacheRead
-            ? t.fromCache(formatTokens(usage.cacheRead))
-            : undefined
-        }
-        tip={usage && <UsageTip usage={usage} cacheWrite />}
-      />
+      <TokensFact run={run} cacheWrite />
       <Fact
         icon={<Cpu />}
         label={t.collectedBy}
@@ -391,14 +368,9 @@ function Stopped({ run }: { run: CollectionRunRecord }) {
 }
 
 /** Its tool calls in order, with what was not kept said so */
-function Lookups({
-  run,
-  groups,
-}: {
-  run: CollectionRunRecord
-  groups: LookupGroup[]
-}) {
+function Lookups({ run }: { run: CollectionRunRecord }) {
   const t = useText(text)
+  const groups = lookupGroups(run)
   if (!groups.length) return <Empty>{t.noLookups}</Empty>
   return (
     <div>

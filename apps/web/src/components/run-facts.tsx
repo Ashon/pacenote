@@ -1,14 +1,20 @@
+import type { HistoryRecord } from '@history/types'
 import type { TokenUsage } from '@history/usage'
-import { totalTokens } from '@history/usage'
+import { newTokens, runUsage, totalTokens } from '@history/usage'
+import { Coins, Timer } from 'lucide-react'
 import { Fragment } from 'react'
 import type * as React from 'react'
 import { Tooltip } from '@/components/ui/tooltip'
-import { formatNumber } from '@/lib/format'
+import { formatDuration, formatNumber, formatTokens } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { CodeBlock } from './code-block'
 import { text } from './run-facts.text'
 
-/** Parts both run details use: a figure in the facts row, and empty tabs */
+/**
+ * Parts both run details use: figures in the facts row, empty tabs, and the
+ * record as JSON
+ */
 export function Fact({
   icon,
   label,
@@ -39,6 +45,51 @@ export function Fact({
         {hint || '\u00a0'}
       </div>
     </div>
+  )
+}
+
+/** How long a run took, or has run so far; label names a finished one's */
+export function DurationFact({
+  run,
+  label,
+}: {
+  run: HistoryRecord
+  label: string
+}) {
+  const t = useText(text)
+  const duration = run.durationMs ?? Date.now() - Date.parse(run.startedAt)
+  return (
+    <Fact
+      icon={<Timer />}
+      label={run.status === 'running' ? t.elapsed : label}
+      value={formatDuration(duration)}
+    />
+  )
+}
+
+/** The tokens a run spent: new ones, those from the cache, all on hover */
+export function TokensFact({
+  run,
+  cacheWrite,
+}: {
+  run: HistoryRecord
+  /** The reasoner reports cache writes (claude does, codex does not) */
+  cacheWrite: boolean
+}) {
+  const t = useText(text)
+  const usage = runUsage(run.events)
+  return (
+    <Fact
+      icon={<Coins />}
+      label={t.tokens}
+      value={usage ? t.newTokens(formatTokens(newTokens(usage))) : '-'}
+      hint={
+        usage?.cacheRead
+          ? t.fromCache(formatTokens(usage.cacheRead))
+          : undefined
+      }
+      tip={usage && <UsageTip usage={usage} cacheWrite={cacheWrite} />}
+    />
   )
 }
 
@@ -92,6 +143,13 @@ export function UsageTip({
         </div>
       )}
     </div>
+  )
+}
+
+/** The record as saved, made only when its tab shows */
+export function RawJson({ run }: { run: HistoryRecord }) {
+  return (
+    <CodeBlock code={JSON.stringify(run, null, 2)} maxHeight="max-h-[70vh]" />
   )
 }
 

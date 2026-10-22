@@ -16,14 +16,9 @@ const en = {
   /** The messenger by name: View in Slack */
   viewIn: (messenger: string) => `View in ${messenger}`,
   emptyRequest: '(empty request)',
-  elapsed: 'Elapsed',
   duration: 'Duration',
   toolCalls: 'Tool calls',
   calls: (n: number) => `${n} ${n === 1 ? 'call' : 'calls'}`,
-  tokens: 'Tokens',
-  /** Tokens, formatted: 1.2k new */
-  newTokens: (n: string) => `${n} new`,
-  fromCache: (n: string) => `+${n} from cache`,
   reasoner: 'Reasoner',
   attachment: {
     read: 'Read',
@@ -48,13 +43,9 @@ const ko: typeof en = {
   attempts: (n) => `${n}번 시도`,
   viewIn: (messenger) => `${messenger}에서 보기`,
   emptyRequest: '(빈 요청)',
-  elapsed: '경과 시간',
   duration: '걸린 시간',
   toolCalls: '도구 호출',
   calls: (n) => `${n}번`,
-  tokens: '토큰',
-  newTokens: (n) => `신규 ${n}`,
-  fromCache: (n) => `캐시에서 +${n}`,
   reasoner: '답변 CLI',
   attachment: {
     read: '읽음',

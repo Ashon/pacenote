@@ -9,13 +9,9 @@ const en = {
   tabRules: 'Rules',
 
   // Its facts
-  elapsed: 'Elapsed',
   duration: 'Duration',
   lookups: 'Lookups',
   lookupsHint: 'in Slack, read only',
-  tokens: 'Tokens',
-  newTokens: (tokens: string) => `${tokens} new`,
-  fromCache: (tokens: string) => `+${tokens} from cache`,
   collectedBy: 'Collected by',
   onYourMac: 'on your Mac',
   readSlackAs: 'Read Slack as',
@@ -88,13 +84,9 @@ const ko: typeof en = {
   tabLookups: '조회',
   tabRules: '규칙',
 
-  elapsed: '경과 시간',
   duration: '소요 시간',
   lookups: '조회',
   lookupsHint: 'Slack, 읽기 전용',
-  tokens: '토큰',
-  newTokens: (tokens) => `신규 ${tokens}`,
-  fromCache: (tokens) => `캐시에서 +${tokens}`,
   collectedBy: '모은 AI',
   onYourMac: '내 Mac에서',
   readSlackAs: 'Slack을 읽은 계정',

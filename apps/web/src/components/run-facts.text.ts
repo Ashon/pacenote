@@ -1,6 +1,11 @@
 import type { Locale } from '@src/i18n/locale'
 
 const en = {
+  elapsed: 'Elapsed',
+  tokens: 'Tokens',
+  /** Tokens, formatted: 1.2k new */
+  newTokens: (n: string) => `${n} new`,
+  fromCache: (n: string) => `+${n} from cache`,
   newInput: 'New input',
   cacheRead: 'Cache read',
   cacheWrite: 'Cache write',
@@ -13,6 +18,10 @@ const en = {
 }
 
 const ko: typeof en = {
+  elapsed: '경과 시간',
+  tokens: '토큰',
+  newTokens: (n) => `신규 ${n}`,
+  fromCache: (n) => `캐시에서 +${n}`,
   newInput: '새 입력',
   cacheRead: '캐시 읽기',
   cacheWrite: '캐시 쓰기',

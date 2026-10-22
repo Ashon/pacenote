@@ -1,15 +1,12 @@
 import { isCollection, type RunRecord } from '@history/types'
-import { newTokens, runUsage } from '@history/usage'
 import { MESSENGER_NAMES } from '@src/messengers/ids'
 import {
   AtSign,
-  Coins,
   Cpu,
   ExternalLink,
   FileText,
   ImageIcon,
   Paperclip,
-  Timer,
   Wrench,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -19,11 +16,11 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { artifactUrl, useRun } from '@/lib/api'
-import { formatDateTime, formatDuration, formatTokens } from '@/lib/format'
+import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { CodeBlock } from './code-block'
 import { CollectionDetail } from './collection-detail'
-import { Empty, Fact, UsageTip } from './run-facts'
+import { DurationFact, Empty, Fact, RawJson, TokensFact } from './run-facts'
 import { text } from './run-detail.text'
 import { StatusBadge } from './status'
 import { Timeline } from './timeline'
@@ -84,10 +81,7 @@ function MentionDetail({ run }: { run: RunRecord }) {
             )}
           </TabsContent>
           <TabsContent value="raw" className="select-text">
-            <CodeBlock
-              code={JSON.stringify(run, null, 2)}
-              maxHeight="max-h-[70vh]"
-            />
+            <RawJson run={run} />
           </TabsContent>
         </div>
       </ScrollArea>
@@ -246,38 +240,15 @@ function RunHeader({ run }: { run: RunRecord }) {
  */
 function RunFacts({ run }: { run: RunRecord }) {
   const t = useText(text)
-  const usage = runUsage(run.events)
   const tools = run.events.filter(
     (e) => e.kind === 'tool' || e.kind === 'command'
   ).length
-  const duration = run.durationMs ?? Date.now() - Date.parse(run.startedAt)
   return (
     // Two columns when the detail is narrow
     <div className="mb-8 grid grid-cols-2 gap-y-4 border-b border-border pb-6 @min-[40rem]:grid-cols-4">
-      <Fact
-        icon={<Timer />}
-        label={run.status === 'running' ? t.elapsed : t.duration}
-        value={formatDuration(duration)}
-      />
+      <DurationFact run={run} label={t.duration} />
       <Fact icon={<Wrench />} label={t.toolCalls} value={t.calls(tools)} />
-      <Fact
-        icon={<Coins />}
-        label={t.tokens}
-        value={usage ? t.newTokens(formatTokens(newTokens(usage))) : '-'}
-        hint={
-          usage?.cacheRead
-            ? t.fromCache(formatTokens(usage.cacheRead))
-            : undefined
-        }
-        tip={
-          usage && (
-            <UsageTip
-              usage={usage}
-              cacheWrite={run.backend.reasoner !== 'codex'}
-            />
-          )
-        }
-      />
+      <TokensFact run={run} cacheWrite={run.backend.reasoner !== 'codex'} />
       <Fact
         icon={<Cpu />}
         label={t.reasoner}
