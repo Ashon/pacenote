@@ -308,22 +308,20 @@ export function TaskRow({
   const recent =
     change && Date.now() - Date.parse(change.at) < WEEK ? change : undefined
 
+  const dismiss = (
+    <Button size="sm" variant="secondary" onClick={() => setDismissing(true)}>
+      {t.dismiss}
+    </Button>
+  )
+  const continueItem = (tool: WorkTool) => ({
+    label: t.continueIn(CLI_NAMES[tool]),
+    icon: <SquareTerminal />,
+    run: () => void continueIn(tool),
+  })
   // The steps the row's own button does not take
   const more: { label: string; icon: React.ReactNode; run: () => void }[] = [
-    ...(task.action === 'code'
-      ? []
-      : [
-          {
-            label: t.continueIn(CLI_NAMES[cli]),
-            icon: <SquareTerminal />,
-            run: () => void continueIn(cli),
-          },
-        ]),
-    {
-      label: t.continueIn(CLI_NAMES[other(cli)]),
-      icon: <SquareTerminal />,
-      run: () => void continueIn(other(cli)),
-    },
+    ...(task.action === 'code' ? [] : [continueItem(cli)]),
+    continueItem(other(cli)),
     ...(folder
       ? [
           {
@@ -574,13 +572,7 @@ export function TaskRow({
                   <CircleCheck />
                   {t.done}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setDismissing(true)}
-                >
-                  {t.dismiss}
-                </Button>
+                {dismiss}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -607,13 +599,7 @@ export function TaskRow({
                 <Button size="sm" onClick={() => onDecide({ status: 'kept' })}>
                   {t.keepAsTask}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setDismissing(true)}
-                >
-                  {t.dismiss}
-                </Button>
+                {dismiss}
               </>
             )}
             {settled && (
@@ -786,15 +772,23 @@ function TaskOpen({
   const suggested = settled ? [] : (detail?.suggested ?? [])
   const latestDraft = detail?.work.find((entry) => entry.kind === 'draft')
   const earlier = detail ? earlierOf(detail) : { rest: [] }
-  const rest: Earlier[] = [
-    ...sessions.slice(1).map((session) => ({
-      key: session.id,
-      group: 'work' as const,
-      label: t.yourWork,
-      session,
-    })),
-    ...earlier.rest,
-  ]
+  const work = (session: Session): Earlier => ({
+    key: session.id,
+    group: 'work',
+    label: t.yourWork,
+    session,
+  })
+  const rest = [...sessions.slice(1).map(work), ...earlier.rest]
+  const earlierLine = (line: Earlier) => (
+    <EarlierLine
+      key={line.key}
+      line={line}
+      taskId={task.id}
+      macs={macs}
+      onResume={onResume}
+      onStartHere={onStartHere}
+    />
+  )
   const replyText = reply ?? latestDraft?.text ?? ''
   const showReply = drafting || reply !== undefined || !!latestDraft
   // The reply the session left, until you have copied one
@@ -859,29 +853,9 @@ function TaskOpen({
                 )}
               </Line>
             )}
-            {earlier.last && (
-              <EarlierLine
-                line={{ ...earlier.last, label: t.lastTime }}
-                taskId={task.id}
-                macs={macs}
-                onResume={onResume}
-                onStartHere={onStartHere}
-              />
-            )}
-            {sessions[0] && (
-              <EarlierLine
-                line={{
-                  key: sessions[0].id,
-                  group: 'work',
-                  label: t.yourWork,
-                  session: sessions[0],
-                }}
-                taskId={task.id}
-                macs={macs}
-                onResume={onResume}
-                onStartHere={onStartHere}
-              />
-            )}
+            {earlier.last &&
+              earlierLine({ ...earlier.last, label: t.lastTime })}
+            {sessions[0] && earlierLine(work(sessions[0]))}
             {suggested.map((suggestion) => (
               <SuggestedLine
                 key={suggestion.id}
@@ -890,17 +864,7 @@ function TaskOpen({
                 onAnswer={onAnswer}
               />
             ))}
-            {all &&
-              rest.map((line) => (
-                <EarlierLine
-                  key={line.key}
-                  line={line}
-                  taskId={task.id}
-                  macs={macs}
-                  onResume={onResume}
-                  onStartHere={onStartHere}
-                />
-              ))}
+            {all && rest.map(earlierLine)}
             {!earlier.last && !sessions[0] && !suggested.length && (
               <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
                 {t.nothingEarlier(
@@ -1546,6 +1510,8 @@ function SessionLogPanel({
   }, [bridge, entryId])
   const entry = found?.entry
   const tool = entry ? CLI_NAMES[entry.tool] : t.theSession
+  const resumeWith =
+    entry?.tool === 'claude' ? 'claude --resume' : 'codex resume'
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -1596,16 +1562,13 @@ function SessionLogPanel({
                       variant="outline"
                       onClick={() =>
                         void navigator.clipboard.writeText(
-                          `${entry.tool === 'claude' ? 'claude --resume' : 'codex resume'} ${entry.session}`
+                          `${resumeWith} ${entry.session}`
                         )
                       }
                     >
                       <Copy />
                       <span className="font-mono text-meta">
-                        {entry.tool === 'claude'
-                          ? 'claude --resume'
-                          : 'codex resume'}{' '}
-                        {entry.session.slice(0, 8)}…
+                        {resumeWith} {entry.session.slice(0, 8)}…
                       </span>
                     </Button>
                   )}
