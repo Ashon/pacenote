@@ -70,10 +70,10 @@ async function sandboxAuthor(
 ): Promise<{ name: string; email: string; source: 'settings' | 'global' }> {
   const fromGlobal = async (key: string) =>
     (await run('git', ['config', '--global', key])).stdout.trim()
-  const name =
-    values.OPS_GIT_AUTHOR_NAME?.trim() || (await fromGlobal('user.name'))
-  const email =
-    values.OPS_GIT_AUTHOR_EMAIL?.trim() || (await fromGlobal('user.email'))
+  const [name, email] = await Promise.all([
+    values.OPS_GIT_AUTHOR_NAME?.trim() || fromGlobal('user.name'),
+    values.OPS_GIT_AUTHOR_EMAIL?.trim() || fromGlobal('user.email'),
+  ])
   const fromSettings = Boolean(
     values.OPS_GIT_AUTHOR_NAME?.trim() || values.OPS_GIT_AUTHOR_EMAIL?.trim()
   )
@@ -152,6 +152,25 @@ export async function collectSandboxStatus(options: {
   // file is there, never what is in it
   const signed = signedIn(vmRootPath(options.env, home), reasoner)
   status.signedIn = signed
+  // What asks a command starts now, alongside the API key's check, and is
+  // awaited where its check goes.
+  const logins = opsOn
+    ? Promise.all([
+        run('gh', ['auth', 'status', '--active', '--hostname', 'github.com']),
+        sandboxAuthor(values, run),
+      ])
+    : undefined
+  const vm =
+    process.platform === 'darwin'
+      ? vmStatus({
+          bin: defaultVmBin(options.env),
+          root: vmRootPath(options.env, home),
+          image: VM_IMAGE,
+          renderer: VM_RENDERER_IMAGE,
+          broker: VM_BROKER_IMAGE,
+          sandboxDir,
+        })
+      : undefined
   if (isolated) {
     const name = reasoner === 'claude' ? 'Claude' : 'Codex'
     const check: SandboxCheck = {
@@ -224,20 +243,13 @@ export async function collectSandboxStatus(options: {
             : t.required(missing.map(settingLabel)),
       })
     }
-    const gh = await run('gh', [
-      'auth',
-      'status',
-      '--active',
-      '--hostname',
-      'github.com',
-    ])
+    const [gh, author] = await logins!
     const account = /account (\S+)/.exec(gh.stdout + gh.stderr)?.[1]
     status.checks.push({
       label: t.github,
       ok: gh.code === 0,
       detail: gh.code === 0 ? t.ghSignedIn(account) : t.ghSignedOut,
     })
-    const author = await sandboxAuthor(values, run)
     status.checks.push({
       label: t.author,
       ok: Boolean(author.name && author.email),
@@ -250,15 +262,8 @@ export async function collectSandboxStatus(options: {
 
   // Shown when the built-in sandbox is chosen, saved or not yet; on a Mac
   // that cannot run it, only why.
-  if (process.platform === 'darwin') {
-    status.vm = await vmStatus({
-      bin: defaultVmBin(options.env),
-      root: vmRootPath(options.env, home),
-      image: VM_IMAGE,
-      renderer: VM_RENDERER_IMAGE,
-      broker: VM_BROKER_IMAGE,
-      sandboxDir,
-    })
+  if (vm) {
+    status.vm = await vm
     const { image, renderer, broker } = status.vm
     status.vm.outdated = [
       image?.current === false && 'reasoner',
