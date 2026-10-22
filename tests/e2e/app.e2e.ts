@@ -2808,6 +2808,8 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     // Copied as a weekly update, with what was written up first
     await page.getByRole('button', { name: /Copy as weekly update/ }).click()
     await page.getByRole('menuitem', { name: /As Markdown/ }).click()
+    // Once the copy is written: until then the clipboard holds what came before
+    await page.getByRole('button', { name: 'Copied' }).waitFor()
     const copied = await app!.evaluate(({ clipboard }) => clipboard.readText())
     expect(copied).toContain('**This week so far**')
     expect(copied).toContain('Most of the week went to Payments')
