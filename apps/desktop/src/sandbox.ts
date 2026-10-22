@@ -80,9 +80,8 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
   }
 
   saveAllowlist(raw: unknown): AllowlistIssue[] {
-    if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string')) {
+    if (!Array.isArray(raw) || raw.some((item) => typeof item !== 'string'))
       return [{ message: localized(text).badDomains }]
-    }
     const values = {
       ...readSettingsValues(this.options.settingsFile),
       ...this.options.env,

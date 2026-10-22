@@ -548,11 +548,6 @@ const taskCollector = new TaskCollector({
   last: latestCollection(dataDir, collectionRuns(90)),
 })
 
-/** When Collect now started here, while it runs */
-function taskCollectorRunning(): string | undefined {
-  return taskCollector.state.running?.startedAt
-}
-
 /**
  * Collect now as Todo shows it: this Mac's, or one another of your Macs ran
  * since, or runs now. collections: the last days', newest first
@@ -635,8 +630,8 @@ if (supervisor) {
       }
     },
     onAnswer: (here) => supervisor.answer(here),
-    // Read when the app is ready: Collect now is set up further down
-    collecting: () => taskCollectorRunning(),
+    // When Collect now started here, while it runs
+    collecting: () => taskCollector.state.running?.startedAt,
     // Add a Mac: your Slack app, who Pace answers and how Todo collects
     setupPayload: () => {
       const env = settings.effectiveEnv()
@@ -758,9 +753,8 @@ function registerAppProtocol(): void {
     const url = new URL(request.url)
     if (url.hostname !== 'app')
       return new Response('Not found', { status: 404 })
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith('/api/'))
       return handleLocalApi(reader, request.method, url)
-    }
     try {
       return await screenFile(url.pathname)
     } catch (error) {
@@ -2244,12 +2238,10 @@ async function createWindow(route = ''): Promise<void> {
   if (!captureFile) window.once('ready-to-show', () => window.show())
   // Full screen hides the traffic lights, so the title bar stops keeping room
   // for them.
-  window.on('enter-full-screen', () =>
-    window.webContents.send('pacenote:window:full-screen-changed', true)
-  )
-  window.on('leave-full-screen', () =>
-    window.webContents.send('pacenote:window:full-screen-changed', false)
-  )
+  const fullScreen = (on: boolean) => () =>
+    window.webContents.send('pacenote:window:full-screen-changed', on)
+  window.on('enter-full-screen', fullScreen(true))
+  window.on('leave-full-screen', fullScreen(false))
   window.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault()
@@ -2314,9 +2306,8 @@ async function createWindow(route = ''): Promise<void> {
     if (
       !url.startsWith('pacenote://app/') &&
       !(webDevUrl && url.startsWith(webDevUrl))
-    ) {
+    )
       event.preventDefault()
-    }
   })
   // The screen failing later, such as reloaded while an upgrade swaps its
   // files, is loaded again the same way, on the screen it was on. One
@@ -2422,9 +2413,8 @@ if (!app.requestSingleInstanceLock()) {
       // straight on to the new version.
       if (isQuitting || bundleWatch?.check()) return
       bundleWatch?.start()
-      if (process.platform === 'darwin' && !app.isPackaged) {
+      if (process.platform === 'darwin' && !app.isPackaged)
         app.dock?.setIcon(nativeImage.createFromPath(appIcon))
-      }
       if (!captureFile) createTray()
       // Your Macs first: whether Pace starts answering or standing by
       if (macs) {
@@ -2441,12 +2431,8 @@ if (!app.requestSingleInstanceLock()) {
         todoSync?.start()
       }
       // The bot starts independently of the window and does not wait for it.
-      if (
-        supervisor?.current.autoStart &&
-        supervisor.current.phase === 'idle'
-      ) {
+      if (supervisor?.current.autoStart && supervisor.current.phase === 'idle')
         void supervisor.start()
-      }
       // Opened at login, it stays in the menu bar until you open it.
       const atLogin =
         app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin

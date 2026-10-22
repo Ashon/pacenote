@@ -175,10 +175,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     const child = this.child
     if (!child) return
     this.stopRequested = true
-    this.set({
-      phase: 'stopping',
-      message: localized(text).finishing,
-    })
+    this.set({ phase: 'stopping', message: localized(text).finishing })
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         if (child.pid) {
@@ -271,9 +268,8 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     const env: Record<string, string> = {
       ...readSettingsValues(this.options.settingsFile),
     }
-    for (const [key, value] of Object.entries(process.env)) {
+    for (const [key, value] of Object.entries(process.env))
       if (value !== undefined && !key.startsWith('ELECTRON_')) env[key] = value
-    }
     env.PATH = this.options.toolPath()
     env.PACENOTE_MANAGED_BY = 'desktop'
     env.PACENOTE_DATA_DIR = this.options.dataDir
