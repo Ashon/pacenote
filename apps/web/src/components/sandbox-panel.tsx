@@ -101,31 +101,6 @@ function JobButton({
   )
 }
 
-/** Whether something is ready, being set up, or still needs a step */
-function Readiness({
-  busy,
-  ready,
-  busyText,
-  needs,
-}: {
-  busy: boolean
-  ready: boolean
-  busyText: string
-  needs: string
-}) {
-  const t = useText(text)
-  return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      {busy ? (
-        <LoaderCircle className="size-3 shrink-0 animate-spin text-status-running" />
-      ) : (
-        <Dot ok={ready} warn />
-      )}
-      {busy ? busyText : ready ? t.ready : needs}
-    </span>
-  )
-}
-
 /**
  * Under the built-in sandbox's choice: whether it is ready, and the job that
  * sets it up, so it can be set up before it is chosen
@@ -153,14 +128,24 @@ export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
   // them anew.
   const outdated = set && (vm.outdated ?? []).length > 0
   const ready = set && !outdated
+  const busy = job?.state === 'running' && job.kind === 'vm'
   return (
     <>
-      <Readiness
-        busy={job?.state === 'running' && job.kind === 'vm'}
-        ready={ready}
-        busyText={t.settingUp}
-        needs={outdated ? t.updateNeeded : t.needsSetup}
-      />
+      {/* Whether it is ready, being set up, or still needs a step */}
+      <span className="flex min-w-0 items-center gap-1.5">
+        {busy ? (
+          <LoaderCircle className="size-3 shrink-0 animate-spin text-status-running" />
+        ) : (
+          <Dot ok={ready} warn />
+        )}
+        {busy
+          ? t.settingUp
+          : ready
+            ? t.ready
+            : outdated
+              ? t.updateNeeded
+              : t.needsSetup}
+      </span>
       <span className="ml-auto">
         <JobButton sandbox={sandbox} kind="vm" primary={!ready} />
       </span>
