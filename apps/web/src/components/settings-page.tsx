@@ -1950,7 +1950,7 @@ function RowNotes({ warning, issue }: { warning?: string; issue?: string }) {
   )
 }
 
-const THEMES: { mode: ThemeMode; icon: typeof Monitor }[] = [
+const THEMES: { mode: ThemeMode; icon: LucideIcon }[] = [
   { mode: 'system', icon: Monitor },
   { mode: 'light', icon: Sun },
   { mode: 'dark', icon: Moon },
@@ -1964,30 +1964,16 @@ function ThemePicker() {
   const t = useText(text)
   const { mode, setMode } = useTheme()
   return (
-    <div
-      role="radiogroup"
-      aria-label={t.theme}
-      className="flex rounded-lg bg-muted p-0.5"
-    >
-      {THEMES.map(({ mode: value, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={mode === value}
-          onClick={() => setMode(value)}
-          className={cn(
-            'flex h-6 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
-            mode === value
-              ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <Icon className="size-3.5" />
-          {t.themes[value]}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label={t.theme}
+      value={mode}
+      options={THEMES.map(({ mode: value, icon }) => ({
+        value,
+        label: t.themes[value],
+        icon,
+      }))}
+      onChange={(value) => setMode(value as ThemeMode)}
+    />
   )
 }
 
@@ -2019,8 +2005,8 @@ function LanguagePicker() {
 }
 
 /**
- * A few short options side by side, like the theme picker: the settings that
- * pick one of two or three (where work runs, which terminal)
+ * A few short options side by side: the theme, the language, and the settings
+ * that pick one of two or three (where work runs, which terminal)
  */
 function Segmented({
   label,
@@ -2030,8 +2016,11 @@ function Segmented({
 }: {
   label: string
   value: string
-  /** lang: an option written in a language of its own (a language's name) */
-  options: { value: string; label: string; lang?: string }[]
+  /**
+   * lang: an option written in a language of its own (a language's name);
+   * icon: one shown before its label
+   */
+  options: { value: string; label: string; lang?: string; icon?: LucideIcon }[]
   onChange: (value: string) => void
 }) {
   return (
@@ -2040,7 +2029,7 @@ function Segmented({
       aria-label={label}
       className="flex rounded-lg bg-muted p-0.5"
     >
-      {options.map((option) => (
+      {options.map(({ icon: Icon, ...option }) => (
         <button
           key={option.value}
           type="button"
@@ -2049,12 +2038,13 @@ function Segmented({
           aria-checked={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'flex h-6 items-center rounded-md px-2.5 text-meta font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
+            'flex h-6 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
             value === option.value
               ? 'bg-card text-foreground shadow-xs dark:bg-selected'
               : 'text-muted-foreground hover:text-foreground'
           )}
         >
+          {Icon && <Icon className="size-3.5" />}
           {option.label}
         </button>
       ))}
