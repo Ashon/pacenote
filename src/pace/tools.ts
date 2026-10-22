@@ -18,7 +18,7 @@ import { openTasks, recapSummary, workSummary } from '../tasks/mcp.js'
 import type { TasksSettings } from '../tasks/settings.js'
 import { allTaskViews } from '../tasks/store.js'
 import type { TaskView } from '../tasks/types.js'
-import { addThreadTasks, closeTask } from '../tasks/write.js'
+import { addThreadTasks, closeTask, isDm } from '../tasks/write.js'
 import type { Audience } from '../you/areas.js'
 import { readYou } from '../you/store.js'
 import { getLocale, LANGUAGE_FOR_AI } from '../i18n/locale.js'
@@ -67,11 +67,6 @@ const ANSWER_CHARS = 1500
 const readOnly = { readOnlyHint: true, openWorldHint: false }
 const writes = { readOnlyHint: false, openWorldHint: false }
 
-/** Tasks from DMs, which need no lookup to be left out */
-const fromDm = (task: { source: { conversation: string; label: string } }) =>
-  task.source.conversation.startsWith('D') ||
-  /^(dm|group dm)\b/i.test(task.source.label.trim())
-
 /**
  * What a channel may hear of from Pace, where everyone reads its answer:
  * tasks from public channels, and the person's own from this Mac unless they
@@ -82,7 +77,11 @@ async function audienceOf(options: OwnToolsOptions): Promise<Audience> {
   const tasks = allTaskViews(options.dataDir)
   const conversations = new Set([
     ...tasks
-      .filter((task) => task.source.app !== 'local' && !fromDm(task))
+      .filter(
+        (task) =>
+          task.source.app !== 'local' &&
+          !isDm(task.source.conversation, task.source.label)
+      )
       .map((task) => task.source.conversation),
     ...readYou(options.dataDir).areas.flatMap((area) =>
       area.parts

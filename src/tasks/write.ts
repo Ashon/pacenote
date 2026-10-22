@@ -77,7 +77,8 @@ export interface Skipped {
   why: string
 }
 
-const isDm = (conversation: string, where: string) =>
+/** A DM or group DM, by its Slack ID or its name: no lookup needed */
+export const isDm = (conversation: string, where: string) =>
   conversation.startsWith('D') || /^(dm|group dm)\b/i.test(where.trim())
 
 const leftOut = (conversation: string, where: string, exclude: string[]) =>

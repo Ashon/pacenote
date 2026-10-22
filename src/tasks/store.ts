@@ -45,18 +45,11 @@ export const HISTORY_MS = 104 * DAY
 /** This many "not for me" dismissals from one channel offer to leave it out */
 const LEAVE_OUT_AFTER = 3
 
-export function emptyTasks(): TasksFile {
-  return { version: 1, tasks: [] }
-}
-
 // Re-exported for the modules that import them from here
 export { readJson, writeJson }
 
 export function readTasks(dataDir: string): TasksFile {
-  const file = readJson<Partial<TasksFile>>(
-    path.join(dataDir, TASKS_FILE),
-    emptyTasks()
-  )
+  const file = readJson<Partial<TasksFile>>(path.join(dataDir, TASKS_FILE), {})
   return {
     version: 1,
     collectedAt: file.collectedAt,

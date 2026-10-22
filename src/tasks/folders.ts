@@ -317,11 +317,18 @@ function folderIn(file: string): string | undefined {
   } catch {
     return undefined
   }
-  const match = /"cwd"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text)
+  const folder = logField(text, 'cwd')
+  return folder && path.isAbsolute(folder) ? folder : undefined
+}
+
+/** A string field's first value in a session log's text */
+export function logField(text: string, name: string): string | undefined {
+  const match = new RegExp(`"${name}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(
+    text
+  )
   if (!match) return undefined
   try {
-    const folder = JSON.parse(`"${match[1]}"`) as string
-    return path.isAbsolute(folder) ? folder : undefined
+    return JSON.parse(`"${match[1]}"`) as string
   } catch {
     return undefined
   }

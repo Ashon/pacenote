@@ -2,7 +2,12 @@ import { execFile } from 'node:child_process'
 import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { codexLogs, remoteRepo, yourFolder } from '../tasks/folders.js'
+import {
+  codexLogs,
+  logField,
+  remoteRepo,
+  yourFolder,
+} from '../tasks/folders.js'
 import type { WorkTool } from '../tasks/types.js'
 
 /**
@@ -40,22 +45,13 @@ async function headOf(file: string) {
     } finally {
       await handle.close()
     }
-  const head = { cwd: field(text, 'cwd'), startedAt: field(text, 'timestamp') }
+  const head = {
+    cwd: logField(text, 'cwd'),
+    startedAt: logField(text, 'timestamp'),
+  }
   // A log too new to say yet is read again next time.
   if (head.cwd) heads.set(file, head)
   return head
-}
-
-function field(text: string, name: string): string | undefined {
-  const match = new RegExp(`"${name}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(
-    text
-  )
-  if (!match) return undefined
-  try {
-    return JSON.parse(`"${match[1]}"`) as string
-  } catch {
-    return undefined
-  }
 }
 
 const run = promisify(execFile)

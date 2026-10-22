@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { dayDirFor } from '../history/layout.js'
 import {
   getLocale,
   LANGUAGE_FOR_AI,
@@ -63,10 +64,6 @@ export const RECAP_PERIODS: readonly RecapPeriod[] = ['day', 'week', 'month']
 const DAY = 86_400_000
 const pad = (n: number) => String(n).padStart(2, '0')
 
-/** A day on this Mac, as YYYY-MM-DD */
-export const dayKey = (date: Date) =>
-  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-
 /** The Monday a week (as ISO counts weeks) starts on, at midnight */
 function mondayOf(date: Date): Date {
   const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -79,7 +76,7 @@ const firstMonday = (year: number) => mondayOf(new Date(year, 0, 4))
 
 /** The period a time is in: "2026-10-15", "2026-W42", "2026-10" */
 export function periodKey(period: RecapPeriod, date: Date): string {
-  if (period === 'day') return dayKey(date)
+  if (period === 'day') return dayDirFor(date)
   if (period === 'month')
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
   const monday = mondayOf(date)
@@ -394,7 +391,7 @@ export function recapOf(input: {
       const item = doneItem(task, area)
       bucket(area).items.push(item)
       bucket(area).done += 1
-      bucket(area).dayKeys.add(dayKey(new Date(at!)))
+      bucket(area).dayKeys.add(dayDirFor(new Date(at!)))
       doneTasks.push(item)
     }
     if (task.kind === 'asked' && within(task.postedAt)) {
@@ -415,7 +412,7 @@ export function recapOf(input: {
     if (!session.repo) continue
     const area = asArea(byRepo(session.repo))
     for (const at of [session.lastAt, session.startedAt])
-      if (within(at)) bucket(area).dayKeys.add(dayKey(new Date(at)))
+      if (within(at)) bucket(area).dayKeys.add(dayDirFor(new Date(at)))
   }
   // Every commit given, by repository: a day's standup reaches back a day
   const commitsByRepo = new Map<string, Commit[]>()
@@ -430,7 +427,7 @@ export function recapOf(input: {
     const into = bucket(area)
     into.commits += 1
     into.repoSet.add(commit.repo)
-    into.dayKeys.add(dayKey(new Date(commit.at)))
+    into.dayKeys.add(dayDirFor(new Date(commit.at)))
     const item = {
       title:
         commit.subject.length > TITLE_CHARS
