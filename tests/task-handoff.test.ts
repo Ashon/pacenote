@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   utimesSync,
@@ -657,6 +658,35 @@ describe("the tools' own session logs", () => {
     )
     expect(findClaudeSession(home, { ...entry, id: 'w3' })).toBeUndefined()
     expect(findClaudeSession(dir('no-claude'), entry)).toBeUndefined()
+  })
+
+  it('looks for a session’s log again once the one it found is gone', () => {
+    const home = dir('claude-moved')
+    const session = '5d1b2c3a-0000-4000-8000-000000000000'
+    const at = (project: string) =>
+      path.join(
+        dir('claude-moved', '.claude', 'projects', project),
+        `${session}.jsonl`
+      )
+    writeFileSync(at('-w-a'), '{}\n')
+    const entry: Session = {
+      kind: 'session',
+      id: 'w1',
+      task: task.id,
+      tool: 'claude',
+      session,
+      cwd: '/w/a',
+      startedAt: '2026-10-13T12:00:00Z',
+    }
+    expect(sessionFile(home, entry)).toBe(at('-w-a'))
+    renameSync(at('-w-a'), at('-w-b'))
+    expect(sessionFile(home, entry)).toBe(at('-w-b'))
+    expect(lastActive(home, entry)).toBe(
+      statSync(at('-w-b')).mtime.toISOString()
+    )
+    rmSync(at('-w-b'))
+    expect(sessionFile(home, entry)).toBeUndefined()
+    expect(lastActive(home, entry)).toBeUndefined()
   })
 
   it('reads a session’s log as turns and steps, secrets redacted', () => {

@@ -9,6 +9,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  type Stats,
 } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -590,8 +591,56 @@ export function findClaudeSession(
   return undefined
 }
 
+/**
+ * Each session's log file as last found, by home, tool and session (and a
+ * Codex session's start, from which its log is looked for): the tools' logs
+ * are looked through again only once that file is gone
+ */
+const foundLogs = new Map<string, string>()
+
+function statOf(file: string): Stats | undefined {
+  try {
+    return statSync(file, { throwIfNoEntry: false })
+  } catch {
+    return undefined
+  }
+}
+
+/** A session's log file and its stat, when the tool kept one */
+function logOf(
+  home: string,
+  entry: Session
+): { file: string; stat: Stats } | undefined {
+  if (!entry.session) return undefined
+  const key = [
+    home,
+    entry.tool,
+    entry.session,
+    entry.tool === 'codex' ? entry.startedAt : '',
+  ].join('\n')
+  const known = foundLogs.get(key)
+  const knownStat = known === undefined ? undefined : statOf(known)
+  if (known && knownStat) return { file: known, stat: knownStat }
+  foundLogs.delete(key)
+  const file = findSessionFile(home, entry)
+  const stat = file === undefined ? undefined : statOf(file)
+  if (!file || !stat) return undefined
+  foundLogs.set(key, file)
+  return { file, stat }
+}
+
 /** A session's log file, when the tool kept one */
 export function sessionFile(home: string, entry: Session): string | undefined {
+  return logOf(home, entry)?.file
+}
+
+/** When a session last wrote to its log */
+export function lastActive(home: string, entry: Session): string | undefined {
+  return logOf(home, entry)?.stat.mtime.toISOString()
+}
+
+/** Looks through the tool's logs for a session's */
+function findSessionFile(home: string, entry: Session): string | undefined {
   if (!entry.session) return undefined
   if (entry.tool === 'claude') {
     const root = path.join(home, '.claude', 'projects')
@@ -605,12 +654,6 @@ export function sessionFile(home: string, entry: Session): string | undefined {
   return codexLogs(home, Date.parse(entry.startedAt)).find((file) =>
     file.includes(entry.session!)
   )
-}
-
-/** When a session last wrote to its log */
-export function lastActive(home: string, entry: Session): string | undefined {
-  const file = sessionFile(home, entry)
-  return file ? statSync(file).mtime.toISOString() : undefined
 }
 
 const ITEM_CHARS = 2000

@@ -190,6 +190,8 @@ function codexLine(summary: Reading, line: string) {
 
 export class SessionIndex {
   private readonly files = new Map<string, FileState>()
+  /** The sessions by id, the first read of each; made again once one changes */
+  private byId?: Map<string, SessionSummary>
   private refreshing?: Promise<void>
 
   constructor(private readonly options: { home: string; windowMs?: number }) {}
@@ -213,7 +215,13 @@ export class SessionIndex {
 
   /** A session by the tool's id for it */
   session(id: string): SessionSummary | undefined {
-    return this.sessions().find((summary) => summary.session === id)
+    if (!this.byId) {
+      this.byId = new Map()
+      for (const summary of this.sessions())
+        if (!this.byId.has(summary.session))
+          this.byId.set(summary.session, summary)
+    }
+    return this.byId.get(id)
   }
 
   private async logs(since: number, now: number) {
@@ -263,6 +271,7 @@ export class SessionIndex {
           },
         }
         this.files.set(file, state)
+        this.byId = undefined
       }
       await this.readFrom(file, state, info.size)
       state.size = info.size
@@ -270,7 +279,10 @@ export class SessionIndex {
       state.summary.lastAt = new Date(info.mtimeMs).toISOString()
     }
     for (const file of this.files.keys())
-      if (!seen.has(file)) this.files.delete(file)
+      if (!seen.has(file)) {
+        this.files.delete(file)
+        this.byId = undefined
+      }
   }
 
   /** Reads whole lines from where it was left up to size */
@@ -291,11 +303,13 @@ export class SessionIndex {
           const whole = await this.wholeLine(handle, state.offset, size)
           if (!whole) break
           line(state.summary, whole.text)
+          this.byId = undefined
           state.offset += whole.bytes
           continue
         }
         for (const text of buffer.subarray(0, end).toString('utf8').split('\n'))
           if (text) line(state.summary, text)
+        this.byId = undefined
         state.offset += end + 1
         // Others' turn between chunks: the app stays responsive.
         await setImmediate()
