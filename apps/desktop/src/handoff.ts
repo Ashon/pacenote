@@ -263,23 +263,20 @@ async function yourTerminal(home: string): Promise<TerminalApp> {
  */
 async function openInTerminal(file: string, terminal: Terminal): Promise<void> {
   const opener = process.env.PACENOTE_HANDOFF_OPENER
-  if (!opener) {
-    const app = terminal === 'auto' ? await yourTerminal(homedir()) : terminal
-    const open = (which: TerminalApp) =>
-      run('open', ['-b', TERMINALS[which].bundle, file])
-    await open(app).catch((error: Error) => {
-      if (terminal === 'auto' && app !== 'terminal') return open('terminal')
-      const t = localized(text)
-      throw new Error(
-        t.didNotOpen(
-          app === 'terminal' ? t.terminal : TERMINALS[app].name,
-          error.message.trim()
-        )
+  if (opener) return standIn(opener, file)
+  const app = terminal === 'auto' ? await yourTerminal(homedir()) : terminal
+  const open = (which: TerminalApp) =>
+    run('open', ['-b', TERMINALS[which].bundle, file])
+  await open(app).catch((error: Error) => {
+    if (terminal === 'auto' && app !== 'terminal') return open('terminal')
+    const t = localized(text)
+    throw new Error(
+      t.didNotOpen(
+        app === 'terminal' ? t.terminal : TERMINALS[app].name,
+        error.message.trim()
       )
-    })
-    return
-  }
-  await standIn(opener, file)
+    )
+  })
 }
 
 /** PACENOTE_HANDOFF_OPENER, run with what it stands in for opening */
@@ -690,6 +687,13 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
     const text = redactSecrets(item.text.trim()).slice(0, ITEM_CHARS)
     if (text) items.push({ ...item, text })
   }
+  const step = (name: unknown, input: unknown, at?: string) =>
+    push({
+      role: 'tool',
+      name: String(name ?? ''),
+      text: stepLine(input) || String(name ?? ''),
+      at,
+    })
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     let event: Record<string, unknown>
     try {
@@ -704,15 +708,8 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
       if (!message || (event.type !== 'user' && event.type !== 'assistant'))
         continue
       if (Array.isArray(message.content))
-        for (const block of message.content as Record<string, unknown>[]) {
-          if (block.type === 'tool_use')
-            push({
-              role: 'tool',
-              name: String(block.name ?? ''),
-              text: stepLine(block.input) || String(block.name ?? ''),
-              at,
-            })
-        }
+        for (const block of message.content as Record<string, unknown>[])
+          if (block.type === 'tool_use') step(block.name, block.input, at)
       const text = textOf(message.content)
       if (text)
         push({ role: event.type === 'user' ? 'user' : 'assistant', text, at })
@@ -735,12 +732,7 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
       } catch {
         // Kept as written
       }
-      push({
-        role: 'tool',
-        name: String(payload.name ?? ''),
-        text: stepLine(input) || String(payload.name ?? ''),
-        at,
-      })
+      step(payload.name, input, at)
     }
   }
   return items.slice(-300)

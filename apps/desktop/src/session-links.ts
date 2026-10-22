@@ -84,15 +84,9 @@ export class RepoLookup {
 }
 
 /** Branches nobody does a task's work on alone */
-const SHARED_BRANCHES = new Set([
-  'main',
-  'master',
-  'develop',
-  'development',
-  'dev',
-  'trunk',
-  'HEAD',
-])
+const SHARED_BRANCHES = new Set(
+  'main master develop development dev trunk HEAD'.split(' ')
+)
 
 export const isTaskBranch = (branch: string, repo?: RepoOf) =>
   !SHARED_BRANCHES.has(branch) && branch !== repo?.defaultBranch
@@ -129,31 +123,11 @@ const KOREAN_STOP_WORDS = new Set(
     ' '
   )
 )
-const PARTICLES = [
-  '으로',
-  '에서',
-  '에게',
-  '까지',
-  '부터',
-  '하고',
-  '이랑',
-  '처럼',
-  '보다',
-  '은',
-  '는',
-  '이',
-  '가',
-  '을',
-  '를',
-  '에',
-  '의',
-  '로',
-  '와',
-  '과',
-  '도',
-  '만',
-  '랑',
-]
+/** Longest first: the first that ends a word is taken off */
+const PARTICLES =
+  '으로 에서 에게 까지 부터 하고 이랑 처럼 보다 은 는 이 가 을 를 에 의 로 와 과 도 만 랑'.split(
+    ' '
+  )
 const COMMON_HYPHENATED = new Set(
   (
     'follow-up check-in sign-off set-up re-run long-term up-to-date ' +
