@@ -122,6 +122,64 @@ describe('SlackMessenger.context', () => {
   })
 })
 
+describe('SlackMessenger.resolveFiles', () => {
+  it('looks up the first ten summaries at once and keeps the order', async () => {
+    const asked: string[] = []
+    let open = 0
+    let most = 0
+    const client = {
+      files: {
+        info: async ({ file }: { file: string }) => {
+          asked.push(file)
+          open += 1
+          most = Math.max(most, open)
+          // The earlier files answer last.
+          await new Promise((resolve) => setTimeout(resolve, 30 - asked.length))
+          open -= 1
+          if (file === 'F2') throw new Error('file_not_found')
+          return {
+            file: {
+              id: file,
+              mimetype: 'text/plain',
+              url_private_download: `https://files.slack.com/${file}`,
+            },
+          }
+        },
+      },
+    } as unknown as WebClient
+    const messenger = new SlackMessenger({
+      client,
+      directory: {} as Directory,
+      botUserId: 'UBOT',
+      files: { token: 'xoxb-1' },
+      owner: () => 'U1',
+      log: createLogger('error'),
+    })
+    const files = [
+      { id: 'F0', name: 'whole.txt', handle: 'https://files.slack.com/F0' },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        id: `F${i + 1}`,
+        name: `f${i + 1}.txt`,
+        partial: true as const,
+      })),
+    ]
+    const resolved = await messenger.resolveFiles(files)
+    expect(asked).toEqual(Array.from({ length: 10 }, (_, i) => `F${i + 1}`))
+    expect(most).toBe(10)
+    expect(resolved.map((file) => file.name)).toEqual(
+      files.map((file) => file.name)
+    )
+    expect(resolved[0]).toBe(files[0])
+    expect(resolved[1]?.handle).toBe('https://files.slack.com/F1')
+    // A failed lookup and those past the limit stay summaries.
+    expect(resolved[2]?.handle).toBeUndefined()
+    expect(resolved[2]?.unreadable).toBeDefined()
+    expect(resolved[10]?.handle).toBe('https://files.slack.com/F10')
+    expect(resolved[11]?.unreadable).toBeDefined()
+    expect(resolved[12]?.unreadable).toBeDefined()
+  })
+})
+
 describe('systemPrompt', () => {
   it('adds file lookup instructions only when there is a reference directory', () => {
     expect(systemPrompt(slack)).not.toContain('working directory')

@@ -239,31 +239,30 @@ export class SlackMessenger implements Messenger {
 
   /**
    * Fills in files that arrived as a summary (file_access=check_file_info,
-   * etc.) with files.info.
+   * etc.) with files.info: the first MAX_FILE_LOOKUPS of them, looked up at
+   * once.
    */
-  async resolveFiles(files: MessageFile[]): Promise<MessageFile[]> {
+  resolveFiles(files: MessageFile[]): Promise<MessageFile[]> {
     const { client, log } = this.options
     let lookups = 0
-    const resolved: MessageFile[] = []
-    for (const file of files) {
-      if (!file.partial || !file.id || lookups >= MAX_FILE_LOOKUPS) {
-        resolved.push(settle(file))
-        continue
-      }
-      lookups += 1
-      try {
-        const res = await client.files.info({ file: file.id })
-        resolved.push(
-          settle(
+    return Promise.all(
+      files.map(async (file) => {
+        if (!file.partial || !file.id || lookups >= MAX_FILE_LOOKUPS)
+          return settle(file)
+        lookups += 1
+        try {
+          const res = await client.files.info({ file: file.id })
+          return settle(
             toMessageFile({ name: file.name, ...(res.file as SlackFileRef) })
           )
-        )
-      } catch (err) {
-        log.warn(`files.info failed for ${file.id}: ${(err as Error).message}`)
-        resolved.push(settle(file))
-      }
-    }
-    return resolved
+        } catch (err) {
+          log.warn(
+            `files.info failed for ${file.id}: ${(err as Error).message}`
+          )
+          return settle(file)
+        }
+      })
+    )
   }
 
   download(file: MessageFile): Promise<Download> {
