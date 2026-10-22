@@ -44,11 +44,7 @@ export class HostSandbox implements Sandbox {
     const { stdout } = await runProcess(
       'pdftotext',
       [...PDFTOTEXT_ARGS, pdfPath, '-'],
-      {
-        cwd: path.dirname(pdfPath),
-        input: '',
-        timeoutMs: 60_000,
-      }
+      { cwd: path.dirname(pdfPath), timeoutMs: 60_000 }
     )
     return stdout
   }

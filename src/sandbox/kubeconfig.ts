@@ -33,14 +33,8 @@ export async function writeKubeconfig(
   const output = path.join(brokerRuntimeDir(processEnv), 'kubeconfig')
 
   const kubectl = async (args: string[]) =>
-    (
-      await runProcess('kubectl', args, {
-        cwd: process.cwd(),
-        input: '',
-        timeoutMs: 30_000,
-        env: processEnv,
-      })
-    ).stdout
+    (await runProcess('kubectl', args, { timeoutMs: 30_000, env: processEnv }))
+      .stdout
   const view = JSON.parse(
     await kubectl(['config', 'view', '--raw', '-o', 'json'])
   ) as KubeConfigView

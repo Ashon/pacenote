@@ -297,12 +297,7 @@ export class VmBroker {
   ): Promise<Record<string, string>> {
     const env = this.options.env
     const capture = (command: string, args: string[]) =>
-      runProcess(command, args, {
-        cwd: process.cwd(),
-        input: '',
-        timeoutMs: 15_000,
-        env,
-      }).then(
+      runProcess(command, args, { timeoutMs: 15_000, env }).then(
         ({ stdout }) => stdout.trim(),
         () => ''
       )

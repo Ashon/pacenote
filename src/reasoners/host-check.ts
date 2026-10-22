@@ -28,7 +28,6 @@ export async function checkCli(
   run: CliRunner = (args) =>
     runProcess(command, args, {
       cwd: tmpdir(),
-      input: '',
       timeoutMs: 20_000,
       env: hostEnv(process.env),
     })

@@ -2,8 +2,10 @@ import { spawn } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
 interface RunOptions {
-  cwd: string
-  input: string
+  /** Defaults to this process's working directory */
+  cwd?: string
+  /** What goes to stdin; none by default */
+  input?: string
   timeoutMs: number
   signal?: AbortSignal
   /**
@@ -166,7 +168,7 @@ export function runProcess(
       // The process exited before reading all input. Handled in the close
       // event.
     })
-    child.stdin.end(options.input)
+    child.stdin.end(options.input ?? '')
   })
 }
 

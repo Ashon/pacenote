@@ -270,7 +270,6 @@ async function exec(
   try {
     const result = await runProcess(command, args, {
       cwd: '/tmp',
-      input: '',
       timeoutMs: env.COMMAND_TIMEOUT_SEC * 1000,
       env: TOOL_ENV,
     })
@@ -1187,12 +1186,7 @@ async function start(): Promise<void> {
         '-o',
         'name',
       ],
-      {
-        cwd: '/tmp',
-        input: '',
-        timeoutMs: 10_000,
-        env: TOOL_ENV,
-      }
+      { cwd: '/tmp', timeoutMs: 10_000, env: TOOL_ENV }
     )
     clusters = stdout
       .split('\n')

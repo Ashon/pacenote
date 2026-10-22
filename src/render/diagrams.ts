@@ -183,15 +183,11 @@ export class DiagramRenderer {
 
   /** What keeps it from rendering: this Mac, or the built-in sandbox's parts */
   async verify(): Promise<string[]> {
-    const status = await vmStatus(this.options)
-    const problems = vmProblems(status, 'renderer')
-    return problems
+    return vmProblems(await vmStatus(this.options), 'renderer')
   }
 
   private async run(args: string[]): Promise<void> {
     await runProcess(this.options.bin, args, {
-      cwd: process.cwd(),
-      input: '',
       timeoutMs: this.options.timeoutMs,
     })
   }

@@ -241,7 +241,6 @@ export class VmSandbox implements Sandbox {
         this.options.bin,
         vmRunArgs(this.options, run, egress.socket, door?.socket),
         {
-          cwd: process.cwd(),
           input: run.input,
           timeoutMs: run.timeoutMs,
           signal: run.signal,
@@ -260,7 +259,7 @@ export class VmSandbox implements Sandbox {
     const { stdout } = await runProcess(
       this.options.bin,
       pdfExtractArgs(this.options, pdfPath),
-      { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
+      { timeoutMs: 60_000 }
     )
     return stdout
   }
@@ -285,12 +284,9 @@ export class VmSandbox implements Sandbox {
         this.options.bin,
         vmRunArgs(
           { ...this.options, memoryMiB: 256, cpus: 1 },
-          {
-            command: 'true',
-            args: [],
-          }
+          { command: 'true', args: [] }
         ),
-        { cwd: process.cwd(), input: '', timeoutMs: 60_000 }
+        { timeoutMs: 60_000 }
       )
       this.started = true
       return problems
@@ -384,8 +380,6 @@ export function readVmReport(
   options: Pick<VmSandboxOptions, 'bin' | 'root'>
 ): Promise<VmReport> {
   return runProcess(options.bin, ['status', '--root', options.root], {
-    cwd: process.cwd(),
-    input: '',
     timeoutMs: 15_000,
   }).then(({ stdout }) => JSON.parse(stdout) as VmReport)
 }

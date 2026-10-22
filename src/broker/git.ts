@@ -171,7 +171,6 @@ export class GitWorkspaces {
     try {
       const { stdout } = await runProcess('git', args, {
         cwd,
-        input: '',
         timeoutMs: this.options.timeoutMs,
         env: this.gitEnv(),
       })
