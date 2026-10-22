@@ -148,11 +148,13 @@ export function useCollect() {
   }
 }
 
+export const REPO_FOLDERS_KEY = ['task-repos']
+
 /** Each repository's folder on this Mac: a task in one opens there */
 export function useRepoFolders() {
   const bridge = window.pacenoteDesktop?.tasks
   return useQuery({
-    queryKey: ['task-repos'],
+    queryKey: REPO_FOLDERS_KEY,
     queryFn: async () => (await bridge?.repos()) ?? {},
     enabled: Boolean(bridge),
   })
@@ -179,7 +181,7 @@ export function useTaskWork(id: string) {
   const refresh = async () => {
     await client.invalidateQueries({ queryKey: ['task', id] })
     await client.invalidateQueries({ queryKey: ['tasks'] })
-    await client.invalidateQueries({ queryKey: ['task-repos'] })
+    await client.invalidateQueries({ queryKey: REPO_FOLDERS_KEY })
   }
   const after = async <T extends { error?: string } | undefined>(
     call: Promise<T> | undefined

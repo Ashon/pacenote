@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { FolderOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useText } from '@/lib/i18n'
+import { REPO_FOLDERS_KEY, useRepoFolders } from '@/lib/tasks'
 import { text } from './repo-folders.text'
 
 /**
@@ -11,12 +13,13 @@ import { text } from './repo-folders.text'
 export function RepoFolders() {
   const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
-  const [repos, setRepos] = useState<Record<string, string>>()
+  const client = useQueryClient()
+  const repos = useRepoFolders().data
   const [error, setError] = useState<string>()
-  useEffect(() => {
-    void bridge?.repos().then(setRepos)
-  }, [bridge])
   if (!bridge || !repos) return null
+  // Shared with the task rows, which open code tasks there
+  const setRepos = (next: Record<string, string>) =>
+    client.setQueryData(REPO_FOLDERS_KEY, next)
   const names = Object.keys(repos).sort((a, b) => a.localeCompare(b))
 
   const change = async (repo: string) => {
