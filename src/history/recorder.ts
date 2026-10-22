@@ -1,28 +1,21 @@
 import { randomBytes } from 'node:crypto'
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { readdirSync, rmSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { writeJson } from '../json-file.js'
 import type { Logger } from '../logger.js'
 import {
   ARTIFACTS_DIR,
   dayDirFor,
-  dayOf,
-  isDayDir,
+  dayDirs,
   isSafeArtifactName,
+  readRunFile,
   RUN_FILE,
+  runDir,
   runIdFor,
   RUNS_DIR,
 } from './layout.js'
 import {
-  normalizeHistoryRecord,
   RUN_RECORD_VERSION,
   type CollectionRunRecord,
   type HistoryRecord,
@@ -78,7 +71,7 @@ export class HistoryStore {
       events: [],
       outputs: [],
     }
-    const handle = new RunHandle(record, this.runDir(id)!, this.log)
+    const handle = new RunHandle(record, runDir(this.root, id)!, this.log)
     handle.flush()
     return handle
   }
@@ -101,7 +94,7 @@ export class HistoryStore {
       ...init,
       events: [],
     }
-    const handle = new RunHandle(record, this.runDir(id)!, this.log)
+    const handle = new RunHandle(record, runDir(this.root, id)!, this.log)
     handle.flush()
     return handle
   }
@@ -110,21 +103,12 @@ export class HistoryStore {
   reopen(id: string): RunHandle | undefined {
     const record = this.read(id)
     if (!record || record.kind === 'collection') return undefined
-    return new RunHandle(record, this.runDir(id)!, this.log)
+    return new RunHandle(record, runDir(this.root, id)!, this.log)
   }
 
   read(id: string): HistoryRecord | undefined {
-    const dir = this.runDir(id)
-    if (!dir) return undefined
-    try {
-      return normalizeHistoryRecord(
-        JSON.parse(
-          readFileSync(path.join(dir, RUN_FILE), 'utf8')
-        ) as HistoryRecord
-      )
-    } catch {
-      return undefined
-    }
+    const dir = runDir(this.root, id)
+    return dir ? readRunFile(path.join(dir, RUN_FILE)) : undefined
   }
 
   /**
@@ -140,7 +124,7 @@ export class HistoryStore {
   ): number {
     const who = kind === 'mention' ? 'the bot' : 'the app'
     let count = 0
-    for (const day of this.days().slice(0, 7)) {
+    for (const day of dayDirs(this.root).slice(0, 7)) {
       const dayDir = path.join(this.root, RUNS_DIR, day)
       for (const id of readdirSync(dayDir)) {
         if (keep.has(id)) continue
@@ -177,7 +161,7 @@ export class HistoryStore {
       new Date(now.getTime() - retentionDays * 86_400_000)
     )
     let removed = 0
-    for (const day of this.days()) {
+    for (const day of dayDirs(this.root)) {
       if (day >= cutoff) continue
       rmSync(path.join(this.root, RUNS_DIR, day), {
         recursive: true,
@@ -186,18 +170,6 @@ export class HistoryStore {
       removed += 1
     }
     return removed
-  }
-
-  /** Day directory names (newest first) */
-  private days(): string[] {
-    const dir = path.join(this.root, RUNS_DIR)
-    if (!existsSync(dir)) return []
-    return readdirSync(dir).filter(isDayDir).sort().reverse()
-  }
-
-  private runDir(id: string): string | undefined {
-    const day = dayOf(id)
-    return day ? path.join(this.root, RUNS_DIR, day, id) : undefined
   }
 }
 
@@ -341,10 +313,7 @@ export class RunHandle<R extends HistoryRecord = RunRecord> {
     }
     this.record.updatedAt = new Date().toISOString()
     try {
-      mkdirSync(this.dir, { recursive: true })
-      const file = path.join(this.dir, RUN_FILE)
-      writeFileSync(`${file}.tmp`, `${JSON.stringify(this.record, null, 2)}\n`)
-      renameSync(`${file}.tmp`, file)
+      writeJson(path.join(this.dir, RUN_FILE), this.record)
     } catch (err) {
       // A history write failure must not block the answer.
       this.log?.warn(

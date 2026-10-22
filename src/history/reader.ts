@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { readCollections } from '../tasks/collections.js'
 import { readRecapSpend } from '../you/spent.js'
@@ -6,15 +6,16 @@ import type { RelatedRun } from '../tasks/types.js'
 import {
   ARTIFACTS_DIR,
   dayDirFor,
+  dayDirs,
   dayOf,
-  isDayDir,
   isSafeArtifactName,
+  readRunFile,
   RUN_FILE,
+  runDir,
   RUNS_DIR,
 } from './layout.js'
 import {
   isCollection,
-  normalizeHistoryRecord,
   summarize,
   type CollectionRunRecord,
   type HistoryRecord,
@@ -148,7 +149,7 @@ export class HistoryReader {
   }
 
   get(id: string): HistoryRecord | undefined {
-    const dir = this.runDir(id)
+    const dir = runDir(this.root, id)
     return dir ? this.load(path.join(dir, RUN_FILE)) : undefined
   }
 
@@ -157,7 +158,7 @@ export class HistoryReader {
    * file is missing
    */
   artifactPath(id: string, name: string): string | undefined {
-    const dir = this.runDir(id)
+    const dir = runDir(this.root, id)
     if (!dir || !isSafeArtifactName(name)) return undefined
     const file = path.join(dir, ARTIFACTS_DIR, name)
     return existsSync(file) ? file : undefined
@@ -277,9 +278,7 @@ export class HistoryReader {
   /** Newest runs first */
   private *records(): Generator<HistoryRecord> {
     const runsDir = path.join(this.root, RUNS_DIR)
-    const days = existsSync(runsDir)
-      ? readdirSync(runsDir).filter(isDayDir).sort().reverse()
-      : []
+    const days = dayDirs(this.root)
     this.forgetBefore(days.at(-1))
     for (const day of days) {
       const ids = readdirSync(path.join(runsDir, day))
@@ -312,19 +311,12 @@ export class HistoryReader {
       const { mtimeMs } = statSync(file)
       const cached = this.cache.get(file)
       if (cached?.mtimeMs === mtimeMs) return cached.record
-      const record = normalizeHistoryRecord(
-        JSON.parse(readFileSync(file, 'utf8')) as HistoryRecord
-      )
-      this.cache.set(file, { mtimeMs, record })
+      const record = readRunFile(file)
+      if (record) this.cache.set(file, { mtimeMs, record })
       return record
     } catch {
       return undefined
     }
-  }
-
-  private runDir(id: string): string | undefined {
-    const day = dayOf(id)
-    return day ? path.join(this.root, RUNS_DIR, day, id) : undefined
   }
 }
 

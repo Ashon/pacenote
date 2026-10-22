@@ -1,3 +1,7 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+import { normalizeHistoryRecord, type HistoryRecord } from './types.js'
+
 /**
  * Run history storage layout. Shared by the bot (writes) and the desktop app
  * (reads).
@@ -33,6 +37,30 @@ export function dayDirFor(date: Date): string {
 }
 
 export const isDayDir = (name: string) => DAY_DIR.test(name)
+
+/** A run's directory. undefined if the id's format is wrong */
+export function runDir(root: string, id: string): string | undefined {
+  const day = dayOf(id)
+  return day ? path.join(root, RUNS_DIR, day, id) : undefined
+}
+
+/** Day directory names (newest first) */
+export function dayDirs(root: string): string[] {
+  const dir = path.join(root, RUNS_DIR)
+  if (!existsSync(dir)) return []
+  return readdirSync(dir).filter(isDayDir).sort().reverse()
+}
+
+/** A run.json in the current shape. undefined if it is missing or broken */
+export function readRunFile(file: string): HistoryRecord | undefined {
+  try {
+    return normalizeHistoryRecord(
+      JSON.parse(readFileSync(file, 'utf8')) as HistoryRecord
+    )
+  } catch {
+    return undefined
+  }
+}
 
 export const isSafeArtifactName = (name: string) =>
   ARTIFACT_NAME.test(name) && !name.includes('..')
