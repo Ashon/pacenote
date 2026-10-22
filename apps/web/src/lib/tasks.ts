@@ -70,6 +70,16 @@ export function useTasksPush() {
   )
 }
 
+/** Waits for a call to the desktop app and a refresh; the error to show */
+async function after(
+  call: Promise<{ error?: string } | undefined> | undefined,
+  refresh: () => Promise<unknown>
+): Promise<string | undefined> {
+  const result = await call
+  await refresh()
+  return result?.error
+}
+
 /**
  * A task that looks done from its quiet session: close it, not yet, or keep
  * a thing left after it as a task. Each refreshes the list and the task.
@@ -82,16 +92,9 @@ export function useProposal(id: string) {
     await client.invalidateQueries({ queryKey: ['task', id] })
   }
   return {
-    answer: async (answer: 'close' | 'not-yet') => {
-      const result = await bridge?.answerProposal(id, answer)
-      await refresh()
-      return result?.error
-    },
-    keep: async (text: string) => {
-      const result = await bridge?.keepLeft(id, text)
-      await refresh()
-      return result?.error
-    },
+    answer: (answer: 'close' | 'not-yet') =>
+      after(bridge?.answerProposal(id, answer), refresh),
+    keep: (text: string) => after(bridge?.keepLeft(id, text), refresh),
   }
 }
 
@@ -101,11 +104,10 @@ export function useProposal(id: string) {
  */
 export function useGroupAnswer() {
   const client = useQueryClient()
-  return async (group: string, yours: boolean) => {
-    const result = await window.pacenoteDesktop?.tasks.answerGroup(group, yours)
-    await client.invalidateQueries({ queryKey: ['tasks'] })
-    return result?.error
-  }
+  return (group: string, yours: boolean) =>
+    after(window.pacenoteDesktop?.tasks.answerGroup(group, yours), () =>
+      client.invalidateQueries({ queryKey: ['tasks'] })
+    )
 }
 
 /** Who you are in Slack, as Collect now last looked you up */
@@ -183,22 +185,15 @@ export function useTaskWork(id: string) {
     await client.invalidateQueries({ queryKey: ['tasks'] })
     await client.invalidateQueries({ queryKey: REPO_FOLDERS_KEY })
   }
-  const after = async <T extends { error?: string } | undefined>(
-    call: Promise<T> | undefined
-  ): Promise<string | undefined> => {
-    const result = await call
-    await refresh()
-    return result?.error
-  }
   return {
     continueIn: async (tool: WorkTool, folder: string) => {
       const result = await bridge?.continueIn(id, { tool, folder })
       await refresh()
       return { error: result?.error, note: result?.note }
     },
-    resume: (entryId: string) => after(bridge?.resume(entryId)),
-    draft: () => after(bridge?.draft(id)),
-    copyReply: (text: string) => after(bridge?.copyReply(id, text)),
+    resume: (entryId: string) => after(bridge?.resume(entryId), refresh),
+    draft: () => after(bridge?.draft(id), refresh),
+    copyReply: (text: string) => after(bridge?.copyReply(id, text), refresh),
     answer: async (entryId: string, yes: boolean) => {
       await bridge?.answerSuggestion(entryId, yes)
       await refresh()

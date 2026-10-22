@@ -288,9 +288,8 @@ export function TaskRow({
         : task.group
           ? t.askedOf(task.group)
           : undefined
-  const source = sourceOf(task)
   // This Mac is kept in English in the task, as AI tools read it too
-  const sourceLabel = local ? t.thisMac : source.label
+  const sourceLabel = local ? t.thisMac : sourceOf(task).label
   const by = closedBy(task.closed?.by)
   const settledLabel =
     task.status === 'closed'
