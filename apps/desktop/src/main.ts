@@ -54,6 +54,7 @@ import {
   setLocale,
   type Locale,
 } from '../../../src/i18n/locale.js'
+import { DESKTOP_PREFS_FILE } from '../../../src/i18n/user.js'
 import { setAppMenu } from './app-menu.js'
 import { text } from './main.text.js'
 import {
@@ -261,7 +262,7 @@ const dataDir = resolveDataDir()
 securePrivateDir(dataDir)
 securePrivateFile(settingsFile)
 /** The app's own preferences: whether Pace starts with it, its language */
-const prefsFile = path.join(dataDir, 'desktop.json')
+const prefsFile = path.join(dataDir, DESKTOP_PREFS_FILE)
 /**
  * The app's language: the one chosen in Settings, or macOS's. Its tray, menus,
  * notifications and window follow it, and Pace is told it when it starts.

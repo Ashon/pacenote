@@ -15,6 +15,7 @@ import {
 } from './bot-readiness.js'
 import type { SupervisorState } from '../../../src/runtime/types.js'
 import { getLocale, localized } from '../../../src/i18n/locale.js'
+import { DESKTOP_PREFS_FILE } from '../../../src/i18n/user.js'
 import { text } from './bot.text.js'
 import { readPrefs, writePrefs } from './language.js'
 
@@ -102,7 +103,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
     }
   ) {
     super()
-    this.prefsFile = path.join(options.dataDir, 'desktop.json')
+    this.prefsFile = path.join(options.dataDir, DESKTOP_PREFS_FILE)
     this.state = {
       phase: 'idle',
       output: [],
