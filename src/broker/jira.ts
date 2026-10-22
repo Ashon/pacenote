@@ -340,24 +340,8 @@ export class JiraClient {
 
   async viewIssue(input: string, maxComments = 10): Promise<string> {
     const key = parseIssueKey(input, this.projects)
-    const fields = [
-      'summary',
-      'status',
-      'issuetype',
-      'priority',
-      'assignee',
-      'reporter',
-      'labels',
-      'created',
-      'updated',
-      'duedate',
-      'project',
-      'parent',
-      'description',
-      'subtasks',
-      'issuelinks',
-      'comment',
-    ].join(',')
+    const fields =
+      'summary,status,issuetype,priority,assignee,reporter,labels,created,updated,duedate,project,parent,description,subtasks,issuelinks,comment'
     const issue = await this.request<Issue>(
       'GET',
       `/rest/api/3/issue/${key}?fields=${fields}`
@@ -419,9 +403,7 @@ export class JiraClient {
     const created = await this.request<{ key: string }>(
       'POST',
       '/rest/api/3/issue',
-      {
-        fields,
-      }
+      { fields }
     )
     return `Created ${created.key} (${type.name}). ${this.siteUrl}/browse/${created.key}`
   }
@@ -435,9 +417,7 @@ export class JiraClient {
     const comment = await this.request<{ id: string }>(
       'POST',
       `/rest/api/3/issue/${key}/comment`,
-      {
-        body: textToAdf(body),
-      }
+      { body: textToAdf(body) }
     )
     return `Added a comment to ${key}. ${this.siteUrl}/browse/${key}?focusedCommentId=${comment.id}`
   }

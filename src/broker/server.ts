@@ -348,6 +348,14 @@ function logged(
   })
 }
 const readOnly = { readOnlyHint: true, openWorldHint: false }
+/** Reads beyond this VM: GitHub, Jira */
+const readsOut = { readOnlyHint: true, openWorldHint: true }
+const writes = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: false,
+}
+const writesOut = { ...writes, openWorldHint: true }
 
 // ------------------------------------------------------------------ Tool
 // registration
@@ -451,6 +459,15 @@ function registerK8sTools(server: McpServer): void {
     .string()
     .describe(`Cluster context (${clusters.join(', ')})`)
   const ns = z.string().optional().describe('Namespace')
+  /** A kubectl lookup: its arguments from the input, and the fields logged */
+  const lookup =
+    <A extends object>(
+      tool: string,
+      args: (a: A, clusters: readonly string[]) => string[],
+      ...keys: (keyof A)[]
+    ) =>
+    (a: A) =>
+      respond(() => kubectl(tool, args(a, clusters), pick(a, ...keys)))
 
   server.registerTool(
     'k8s_get',
@@ -496,14 +513,7 @@ function registerK8sTools(server: McpServer): void {
       },
       annotations: readOnly,
     },
-    async (a) =>
-      respond(() =>
-        kubectl(
-          'k8s_describe',
-          describeArgs(a, clusters),
-          pick(a, 'cluster', 'kind', 'namespace', 'name')
-        )
-      )
+    lookup('k8s_describe', describeArgs, 'cluster', 'kind', 'namespace', 'name')
   )
 
   server.registerTool(
@@ -524,14 +534,15 @@ function registerK8sTools(server: McpServer): void {
       },
       annotations: readOnly,
     },
-    async (a) =>
-      respond(() =>
-        kubectl(
-          'k8s_logs',
-          logsArgs(a, clusters),
-          pick(a, 'cluster', 'namespace', 'pod', 'container', 'tail')
-        )
-      )
+    lookup(
+      'k8s_logs',
+      logsArgs,
+      'cluster',
+      'namespace',
+      'pod',
+      'container',
+      'tail'
+    )
   )
 
   server.registerTool(
@@ -542,14 +553,7 @@ function registerK8sTools(server: McpServer): void {
       inputSchema: { cluster, namespace: ns },
       annotations: readOnly,
     },
-    async (a) =>
-      respond(() =>
-        kubectl(
-          'k8s_events',
-          eventsArgs(a, clusters),
-          pick(a, 'cluster', 'namespace')
-        )
-      )
+    lookup('k8s_events', eventsArgs, 'cluster', 'namespace')
   )
 
   server.registerTool(
@@ -563,14 +567,7 @@ function registerK8sTools(server: McpServer): void {
       },
       annotations: readOnly,
     },
-    async (a) =>
-      respond(() =>
-        kubectl(
-          'k8s_top',
-          topArgs(a, clusters),
-          pick(a, 'cluster', 'target', 'namespace')
-        )
-      )
+    lookup('k8s_top', topArgs, 'cluster', 'target', 'namespace')
   )
 }
 
@@ -717,11 +714,6 @@ function registerWorkspaceTools(
 ): void {
   const ws = z.string().describe('Workspace id returned by ws_prepare')
   const file = z.string().describe('Path relative to the workspace')
-  const write = {
-    readOnlyHint: false,
-    destructiveHint: false,
-    openWorldHint: false,
-  }
   // Their output goes back as it is: only the time is logged.
   const loggedAsIs = (
     tool: string,
@@ -745,7 +737,7 @@ function registerWorkspaceTools(
           .optional()
           .describe('Base branch. Defaults to the remote default branch'),
       },
-      annotations: { ...write, openWorldHint: true },
+      annotations: writesOut,
     },
     async ({ repo, base }) =>
       loggedAsIs('ws_prepare', { repo, base }, async () => {
@@ -822,7 +814,7 @@ function registerWorkspaceTools(
       description:
         'Writes a new file in the workspace or overwrites a whole file. Use ws_edit to change only part of a file.',
       inputSchema: { ws, path: file, content: z.string() },
-      annotations: write,
+      annotations: writes,
     },
     async (a) =>
       loggedAsIs(
@@ -844,7 +836,7 @@ function registerWorkspaceTools(
         new_string: z.string(),
         replace_all: z.boolean().optional(),
       },
-      annotations: write,
+      annotations: writes,
     },
     async (a) =>
       loggedAsIs('ws_edit', { ws: a.ws, path: a.path }, () =>
@@ -857,7 +849,7 @@ function registerWorkspaceTools(
     {
       description: 'Deletes a file from the workspace.',
       inputSchema: { ws, path: file },
-      annotations: { ...write, destructiveHint: true },
+      annotations: { ...writes, destructiveHint: true },
     },
     async (a) =>
       loggedAsIs('ws_delete', a, () => workspaces.remove(a.ws, a.path))
@@ -893,7 +885,7 @@ function registerWorkspaceTools(
             'Why the change was made, what changed, and how to verify it'
           ),
       },
-      annotations: { ...write, openWorldHint: true },
+      annotations: writesOut,
     },
     async (a) =>
       loggedAsIs('ws_create_pr', { ws: a.ws, title: a.title }, () =>
@@ -910,7 +902,6 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
       `Repository. Accepts owner/repo, repo (looked up in the allowed orgs), or a GitHub URL. Orgs available for lookup: ${owners}`
     )
   const limit = z.number().int().min(1).max(50).optional()
-  const read = { readOnlyHint: true, openWorldHint: true }
   server.registerTool(
     'gh_repo_search',
     {
@@ -922,7 +913,7 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
           .describe('Search query (GitHub search syntax)'),
         limit,
       },
-      annotations: read,
+      annotations: readsOut,
     },
     async (a) =>
       logged('gh_repo_search', a, () => reader.searchRepos(a.query, a.limit))
@@ -941,7 +932,7 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
           .describe('Default open'),
         limit,
       },
-      annotations: read,
+      annotations: readsOut,
     },
     async (a) =>
       logged('gh_pr_list', a, () =>
@@ -958,7 +949,7 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
         `Without repo: or org:, searches all of the orgs (${owners}).`,
       ].join(' '),
       inputSchema: { query: z.string().min(1), limit },
-      annotations: read,
+      annotations: readsOut,
     },
     async (a) =>
       logged('gh_pr_search', a, () => reader.searchPulls(a.query, a.limit))
@@ -980,7 +971,7 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
             'PR number (omit if repo is owner/repo#number or a PR URL)'
           ),
       },
-      annotations: read,
+      annotations: readsOut,
     },
     async (a) =>
       logged('gh_pr_view', a, () => reader.viewPull(a.repo, a.number))
@@ -999,7 +990,7 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
           .optional()
           .describe('Show only changes to this file (path prefix)'),
       },
-      annotations: read,
+      annotations: readsOut,
     },
     async (a) =>
       logged('gh_pr_diff', a, () => reader.pullDiff(a.repo, a.number, a.path))
@@ -1011,11 +1002,6 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
   const key = z
     .string()
     .describe(`Issue key (e.g. ${client.projects[0]}-123) or issue URL`)
-  const write = {
-    readOnlyHint: false,
-    destructiveHint: false,
-    openWorldHint: true,
-  }
   server.registerTool(
     'jira_search',
     {
@@ -1031,7 +1017,7 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
           .describe('JQL. The project condition is added automatically'),
         limit: z.number().int().min(1).max(50).optional(),
       },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: readsOut,
     },
     async (a) => logged('jira_search', a, () => client.search(a.jql, a.limit))
   )
@@ -1051,7 +1037,7 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
           .optional()
           .describe('Number of recent comments to show (default 10)'),
       },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: readsOut,
     },
     async (a) =>
       logged('jira_issue', a, () => client.viewIssue(a.key, a.comments))
@@ -1087,7 +1073,7 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
             'Parent issue key (when creating a subtask or an issue under an epic)'
           ),
       },
-      annotations: write,
+      annotations: writesOut,
     },
     async (a) =>
       logged(
@@ -1123,7 +1109,7 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
           .max(20_000)
           .describe('Comment body. Blank lines separate paragraphs'),
       },
-      annotations: write,
+      annotations: writesOut,
     },
     async (a) =>
       logged('jira_add_comment', { key: a.key, bytes: a.body.length }, () =>
