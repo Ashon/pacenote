@@ -98,7 +98,7 @@ export function TokensFact({
  * The cost, when claude reported one, is at API prices: what the run would
  * cost with an API key.
  */
-export function UsageTip({
+function UsageTip({
   usage,
   cacheWrite,
 }: {

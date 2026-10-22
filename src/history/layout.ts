@@ -36,7 +36,7 @@ export function dayDirFor(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-export const isDayDir = (name: string) => DAY_DIR.test(name)
+const isDayDir = (name: string) => DAY_DIR.test(name)
 
 /** A run's directory. undefined if the id's format is wrong */
 export function runDir(root: string, id: string): string | undefined {

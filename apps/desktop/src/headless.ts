@@ -455,7 +455,7 @@ export function exitError(
  * so the other one may: not on this Mac, or what the CLI's own words say. A
  * run that took too long is not.
  */
-export function exitUnable(exit: Exit, error: string): Unable | undefined {
+function exitUnable(exit: Exit, error: string): Unable | undefined {
   if (exit.timedOut) return undefined
   if (exit.spawnError?.code === 'ENOENT') return 'missing'
   return unableFrom(error)
@@ -484,7 +484,7 @@ export function taskLines(task: TaskView): string[] {
  * Runs a piece of work with no tools on a CLI, and for opencode takes its
  * session out of opencode's history after, as claude and codex keep none
  */
-export async function runPlain(options: {
+async function runPlain(options: {
   cli: OwnCli
   bin: string
   prompt: string
