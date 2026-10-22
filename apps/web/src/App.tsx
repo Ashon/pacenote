@@ -284,6 +284,7 @@ function SidebarToggle({
   const t = useText(text)
   const key = isMac ? '⌘B' : 'Ctrl+B'
   const label = compact ? t.showLabels : t.hideLabels
+  const Icon = compact ? PanelLeftOpen : PanelLeftClose
   return (
     <Tooltip
       side="bottom"
@@ -300,11 +301,7 @@ function SidebarToggle({
           forced ? 'opacity-50' : 'hover:bg-selected/50 hover:text-foreground'
         )}
       >
-        {compact ? (
-          <PanelLeftOpen className="size-[18px]" strokeWidth={1.75} />
-        ) : (
-          <PanelLeftClose className="size-[18px]" strokeWidth={1.75} />
-        )}
+        <Icon className="size-[18px]" strokeWidth={1.75} />
       </button>
     </Tooltip>
   )

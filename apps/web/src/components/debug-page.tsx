@@ -54,7 +54,11 @@ import { PaceSpinner } from './pace-spinner'
 import { StatusBarView } from './status-bar'
 
 const SIZES = [16, 20, 24, 28, 48, 96, 192]
-const SPEEDS = [0.1, 0.25, 0.5, 1]
+/** Playback speeds for a bench's animations */
+const SPEEDS = [0.1, 0.25, 0.5, 1].map((speed) => ({
+  value: speed,
+  label: `${speed}×`,
+}))
 /** Load lengths for the settle bench, in seconds */
 const LOADS = [0.2, 1.5, 5, 12]
 /** Pace's states as the status bar names them, and what makes each */
@@ -168,7 +172,7 @@ function SpinnerBench() {
         >
           {t.fps(fps, longest)}
         </span>
-        <SpeedPicker value={speed} onChange={setSpeed} />
+        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
         <Button
           size="sm"
           variant="outline"
@@ -290,7 +294,7 @@ function SettleBench() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-section">{t.settle}</h2>
-        <SpeedPicker value={speed} onChange={setSpeed} />
+        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
       </div>
       <p className="text-meta text-muted-foreground">{t.settleNote}</p>
       <div className="flex flex-wrap items-center gap-2">
@@ -567,7 +571,7 @@ function MotionBench() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-section">{t.motion}</h2>
-        <SpeedPicker value={speed} onChange={setSpeed} />
+        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
       </div>
       <p className="text-meta text-muted-foreground">{t.motionNote}</p>
       <div className="grid gap-x-10 gap-y-8 @min-[44rem]:grid-cols-2">
@@ -802,23 +806,6 @@ function Bench({
       <p className="mb-3 text-meta text-muted-foreground">{note}</p>
       {children}
     </div>
-  )
-}
-
-/** Playback speed for a bench's animations */
-function SpeedPicker({
-  value,
-  onChange,
-}: {
-  value: number
-  onChange: (speed: number) => void
-}) {
-  return (
-    <Choice
-      options={SPEEDS.map((speed) => ({ value: speed, label: `${speed}×` }))}
-      value={value}
-      onChange={onChange}
-    />
   )
 }
 

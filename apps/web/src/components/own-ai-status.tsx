@@ -2,8 +2,6 @@ import {
   CLI_NAMES,
   cliOrder,
   OWN_CLIS,
-  type CliReadiness,
-  type CliState,
   type OwnAiNow,
   type OwnAiView,
   type OwnCli,
@@ -93,12 +91,11 @@ type Tone = 'ok' | 'warn' | 'rest' | 'off'
 /** One CLI's line: how it is, and what it does for your work */
 function describeCli(
   cli: OwnCli,
-  view: Pick<OwnAiView, 'chosen' | 'fallback'>,
-  ready: CliReadiness,
-  state: CliState | undefined,
-  now = new Date()
+  view: OwnAiView
 ): { tone: Tone; text: string; signIn?: boolean } {
   const t = localized(text)
+  const ready = view.clis[cli]
+  const state = view.state[cli]
   const chosen = view.chosen === cli
   // Who does the work while this one cannot: the first that may take over
   const next = cliOrder(view.chosen, view.fallback, {}).find((c) => c !== cli)
@@ -110,7 +107,7 @@ function describeCli(
       tone: 'rest',
       text: t.resting(
         state.unable === 'unavailable',
-        untilWords(state.until, now),
+        untilWords(state.until),
         chosen && next ? CLI_NAMES[next] : undefined
       ),
     }
@@ -195,7 +192,7 @@ export function OwnAiStatus({
       ) : (
         <ul className="divide-y divide-border rounded-lg bg-well/60">
           {OWN_CLIS.map((cli) => {
-            const line = describeCli(cli, view, view.clis[cli], view.state[cli])
+            const line = describeCli(cli, view)
             const Icon = ICON[line.tone]
             return (
               <li
