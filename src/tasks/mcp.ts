@@ -1,7 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { errorResult, jsonResult } from '../mcp-result.js'
+import {
+  errorResult,
+  jsonResult,
+  limitField,
+  recapFields,
+  repoField,
+} from '../mcp-tools.js'
 import type { Audience } from '../you/areas.js'
 import { countRecap, periodCommits, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
@@ -87,6 +93,16 @@ const WRAP_UP_AT_ONCE = 5
 const inUserLanguage = (locale: Locale) =>
   `in ${LANGUAGE_FOR_AI[locale]}, the language the user reads Pacenote in, whatever language the messages are in (names, code and quoted words stay as they are)`
 const REPLY = 'A reply for the user to send in the thread, in its language'
+
+/** A task, as the tools that take one name it */
+const taskRef = () => z.string().describe("The task id or its message's link")
+
+/** A prompt's text, as the user's message */
+const userPrompt = (text: string) => ({
+  messages: [
+    { role: 'user' as const, content: { type: 'text' as const, text } },
+  ],
+})
 
 /** What a wrap-up says, for close_task and wrap_up_task */
 const wrapUp = (locale: Locale) =>
@@ -245,11 +261,7 @@ export function registerTaskTools(
       description:
         "Reads Slack with your Slack tools and adds the user's tasks to Pacenote.",
     },
-    () => ({
-      messages: [
-        { role: 'user', content: { type: 'text', text: collectPrompt() } },
-      ],
-    })
+    () => userPrompt(collectPrompt())
   )
 
   server.registerPrompt(
@@ -265,17 +277,7 @@ export function registerTaskTools(
           .describe("The task: its id, its message's link, or a few words"),
       },
     },
-    ({ task }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: {
-            type: 'text',
-            text: taskPrompt(task?.trim() || undefined, locale),
-          },
-        },
-      ],
-    })
+    ({ task }) => userPrompt(taskPrompt(task?.trim() || undefined, locale))
   )
 
   server.registerPrompt(
@@ -285,11 +287,7 @@ export function registerTaskTools(
       description:
         'Closes the task this session worked on in Pacenote, with what was done and a reply for you to send.',
     },
-    () => ({
-      messages: [
-        { role: 'user', content: { type: 'text', text: donePrompt(locale) } },
-      ],
-    })
+    () => userPrompt(donePrompt(locale))
   )
 
   server.registerPrompt(
@@ -305,14 +303,7 @@ export function registerTaskTools(
           .describe('day, week (the default) or month'),
       },
     },
-    ({ period }) => ({
-      messages: [
-        {
-          role: 'user',
-          content: { type: 'text', text: recapPromptFor(period, locale) },
-        },
-      ],
-    })
+    ({ period }) => userPrompt(recapPromptFor(period, locale))
   )
 
   server.registerTool(
@@ -428,10 +419,7 @@ export function registerTaskTools(
                 .enum(['code', 'reply', 'other'])
                 .optional()
                 .describe('What doing it takes: code, reply or other'),
-              repo: z
-                .string()
-                .optional()
-                .describe('The repository it is about, as owner/name'),
+              repo: repoField(),
               summary: z
                 .string()
                 .optional()
@@ -520,10 +508,7 @@ export function registerTaskTools(
             `What it is about and what is known so far, in two or three sentences, ${inTheirs}`
           ),
         action: z.enum(['code', 'reply', 'other']).optional(),
-        repo: z
-          .string()
-          .optional()
-          .describe('The repository it is about, as owner/name'),
+        repo: repoField(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -559,7 +544,7 @@ export function registerTaskTools(
         'for tasks that lack them. Tasks the user settled are left as they ' +
         'are; settled in Slack, close_task closes it instead.',
       inputSchema: {
-        task: z.string().describe("The task id or its message's link"),
+        task: taskRef(),
         why: z
           .string()
           .describe('Why, in a line: "mina moved it to Wednesday"'),
@@ -643,7 +628,7 @@ export function registerTaskTools(
         'closing it from its thread says how it ended (wrap_up). It never ' +
         'posts to Slack itself.',
       inputSchema: {
-        task: z.string().describe("The task id or its message's link"),
+        task: taskRef(),
         why: z.enum(['replied', 'checked', 'resolved']),
         note: z
           .string()
@@ -684,7 +669,7 @@ export function registerTaskTools(
         'after it. collect_context lists the tasks to wrap up. Open tasks, ' +
         'Maybes and tasks the user dismissed are left as they are.',
       inputSchema: {
-        task: z.string().describe("The task id or its message's link"),
+        task: taskRef(),
         wrap_up: z.string().min(1).describe(wrapUp(locale)),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
@@ -719,7 +704,7 @@ export function registerTaskTools(
         'person, with how each ended and the session it was done in, and ' +
         "Pace's answers in the thread when the run history is shared).",
       inputSchema: {
-        task: z.string().describe("The task id or its message's link"),
+        task: taskRef(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -802,14 +787,7 @@ export function registerTaskTools(
         "commits' subjects, the days with sessions, new asks and what is " +
         'still open; for today, what they are doing and what is next; and ' +
         'the sentences they had written for it, if any.',
-      inputSchema: {
-        period: z.enum(['day', 'week', 'month']),
-        date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
-          .optional()
-          .describe('A day in the period, YYYY-MM-DD; today by default'),
-      },
+      inputSchema: recapFields(),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ period, date }) =>
@@ -839,15 +817,7 @@ export function registerTaskTools(
         'asked of them or what they said they would do, newest first, with ' +
         'who asked, the source and where in it, a due hint, why it is a task ' +
         'and a link to the message. Maybes are left out.',
-      inputSchema: {
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(50)
-          .optional()
-          .describe('How many tasks (default 20)'),
-      },
+      inputSchema: { limit: limitField(50, 'tasks', 20) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     ({ limit }) =>

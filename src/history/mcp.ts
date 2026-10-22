@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { errorResult, jsonResult } from '../mcp-result.js'
+import { errorResult, jsonResult, limitField } from '../mcp-tools.js'
 import {
   registerTaskTools,
   taskInstructions,
@@ -75,13 +75,7 @@ export function createHistoryServer({
         'Lists the most recent runs, newest first: id, status, when, the ' +
         'Slack channel and requester, the request, and how many tools it used.',
       inputSchema: {
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(50)
-          .optional()
-          .describe('How many runs (default 10)'),
+        limit: limitField(50, 'runs', 10),
         status: z.enum(STATUSES).optional().describe('Only runs in this state'),
       },
       annotations: readOnly,
@@ -107,13 +101,7 @@ export function createHistoryServer({
           .string()
           .optional()
           .describe('Only runs started at or after this date (ISO 8601)'),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(50)
-          .optional()
-          .describe('How many runs (default 10)'),
+        limit: limitField(50, 'runs', 10),
       },
       annotations: readOnly,
     },

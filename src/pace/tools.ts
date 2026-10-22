@@ -4,7 +4,13 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import type { HistoryReader } from '../history/reader.js'
-import { errorResult, jsonResult } from '../mcp-result.js'
+import {
+  errorResult,
+  jsonResult,
+  limitField,
+  recapFields,
+  repoField,
+} from '../mcp-tools.js'
 import type { Requester } from '../sandbox/runtime.js'
 import type { OwnTools } from '../sandbox/vm-broker.js'
 import { recordActivity } from '../tasks/activity.js'
@@ -142,15 +148,7 @@ export function createOwnToolsServer(
     {
       description:
         "The open tasks in the user's Todo in Pacenote, newest first: what was asked of them or what they said they would do, who asked, where, a due hint and a link. Only tasks from public channels and the user's own are given here; those from DMs and private channels are left out.",
-      inputSchema: {
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(50)
-          .optional()
-          .describe('How many tasks (default 20)'),
-      },
+      inputSchema: { limit: limitField(50, 'tasks', 20) },
       annotations: readOnly,
     },
     ({ limit }) =>
@@ -186,10 +184,7 @@ export function createOwnToolsServer(
                 ),
               due: z.string().optional().describe('A due hint in words'),
               action: z.enum(['code', 'reply', 'other']).optional(),
-              repo: z
-                .string()
-                .optional()
-                .describe('The repository it is about, as owner/name'),
+              repo: repoField(),
               summary: z
                 .string()
                 .optional()
@@ -276,14 +271,7 @@ export function createOwnToolsServer(
     {
       description:
         "A recap of the user's work for a day, a week (Monday to Sunday) or a month: in each area, the tasks done, their commits' subjects, the days with sessions, new asks and what is still open; for today, what they are doing and what is next.",
-      inputSchema: {
-        period: z.enum(['day', 'week', 'month']),
-        date: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/)
-          .optional()
-          .describe('A day in the period, YYYY-MM-DD; today by default'),
-      },
+      inputSchema: recapFields(),
       annotations: readOnly,
     },
     ({ period, date }) =>
@@ -304,13 +292,7 @@ export function createOwnToolsServer(
             .string()
             .optional()
             .describe('Text to look for in the request or the answer'),
-          limit: z
-            .number()
-            .int()
-            .min(1)
-            .max(20)
-            .optional()
-            .describe('How many answers (default 5)'),
+          limit: limitField(20, 'answers', 5),
         },
         annotations: readOnly,
       },
