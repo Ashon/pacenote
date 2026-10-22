@@ -1,3 +1,4 @@
+import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { AreaView } from '@src/you/types'
 import { ChevronRight, MoreHorizontal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -36,8 +37,6 @@ import {
 import { taskHash } from '@/lib/tasks'
 import { Page } from './page'
 import { text } from './you-page.text'
-
-const TOOL = { claude: 'Claude Code', codex: 'Codex' } as const
 
 /**
  * You: where you contribute and what is going on in each area, from your
@@ -312,7 +311,7 @@ function AreaRow({
               {area.working && (
                 <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
                   <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-                  {t.workingIn(TOOL[area.working.tool])}
+                  {t.workingIn(CLI_NAMES[area.working.tool])}
                 </span>
               )}
               {resting ? (

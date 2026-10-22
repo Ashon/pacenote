@@ -85,7 +85,6 @@ import { text } from './task-row.text'
  * Nothing is posted to Slack.
  */
 
-const TOOL: Record<WorkTool, string> = { claude: 'Claude Code', codex: 'Codex' }
 /** A Codex session from the Codex app continues there; others in a terminal */
 const resumesInApp = (session: Session) =>
   !!session.app && session.tool === 'codex'
@@ -98,11 +97,14 @@ const DISMISS_REASONS: DismissReason[] = [
   'not-worth-it',
 ]
 
-/** The AI tool that closed a task, by its MCP client name ("claude-code") */
-function closedBy(client: string | undefined): string | undefined {
+/**
+ * The AI tool that closed a task, or is at work on your tasks, by its MCP
+ * client name ("claude-code")
+ */
+export function closedBy(client: string | undefined): string | undefined {
   if (!client) return undefined
-  if (/claude/i.test(client)) return TOOL.claude
-  if (/codex/i.test(client)) return TOOL.codex
+  if (/claude/i.test(client)) return CLI_NAMES.claude
+  if (/codex/i.test(client)) return CLI_NAMES.codex
   return client
 }
 
@@ -315,13 +317,13 @@ export function TaskRow({
       ? []
       : [
           {
-            label: t.continueIn(TOOL[cli]),
+            label: t.continueIn(CLI_NAMES[cli]),
             icon: <SquareTerminal />,
             run: () => void continueIn(cli),
           },
         ]),
     {
-      label: t.continueIn(TOOL[other(cli)]),
+      label: t.continueIn(CLI_NAMES[other(cli)]),
       icon: <SquareTerminal />,
       run: () => void continueIn(other(cli)),
     },
@@ -438,11 +440,11 @@ export function TaskRow({
               )}
               {working && task.status === 'open' && !atWork.mounted && (
                 <span
-                  title={t.lastActiveIn(TOOL[working.tool])}
+                  title={t.lastActiveIn(CLI_NAMES[working.tool])}
                   className="inline-flex items-center gap-1"
                 >
                   <SquareTerminal aria-hidden="true" className="size-3" />
-                  {TOOL[working.tool]} {formatRelative(working.at)}
+                  {CLI_NAMES[working.tool]} {formatRelative(working.at)}
                 </span>
               )}
               {looksDone.mounted && (
@@ -542,7 +544,7 @@ export function TaskRow({
                       onClick={() => void continueIn(cli)}
                     >
                       <SquareTerminal />
-                      {t.continueIn(TOOL[cli])}
+                      {t.continueIn(CLI_NAMES[cli])}
                     </Button>
                   </OpensIn>
                 )}
@@ -1061,11 +1063,11 @@ function EarlierLine({
       ? t.resumeInApp(Boolean(task), t.app.codex)
       : session.app
         ? t.resumeInTerminal(Boolean(task))
-        : t.resumeIn(Boolean(task), TOOL[session.tool])
+        : t.resumeIn(Boolean(task), CLI_NAMES[session.tool])
   const action =
     elsewhere && session ? (
       <Tooltip
-        content={t.startHereTip(elsewhere, TOOL[session.tool])}
+        content={t.startHereTip(elsewhere, CLI_NAMES[session.tool])}
         side="left"
       >
         <Button
@@ -1094,7 +1096,7 @@ function EarlierLine({
       <span className="text-meta text-muted-foreground">
         {line.session.app
           ? t.waitingToSend
-          : t.waitingToStart(TOOL[line.session.tool])}
+          : t.waitingToStart(CLI_NAMES[line.session.tool])}
       </span>
     ) : undefined
   const name = (text: string, href?: string, hint?: string) =>
@@ -1143,7 +1145,7 @@ function EarlierLine({
   const own = line.session as Session
   return (
     <Line label={line.label} actions={action}>
-      {name(t.toolSession(TOOL[own.tool]), log, t.readSession)}
+      {name(t.toolSession(CLI_NAMES[own.tool]), log, t.readSession)}
       {quiet(
         [
           elsewhere && t.onMac(elsewhere),
@@ -1198,7 +1200,7 @@ function LooksDone({
   onKeep: (text: string) => void
 }) {
   const t = useText(text)
-  const tool = TOOL[proposal.tool]
+  const tool = CLI_NAMES[proposal.tool]
   return (
     <>
       <Line
@@ -1287,7 +1289,7 @@ function SuggestedLine({
         title={t.readSession}
         className="font-semibold underline-offset-2 hover:underline"
       >
-        {t.toolSession(TOOL[suggestion.tool])}
+        {t.toolSession(CLI_NAMES[suggestion.tool])}
       </a>
       <span title={suggestion.cwd} className="text-meta text-muted-foreground">
         {[
@@ -1392,7 +1394,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
           {task.repo ? t.whereIsRepo(task.repo) : t.whereToOpen}
         </DialogTitle>
         <DialogDescription className="text-body text-muted-foreground">
-          {t.opensHere(TOOL[tool], Boolean(task.repo))}
+          {t.opensHere(CLI_NAMES[tool], Boolean(task.repo))}
         </DialogDescription>
       </div>
       <div
@@ -1472,7 +1474,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
       </div>
       <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
-        {t.runsAsYou(TOOL[tool])}
+        {t.runsAsYou(CLI_NAMES[tool])}
       </p>
       {error && (
         <p role="alert" className="text-copy text-status-failed">
@@ -1492,7 +1494,7 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
           }}
         >
           <SquareTerminal />
-          {t.openHere(TOOL[tool])}
+          {t.openHere(CLI_NAMES[tool])}
         </Button>
       </div>
     </>
@@ -1545,7 +1547,7 @@ function SessionLogPanel({
     void bridge?.sessionLog(entryId).then((result) => setLog(result ?? {}))
   }, [bridge, entryId])
   const entry = found?.entry
-  const tool = entry ? TOOL[entry.tool] : t.theSession
+  const tool = entry ? CLI_NAMES[entry.tool] : t.theSession
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

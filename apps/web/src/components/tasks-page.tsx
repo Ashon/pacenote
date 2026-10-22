@@ -46,7 +46,7 @@ import { cn, go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
-import { TaskRow } from './task-row'
+import { closedBy, TaskRow } from './task-row'
 import { Page } from './page'
 import { text } from './tasks-page.text'
 import {
@@ -547,14 +547,6 @@ function CollectButton({
   )
 }
 
-/** An AI tool's name, from its MCP client name ("claude-code") */
-function toolOf(client: string | undefined): string {
-  if (!client) return localized(text).anAiTool
-  if (/claude/i.test(client)) return 'Claude Code'
-  if (/codex/i.test(client)) return 'Codex'
-  return client
-}
-
 /** What an AI tool is doing with your tasks, or just did, in a sentence */
 function liveLine(
   live: TasksLive | null | undefined,
@@ -567,13 +559,13 @@ function liveLine(
     return {
       key: `collect:${since}`,
       active: true,
-      text: t.liveCollecting(toolOf(by), added),
+      text: t.liveCollecting(closedBy(by) ?? t.anAiTool, added),
     }
   }
   const event = live.latest
   if (!event) return undefined
   const title = event.task ? titleOf(event.task) : undefined
-  const tool = toolOf(event.by)
+  const tool = closedBy(event.by) ?? t.anAiTool
   const line =
     event.kind === 'look'
       ? t.liveLook(tool, title)
