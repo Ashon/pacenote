@@ -22,6 +22,7 @@ import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useStats } from '@/lib/api'
 import { useSupervisor } from '@/lib/desktop'
 import { useSetup } from '@/lib/setup'
+import { readStored, writeStored } from '@/lib/storage'
 import {
   formatDuration,
   formatNumber,
@@ -302,38 +303,22 @@ export function Overview() {
 const SETUP_CARD_KEY = 'pacenote.overview.setup-card'
 
 function lastSetupCard(): number {
-  try {
-    return Number(localStorage.getItem(SETUP_CARD_KEY)) || 0
-  } catch {
-    return 0
-  }
+  return Number(readStored(SETUP_CARD_KEY)) || 0
 }
 
 function rememberSetupCard(height: number) {
-  try {
-    localStorage.setItem(SETUP_CARD_KEY, String(height))
-  } catch {
-    // Without storage the skeleton leaves the setup card out.
-  }
+  writeStored(SETUP_CARD_KEY, String(height))
 }
 
 /** Whether the tasks band showed last time: the skeleton holds its place */
 const TASK_BAND_KEY = 'pacenote.overview.task-band'
 
 function lastTaskBand(): boolean {
-  try {
-    return localStorage.getItem(TASK_BAND_KEY) === '1'
-  } catch {
-    return false
-  }
+  return readStored(TASK_BAND_KEY) === '1'
 }
 
 function rememberTaskBand(shown: boolean) {
-  try {
-    localStorage.setItem(TASK_BAND_KEY, shown ? '1' : '0')
-  } catch {
-    // Without storage the skeleton leaves the tasks band out.
-  }
+  writeStored(TASK_BAND_KEY, shown ? '1' : '0')
 }
 
 /** A figure's place: its label as it is, its number and line as bars */

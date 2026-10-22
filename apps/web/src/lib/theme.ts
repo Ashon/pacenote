@@ -6,17 +6,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { readStored, writeStored } from './storage'
 
 export type ThemeMode = 'system' | 'light' | 'dark'
 const KEY = 'pacenote.theme'
 
 const readMode = (): ThemeMode => {
-  try {
-    const value = localStorage.getItem(KEY)
-    return value === 'light' || value === 'dark' ? value : 'system'
-  } catch {
-    return 'system'
-  }
+  const value = readStored(KEY)
+  return value === 'light' || value === 'dark' ? value : 'system'
 }
 
 const ThemeContext = createContext<
@@ -36,11 +33,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       document.documentElement.classList.toggle('dark', dark)
     }
     apply()
-    try {
-      localStorage.setItem(KEY, mode)
-    } catch {
-      // Even if saving fails, it still applies for this session.
-    }
+    // Even if saving fails, it still applies for this session.
+    writeStored(KEY, mode)
     media.addEventListener('change', apply)
     return () => media.removeEventListener('change', apply)
   }, [mode])

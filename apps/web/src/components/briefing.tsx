@@ -3,6 +3,7 @@ import { SkeletonText } from '@/components/ui/skeleton'
 import { briefLines, type BriefLine } from '@/lib/briefing'
 import { useText } from '@/lib/i18n'
 import { recapHash, useRecap } from '@/lib/recap'
+import { readStored, writeStored } from '@/lib/storage'
 import { taskHash } from '@/lib/tasks'
 import { text } from './briefing.text'
 
@@ -12,19 +13,11 @@ const LINES_KEY = 'pacenote.overview.briefing'
 
 /** How many lines it had last time: the skeleton holds their place */
 export function lastBriefing(): number {
-  try {
-    return Number(localStorage.getItem(LINES_KEY)) || 0
-  } catch {
-    return 0
-  }
+  return Number(readStored(LINES_KEY)) || 0
 }
 
 function rememberBriefing(lines: number) {
-  try {
-    localStorage.setItem(LINES_KEY, String(lines))
-  } catch {
-    // Without storage the skeleton leaves the briefing out.
-  }
+  writeStored(LINES_KEY, String(lines))
 }
 
 /** One row per line, each one line tall, so its place is known ahead */

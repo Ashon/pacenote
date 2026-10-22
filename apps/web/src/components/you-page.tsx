@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/skeleton'
 import { formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { readStored, writeStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import {
   accountsSentence,
@@ -182,20 +183,12 @@ function Intro() {
 const AREAS_KEY = 'pacenote.you.rows'
 
 function lastAreas(): number {
-  try {
-    const rows = Number(localStorage.getItem(AREAS_KEY))
-    return rows > 0 ? Math.min(rows, 6) : 3
-  } catch {
-    return 3
-  }
+  const rows = Number(readStored(AREAS_KEY))
+  return rows > 0 ? Math.min(rows, 6) : 3
 }
 
 function rememberAreas(rows: number) {
-  try {
-    localStorage.setItem(AREAS_KEY, String(rows))
-  } catch {
-    // Without storage the skeleton has three rows.
-  }
+  writeStored(AREAS_KEY, String(rows))
 }
 
 /** Widths for skeleton rows, so they do not read as one block */

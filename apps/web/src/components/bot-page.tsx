@@ -30,6 +30,7 @@ import { useBotLogs, useBotStatus } from '@/lib/api'
 import { botControl, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { readStored, writeStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { text } from './bot-page.text'
 import { botKnown, describeBot, TONE_CLASS, type BotTone } from './bot-state'
@@ -609,19 +610,11 @@ const LogPanel = memo(function LogPanel() {
 const NOTICE_KEY = 'pacenote.bot.notice'
 
 function lastNotice(): number {
-  try {
-    return Number(localStorage.getItem(NOTICE_KEY)) || 0
-  } catch {
-    return 0
-  }
+  return Number(readStored(NOTICE_KEY)) || 0
 }
 
 function rememberNotice(height: number) {
-  try {
-    localStorage.setItem(NOTICE_KEY, String(height))
-  } catch {
-    // Without storage the skeleton leaves the notice out.
-  }
+  writeStored(NOTICE_KEY, String(height))
 }
 
 /** Widths for the log's skeleton lines */

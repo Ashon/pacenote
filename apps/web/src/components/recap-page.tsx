@@ -37,6 +37,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatHourMinute, formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { readStored, writeStored } from '@/lib/storage'
 import {
   areaCounts,
   type CopyFormat,
@@ -61,12 +62,8 @@ const PERIODS: RecapPeriod[] = ['day', 'week', 'month']
 const PERIOD_KEY = 'pacenote.recap.period'
 
 export function lastPeriod(): RecapPeriod {
-  try {
-    const value = localStorage.getItem(PERIOD_KEY)
-    return value === 'week' || value === 'month' ? value : 'day'
-  } catch {
-    return 'day'
-  }
+  const value = readStored(PERIOD_KEY)
+  return value === 'week' || value === 'month' ? value : 'day'
 }
 
 const go = (hash: string) => {
@@ -106,11 +103,7 @@ export function RecapPage({
   }, [arrived, shownKey])
 
   const choose = (next: RecapPeriod) => {
-    try {
-      localStorage.setItem(PERIOD_KEY, next)
-    } catch {
-      // Without storage the screen opens on Day next time.
-    }
+    writeStored(PERIOD_KEY, next)
     go(recapHash(next))
   }
   const writeUp = async () => {

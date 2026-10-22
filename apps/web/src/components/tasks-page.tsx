@@ -41,6 +41,7 @@ import {
   useTasksLive,
 } from '@/lib/tasks'
 import { macNamed, useMacs } from '@/lib/macs'
+import { readStored, writeStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
@@ -69,7 +70,7 @@ const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
 
 function declinedOffers(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(OFFERS_KEY) ?? '[]') as string[]
+    return JSON.parse(readStored(OFFERS_KEY) ?? '[]') as string[]
   } catch {
     return []
   }
@@ -79,12 +80,8 @@ function declinedOffers(): string[] {
 const ROWS_KEY = 'pacenote.tasks.rows'
 
 function lastRows(): number {
-  try {
-    const rows = Number(localStorage.getItem(ROWS_KEY))
-    return rows > 0 ? Math.min(rows, 8) : 3
-  } catch {
-    return 3
-  }
+  const rows = Number(readStored(ROWS_KEY))
+  return rows > 0 ? Math.min(rows, 8) : 3
 }
 
 /**
@@ -246,11 +243,7 @@ export function TasksPage({
   const decline = (conversation: string) => {
     const next = [...declined, conversation]
     setDeclined(next)
-    try {
-      localStorage.setItem(OFFERS_KEY, JSON.stringify(next))
-    } catch {
-      // Without storage the offer comes back next time.
-    }
+    writeStored(OFFERS_KEY, JSON.stringify(next))
   }
 
   return (
@@ -383,11 +376,7 @@ export function TasksPage({
 }
 
 function rememberRows(rows: number) {
-  try {
-    localStorage.setItem(ROWS_KEY, String(rows))
-  } catch {
-    // Without storage the skeleton has three rows.
-  }
+  writeStored(ROWS_KEY, String(rows))
 }
 
 /** Open, Maybe and Done, with their counts once the tasks are in */

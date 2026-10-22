@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { isLocale, pickLocale, setLocale, type Locale } from '@src/i18n/locale'
+import { readStored } from './storage'
 
 export type { Locale } from '@src/i18n/locale'
 
@@ -35,12 +36,8 @@ function browserLanguage(preference: LanguagePreference): LanguageState {
 function initialLanguage(): LanguageState {
   const desktop = window.pacenoteDesktop?.language.initial
   if (desktop && isLocale(desktop.locale)) return desktop
-  try {
-    const stored = localStorage.getItem(KEY)
-    return browserLanguage(isLocale(stored) ? stored : 'system')
-  } catch {
-    return browserLanguage('system')
-  }
+  const stored = readStored(KEY)
+  return browserLanguage(isLocale(stored) ? stored : 'system')
 }
 
 function apply(state: LanguageState): LanguageState {

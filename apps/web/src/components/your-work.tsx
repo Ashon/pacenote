@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Swap, usePresence } from '@/components/ui/motion'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useText } from '@/lib/i18n'
+import { readStored, writeStored } from '@/lib/storage'
 import { accountsSentence, partKey, roleSentence, useFixYou } from '@/lib/you'
 import { text } from './your-work.text'
 
@@ -200,7 +201,7 @@ export interface YourWorkShape {
 export function lastYourWork(): YourWorkShape | undefined {
   try {
     const shape = JSON.parse(
-      localStorage.getItem(LAST_KEY) ?? 'null'
+      readStored(LAST_KEY) ?? 'null'
     ) as YourWorkShape | null
     return shape && shape.rows > 0 ? shape : undefined
   } catch {
@@ -216,17 +217,13 @@ export function rememberYourWork(you: YouView | null | undefined) {
         you.areas.filter((area) => area.state === 'active').length
       )
     : 0
-  try {
-    localStorage.setItem(
-      LAST_KEY,
-      JSON.stringify({
-        rows,
-        accounts: Boolean(you && accountsSentence(you.accounts)),
-      })
-    )
-  } catch {
-    // Without storage the skeleton leaves the card out.
-  }
+  writeStored(
+    LAST_KEY,
+    JSON.stringify({
+      rows,
+      accounts: Boolean(you && accountsSentence(you.accounts)),
+    })
+  )
 }
 
 /** The card's place while Todo loads: its heading, rows and buttons */

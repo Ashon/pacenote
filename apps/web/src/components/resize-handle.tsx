@@ -1,57 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
+import { readStored, writeStored } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 
-/**
- * A width that the viewer sets by dragging and that this browser remembers.
- * Storage can be unavailable (private windows, blocked site data), so reads and
- * writes fall back quietly.
- */
+/** A width that the viewer sets by dragging and that this browser remembers */
 export function useStoredWidth(
   key: string,
   fallback: number
 ): [number, (width: number) => void] {
   const [width, setWidth] = useState(() => {
-    try {
-      const stored = Number(window.localStorage.getItem(key))
-      return Number.isFinite(stored) && stored > 0 ? stored : fallback
-    } catch {
-      return fallback
-    }
+    const stored = Number(readStored(key))
+    return Number.isFinite(stored) && stored > 0 ? stored : fallback
   })
   const save = (next: number) => {
     setWidth(next)
-    try {
-      window.localStorage.setItem(key, String(Math.round(next)))
-    } catch {
-      // Not remembered this time.
-    }
+    writeStored(key, String(Math.round(next)))
   }
   return [width, save]
 }
 
-/**
- * An on/off choice this browser remembers, with the same quiet fallback as
- * useStoredWidth.
- */
+/** An on/off choice this browser remembers */
 export function useStoredFlag(
   key: string,
   fallback: boolean
 ): [boolean, (value: boolean) => void] {
   const [value, setValue] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem(key)
-      return stored === null ? fallback : stored === '1'
-    } catch {
-      return fallback
-    }
+    const stored = readStored(key)
+    return stored === null ? fallback : stored === '1'
   })
   const save = (next: boolean) => {
     setValue(next)
-    try {
-      window.localStorage.setItem(key, next ? '1' : '0')
-    } catch {
-      // Not remembered this time.
-    }
+    writeStored(key, next ? '1' : '0')
   }
   return [value, save]
 }
