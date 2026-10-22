@@ -1324,10 +1324,13 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         { exact: true }
       )
       .waitFor({ timeout: 10_000 })
-    // Todo opened afresh lists it with the others.
+    // Todo opened afresh lists it with the others, or behind the notice when
+    // it comes in just as Todo opens.
     const kept = page.locator('[data-task-row]', {
       hasText: 'Add a test for the retry backoff',
     })
+    await kept.or(notice).first().waitFor()
+    if (await notice.isVisible()) await notice.click()
     await kept
       .getByText('Left after \u201cReview the payment retry PR\u201d', {
         exact: false,
