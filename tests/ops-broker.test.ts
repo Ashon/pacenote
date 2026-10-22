@@ -16,6 +16,7 @@ import {
   readText,
   resolveInRoot,
   rgFilterArgs,
+  rgSearchArgs,
 } from '../src/broker/fs.js'
 import {
   describeArgs,
@@ -217,6 +218,41 @@ describe('ripgrep deny rules', () => {
       '--iglob',
     ])
     expect(rgFilterArgs()[0]).toBe('--iglob')
+  })
+
+  it('searches with the limits, then the filter, then the pattern', () => {
+    const search = [
+      '--line-number',
+      '--no-heading',
+      '--null',
+      '--color',
+      'never',
+      '--max-count',
+      '20',
+    ]
+    expect(
+      rgSearchArgs('-x', '/w/repo', {
+        glob: '*.md',
+        fixedStrings: true,
+        limits: ['--max-filesize', '1M'],
+      })
+    ).toEqual([
+      ...search,
+      '--max-filesize',
+      '1M',
+      ...rgFilterArgs('*.md'),
+      '--fixed-strings',
+      '--',
+      '-x',
+      '/w/repo',
+    ])
+    expect(rgSearchArgs('x', '/w', {})).toEqual([
+      ...search,
+      ...rgFilterArgs(),
+      '--',
+      'x',
+      '/w',
+    ])
   })
 
   it('drops excluded files from search results and makes paths relative', () => {

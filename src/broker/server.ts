@@ -30,6 +30,7 @@ import {
   readText,
   resolveInRoot,
   rgFilterArgs,
+  rgSearchArgs,
 } from './fs.js'
 import { GitWorkspaces } from './git.js'
 import { GitHubReader } from './github.js'
@@ -299,6 +300,10 @@ function finish(output: string): string {
 const kubectl = (tool: string, args: string[], meta: Record<string, unknown>) =>
   exec(tool, 'kubectl', ['--kubeconfig', env.KUBECONFIG_FILE, ...args], meta)
 
+/** The named fields of a tool's input, in that order, for its audit line */
+const pick = <T extends object, K extends keyof T>(a: T, ...keys: K[]) =>
+  Object.fromEntries(keys.map((key) => [key, a[key]]))
+
 type ToolResult = {
   content: { type: 'text'; text: string }[]
   isError?: boolean
@@ -472,24 +477,8 @@ function registerK8sTools(server: McpServer): void {
       respond(() =>
         kubectl(
           'k8s_get',
-          getArgs(
-            {
-              cluster: a.cluster,
-              kind: a.kind,
-              namespace: a.namespace,
-              name: a.name,
-              selector: a.selector,
-              allNamespaces: a.all_namespaces,
-              output: a.output,
-            },
-            clusters
-          ),
-          {
-            cluster: a.cluster,
-            kind: a.kind,
-            namespace: a.namespace,
-            name: a.name,
-          }
+          getArgs({ ...a, allNamespaces: a.all_namespaces }, clusters),
+          pick(a, 'cluster', 'kind', 'namespace', 'name')
         )
       )
   )
@@ -509,12 +498,11 @@ function registerK8sTools(server: McpServer): void {
     },
     async (a) =>
       respond(() =>
-        kubectl('k8s_describe', describeArgs(a, clusters), {
-          cluster: a.cluster,
-          kind: a.kind,
-          namespace: a.namespace,
-          name: a.name,
-        })
+        kubectl(
+          'k8s_describe',
+          describeArgs(a, clusters),
+          pick(a, 'cluster', 'kind', 'namespace', 'name')
+        )
       )
   )
 
@@ -538,13 +526,11 @@ function registerK8sTools(server: McpServer): void {
     },
     async (a) =>
       respond(() =>
-        kubectl('k8s_logs', logsArgs(a, clusters), {
-          cluster: a.cluster,
-          namespace: a.namespace,
-          pod: a.pod,
-          container: a.container,
-          tail: a.tail,
-        })
+        kubectl(
+          'k8s_logs',
+          logsArgs(a, clusters),
+          pick(a, 'cluster', 'namespace', 'pod', 'container', 'tail')
+        )
       )
   )
 
@@ -558,10 +544,11 @@ function registerK8sTools(server: McpServer): void {
     },
     async (a) =>
       respond(() =>
-        kubectl('k8s_events', eventsArgs(a, clusters), {
-          cluster: a.cluster,
-          namespace: a.namespace,
-        })
+        kubectl(
+          'k8s_events',
+          eventsArgs(a, clusters),
+          pick(a, 'cluster', 'namespace')
+        )
       )
   )
 
@@ -578,11 +565,11 @@ function registerK8sTools(server: McpServer): void {
     },
     async (a) =>
       respond(() =>
-        kubectl('k8s_top', topArgs(a, clusters), {
-          cluster: a.cluster,
-          target: a.target,
-          namespace: a.namespace,
-        })
+        kubectl(
+          'k8s_top',
+          topArgs(a, clusters),
+          pick(a, 'cluster', 'target', 'namespace')
+        )
       )
   )
 }
@@ -677,19 +664,11 @@ function registerFsTools(server: McpServer): void {
     async ({ pattern, path, glob, fixed_strings }) =>
       respond(async () => {
         const target = await resolveInRoot(root, requireScope(path))
-        const args = [
-          '--line-number',
-          '--no-heading',
-          '--null',
-          '--color',
-          'never',
-          '--max-count',
-          '20',
-        ]
-        args.push('--max-filesize', '1M', '--max-columns', '300')
-        args.push(...rgFilterArgs(glob))
-        if (fixed_strings) args.push('--fixed-strings')
-        args.push('--', pattern, target)
+        const args = rgSearchArgs(pattern, target, {
+          glob,
+          fixedStrings: fixed_strings,
+          limits: ['--max-filesize', '1M', '--max-columns', '300'],
+        })
         const output = await exec('fs_search', 'rg', args, {
           pattern,
           path,
@@ -825,18 +804,10 @@ function registerWorkspaceTools(
       respond(async () => {
         const dir = workspaces.get(a.ws).dir
         const target = await resolveInRoot(dir, a.path ?? '.')
-        const args = [
-          '--line-number',
-          '--no-heading',
-          '--null',
-          '--color',
-          'never',
-          '--max-count',
-          '20',
-        ]
-        args.push(...rgFilterArgs(a.glob))
-        if (a.fixed_strings) args.push('--fixed-strings')
-        args.push('--', a.pattern, target)
+        const args = rgSearchArgs(a.pattern, target, {
+          glob: a.glob,
+          fixedStrings: a.fixed_strings,
+        })
         const output = await exec('ws_search', 'rg', args, {
           ws: a.ws,
           pattern: a.pattern,

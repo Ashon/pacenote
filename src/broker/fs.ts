@@ -78,6 +78,32 @@ export function rgFilterArgs(glob?: string): string[] {
 }
 
 /**
+ * ripgrep arguments for a content search: up to 20 matches a file, in the
+ * --null format filterRgOutput reads. limits: more options, before the filter.
+ */
+export function rgSearchArgs(
+  pattern: string,
+  target: string,
+  options: { glob?: string; fixedStrings?: boolean; limits?: string[] }
+): string[] {
+  return [
+    '--line-number',
+    '--no-heading',
+    '--null',
+    '--color',
+    'never',
+    '--max-count',
+    '20',
+    ...(options.limits ?? []),
+    ...rgFilterArgs(options.glob),
+    ...(options.fixedStrings ? ['--fixed-strings'] : []),
+    '--',
+    pattern,
+    target,
+  ]
+}
+
+/**
  * Drops lines for excluded files from ripgrep output and makes paths relative
  * to root. Search results use the --null format (path\0line:content); file
  * lists (--files) have one path per line. Lines that are not paths (exit code,
