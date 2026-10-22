@@ -533,30 +533,22 @@ export function recapOf(input: {
   if (input.period === 'day') {
     // Commits as one line per repository, the tasks done as they are
     const commitLines = (from: number, to: number): RecapItem[] =>
-      [...commitsByRepo]
-        .map(
-          ([repo, commits]) =>
-            [
-              repo,
-              commits.filter((c) => {
-                const t = Date.parse(c.at)
-                return t >= from && t < to
-              }),
-            ] as const
+      [...commitsByRepo].flatMap(([repo, all]) => {
+        const commits = all.filter(
+          (c) => Date.parse(c.at) >= from && Date.parse(c.at) < to
         )
-        .filter(([, commits]) => commits.length > 0)
-        .map(([repo, commits]) => {
-          const area = asArea(byRepo(repo))
-          return {
-            title: t.commitsIn(commits.length, repo),
-            at: commits[0]!.at,
-            note: commits
-              .slice(0, 2)
-              .map((c) => c.subject)
-              .join(' · '),
-            ...(area ? { area } : {}),
-          }
-        })
+        if (commits.length === 0) return []
+        const area = asArea(byRepo(repo))
+        return {
+          title: t.commitsIn(commits.length, repo),
+          at: commits[0]!.at,
+          note: commits
+            .slice(0, 2)
+            .map((c) => c.subject)
+            .join(' · '),
+          ...(area ? { area } : {}),
+        }
+      })
     const newest = (items: RecapItem[]) =>
       items.sort((a, b) => Date.parse(b.at ?? '') - Date.parse(a.at ?? ''))
     const done = newest([...doneTasks, ...commitLines(start, end)])
@@ -573,7 +565,6 @@ export function recapOf(input: {
         ...commitLines(from, start),
       ])
     }
-    const today = (at: string | undefined) => within(at)
     const open = current
       ? input.tasks.filter((task) => task.status === 'open')
       : []
@@ -582,7 +573,7 @@ export function recapOf(input: {
         (entry) =>
           entry.task === task.id &&
           entry.kind === 'session' &&
-          (today(entry.startedAt) || (entry.resumedAt ?? []).some(today))
+          (within(entry.startedAt) || (entry.resumedAt ?? []).some(within))
       )
     const line = (task: TaskView) => openItem(task, taskArea(areas, task), true)
     const doing = open.filter(workedToday)
