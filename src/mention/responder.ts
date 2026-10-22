@@ -313,7 +313,6 @@ export class MentionResponder {
     const { config, reasoner, log } = this.deps
     const { key, mention, label } = taken
     const where = `${reasoner.backend}@${reasoner.sandbox}`
-    const say = (markdown: string) => messenger.render(markdown)[0] ?? ''
     /** The request as recorded for a restart, kept up to date */
     let entry = taken
     const note = (patch: Partial<InflightEntry>) => {
@@ -443,10 +442,7 @@ export class MentionResponder {
         system,
         prompt,
         readOnlyDir,
-        images: images.map((image) => ({
-          path: image.path,
-          mimetype: image.mimetype,
-        })),
+        images: images.map(({ path, mimetype }) => ({ path, mimetype })),
         outputDir,
         signal: cutOff.signal,
         onEvent: run ? (step) => run?.event(step) : undefined,
@@ -542,13 +538,11 @@ export class MentionResponder {
       await this.fail(
         messenger,
         mention,
-        say(
-          failureReply(cause, reasoner.backend, {
-            own: this.deps.ownMentions,
-            timeoutMs: config.reasoner.timeoutMs,
-            locale: config.notesLocale,
-          })
-        )
+        failureReply(cause, reasoner.backend, {
+          own: this.deps.ownMentions,
+          timeoutMs: config.reasoner.timeoutMs,
+          locale: config.notesLocale,
+        })
       )
     } finally {
       this.running.delete(cutOff)
@@ -633,11 +627,7 @@ export class MentionResponder {
           continue
         }
         log.warn(`Restarted while posting the answer to ${entry.key}`)
-        await this.fail(
-          messenger,
-          entry.mention,
-          messenger.render(this.notes().cutShort)[0] ?? ''
-        )
+        await this.fail(messenger, entry.mention, this.notes().cutShort)
         continue
       }
       // Waiting since before Pace answered only you: not taken up for anyone
@@ -757,24 +747,22 @@ export class MentionResponder {
     }
   }
 
-  /** ⚠️ on the mention, and the text to the asker alone */
+  /** ⚠️ on the mention, and what it says to the asker alone */
   private async fail(
     messenger: Messenger,
     mention: Mention,
-    text: string
+    markdown: string
   ): Promise<void> {
     await messenger.mark?.(mention, 'failed').catch(() => false)
-    await messenger.notice(mention, text).catch(() => undefined)
+    await messenger
+      .notice(mention, messenger.render(markdown)[0] ?? '')
+      .catch(() => undefined)
   }
 
   /** A request cut off by a restart that will not be answered after all */
   private async giveUp(messenger: Messenger, mention: Mention): Promise<void> {
     await this.clearMarks(messenger, mention)
-    await this.fail(
-      messenger,
-      mention,
-      messenger.render(this.notes().cutOff)[0] ?? ''
-    )
+    await this.fail(messenger, mention, this.notes().cutOff)
   }
 
   /** Takes the marks off a mention that will not be answered after all */
