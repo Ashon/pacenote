@@ -243,10 +243,7 @@ function createOwnToolsServer(
           task,
           'resolved',
           new Date(),
-          {
-            by: BY,
-            note,
-          }
+          { by: BY, note }
         )
         if (!closed) throw new Error(`No task ${task}`)
         track('close', { task: closed.id })

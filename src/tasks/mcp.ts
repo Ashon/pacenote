@@ -451,19 +451,15 @@ export function registerTaskTools(
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    ({ tasks, finished, you }) =>
+    ({ tasks, finished = true, you }) =>
       respond(options, () => {
         const result = addTasks(options.dataDir, tasks, {
           settings: options.settings(),
           addedBy: client(),
-          finished: finished ?? true,
+          finished,
           you,
         })
-        track({
-          kind: 'add',
-          added: result.added.length,
-          finished: finished ?? true,
-        })
+        track({ kind: 'add', added: result.added.length, finished })
         return {
           added: result.added.map((task) => ({
             id: task.id,
@@ -582,36 +578,17 @@ export function registerTaskTools(
           client()
         )
         if (!result) throw new Error(`No task ${task}`)
+        const { id, title } = result.task
+        const unchanged = (reason: string) => ({
+          unchanged: { id, title, why: reason },
+        })
         if ('refused' in result)
-          return {
-            unchanged: {
-              id: result.task.id,
-              title: result.task.title,
-              why: `Left as it is: ${result.refused}`,
-            },
-          }
-        if (result.changed.length)
-          track({
-            kind: 'update',
-            task: result.task.id,
-            fields: result.changed.map((change) => change.field),
-          })
-        return result.changed.length
-          ? {
-              updated: {
-                id: result.task.id,
-                title: result.task.title,
-                why,
-                changed: result.changed.map((change) => change.field),
-              },
-            }
-          : {
-              unchanged: {
-                id: result.task.id,
-                title: result.task.title,
-                why: 'Nothing differs from what it has',
-              },
-            }
+          return unchanged(`Left as it is: ${result.refused}`)
+        const changed = result.changed.map((change) => change.field)
+        if (!changed.length)
+          return unchanged('Nothing differs from what it has')
+        track({ kind: 'update', task: id, fields: changed })
+        return { updated: { id, title, why, changed } }
       })
   )
 
