@@ -1254,10 +1254,7 @@ function registerBotIpc(): void {
       working: working(open, work.entries),
       proposals: openProposals(work, new Set(open.map((task) => task.id))),
       // A Maybe from a group neither list has asks whether it means you.
-      groups: {
-        yours,
-        notYours: notYourGroups(file, yours),
-      },
+      groups: { yours, notYours: notYourGroups(file, yours) },
       // The area each task is in, for its row (src/you)
       areas: Object.fromEntries(
         view.tasks.flatMap((task) => {
@@ -1471,8 +1468,7 @@ function registerBotIpc(): void {
   const handoff = (): HandoffOptions => ({
     dataDir,
     home: homedir(),
-    bin: (tool) =>
-      (tool === 'claude' ? env().CLAUDE_BIN : env().CODEX_BIN)?.trim() || tool,
+    bin: (tool) => cliBins()[tool],
     terminal: () => terminalOf(env().TASKS_TERMINAL),
     planFirst: () => env().TASKS_PLAN_FIRST !== 'off',
     openIn: () => (env().TASKS_OPEN_IN === 'app' ? 'app' : 'terminal'),
@@ -1494,13 +1490,11 @@ function registerBotIpc(): void {
   const LINK_EVERY_MS = Number(process.env.PACENOTE_TASKS_LINK_MS) || 30_000
   const sessionIndex = new SessionIndex({ home: homedir() })
   const repoLookup = new RepoLookup()
-  const linkingOn = () =>
-    env().TASKS === 'on' && env().TASKS_LINK_SESSIONS === 'on'
   let linking: Promise<void> | undefined
   let linkedAt = 0
   let linkAgain = false
   const linkSessionsSoon = (force = false): void => {
-    if (!linkingOn()) return
+    if (env().TASKS !== 'on' || env().TASKS_LINK_SESSIONS !== 'on') return
     if (linking) {
       linkAgain ||= force
       return
@@ -1568,9 +1562,7 @@ function registerBotIpc(): void {
   const sessionNow = (
     entry: Pick<Session, 'session' | 'tool' | 'startedAt'>
   ): { lastActiveAt?: string; branch?: string } => {
-    const summary = entry.session
-      ? sessionIndex.session(entry.session)
-      : undefined
+    const summary = entry.session && sessionIndex.session(entry.session)
     if (summary)
       return {
         lastActiveAt: summary.lastAt,
@@ -1832,10 +1824,7 @@ function registerBotIpc(): void {
   })
   handle('pacenote:tasks:continue', undefined, async (id, how) => {
     if (typeof id !== 'string') return undefined
-    const { tool, folder } = (how ?? {}) as {
-      tool?: unknown
-      folder?: unknown
-    }
+    const { tool, folder } = (how ?? {}) as { tool?: unknown; folder?: unknown }
     const t = localized(text)
     const detail = taskDetail(id, 'en')
     if (!detail) return { error: t.noSuchTask }
