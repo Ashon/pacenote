@@ -242,39 +242,32 @@ function ChooseConnection({
         aria-label={t.connectionLabel}
         className="grid grid-cols-1 gap-3"
       >
-        <ChoiceCard
-          name="connection"
-          value="hub"
-          checked={connection === 'hub'}
-          onChoose={() => choose('hub')}
-        >
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <b className="text-section">{t.hubTitle}</b>
-            <Chip tone="neutral">{t.forTeams}</Chip>
-          </span>
-          <span className="text-body text-muted-foreground">{t.hubWhat}</span>
-        </ChoiceCard>
-        <ChoiceCard
-          name="connection"
-          value="app"
-          checked={connection === 'app'}
-          onChoose={() => choose('app')}
-        >
-          <b className="text-section">{t.appCardTitle}</b>
-          <span className="text-body text-muted-foreground">{t.appWhat}</span>
-        </ChoiceCard>
-        <ChoiceCard
-          name="connection"
-          value="mac"
-          checked={connection === 'mac'}
-          onChoose={() => choose('mac')}
-        >
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <b className="text-section">{t.macTitle}</b>
-            <Chip tone="neutral">{t.alreadySetUp}</Chip>
-          </span>
-          <span className="text-body text-muted-foreground">{t.macWhat}</span>
-        </ChoiceCard>
+        {/* Each way: its value, its name, what it is, and a word beside it */}
+        {(
+          [
+            ['hub', t.hubTitle, t.hubWhat, t.forTeams],
+            ['app', t.appCardTitle, t.appWhat],
+            ['mac', t.macTitle, t.macWhat, t.alreadySetUp],
+          ] as const
+        ).map(([value, title, what, chip]) => (
+          <ChoiceCard
+            key={value}
+            name="connection"
+            value={value}
+            checked={connection === value}
+            onChoose={() => choose(value)}
+          >
+            {chip ? (
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <b className="text-section">{title}</b>
+                <Chip tone="neutral">{chip}</Chip>
+              </span>
+            ) : (
+              <b className="text-section">{title}</b>
+            )}
+            <span className="text-body text-muted-foreground">{what}</span>
+          </ChoiceCard>
+        ))}
       </div>
       <Collapsible open={connection === 'mac'}>
         <CollapsibleContent>

@@ -283,12 +283,7 @@ export function SandboxLogin({
 const PART_TONE: Record<
   SetupPart['state'],
   'ok' | 'working' | 'failed' | 'neutral'
-> = {
-  done: 'ok',
-  working: 'working',
-  failed: 'failed',
-  waiting: 'neutral',
-}
+> = { done: 'ok', working: 'working', failed: 'failed', waiting: 'neutral' }
 
 /** 2b. The sandbox being prepared, which setup need not wait for */
 function Preparing({

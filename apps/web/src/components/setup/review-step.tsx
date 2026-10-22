@@ -129,10 +129,7 @@ export function ReviewStep({
         step: 'runtime',
       })
     else if (vm && fresh && job?.state === 'failed')
-      setStarting({
-        error: t.sandboxStopped,
-        step: 'runtime',
-      })
+      setStarting({ error: t.sandboxStopped, step: 'runtime' })
     else if (!vm || sandbox.ready || (fresh && job?.state === 'succeeded'))
       void launch()
   }, [starting, vm, sandbox.ready, sandbox.job, sandbox.error])
@@ -188,6 +185,8 @@ export function ReviewStep({
       ? t.sayWhoFirst
       : undefined
   const stopped = typeof starting === 'object' ? starting : undefined
+  /** A row's way back to its step, while nothing is starting */
+  const change = (step: SetupStep) => (busy ? undefined : () => onChange(step))
 
   return (
     <StepFrame
@@ -315,16 +314,10 @@ export function ReviewStep({
       </section>
 
       <dl className="flex flex-col rounded-xl ring-1 ring-border">
-        <Row
-          label={t.aiService}
-          onChange={busy ? undefined : () => onChange('ai')}
-        >
+        <Row label={t.aiService} onChange={change('ai')}>
           {t.serviceState(SERVICE[backend], cli?.signedIn)}
         </Row>
-        <Row
-          label={t.runsIn}
-          onChange={busy ? undefined : () => onChange('runtime')}
-        >
+        <Row label={t.runsIn} onChange={change('runtime')}>
           {vm ? (
             <>
               {t.sandbox}
@@ -351,10 +344,7 @@ export function ReviewStep({
             </>
           )}
         </Row>
-        <Row
-          label="Slack"
-          onChange={busy ? undefined : () => onChange('slack')}
-        >
+        <Row label="Slack" onChange={change('slack')}>
           {hub ? t.throughHub(values?.HUB_URL ?? '') : t.ownApp}
         </Row>
         {vm && (

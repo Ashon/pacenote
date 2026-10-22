@@ -82,6 +82,19 @@ export function SetupFacts() {
   const used = settings.view?.values.REASONER_SANDBOX !== 'none' && !unsupported
   const stopped = used && preparingProblem(sandbox) !== undefined
   const running = supervisor?.phase === 'running'
+  // The sandbox's state, and what it means
+  const [value, hint] = !used
+    ? [unsupported ? t.notOnThisMac : t.notUsed, t.directly]
+    : sandbox.ready
+      ? [t.ready, t.answersInIt]
+      : sandbox.preparing
+        ? [
+            t.preparing(Math.round((sandbox.progress?.fraction ?? 0) * 100)),
+            t.background,
+          ]
+        : stopped
+          ? [t.preparingStopped, t.tryAgain]
+          : [t.notPrepared, t.preparesOnResume]
   return (
     <section
       aria-label={t.factsLabel}
@@ -95,32 +108,8 @@ export function SetupFacts() {
       <Fact label={t.answers} value={t.noneYet} hint={t.answersHint} />
       <Fact
         label={t.sandbox}
-        value={
-          !used
-            ? unsupported
-              ? t.notOnThisMac
-              : t.notUsed
-            : sandbox.ready
-              ? t.ready
-              : sandbox.preparing
-                ? t.preparing(
-                    Math.round((sandbox.progress?.fraction ?? 0) * 100)
-                  )
-                : stopped
-                  ? t.preparingStopped
-                  : t.notPrepared
-        }
-        hint={
-          !used
-            ? t.directly
-            : sandbox.ready
-              ? t.answersInIt
-              : sandbox.preparing
-                ? t.background
-                : stopped
-                  ? t.tryAgain
-                  : t.preparesOnResume
-        }
+        value={value}
+        hint={hint}
         accent={used && sandbox.preparing}
       />
     </section>
