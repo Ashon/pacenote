@@ -63,6 +63,27 @@ describe('composeAnswer', () => {
     expect(text).toContain('```bash\nkubectl get pods\n```')
   })
 
+  it("keeps $ patterns in a failed block's source as they are", () => {
+    const markdown = [
+      'Before',
+      '```vega-lite',
+      '{"title":"$$x^2$$ and $& and $\'"}',
+      '```',
+      'After',
+    ].join('\n')
+    const [vega] = extractDiagrams(markdown)
+    expect(composeAnswer(markdown, [{ block: vega! }])).toBe(
+      [
+        'Before',
+        '```vega-lite',
+        '{"title":"$$x^2$$ and $& and $\'"}',
+        '```',
+        "_(Couldn't render this diagram, so the source is shown)_",
+        'After',
+      ].join('\n')
+    )
+  })
+
   it("words the markers in Pace's notes language", () => {
     const [mermaid, dot] = extractDiagrams(answer)
     const text = composeAnswer(

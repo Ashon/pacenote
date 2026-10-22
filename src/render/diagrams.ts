@@ -68,10 +68,10 @@ export function composeAnswer(
   const t = localized(text, locale)
   let answer = markdown
   for (const { block, figure } of results) {
-    answer = answer.replace(
-      block.raw,
+    const replacement =
       figure !== undefined ? t.figure(figure) : `${block.raw}\n${t.unrendered}`
-    )
+    // A function, so $ patterns in the block stay as they are
+    answer = answer.replace(block.raw, () => replacement)
   }
   return answer
 }
