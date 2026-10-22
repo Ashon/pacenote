@@ -44,7 +44,7 @@ const SERVICES: Record<
 const otherBackend = (backend: Backend): Backend =>
   backend === 'claude' ? 'codex' : 'claude'
 
-export const cliReady = (check: CliCheck | undefined) =>
+const cliReady = (check: CliCheck | undefined) =>
   Boolean(check?.installed && check.signedIn && !check.tooOld)
 
 /**

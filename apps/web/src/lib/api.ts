@@ -64,14 +64,6 @@ export function useStats() {
   })
 }
 
-export function useHealth() {
-  return useQuery({
-    queryKey: ['health'],
-    queryFn: () => getJson<{ ok: boolean; root: string }>('/api/health'),
-    staleTime: Infinity,
-  })
-}
-
 export function useBotStatus() {
   return useQuery({
     queryKey: ['bot'],
@@ -80,20 +72,13 @@ export function useBotStatus() {
   })
 }
 
-export interface LogFilter {
-  scope?: string
-  level?: 'INFO' | 'WARN' | 'ERROR'
-  lines?: number
-}
-
-export function useBotLogs(filter: LogFilter, enabled = true) {
-  const params = new URLSearchParams({ lines: String(filter.lines ?? 800) })
-  if (filter.scope) params.set('scope', filter.scope)
-  if (filter.level) params.set('level', filter.level)
+/** Pace's log, its last lines */
+export function useBotLogs(lines: number) {
+  const params = new URLSearchParams({ lines: String(lines) })
   return useQuery({
     queryKey: ['bot-logs', params.toString()],
     queryFn: () => getJson<LogLine[]>(`/api/bot/logs?${params}`),
     placeholderData: keepPreviousData,
-    refetchInterval: enabled ? 2_000 : false,
+    refetchInterval: 2_000,
   })
 }

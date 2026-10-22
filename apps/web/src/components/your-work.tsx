@@ -192,7 +192,7 @@ export function YourWork({ you }: { you: YouView | null | undefined }) {
 /** How the card looked last time it showed: its rows, and the accounts line */
 const LAST_KEY = 'pacenote.tasks.your-work'
 
-export interface YourWorkShape {
+interface YourWorkShape {
   rows: number
   accounts: boolean
 }

@@ -5,7 +5,6 @@ import {
   type SandboxCheck,
   type SandboxJob,
   type SandboxJobKind,
-  type SandboxStatus,
 } from '@src/sandbox/types'
 import {
   CircleCheck,
@@ -73,7 +72,7 @@ const Dot = ({ ok, warn }: { ok: boolean; warn?: boolean }) => (
 )
 
 /** A sandbox job's button, named after the job. One job runs at a time. */
-export function JobButton({
+function JobButton({
   sandbox,
   kind,
   primary,
@@ -527,7 +526,7 @@ export function AllowlistCard({ sandbox }: { sandbox: Sandbox }) {
 }
 
 /** The output of the last of these jobs, or why one of them could not start */
-export function JobLog({
+function JobLog({
   sandbox,
   kinds,
   className,
@@ -594,5 +593,3 @@ function JobOutput({
     </div>
   )
 }
-
-export type { SandboxStatus }

@@ -1998,11 +1998,6 @@ function Segmented({
 }
 
 /**
- * Help: diagnostics to paste into a bug report. The secrets are taken out in
- * the app; the logs can still name channels and people, so it says to read it
- * first.
- */
-/**
  * Settings > Macs: Pace answers on the Mac you're using. Pacenote on your
  * other Macs with the same Slack app joins in on this network by itself
  * (src/macs), and you can add one on another network by its address.
@@ -2272,7 +2267,7 @@ const MAC_DOT: Record<MacView['status'], string> = {
 }
 
 /** What a Mac is doing, in a few words */
-export function macWords(mac: MacView): string {
+function macWords(mac: MacView): string {
   const t = localized(text)
   if (mac.notReady) return t.paceNotRunning
   switch (mac.status) {
@@ -2354,6 +2349,11 @@ function MacRow({ mac }: { mac: MacView }) {
   )
 }
 
+/**
+ * Help: diagnostics to paste into a bug report. The secrets are taken out in
+ * the app; the logs can still name channels and people, so it says to read it
+ * first.
+ */
 function HelpCard() {
   const t = useText(text)
   const diagnostics = window.pacenoteDesktop?.diagnostics

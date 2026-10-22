@@ -35,9 +35,9 @@ import { text } from './own-ai-status.text'
  * on focus and after a change, not on an interval.
  */
 
-export const OWN_AI_KEY = ['own-ai']
+const OWN_AI_KEY = ['own-ai']
 
-export function useOwnAi() {
+function useOwnAi() {
   const bridge = window.pacenoteDesktop?.ai
   const client = useQueryClient()
   const query = useQuery({
@@ -70,7 +70,7 @@ const sameNow = (a: OwnAiNow, b: OwnAiNow) =>
   JSON.stringify(a.state) === JSON.stringify(b.state)
 
 /** When a rest ends: 14:00 today, "Tue 14:00" (화요일 14:00) on another day */
-export function untilWords(iso: string, now = new Date()): string {
+function untilWords(iso: string, now = new Date()): string {
   const at = new Date(iso)
   if (at.toDateString() === now.toDateString()) return formatHourMinute(iso)
   const weekday = dateFormat({
@@ -91,7 +91,7 @@ export function switchLine(switched: Switch, now = new Date()): string {
 type Tone = 'ok' | 'warn' | 'rest' | 'off'
 
 /** One CLI's line: how it is, and what it does for your work */
-export function describeCli(
+function describeCli(
   cli: OwnCli,
   view: Pick<OwnAiView, 'chosen' | 'fallback'>,
   ready: CliReadiness,

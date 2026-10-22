@@ -8,6 +8,7 @@ import type {
   RelatedRun,
   RelatedTask,
   SessionItem,
+  TaskDecision,
   TaskDetail,
   TaskUpdate,
   TaskView,
@@ -154,11 +155,6 @@ function changeWords(change: Change): string {
 
 const WEEK = 7 * 24 * 60 * 60_000
 
-export type TaskDecision = {
-  status: 'done' | 'dismissed' | 'kept'
-  reason?: DismissReason
-} | null
-
 export function TaskRow({
   task,
   motion,
@@ -204,7 +200,7 @@ export function TaskRow({
   /** A session's log to show over the list */
   logEntry?: string
   onToggle: () => void
-  onDecide: (decision: TaskDecision) => void
+  onDecide: (decision: Omit<TaskDecision, 'at'> | null) => void
 }) {
   const t = useText(text)
   const client = useQueryClient()
@@ -1182,10 +1178,6 @@ function foundHint(session: Session): string | undefined {
 type Suggestion = NonNullable<TaskDetail['suggested']>[number]
 
 /**
- * A session that only looks like the task's work, by what they share: you
- * say whether it is, and its log opens like any other
- */
-/**
  * What the task's quiet session looked like: done, how it ended, what is left.
  * Close it closes the task with that; Not yet waits for the session to go on.
  * Each thing left can be kept as a task of its own.
@@ -1250,6 +1242,10 @@ function LooksDone({
   )
 }
 
+/**
+ * A session that only looks like the task's work, by what they share: you
+ * say whether it is, and its log opens like any other
+ */
 function SuggestedLine({
   suggestion,
   taskId,
@@ -1317,7 +1313,6 @@ const repoFolderOf = (
 /** A folder under your home folder, as ~/… */
 const tilde = (folder: string) => folder.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
-/** Continue, with where it opens on hover when it opens without asking */
 /**
  * Where Continue opens, on hover: the folder, and the desktop app with the
  * task written in when sessions open there

@@ -4,7 +4,7 @@ import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { text } from './status.text'
 
-export const STATUS_META: Record<
+const STATUS_META: Record<
   RunStatus,
   {
     text: string

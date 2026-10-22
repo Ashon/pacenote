@@ -52,7 +52,7 @@ export function McpConnections({ about }: { about: string }) {
 }
 
 /** One row per tool: its state and the change it needs */
-export function McpClientRows({ className }: { className?: string }) {
+function McpClientRows() {
   const t = useText(text)
   const clients = useMcpClients()
   const { busy, change } = useMcpChange()
@@ -64,9 +64,7 @@ export function McpClientRows({ className }: { className?: string }) {
       </p>
     )
   return (
-    <ul
-      className={cn('divide-y divide-border rounded-lg bg-well/60', className)}
-    >
+    <ul className="divide-y divide-border rounded-lg bg-well/60">
       {clients.data.map((client) => {
         // Not installed: nothing to change here
         const action = client.state === 'missing' ? undefined : client.state

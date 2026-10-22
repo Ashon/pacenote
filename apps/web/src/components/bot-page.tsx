@@ -498,7 +498,7 @@ const LogPanel = memo(function LogPanel() {
   const [view, setView] = useState<LogView>('all')
   const [q, setQ] = useState('')
   const [follow, setFollow] = useState(true)
-  const { data, isError } = useBotLogs({ lines: 1500 })
+  const { data, isError } = useBotLogs(1500)
   const scroller = useRef<HTMLDivElement>(null)
   const lines = useMemo(() => {
     const query = q.trim().toLowerCase()

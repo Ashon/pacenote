@@ -267,7 +267,7 @@ export function TasksPage({
       />
       <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
-        <Banner tone="note">
+        <Banner>
           <span className="flex-1">
             {t.leaveOutOffer(offer.count, offer.label)}
           </span>
@@ -498,7 +498,7 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
   )
 }
 
-function Banner({ children }: { tone: 'note'; children: React.ReactNode }) {
+function Banner({ children }: { children: React.ReactNode }) {
   return (
     <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy">
       {children}
