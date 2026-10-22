@@ -197,14 +197,10 @@ export class EgressProxy {
           ? 'only port 443'
           : 'not allowed'
       )
-      forbid()
-      return
+      return forbid()
     }
     const address = await this.address(host, req.url ?? host)
-    if (!address) {
-      forbid()
-      return
-    }
+    if (!address) return forbid()
     const upstream = net.connect({ host: address, port })
     upstream.setTimeout(IDLE_MS, () => upstream.destroy())
     client.setTimeout(IDLE_MS, () => client.destroy())
@@ -237,14 +233,10 @@ export class EgressProxy {
       !this.permits(url.hostname, Number(url.port || 80), false)
     ) {
       this.refuse(req.url ?? '?', 'not allowed')
-      forbid()
-      return
+      return forbid()
     }
     const address = await this.address(url.hostname, req.url ?? url.hostname)
-    if (!address) {
-      forbid()
-      return
-    }
+    if (!address) return forbid()
     const headers = { ...req.headers }
     for (const name of HOP_HEADERS) delete headers[name]
     // The Host header still names the host; only the connection goes to the

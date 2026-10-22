@@ -37,31 +37,16 @@ export const VERSIONS = {
 export const VM_BASE_IMAGE = 'docker.io/library/node:24-bookworm-slim'
 /** Where the image build may go: Debian's and npm's package hosts */
 const BUILD_DOMAINS = ['deb.debian.org', 'registry.npmjs.org']
-/** The renderer's build: those, and Python's packages */
-const RENDERER_BUILD_DOMAINS = [
-  ...BUILD_DOMAINS,
-  'pypi.org',
-  'files.pythonhosted.org',
-]
-/** The broker image's build: Debian's packages and kubectl's downloads */
-const BROKER_BUILD_DOMAINS = ['deb.debian.org', 'dl.k8s.io', 'cdn.dl.k8s.io']
 
-/** pacenote-vm build options: the reasoner image's settings from then on */
-const VM_IMAGE_SETTINGS = [
+/** pacenote-vm build options: an image's settings from then on */
+const imageSettings = (workdir: string, entrypoint: string, env: string[]) => [
   '--set-user',
   '1000:1000',
   '--set-workdir',
-  '/work',
+  workdir,
   '--set-entrypoint',
-  '/usr/local/bin/sandbox-entrypoint',
-  ...[
-    'HOME=/home/node',
-    'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1',
-    'DISABLE_AUTOUPDATER=1',
-    'HTTPS_PROXY=http://127.0.0.1:3128',
-    'HTTP_PROXY=http://127.0.0.1:3128',
-    'NO_PROXY=localhost,127.0.0.1',
-  ].flatMap((entry) => ['--set-env', entry]),
+  entrypoint,
+  ...env.flatMap((entry) => ['--set-env', entry]),
 ]
 
 /** The label (pacenote-vm build --label) an image keeps its recipe's hash in */
@@ -92,7 +77,14 @@ export const IMAGE_RECIPES: Record<string, ImageRecipe> = {
     versions: `claude ${VERSIONS.claude} and codex ${VERSIONS.codex}`,
     script: 'build.sh',
     files: ['egress.sh', 'egress-forward.mjs', 'entrypoint.sh'],
-    settings: VM_IMAGE_SETTINGS,
+    settings: imageSettings('/work', '/usr/local/bin/sandbox-entrypoint', [
+      'HOME=/home/node',
+      'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1',
+      'DISABLE_AUTOUPDATER=1',
+      'HTTPS_PROXY=http://127.0.0.1:3128',
+      'HTTP_PROXY=http://127.0.0.1:3128',
+      'NO_PROXY=localhost,127.0.0.1',
+    ]),
     env: {
       CLAUDE_CODE_VERSION: VERSIONS.claude,
       CODEX_VERSION: VERSIONS.codex,
@@ -113,26 +105,19 @@ export const IMAGE_RECIPES: Record<string, ImageRecipe> = {
       'renderer/dot.gvpr',
       'renderer/puppeteer.json',
     ],
-    settings: [
-      '--set-user',
-      '1000:1000',
-      '--set-workdir',
-      '/work',
-      // The format is the run's command: render mermaid IN OUT
-      '--set-entrypoint',
-      '/usr/local/bin/render',
-      '--set-env',
+    // The format is the run's command: render mermaid IN OUT
+    settings: imageSettings('/work', '/usr/local/bin/render', [
       'HOME=/tmp/home',
-      '--set-env',
       'PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium',
-    ],
+    ]),
     env: {
       MERMAID_CLI_VERSION: VERSIONS.mermaidCli,
       VL_CONVERT_VERSION: VERSIONS.vlConvert,
       PILLOW_VERSION: VERSIONS.pillow,
       PRETENDARD_VERSION: VERSIONS.pretendard,
     },
-    domains: RENDERER_BUILD_DOMAINS,
+    // Python's packages too
+    domains: [...BUILD_DOMAINS, 'pypi.org', 'files.pythonhosted.org'],
     memoryMiB: 4096,
   },
   [VM_BROKER_IMAGE]: {
@@ -145,18 +130,12 @@ export const IMAGE_RECIPES: Record<string, ImageRecipe> = {
       'proxy-connect.mjs',
       'entrypoint.sh',
     ],
-    settings: [
-      '--set-user',
-      '1000:1000',
-      '--set-workdir',
-      '/app',
-      '--set-entrypoint',
-      '/usr/local/bin/sandbox-entrypoint',
-      '--set-env',
+    settings: imageSettings('/app', '/usr/local/bin/sandbox-entrypoint', [
       'HOME=/tmp',
-    ],
+    ]),
     env: { KUBECTL_VERSION: VERSIONS.kubectl },
-    domains: BROKER_BUILD_DOMAINS,
+    // Debian's packages and kubectl's downloads
+    domains: ['deb.debian.org', 'dl.k8s.io', 'cdn.dl.k8s.io'],
     memoryMiB: 2048,
   },
 }

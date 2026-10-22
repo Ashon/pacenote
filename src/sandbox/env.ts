@@ -21,9 +21,9 @@ const absolutePath = z
   .string()
   .refine((value) => value.startsWith('/'), says('absolutePath'))
 
-const owner = '[A-Za-z0-9][A-Za-z0-9-]*'
-const projectKey = '[A-Za-z][A-Za-z0-9_]*'
-const name = '[A-Za-z0-9][A-Za-z0-9._@-]*'
+/** A comma-separated list of what item matches */
+const listOf = (item: string) =>
+  new RegExp(`^\\s*${item}(\\s*,\\s*${item})*\\s*$`)
 
 /**
  * Values that ops-broker and its prep jobs (the broker's start, sandbox-job
@@ -42,10 +42,7 @@ export const BrokerEnvSchema = z.object({
    */
   OPS_GIT_ALLOWED_OWNERS: z
     .string()
-    .regex(
-      new RegExp(`^\\s*${owner}(\\s*,\\s*${owner})*\\s*$`),
-      says('githubOrgs')
-    )
+    .regex(listOf('[A-Za-z0-9][A-Za-z0-9-]*'), says('githubOrgs'))
     .optional(),
   /**
    * Author of commits the sandbox makes (ws_create_pr). If empty, the global
@@ -68,10 +65,7 @@ export const BrokerEnvSchema = z.object({
   OPS_JIRA_TOKEN: z.string().optional(),
   OPS_JIRA_PROJECTS: z
     .string()
-    .regex(
-      new RegExp(`^\\s*${projectKey}(\\s*,\\s*${projectKey})*\\s*$`),
-      says('jiraProjects')
-    )
+    .regex(listOf('[A-Za-z][A-Za-z0-9_]*'), says('jiraProjects'))
     .optional(),
   /**
    * Directory with the ansible inventory used to build the host list. Relative
@@ -102,10 +96,7 @@ export const BrokerEnvSchema = z.object({
    */
   OPS_K8S_CONTEXTS: z
     .string()
-    .regex(
-      new RegExp(`^\\s*${name}(\\s*,\\s*${name})*\\s*$`),
-      says('k8sContexts')
-    )
+    .regex(listOf('[A-Za-z0-9][A-Za-z0-9._@-]*'), says('k8sContexts'))
     .optional(),
   OPS_K8S_SA: z
     .string()

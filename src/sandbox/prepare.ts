@@ -39,34 +39,17 @@ export async function prepareBrokerFiles(
   if (!env.OPS_SSH_ALLOWED_CIDR)
     throw new Error('Set the allowed SSH range to use an inventory.')
 
-  const hosts = await renderInventory(env, env.OPS_SSH_ALLOWED_CIDR, processEnv)
-  writeFileSync(
-    output,
-    `${JSON.stringify(Object.fromEntries(hosts.allowed), null, 2)}\n`
-  )
-  log(
-    `${output}: ${hosts.allowed.size} host${hosts.allowed.size === 1 ? '' : 's'} (of ${hosts.total} in the inventory, within ${env.OPS_SSH_ALLOWED_CIDR})`
-  )
-}
-
-/**
- * Renders the inventory with ansible to get each host's address.
- * ansible_host can be a Jinja expression, so the file is not read directly.
- * Only the debug module runs, so no host is contacted.
- */
-async function renderInventory(
-  env: BrokerEnv,
-  cidr: string,
-  processEnv: NodeJS.ProcessEnv
-): Promise<{ allowed: Map<string, string>; total: number }> {
-  const dir = path.resolve(env.OPS_SSH_INVENTORY_DIR!)
+  // ansible renders the inventory for each host's address: ansible_host can
+  // be a Jinja expression, so the file is not read directly. Only the debug
+  // module runs, so no host is contacted.
+  const dir = path.resolve(env.OPS_SSH_INVENTORY_DIR)
   const venvAnsible = path.join(dir, '.venv/bin/ansible')
   const ansible = existsSync(venvAnsible) ? venvAnsible : 'ansible'
   const { stdout } = await runProcess(
     ansible,
     [
       '-i',
-      env.OPS_SSH_INVENTORY!,
+      env.OPS_SSH_INVENTORY,
       'all',
       '-m',
       'debug',
@@ -76,7 +59,6 @@ async function renderInventory(
     ],
     {
       cwd: dir,
-      input: '',
       timeoutMs: 120_000,
       env: {
         ...processEnv,
@@ -87,9 +69,15 @@ async function renderInventory(
   )
   const all = parseAnsibleHosts(stdout)
   const allowed = new Map(
-    [...filterByCidr(all, cidr)].sort(([a], [b]) =>
+    [...filterByCidr(all, env.OPS_SSH_ALLOWED_CIDR)].sort(([a], [b]) =>
       a.localeCompare(b, 'en', { numeric: true })
     )
   )
-  return { allowed, total: all.size }
+  writeFileSync(
+    output,
+    `${JSON.stringify(Object.fromEntries(allowed), null, 2)}\n`
+  )
+  log(
+    `${output}: ${allowed.size} host${allowed.size === 1 ? '' : 's'} (of ${all.size} in the inventory, within ${env.OPS_SSH_ALLOWED_CIDR})`
+  )
 }
