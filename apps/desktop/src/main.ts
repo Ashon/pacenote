@@ -2251,9 +2251,20 @@ function registerBotIpc(): void {
     // bot checks the sandbox again.
     if (job.state !== 'running') supervisor?.recheckSandbox()
   })
+  // The tray shows none of Pace's output, so a line it prints leaves the tray
+  // be; the tray's timer still follows bot.json.
+  const TRAY_FIELDS = [
+    'phase',
+    'message',
+    'restarts',
+    'retryAt',
+    'issues',
+  ] as const
+  let last = supervisor?.current
   supervisor?.on('change', (state) => {
     mainWindow?.webContents.send('pacenote:bot:changed', state)
-    updateTray()
+    if (TRAY_FIELDS.some((key) => state[key] !== last?.[key])) updateTray()
+    last = state
     // Pace takes the mentions from here on, so setup stops listening for
     // "it's me" rather than share them.
     if (claim && (state.phase === 'starting' || state.phase === 'external'))
