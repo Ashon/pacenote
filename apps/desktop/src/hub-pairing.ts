@@ -10,6 +10,10 @@ import type { SettingsIssue } from '../../../src/settings/fields.js'
 import type { SettingsStore } from './settings.js'
 import { text } from './hub-pairing.text.js'
 
+/** A hub's address: https, or http on this Mac */
+const HUB_ADDRESS =
+  /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/
+
 /**
  * Pairs this desktop with the team hub (docs/team-hub.md). The token is made
  * here and stays in the main process until it is saved to the settings file;
@@ -30,16 +34,9 @@ export class HubPairing {
 
   async start(url: unknown): Promise<PairStartResponse> {
     const given = typeof url === 'string' ? url.trim() : ''
-    if (
-      !/^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/.test(
-        given
-      )
-    )
-      throw new Error(
-        /^http:\/\//.test(given)
-          ? localized(text).useHttps
-          : localized(text).enterAddress
-      )
+    const t = localized(text)
+    if (!HUB_ADDRESS.test(given))
+      throw new Error(/^http:\/\//.test(given) ? t.useHttps : t.enterAddress)
     const hubUrl = given.replace(/\/+$/, '')
     const client = new HubClient(hubUrl, this.fetchImpl)
     const { token, tokenHash } = newHubToken()

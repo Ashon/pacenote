@@ -1147,11 +1147,7 @@ function registerBotIpc(): void {
     if (typeof id === 'string') macs?.ignore(id)
   })
   // Add a Mac: a new Mac's setup takes your Slack app from this one
-  handle(
-    'pacenote:macs:add-start',
-    false,
-    async () => (await macs?.startAdding()) ?? false
-  )
+  handle('pacenote:macs:add-start', false, () => macs?.startAdding() ?? false)
   handle('pacenote:macs:add-stop', undefined, () => macs?.stopAdding())
   handle('pacenote:macs:add-allow', undefined, () => macs?.allowAdding())
   handle('pacenote:macs:add-decline', undefined, () => macs?.declineAdding())
