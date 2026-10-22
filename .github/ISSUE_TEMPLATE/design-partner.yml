@@ -1,0 +1,30 @@
+name: Become a design partner
+description: Use Pacenote for about a month and talk every two weeks about what works and what doesn't.
+title: "Design partner: "
+labels: ["design-partner"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for wanting to shape Pacenote. Design partners use it for about a month and talk for 20 minutes every two weeks about what works, what doesn't and what they would pay for.
+
+        This issue is public: leave only what you are happy to share. If you would rather talk privately, say so and leave a way to reach you.
+  - type: checkboxes
+    id: fit
+    attributes:
+      label: What you have
+      description: Pacenote needs all three.
+      options:
+        - label: An Apple silicon Mac
+        - label: Claude Code on a Claude Pro, Max, Team or Enterprise plan, or Codex on ChatGPT Plus, Pro or Business
+        - label: A Slack workspace where I can create an app (or a teammate who can)
+  - type: textarea
+    id: work
+    attributes:
+      label: How work reaches you
+      description: Roughly how many asks reach you in Slack in a day, and whether you do them in Claude Code, Codex or both.
+  - type: input
+    id: contact
+    attributes:
+      label: Where to reach you
+      description: An X handle, a site or an email, if you want to be reached outside this issue. Optional.
