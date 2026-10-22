@@ -291,6 +291,12 @@ export function settingSectionOf(
   return SETTING_GROUPS.find((info) => info.id === group)?.section
 }
 
+/** A Todo setting: read where it is used, and shown while Todo is on */
+const WITH_TODO = {
+  applies: 'app',
+  shownWhen: { key: 'TASKS', equals: 'on' },
+} as const
+
 export const SETTING_FIELDS: SettingField[] = [
   {
     key: 'SLACK_CONNECTION',
@@ -771,8 +777,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Off: AI tools are told to leave DMs out, and tasks from them are not added.',
     type: 'toggle',
     default: 'off',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_EXCLUDE_CHANNELS',
@@ -783,8 +788,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Comma-separated channel names or IDs.',
     type: 'text',
     placeholder: '#random, #social',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_NAMES',
@@ -795,8 +799,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Besides your Slack names: a nickname, or your name in another language. A request that calls you by one is yours, @mention or not.',
     type: 'text',
     placeholder: 'Ash, Ashy',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_GROUPS',
@@ -807,8 +810,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Slack user groups whose mention asks you, such as an on-call group. The first time a Maybe comes from another group, Todo asks whether it means you.',
     type: 'text',
     placeholder: '@infra-oncall',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_CLI',
@@ -823,8 +825,7 @@ export const SETTING_FIELDS: SettingField[] = [
       { value: 'codex', label: 'Codex' },
     ],
     default: 'claude',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_OPEN_IN',
@@ -839,8 +840,7 @@ export const SETTING_FIELDS: SettingField[] = [
       { value: 'app', label: 'Desktop app' },
     ],
     default: 'terminal',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_TERMINAL',
@@ -857,8 +857,7 @@ export const SETTING_FIELDS: SettingField[] = [
       { value: 'ghostty', label: 'Ghostty' },
     ],
     default: 'auto',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_PLAN_FIRST',
@@ -868,8 +867,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'The session sums up the task and its plan, then waits for you before it changes anything.',
     type: 'toggle',
     default: 'on',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_LINK_SESSIONS',
@@ -879,8 +877,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: "Adds the Claude Code and Codex sessions you start yourself to a task's work log: ones that used Pacenote's task tools for it, had its Slack link in what you typed, or worked on its branch. Ones that only look related are suggested for you to link. Their logs are read on this Mac, and nothing from them leaves it.",
     type: 'toggle',
     default: 'off',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'TASKS_SUGGEST_DONE',
@@ -890,8 +887,7 @@ export const SETTING_FIELDS: SettingField[] = [
     help: "When a task's latest session has been quiet for 10 minutes, the AI chosen above reads its last turns, with no tools, and the state of its pull request, and says on the task whether it looks done, how it ended and what is left. You close it or not.",
     type: 'toggle',
     default: 'off',
-    applies: 'app',
-    shownWhen: { key: 'TASKS', equals: 'on' },
+    ...WITH_TODO,
   },
   {
     key: 'LOG_LEVEL',
