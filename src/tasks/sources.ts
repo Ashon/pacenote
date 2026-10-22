@@ -167,6 +167,12 @@ export function findMessage(
   return undefined
 }
 
+/** The task a reference names: its id, or its message's link */
+export function taskIdOf(ref: string): string {
+  const source = findMessage(ref)
+  return source ? SOURCES[source.app].taskId(source) : ref
+}
+
 /**
  * The tools a Claude Code collection reading these sources may use, by full
  * name

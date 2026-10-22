@@ -10,13 +10,7 @@ import { recordActivity } from './activity.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
 import { yourRepos } from './folders.js'
 import type { TasksSettings } from './settings.js'
-import {
-  findMessage,
-  SOURCE_IDS,
-  SOURCES,
-  sourceNames,
-  sourceOf,
-} from './sources.js'
+import { SOURCE_IDS, sourceNames, sourceOf, taskIdOf } from './sources.js'
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskActivity, TaskView } from './types.js'
 import { readWork } from './work.js'
@@ -724,8 +718,7 @@ export function registerTaskTools(
     ({ task }) =>
       respond(options, () => {
         const all = allTaskViews(options.dataDir)
-        const found = findMessage(task)
-        const id = found ? SOURCES[found.app].taskId(found) : task
+        const id = taskIdOf(task)
         const view = all.find((t) => t.id === id)
         if (!view) throw new Error(`No task ${task}`)
         track({ kind: 'look', task: view.id })

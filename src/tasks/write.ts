@@ -5,6 +5,7 @@ import {
   LOCAL,
   SOURCES,
   sourceNames,
+  taskIdOf,
   type SourceId,
 } from './sources.js'
 import {
@@ -296,6 +297,31 @@ export function addThreadTasks(
   })
 }
 
+/**
+ * Changes the task a reference (its id or its message's link) names, under
+ * the lock: change gets the task and write, which puts a task in its place;
+ * undefined when there is no such task
+ */
+function changeTask<R>(
+  dataDir: string,
+  ref: string,
+  change: (task: Task, write: (next: Task) => Task) => R
+): R | undefined {
+  return withTasksLock(dataDir, () => {
+    const id = taskIdOf(ref)
+    const file = readTasks(dataDir)
+    const task = file.tasks.find((t) => t.id === id)
+    if (!task) return undefined
+    return change(task, (next) => {
+      writeTasks(dataDir, {
+        ...file,
+        tasks: file.tasks.map((t) => (t.id === id ? next : t)),
+      })
+      return next
+    })
+  })
+}
+
 /** Closes an open task by its id or its message's link; undefined when none */
 export function closeTask(
   dataDir: string,
@@ -305,30 +331,21 @@ export function closeTask(
   /** Who closed it, what was done, a reply to send, and how it ended */
   more: { by?: string; note?: string; reply?: string; wrapUp?: string } = {}
 ): Task | undefined {
-  return withTasksLock(dataDir, () => {
-    const source = findMessage(ref)
-    const id = source ? SOURCES[source.app].taskId(source) : ref
-    const file = readTasks(dataDir)
-    const task = file.tasks.find((t) => t.id === id)
-    if (!task) return undefined
-    if (task.closed) return task
-    const closed: Task = {
-      ...task,
-      closed: {
-        at: now.toISOString(),
-        why,
-        by: more.by,
-        note: more.note?.trim().slice(0, 300) || undefined,
-        reply: more.reply?.trim().slice(0, 4000) || undefined,
-      },
-      wrapUp: wrapUpOf(more.wrapUp, now, more.by) ?? task.wrapUp,
-    }
-    writeTasks(dataDir, {
-      ...file,
-      tasks: file.tasks.map((t) => (t.id === id ? closed : t)),
-    })
-    return closed
-  })
+  return changeTask(dataDir, ref, (task, write) =>
+    task.closed
+      ? task
+      : write({
+          ...task,
+          closed: {
+            at: now.toISOString(),
+            why,
+            by: more.by,
+            note: more.note?.trim().slice(0, 300) || undefined,
+            reply: more.reply?.trim().slice(0, 4000) || undefined,
+          },
+          wrapUp: wrapUpOf(more.wrapUp, now, more.by) ?? task.wrapUp,
+        })
+  )
 }
 
 const wrapUpOf = (text: string | undefined, now: Date, by?: string) =>
@@ -348,23 +365,13 @@ export function wrapUpTask(
   now = new Date(),
   by?: string
 ): { task: Task } | { task: Task; refused: string } | undefined {
-  return withTasksLock(dataDir, () => {
-    const source = findMessage(ref)
-    const id = source ? SOURCES[source.app].taskId(source) : ref
-    const file = readTasks(dataDir)
-    const task = file.tasks.find((t) => t.id === id)
-    if (!task) return undefined
+  return changeTask(dataDir, ref, (task, write) => {
     const status = viewOf(task, readDecisions(dataDir)).status
     if (status !== 'done' && status !== 'closed')
       return { task, refused: `it is ${status}` }
     const wrapUp = wrapUpOf(text, now, by)
     if (!wrapUp) return { task, refused: 'the wrap-up is empty' }
-    const wrapped: Task = { ...task, wrapUp }
-    writeTasks(dataDir, {
-      ...file,
-      tasks: file.tasks.map((t) => (t.id === id ? wrapped : t)),
-    })
-    return { task: wrapped }
+    return { task: write({ ...task, wrapUp }) }
   })
 }
 
@@ -398,14 +405,9 @@ export function updateTask(
   | { task: Task; changed: TaskUpdate['changed'] }
   | { task: Task; refused: string }
   | undefined {
-  return withTasksLock(dataDir, () => {
-    const source = findMessage(ref)
-    const id = source ? SOURCES[source.app].taskId(source) : ref
-    const file = readTasks(dataDir)
-    const task = file.tasks.find((t) => t.id === id)
-    if (!task) return undefined
+  return changeTask(dataDir, ref, (task, write) => {
     const decisions = readDecisions(dataDir)
-    const decision = decisions[id]
+    const decision = decisions[task.id]
     const status = viewOf(task, decisions).status
     if (status !== 'open' && status !== 'maybe')
       return { task, refused: `it is ${status}` }
@@ -439,14 +441,10 @@ export function updateTask(
       by,
       changed,
     }
-    const updated: Task = {
+    const updated = write({
       ...task,
       ...Object.fromEntries(changed.map(({ field, to }) => [field, to])),
       updates: [...(task.updates ?? []), update].slice(-UPDATES_KEPT),
-    }
-    writeTasks(dataDir, {
-      ...file,
-      tasks: file.tasks.map((t) => (t.id === id ? updated : t)),
     })
     return { task: updated, changed }
   })
@@ -463,12 +461,6 @@ export interface NewFollowUp {
   summary?: string
   action?: TaskAction
   repo?: string
-}
-
-/** The task a reference names: its id, or its message's link */
-const idOf = (ref: string) => {
-  const source = findMessage(ref)
-  return source ? SOURCES[source.app].taskId(source) : ref
 }
 
 /**
@@ -488,9 +480,8 @@ export function addFollowUp(
     const title = item.title.trim().slice(0, 120)
     if (!title) return { error: 'A task needs a title.' }
     const file = readTasks(dataDir)
-    const after = item.after
-      ? file.tasks.find((t) => t.id === idOf(item.after!))
-      : undefined
+    const afterId = item.after ? taskIdOf(item.after) : undefined
+    const after = afterId ? file.tasks.find((t) => t.id === afterId) : undefined
     if (item.after && !after) return { error: `No task ${item.after}` }
     const named = item.repo?.trim()
     const repo =
