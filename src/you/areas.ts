@@ -192,14 +192,18 @@ export function findAreas(signals: readonly Signal[]): {
   }
   const join = (a: string, b: string) => up.set(root(a), root(b))
   const alone = new Set<string>()
+  /** A part joins the area of to, or with min of its own stands alone */
+  const place = (key: string, to: string | undefined, min: number) => {
+    if (!to && n(key) < min) return
+    up.set(key, key)
+    if (to) join(key, to)
+    else alone.add(key)
+  }
 
   const repos = [...count.keys()].filter(
     (key) => kind(key) === 'repo' && n(key) >= REPO_MIN
   )
-  for (const repo of repos) {
-    up.set(repo, repo)
-    alone.add(repo)
-  }
+  for (const repo of repos) place(repo, undefined, REPO_MIN)
   // Siblings: payments and payments-sdk, under one owner
   for (const a of repos)
     for (const b of repos) {
@@ -234,25 +238,13 @@ export function findAreas(signals: readonly Signal[]): {
       channel,
       (other) => up.has(other) && kind(other) === 'repo'
     )
-    if (repo) {
-      up.set(channel, channel)
-      join(channel, repo)
-    } else if (n(channel) >= CHANNEL_MIN) {
-      up.set(channel, channel)
-      alone.add(channel)
-    }
+    place(channel, repo, CHANNEL_MIN)
   }
   for (const group of [...count.keys()].filter((k) => kind(k) === 'group')) {
     const [top] = [...(with_.get(group) ?? new Map<string, number>())]
       .filter(([other]) => up.has(other))
       .sort((a, b) => b[1] - a[1])
-    if (top) {
-      up.set(group, group)
-      join(group, top[0])
-    } else if (n(group) >= GROUP_MIN) {
-      up.set(group, group)
-      alone.add(group)
-    }
+    place(group, top?.[0], GROUP_MIN)
   }
 
   const byRoot = new Map<string, string[]>()
@@ -473,17 +465,10 @@ export function areaViews(
       const askers = rank(asked.map((task) => task.askedBy!))
       const roles: AreaView['roles'] = []
       const days = new Set(sessions.map((signal) => dayOf(signal.at))).size
-      if (days)
-        roles.push({
-          role: 'build',
-          evidence: t.sessionDays(days),
-        })
+      if (days) roles.push({ role: 'build', evidence: t.sessionDays(days) })
       const reviews = tasks.filter((task) => /\breview|리뷰/i.test(task.title))
       if (reviews.length >= 2)
-        roles.push({
-          role: 'review',
-          evidence: t.reviews(reviews.length),
-        })
+        roles.push({ role: 'review', evidence: t.reviews(reviews.length) })
       if (asked.length >= 2)
         roles.push({
           role: 'answer',
