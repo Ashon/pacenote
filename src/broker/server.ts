@@ -313,6 +313,35 @@ async function respond(run: () => Promise<string>): Promise<ToolResult> {
     }
   }
 }
+
+/**
+ * respond, logging how long the tool took or why it failed. Its output is
+ * redacted and truncated (finish) and its size logged, unless asIs.
+ */
+function logged(
+  tool: string,
+  meta: Record<string, unknown>,
+  run: () => Promise<string>,
+  asIs = false
+): Promise<ToolResult> {
+  return respond(async () => {
+    const started = Date.now()
+    try {
+      const output = await run()
+      const result = asIs ? output : finish(output)
+      audit({
+        tool,
+        ...meta,
+        ms: Date.now() - started,
+        ...(!asIs && { bytes: result.length }),
+      })
+      return result
+    } catch (err) {
+      audit({ tool, ...meta, error: (err as Error).message.slice(0, 300) })
+      throw err
+    }
+  })
+}
 const readOnly = { readOnlyHint: true, openWorldHint: false }
 
 // ------------------------------------------------------------------ Tool
@@ -714,22 +743,12 @@ function registerWorkspaceTools(
     destructiveHint: false,
     openWorldHint: false,
   }
-  const logged = (
+  // Their output goes back as it is: only the time is logged.
+  const loggedAsIs = (
     tool: string,
     meta: Record<string, unknown>,
     run: () => Promise<string>
-  ) =>
-    respond(async () => {
-      const started = Date.now()
-      try {
-        const result = await run()
-        audit({ tool, ...meta, ms: Date.now() - started })
-        return result
-      } catch (err) {
-        audit({ tool, ...meta, error: (err as Error).message.slice(0, 300) })
-        throw err
-      }
-    })
+  ) => logged(tool, meta, run, true)
 
   server.registerTool(
     'ws_prepare',
@@ -750,7 +769,7 @@ function registerWorkspaceTools(
       annotations: { ...write, openWorldHint: true },
     },
     async ({ repo, base }) =>
-      logged('ws_prepare', { repo, base }, async () => {
+      loggedAsIs('ws_prepare', { repo, base }, async () => {
         const w = await workspaces.prepare(repo, base)
         return `ws=${w.id} repo=${w.slug.owner}/${w.slug.repo} branch=${w.branch} base=${w.base}`
       })
@@ -764,7 +783,7 @@ function registerWorkspaceTools(
       annotations: readOnly,
     },
     async (a) =>
-      logged('ws_list', a, () =>
+      loggedAsIs('ws_list', a, () =>
         listDir(workspaces.get(a.ws).dir, a.path ?? '.')
       )
   )
@@ -782,7 +801,7 @@ function registerWorkspaceTools(
       annotations: readOnly,
     },
     async (a) =>
-      logged('ws_read', { ws: a.ws, path: a.path }, async () =>
+      loggedAsIs('ws_read', { ws: a.ws, path: a.path }, async () =>
         finish(
           await readText(workspaces.get(a.ws).dir, a.path, a.offset, a.limit)
         )
@@ -835,7 +854,7 @@ function registerWorkspaceTools(
       annotations: write,
     },
     async (a) =>
-      logged(
+      loggedAsIs(
         'ws_write',
         { ws: a.ws, path: a.path, bytes: a.content.length },
         () => workspaces.write(a.ws, a.path, a.content)
@@ -857,7 +876,7 @@ function registerWorkspaceTools(
       annotations: write,
     },
     async (a) =>
-      logged('ws_edit', { ws: a.ws, path: a.path }, () =>
+      loggedAsIs('ws_edit', { ws: a.ws, path: a.path }, () =>
         workspaces.edit(a.ws, a.path, a.old_string, a.new_string, a.replace_all)
       )
   )
@@ -869,7 +888,8 @@ function registerWorkspaceTools(
       inputSchema: { ws, path: file },
       annotations: { ...write, destructiveHint: true },
     },
-    async (a) => logged('ws_delete', a, () => workspaces.remove(a.ws, a.path))
+    async (a) =>
+      loggedAsIs('ws_delete', a, () => workspaces.remove(a.ws, a.path))
   )
 
   server.registerTool(
@@ -881,7 +901,7 @@ function registerWorkspaceTools(
       annotations: readOnly,
     },
     async (a) =>
-      logged('ws_diff', a, async () => finish(await workspaces.diff(a.ws)))
+      loggedAsIs('ws_diff', a, async () => finish(await workspaces.diff(a.ws)))
   )
 
   server.registerTool(
@@ -905,7 +925,7 @@ function registerWorkspaceTools(
       annotations: { ...write, openWorldHint: true },
     },
     async (a) =>
-      logged('ws_create_pr', { ws: a.ws, title: a.title }, () =>
+      loggedAsIs('ws_create_pr', { ws: a.ws, title: a.title }, () =>
         workspaces.createPullRequest(a.ws, a.title, a.body)
       )
   )
@@ -920,23 +940,6 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
     )
   const limit = z.number().int().min(1).max(50).optional()
   const read = { readOnlyHint: true, openWorldHint: true }
-  const logged = (
-    tool: string,
-    meta: Record<string, unknown>,
-    run: () => Promise<string>
-  ) =>
-    respond(async () => {
-      const started = Date.now()
-      try {
-        const result = finish(await run())
-        audit({ tool, ...meta, ms: Date.now() - started, bytes: result.length })
-        return result
-      } catch (err) {
-        audit({ tool, ...meta, error: (err as Error).message.slice(0, 300) })
-        throw err
-      }
-    })
-
   server.registerTool(
     'gh_repo_search',
     {
@@ -1042,23 +1045,6 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
     destructiveHint: false,
     openWorldHint: true,
   }
-  const logged = (
-    tool: string,
-    meta: Record<string, unknown>,
-    run: () => Promise<string>
-  ) =>
-    respond(async () => {
-      const started = Date.now()
-      try {
-        const result = finish(await run())
-        audit({ tool, ...meta, ms: Date.now() - started, bytes: result.length })
-        return result
-      } catch (err) {
-        audit({ tool, ...meta, error: (err as Error).message.slice(0, 300) })
-        throw err
-      }
-    })
-
   server.registerTool(
     'jira_search',
     {
