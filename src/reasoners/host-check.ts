@@ -15,7 +15,7 @@ export type { CliCheck }
 const CODEX_MIN_VERSION = '0.138.0'
 
 /** Runs one CLI command the way an answer would, without its secrets */
-type CliRunner = (args: string[]) => Promise<RunResult>
+export type CliRunner = (args: string[]) => Promise<RunResult>
 
 /**
  * Whether the CLI can answer on this Mac: installed, signed in, and for codex

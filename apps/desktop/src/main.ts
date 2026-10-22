@@ -189,6 +189,7 @@ import {
   cliReadiness,
   isOwnCli,
   type OwnAiView,
+  type OwnCli,
 } from '../../../src/tasks/own-ai.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
@@ -202,7 +203,11 @@ import {
   listenForClaim,
   type ClaimListener,
 } from '../../../src/messengers/slack/claim.js'
-import { checkCli, checkOpencode } from '../../../src/reasoners/host-check.js'
+import {
+  checkCli,
+  checkOpencode,
+  type CliRunner,
+} from '../../../src/reasoners/host-check.js'
 import { hostEnv } from '../../../src/sandbox/host.js'
 import { runProcess } from '../../../src/sandbox/process.js'
 import { vmUnsupported } from '../../../src/sandbox/vm.js'
@@ -510,6 +515,14 @@ const cliBins = (): Bins => {
     opencode: env.OPENCODE_BIN?.trim() || 'opencode',
   }
 }
+/** How Pacenote's own work runs a CLI on this Mac */
+const ownWork = (cli: OwnCli) => ({
+  cli,
+  bin: cliBins()[cli],
+  codex: codexDefaults(process.env),
+  toolPath: toolPath(),
+  cwd: dataDir,
+})
 
 /** Collect now on the Todo screen: the AI reads Slack, read only */
 const taskCollector = new TaskCollector({
@@ -1391,12 +1404,8 @@ function registerBotIpc(): void {
       const prompt = recapPrompt(view, periodWords(view), commits)
       const ran = await ownAi.run(async (cli) => {
         const result = await writeRecap({
-          cli,
-          bin: cliBins()[cli],
-          codex: codexDefaults(process.env),
+          ...ownWork(cli),
           opencode: opencodeRun(),
-          toolPath: toolPath(),
-          cwd: dataDir,
           prompt,
         })
         // Spent whether it wrote or not, for the Overview's tokens
@@ -1612,12 +1621,8 @@ function registerBotIpc(): void {
           ? await ownAi.run(
               (cli) =>
                 judge({
-                  cli,
-                  bin: cliBins()[cli],
-                  codex: codexDefaults(process.env),
+                  ...ownWork(cli),
                   opencode: opencodeRun(),
-                  toolPath: toolPath(),
-                  cwd: dataDir,
                   prompt: judgePrompt(task, items, pr),
                 }),
               refusalOf,
@@ -1909,16 +1914,12 @@ function registerBotIpc(): void {
       const ran = await ownAi.run(
         (cli) =>
           draftReply({
-            cli,
-            bin: cliBins()[cli],
-            codex: codexDefaults(process.env),
+            ...ownWork(cli),
             launch: {
               command,
               args,
               env: { ...launchEnv, PACENOTE_MCP_FROM_APP: '1' },
             },
-            toolPath: toolPath(),
-            cwd: dataDir,
             task: detail.task,
             context: detail.context,
           }),
@@ -2055,36 +2056,44 @@ function registerBotIpc(): void {
   // it's me" on your own Slack app.
   handle('pacenote:setup:state', null, () => setup.view())
   handle('pacenote:setup:save', null, (patch) => setup.save(patch))
-  /** Whether each CLI is on this Mac and signed in, as you would run it */
-  const detectClis = async () => {
-    const env = settings.effectiveEnv()
-    const runner = (command: string) => (args: string[]) =>
+  /** Runs a CLI as you would: your PATH, outside any project */
+  const hostRunner =
+    (command: string): CliRunner =>
+    (args) =>
       runProcess(command, args, {
         cwd: tmpdir(),
         input: '',
         timeoutMs: 20_000,
         env: { ...hostEnv(process.env), PATH: toolPath() },
       })
-    const cli = (backend: 'claude' | 'codex', setting: string | undefined) => {
-      const command = setting?.trim() || backend
-      return checkCli(backend, command, runner(command))
-    }
-    const [claude, codex] = await Promise.all([
-      cli('claude', env.CLAUDE_BIN),
-      cli('codex', env.CODEX_BIN),
-    ])
+  // Each check starts the CLI a few times: asks that overlap share the one
+  // under way.
+  const checking = new Map<string, Promise<unknown>>()
+  const shareCheck = <T>(key: string, check: () => Promise<T>): Promise<T> => {
+    const running = checking.get(key) as Promise<T> | undefined
+    if (running) return running
+    const started = check().finally(() => {
+      if (checking.get(key) === started) checking.delete(key)
+    })
+    checking.set(key, started)
+    return started
+  }
+  /** Whether each CLI is on this Mac and signed in, as you would run it */
+  const detectClis = async () => {
+    const bins = cliBins()
+    // What a check says is worded in the app's language
+    const check = (cli: 'claude' | 'codex') =>
+      shareCheck(`${getLocale()} ${cli} ${bins[cli]}`, () =>
+        checkCli(cli, bins[cli], hostRunner(bins[cli]))
+      )
+    const [claude, codex] = await Promise.all([check('claude'), check('codex')])
     return { claude, codex }
   }
   /** opencode, for Pacenote's own work only */
   const detectOpencode = () => {
-    const command = settings.effectiveEnv().OPENCODE_BIN?.trim() || 'opencode'
-    return checkOpencode((args) =>
-      runProcess(command, args, {
-        cwd: tmpdir(),
-        input: '',
-        timeoutMs: 20_000,
-        env: { ...hostEnv(process.env), PATH: toolPath() },
-      })
+    const command = cliBins().opencode
+    return shareCheck(`opencode ${command}`, () =>
+      checkOpencode(hostRunner(command))
     )
   }
   // Connect to your other Mac: setup takes your Slack app from it
