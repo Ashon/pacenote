@@ -341,9 +341,12 @@ export class GitWorkspaces {
   async diff(id: string): Promise<string> {
     const workspace = this.get(id)
     await this.git(['add', '--all'], workspace.dir)
-    const stat = await this.git(['diff', '--cached', '--stat'], workspace.dir)
-    const diff = await this.git(['diff', '--cached'], workspace.dir)
-    return `${workspace.slug.owner}/${workspace.slug.repo} ${workspace.branch} (base ${workspace.base})\n${stat}\n${diff}`
+    // The stat, a blank line and the patch; with no changes, a blank line
+    const diff = await this.git(
+      ['diff', '--cached', '--stat', '--patch'],
+      workspace.dir
+    )
+    return `${workspace.slug.owner}/${workspace.slug.repo} ${workspace.branch} (base ${workspace.base})\n${diff || '\n'}`
   }
 
   async createPullRequest(
@@ -362,12 +365,11 @@ export class GitWorkspaces {
       throw new Error('PR title must be 1-200 characters.')
 
     await this.git(['add', '--all'], workspace.dir)
-    const files = (
-      await this.git(['diff', '--cached', '--name-only'], workspace.dir)
-    )
-      .split('\n')
-      .filter(Boolean)
-    const diff = await this.git(['diff', '--cached'], workspace.dir)
+    const [names, diff] = await Promise.all([
+      this.git(['diff', '--cached', '--name-only'], workspace.dir),
+      this.git(['diff', '--cached'], workspace.dir),
+    ])
+    const files = names.split('\n').filter(Boolean)
     const added = diff
       .split('\n')
       .filter((l) => l.startsWith('+') && !l.startsWith('+++')).length
