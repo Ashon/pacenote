@@ -15,7 +15,7 @@ import {
   Square,
   TriangleAlert,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -491,7 +491,8 @@ const LEVEL_CLASS: Record<string, string> = {
   ERROR: 'text-status-failed',
 }
 
-function LogPanel() {
+/** Takes no props, so Pace's status polls leave it be */
+const LogPanel = memo(function LogPanel() {
   const t = useText(text)
   const [view, setView] = useState<LogView>('all')
   const [q, setQ] = useState('')
@@ -500,11 +501,20 @@ function LogPanel() {
   const scroller = useRef<HTMLDivElement>(null)
   const lines = useMemo(() => {
     const query = q.trim().toLowerCase()
-    return (data ?? []).filter(
-      (line) =>
-        matchesView(line, view) &&
-        (!query || line.message.toLowerCase().includes(query))
-    )
+    // A row's key is its time and how many rows before it share that time,
+    // so rows keep their key as the tail slides on.
+    const seen = new Map<string | undefined, number>()
+    return (data ?? [])
+      .filter(
+        (line) =>
+          matchesView(line, view) &&
+          (!query || line.message.toLowerCase().includes(query))
+      )
+      .map((line) => {
+        const n = seen.get(line.at) ?? 0
+        seen.set(line.at, n + 1)
+        return { line, key: `${line.at}-${n}` }
+      })
   }, [data, view, q])
 
   useEffect(() => {
@@ -580,8 +590,8 @@ function LogPanel() {
                 ))}
               </div>
             )}
-            {lines.map((line, i) => (
-              <LogRow key={`${line.at}-${i}`} line={line} />
+            {lines.map(({ line, key }) => (
+              <LogRow key={key} line={line} />
             ))}
             {(data !== undefined || isError) && lines.length === 0 && (
               <p className="py-10 text-center font-sans text-copy text-muted-foreground">
@@ -593,7 +603,7 @@ function LogPanel() {
       </ScrollArea>
     </section>
   )
-}
+})
 
 /** The app's notice's height last time, with its margin; 0 for none */
 const NOTICE_KEY = 'pacenote.bot.notice'
