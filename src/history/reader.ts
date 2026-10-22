@@ -42,6 +42,8 @@ export class HistoryReader {
     string,
     { mtimeMs: number; record: HistoryRecord }
   >()
+  /** The oldest day folder when the runs were last read */
+  private oldest?: string
 
   constructor(readonly root: string) {}
 
@@ -275,8 +277,10 @@ export class HistoryReader {
   /** Newest runs first */
   private *records(): Generator<HistoryRecord> {
     const runsDir = path.join(this.root, RUNS_DIR)
-    if (!existsSync(runsDir)) return
-    const days = readdirSync(runsDir).filter(isDayDir).sort().reverse()
+    const days = existsSync(runsDir)
+      ? readdirSync(runsDir).filter(isDayDir).sort().reverse()
+      : []
+    this.forgetBefore(days.at(-1))
     for (const day of days) {
       const ids = readdirSync(path.join(runsDir, day))
         .filter((id) => dayOf(id) === day)
@@ -286,6 +290,20 @@ export class HistoryReader {
         const record = this.load(path.join(runsDir, day, id, RUN_FILE))
         if (record) yield record
       }
+    }
+  }
+
+  /**
+   * Drops the cached runs of the days before the oldest day folder left: the
+   * bot prunes the oldest days, and the app keeps its reader open
+   */
+  private forgetBefore(oldest: string | undefined): void {
+    if (oldest === this.oldest) return
+    this.oldest = oldest
+    for (const file of this.cache.keys()) {
+      // <root>/runs/<day>/<run id>/run.json
+      const day = path.basename(path.dirname(path.dirname(file)))
+      if (oldest === undefined || day < oldest) this.cache.delete(file)
     }
   }
 

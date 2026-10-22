@@ -257,12 +257,20 @@ describe('run history', () => {
   })
 
   it('deletes day directories past the retention period', () => {
+    const cached = () => [
+      ...(reader as unknown as { cache: Map<string, unknown> }).cache.keys(),
+    ]
     store.start(init, new Date(2026, 7, 1, 9, 0, 0))
+    reader.list()
+    expect(cached().some((file) => file.includes('2026-08-01'))).toBe(true)
     expect(store.prune(30, new Date(2026, 9, 8))).toBe(1)
     expect(store.prune(0, new Date(2030, 0, 1))).toBe(0)
     expect(reader.list().every((run) => run.id.startsWith('20261008'))).toBe(
       true
     )
+    // The app's reader, open all along, lets go of them too
+    expect(cached().length).toBeGreaterThan(0)
+    expect(cached().every((file) => file.includes('2026-10-08'))).toBe(true)
   })
 })
 
