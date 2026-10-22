@@ -59,7 +59,6 @@ export function ResizeHandle({
   onChange,
   onReset,
   label,
-  className,
 }: {
   value: number
   min: number
@@ -67,7 +66,6 @@ export function ResizeHandle({
   onChange: (width: number) => void
   onReset: () => void
   label: string
-  className?: string
 }) {
   const drag = useRef<{ startX: number; startWidth: number } | undefined>(
     undefined
@@ -121,10 +119,7 @@ export function ResizeHandle({
         else return
         e.preventDefault()
       }}
-      className={cn(
-        'group absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize outline-none',
-        className
-      )}
+      className="group absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize outline-none"
     >
       {/* The line lights up on hover, while dragging, and on keyboard
           focus. */}

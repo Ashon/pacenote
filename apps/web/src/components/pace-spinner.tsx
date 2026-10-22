@@ -53,14 +53,11 @@ const INK = [
  */
 export function PaceSpinner({
   className,
-  label,
   active = true,
   turn,
   writing,
 }: {
   className?: string
-  /** Read out instead of the text beside it; without one it is decoration */
-  label?: string
   /** Looking around (default), or the logo */
   active?: boolean
   /** Writing instead of looking around */
@@ -121,9 +118,7 @@ export function PaceSpinner({
     <svg
       ref={svg}
       viewBox="0 0 512 512"
-      role={label ? 'img' : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
+      aria-hidden
       data-write={writing ? '' : undefined}
       className={cn('pace-spinner size-7 shrink-0', className)}
     >

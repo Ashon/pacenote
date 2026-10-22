@@ -1,7 +1,6 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useText } from '@/lib/i18n'
-import { cn } from '@/lib/utils'
 import { text } from './search-field.text'
 
 const isMac = /Mac/.test(navigator.platform)
@@ -13,11 +12,9 @@ const isMac = /Mac/.test(navigator.platform)
 export function SearchField({
   value,
   onChange,
-  className,
 }: {
   value: string
   onChange: (value: string) => void
-  className?: string
 }) {
   const t = useText(text)
   const input = useRef<HTMLInputElement>(null)
@@ -35,7 +32,7 @@ export function SearchField({
   }, [])
 
   return (
-    <div className={cn('group relative', className)}>
+    <div className="group relative">
       <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
       <input
         ref={input}
