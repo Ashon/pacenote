@@ -1,4 +1,5 @@
-import ReactMarkdown from 'react-markdown'
+import { memo } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { slackToMarkdown } from '@/lib/slack'
 import { cn } from '@/lib/utils'
@@ -32,7 +33,18 @@ function remarkLineBreaks() {
   return (tree: MdNode) => walk(tree)
 }
 
-export function Markdown({
+const PLUGINS = [remarkGfm, remarkLineBreaks]
+
+const COMPONENTS: Components = {
+  a: ({ href, children: label }) => (
+    <a href={href} target="_blank" rel="noreferrer">
+      {label}
+    </a>
+  ),
+}
+
+/** Parses again only when its text or class changes */
+export const Markdown = memo(function Markdown({
   children,
   className,
 }: {
@@ -56,18 +68,9 @@ export function Markdown({
         className
       )}
     >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkLineBreaks]}
-        components={{
-          a: ({ href, children: label }) => (
-            <a href={href} target="_blank" rel="noreferrer">
-              {label}
-            </a>
-          ),
-        }}
-      >
+      <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS}>
         {slackToMarkdown(children)}
       </ReactMarkdown>
     </div>
   )
-}
+})
