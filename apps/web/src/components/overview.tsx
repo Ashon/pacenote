@@ -265,20 +265,13 @@ export function Overview() {
                 {data?.topTools.length ? (
                   <ul className="mt-5 space-y-3">
                     {data.topTools.slice(0, 5).map((tool) => (
-                      <li key={tool.name} className="text-meta">
-                        <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                          <span className="truncate font-mono">
-                            {tool.name}
-                          </span>
-                          <span className="shrink-0 font-medium tabular-nums">
-                            {tool.calls}
-                          </span>
-                        </div>
-                        <LineBar
-                          share={tool.calls / maxTool}
-                          className="pacenote-gradient"
-                        />
-                      </li>
+                      <BarItem
+                        key={tool.name}
+                        name={tool.name}
+                        mono
+                        count={tool.calls}
+                        share={tool.calls / maxTool}
+                      />
                     ))}
                   </ul>
                 ) : (
@@ -521,18 +514,12 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
         />
         <ul className="mt-5 space-y-3">
           {HOW.map((how) => (
-            <li key={how} className="text-meta">
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <span className="truncate font-medium">{t.how[how]}</span>
-                <span className="shrink-0 font-medium tabular-nums">
-                  {trend.how[how]}
-                </span>
-              </div>
-              <LineBar
-                share={trend.how[how] / top}
-                className="pacenote-gradient"
-              />
-            </li>
+            <BarItem
+              key={how}
+              name={t.how[how]}
+              count={trend.how[how]}
+              share={trend.how[how] / top}
+            />
           ))}
         </ul>
         {trend.medianMs !== undefined && (
@@ -688,6 +675,32 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
         </div>
       </section>
     </div>
+  )
+}
+
+/** A row of a ranked list: its name and count, and a bar of its share */
+function BarItem({
+  name,
+  mono,
+  count,
+  share,
+}: {
+  name: string
+  /** A tool's name, in the code face */
+  mono?: boolean
+  count: number
+  share: number
+}) {
+  return (
+    <li className="text-meta">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className={cn('truncate', mono ? 'font-mono' : 'font-medium')}>
+          {name}
+        </span>
+        <span className="shrink-0 font-medium tabular-nums">{count}</span>
+      </div>
+      <LineBar share={share} className="pacenote-gradient" />
+    </li>
   )
 }
 
