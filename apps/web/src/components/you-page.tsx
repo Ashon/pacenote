@@ -244,7 +244,6 @@ function AreaRow({
   const [merging, setMerging] = useState(false)
   const row = useRef<HTMLLIElement>(null)
   const resting = area.state === 'resting'
-  const open_ = area.now.length
 
   // Opened from a link, the row comes into view.
   useEffect(() => {
@@ -310,17 +309,15 @@ function AreaRow({
                   {t.workingIn(CLI_NAMES[area.working.tool])}
                 </span>
               )}
-              {resting ? (
-                <span>
-                  {area.lastActiveAt
+              <span>
+                {resting
+                  ? area.lastActiveAt
                     ? t.lastWorked(formatShortDay(area.lastActiveAt))
-                    : t.nothingLately}
-                </span>
-              ) : (
-                <span>
-                  {open_ === 0 ? t.nothingOpenShort : t.openTasks(open_)}
-                </span>
-              )}
+                    : t.nothingLately
+                  : area.now.length
+                    ? t.openTasks(area.now.length)
+                    : t.nothingOpenShort}
+              </span>
               {area.people.length > 0 && !resting && (
                 <span>{t.askYouMost(area.people)}</span>
               )}

@@ -295,12 +295,10 @@ function Version() {
   const dev = Boolean(window.pacenoteDesktop?.dev)
   if (!describe) {
     const notes = `https://github.com/Ashon/pacenote/releases/tag/v${version}`
-    return dev ? (
-      <Item tip={t.versionDev(version)}>v{version}</Item>
-    ) : (
+    return (
       <Item
-        tip={t.versionNotes(version)}
-        onClick={() => window.open(notes, '_blank')}
+        tip={dev ? t.versionDev(version) : t.versionNotes(version)}
+        onClick={dev ? undefined : () => window.open(notes, '_blank')}
       >
         v{version}
       </Item>
