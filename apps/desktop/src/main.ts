@@ -262,6 +262,10 @@ let language: LanguageState = resolveLanguage(
   app.getPreferredSystemLanguages()
 )
 setLocale(language.locale)
+// Kept for the processes the app does not start, such as Pacenote's MCP
+// server in Claude Code, so what their AI writes is in it too
+// (src/i18n/user.ts)
+writePrefs(prefsFile, { locale: language.locale })
 /**
  * The app's own log, kept beside Pace's in the data folder so the installed
  * app's messages are not lost with its console. Open logs folder shows both.
@@ -1059,8 +1063,11 @@ function registerBotIpc(): void {
   ipcMain.handle('pacenote:app:set-language', (event, value: unknown) => {
     if (!fromMainWindow(event) || (value !== 'system' && !isLocale(value)))
       return language
-    writePrefs(prefsFile, { language: value === 'system' ? undefined : value })
     language = resolveLanguage(value, app.getPreferredSystemLanguages())
+    writePrefs(prefsFile, {
+      language: value === 'system' ? undefined : value,
+      locale: language.locale,
+    })
     setLocale(language.locale)
     setAppMenu(appName)
     lastTrayKey = ''

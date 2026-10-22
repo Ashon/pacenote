@@ -183,7 +183,8 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   NOTES_LANGUAGE: {
     label: 'Pace가 직접 쓰는 글',
-    help: 'Pace가 직접 쓰는 글의 언어예요. 답변 아래의 한 줄, 요청한 사람에게만 보이는 안내, 답변하지 못했을 때 남기는 글이 여기에 해당해요. 답변은 대화의 언어를 따라요.',
+    help: 'Pace가 직접 쓰는 글의 언어예요. 답변 아래의 한 줄, 요청한 사람에게만 보이는 안내, 답변하지 못했을 때 남기는 글이 여기에 해당해요. 앱과 같게를 고르면 앱 언어를 따라요. 답변은 요청한 언어를 따라요.',
+    options: { app: { label: '앱과 같게' } },
   },
   MENTION_WORKSPACE: {
     label: '참고 디렉터리',

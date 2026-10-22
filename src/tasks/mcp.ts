@@ -20,6 +20,8 @@ import {
 import { allTaskViews, readTasks, tasksView } from './store.js'
 import type { RelatedRun, TaskActivity, TaskView } from './types.js'
 import { readWork } from './work.js'
+import { LANGUAGE_FOR_AI, type Locale } from '../i18n/locale.js'
+import { userLocale } from '../i18n/user.js'
 import { youForCollection } from './you.js'
 import {
   addFollowUp,
@@ -76,21 +78,32 @@ const FIRST_WINDOW_MS = 7 * 24 * 60 * 60_000
  */
 const WRAP_UP_WINDOW_MS = 7 * 24 * 60 * 60_000
 const WRAP_UP_AT_ONCE = 5
+/**
+ * What the AI writes for the user (titles, summaries, wrap-ups, notes) is in
+ * the user's language, whatever language the messages are in; names, code
+ * and quoted words stay as they are. A reply for the user to send is for the
+ * thread, so it is in the thread's language.
+ */
+const inUserLanguage = (locale: Locale) =>
+  `in ${LANGUAGE_FOR_AI[locale]}, the language the user reads Pacenote in, whatever language the messages are in (names, code and quoted words stay as they are)`
+const REPLY = 'A reply for the user to send in the thread, in its language'
+
 /** What a wrap-up says, for close_task and wrap_up_task */
-const WRAP_UP =
-  'How it ended, in two or three sentences in the language of the messages: what was done or decided and by whom, and anything left after it. It is what reminds the user, and the next task like it, later; no secrets or personal details.'
+const wrapUp = (locale: Locale) =>
+  `How it ended, in two or three sentences ${inUserLanguage(locale)}: what was done or decided and by whom, and anything left after it. It is what reminds the user, and the next task like it, later; no secrets or personal details.`
 
 /** Precision first (docs/proposals/personal-tasks.md) */
-export const TASK_RULES = [
-  'Precision matters more than recall: a wrong task costs the user more than a missed one.',
-  '- A task (confidence "sure"): someone asks the user by name (their @mention, or one of the names collect_context gives for them), in a direct message, or through a user group collect_context says means them, to do or answer something (kind "asked"), or the user says they will do something (kind "promised").',
-  '- A Maybe (confidence "maybe"): an @here or @channel, a user group collect_context names neither way (give its @handle as group, when the group is all that makes it the user\u2019s), "someone should look at this", a request that may or may not be for the user, or anything you are not sure about.',
-  '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done, or an ask of a group the user said does not mean them, unless it names the user too.',
-  'title: what to do, a short imperative under 80 characters, in the language of the messages. reason: one line on why it is a task. due: a due hint in words, only if the messages give one.',
-  'action: what doing it takes. "code" when it needs a change to code or a look in a repository (a review, a fix, a question only the code answers), "reply" when an answer in the thread is all it needs, "other" for anything else.',
-  'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself) or plainly mean one of the user\u2019s repositories collect_context lists (by its name, as "the payments service" means acme/payments).',
-  'summary: the thread in two or three sentences, in the language of the messages: who wants what, why, and by when. It is what reminds the user later; no secrets or personal details.',
-].join('\n')
+export const taskRules = (locale: Locale) =>
+  [
+    'Precision matters more than recall: a wrong task costs the user more than a missed one.',
+    '- A task (confidence "sure"): someone asks the user by name (their @mention, or one of the names collect_context gives for them), in a direct message, or through a user group collect_context says means them, to do or answer something (kind "asked"), or the user says they will do something (kind "promised").',
+    '- A Maybe (confidence "maybe"): an @here or @channel, a user group collect_context names neither way (give its @handle as group, when the group is all that makes it the user\u2019s), "someone should look at this", a request that may or may not be for the user, or anything you are not sure about.',
+    '- Nothing: an FYI, thanks, social talk, a question already answered in the thread, something already done, or an ask of a group the user said does not mean them, unless it names the user too.',
+    `title: what to do, a short imperative under 80 characters, ${inUserLanguage(locale)}. reason: one line on why it is a task. due: a due hint in words, only if the messages give one.`,
+    'action: what doing it takes. "code" when it needs a change to code or a look in a repository (a review, a fix, a question only the code answers), "reply" when an answer in the thread is all it needs, "other" for anything else.',
+    'repo: the repository it is about, as owner/name, only when the messages name one (a pull request or issue link, or the repository itself) or plainly mean one of the user\u2019s repositories collect_context lists (by its name, as "the payments service" means acme/payments).',
+    `summary: the thread in two or three sentences, ${inUserLanguage(locale)}: who wants what, why, and by when. It is what reminds the user later; no secrets or personal details.`,
+  ].join('\n')
 
 export function collectPrompt(): string {
   return [
@@ -167,8 +180,15 @@ export function taskInstructions(options: TaskToolsOptions): string {
   return lines.join('\n')
 }
 
+/** Talking with the user in their language, in a session's prompt */
+const talkIn = (locale: Locale) =>
+  `Talk to the user in ${LANGUAGE_FOR_AI[locale]}, the language they read Pacenote in.`
+
 /** Picking a task up in the session the user is in (the task prompt) */
-export function taskPrompt(task: string | undefined): string {
+export function taskPrompt(
+  task: string | undefined,
+  locale: Locale = 'en'
+): string {
   return [
     task
       ? `Pick up this task from Pacenote in this session: ${task}`
@@ -180,20 +200,22 @@ export function taskPrompt(task: string | undefined): string {
     '2. Tell the user in a few lines what is asked, by whom and by when, and what came before it (earlier tasks like it and how they ended).',
     '3. Propose the first step and wait for the user before changing anything.',
     '',
+    talkIn(locale),
     NOTE,
   ].join('\n')
 }
 
 /** Wrapping the session up into its task (the done prompt) */
-export function donePrompt(): string {
+export function donePrompt(locale: Locale = 'en'): string {
   return [
     'Wrap this session up into its task in Pacenote.',
     '',
     '1. Find the task this session worked on: the one you called task_context for, else the open task of this folder’s repository that the work matches (my_tasks lists them). If none or several fit, ask the user which.',
     '2. If the work is done, call close_task with why "resolved", a note on what was done in a line, a reply for the user to send if the person who asked waits for an answer, and a wrap_up: how it ended, and anything left after it. For each thing left that the user will do later, call add_followup with after: this task\u2019s id.',
     '3. If it is not done, do not close it. Tell the user what is left, and keep it with add_followup only if they want it kept.',
-    '4. Never post to Slack yourself: a reply is for the user to send.',
+    '4. Never post to Slack yourself: a reply is for the user to send, in the language of its thread.',
     '',
+    talkIn(locale),
     NOTE,
   ].join('\n')
 }
@@ -203,6 +225,10 @@ export function registerTaskTools(
   options: TaskToolsOptions
 ): void {
   const client = () => server.server.getClientVersion()?.name
+  // The user's language when the server started, for what the tools ask the
+  // AI to write; collect_context reads it again each time
+  const locale = userLocale(options.dataDir)
+  const inTheirs = inUserLanguage(locale)
   // What the tool is doing, for the app to show as it happens (activity.ts)
   const track = (event: Omit<TaskActivity, 'at' | 'by' | 'app'>) =>
     recordActivity(options.dataDir, {
@@ -245,7 +271,7 @@ export function registerTaskTools(
           role: 'user',
           content: {
             type: 'text',
-            text: taskPrompt(task?.trim() || undefined),
+            text: taskPrompt(task?.trim() || undefined, locale),
           },
         },
       ],
@@ -261,7 +287,7 @@ export function registerTaskTools(
     },
     () => ({
       messages: [
-        { role: 'user', content: { type: 'text', text: donePrompt() } },
+        { role: 'user', content: { type: 'text', text: donePrompt(locale) } },
       ],
     })
   )
@@ -283,7 +309,7 @@ export function registerTaskTools(
       messages: [
         {
           role: 'user',
-          content: { type: 'text', text: recapPromptFor(period) },
+          content: { type: 'text', text: recapPromptFor(period, locale) },
         },
       ],
     })
@@ -313,7 +339,7 @@ export function registerTaskTools(
         const work = readWork(options.dataDir).entries
         return {
           how: collectPrompt(),
-          rules: TASK_RULES,
+          rules: taskRules(userLocale(options.dataDir)),
           since,
           dms: settings.dms,
           leaveOut: settings.exclude,
@@ -374,7 +400,9 @@ export function registerTaskTools(
         tasks: z
           .array(
             z.object({
-              title: z.string().describe('What to do, short and imperative'),
+              title: z
+                .string()
+                .describe(`What to do, short and imperative, ${inTheirs}`),
               kind: z.enum(['asked', 'promised']).optional(),
               asked_by: z.string().optional().describe('Who asked, by name'),
               where: z
@@ -470,9 +498,9 @@ export function registerTaskTools(
         title: z
           .string()
           .describe(
-            'What to do, a short imperative: "Add retries to the export job"'
+            `What to do, a short imperative ("Add retries to the export job"), ${inTheirs}`
           ),
-        why: z.string().describe('Why it is a task, in a line'),
+        why: z.string().describe(`Why it is a task, in a line, ${inTheirs}`),
         after: z
           .string()
           .optional()
@@ -487,7 +515,7 @@ export function registerTaskTools(
           .string()
           .optional()
           .describe(
-            'What it is about and what is known so far, in two or three sentences'
+            `What it is about and what is known so far, in two or three sentences, ${inTheirs}`
           ),
         action: z.enum(['code', 'reply', 'other']).optional(),
         repo: z
@@ -615,12 +643,12 @@ export function registerTaskTools(
       inputSchema: {
         task: z.string().describe("The task id or its message's link"),
         why: z.enum(['replied', 'checked', 'resolved']),
-        note: z.string().optional().describe('What was done, in a line'),
-        reply: z
+        note: z
           .string()
           .optional()
-          .describe('A reply for the user to send in the thread'),
-        wrap_up: z.string().optional().describe(WRAP_UP),
+          .describe(`What was done, in a line, ${inTheirs}`),
+        reply: z.string().optional().describe(REPLY),
+        wrap_up: z.string().optional().describe(wrapUp(locale)),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -655,7 +683,7 @@ export function registerTaskTools(
         'Maybes and tasks the user dismissed are left as they are.',
       inputSchema: {
         task: z.string().describe("The task id or its message's link"),
-        wrap_up: z.string().min(1).describe(WRAP_UP),
+        wrap_up: z.string().min(1).describe(wrapUp(locale)),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -963,7 +991,10 @@ export async function recapSummary(
 }
 
 /** Writing the user's recap in the session they are in (the recap prompt) */
-export function recapPromptFor(period: string | undefined): string {
+export function recapPromptFor(
+  period: string | undefined,
+  locale: Locale = 'en'
+): string {
   const which = ['day', 'week', 'month'].includes(period?.trim() ?? '')
     ? period!.trim()
     : 'week'
@@ -977,7 +1008,7 @@ export function recapPromptFor(period: string | undefined): string {
     `Write the user's recap for this ${which}.`,
     '',
     `1. Call my_recap with period "${which}".`,
-    `2. Write ${kind}, in the language most of their task titles are in, area by area. Sum the commits up into what the work was about; do not list commit messages.`,
+    `2. Write ${kind}, in ${LANGUAGE_FOR_AI[locale]}, the language the user reads Pacenote in, area by area. Sum the commits up into what the work was about; do not list commit messages.`,
     '3. Show it to the user to copy. Do not post it anywhere yourself.',
     '',
     NOTE,

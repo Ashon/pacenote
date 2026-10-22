@@ -5,7 +5,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
 import { isTimeZone, systemTimeZone } from './messengers/text.js'
-import { localized, LOCALES, type Locale } from './i18n/locale.js'
+import { getLocale, localized, LOCALES, type Locale } from './i18n/locale.js'
 import { defaultHome } from './settings/home.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
@@ -143,10 +143,10 @@ export const EnvSchema = z.object({
     .refine(isTimeZone, says('timeZone'))
     .default(systemTimeZone),
   /**
-   * The language of what Pace writes itself in Slack (answers follow the
-   * thread)
+   * The language of what Pace writes itself in Slack: the app's (app), or one
+   * of its own. Answers follow the request.
    */
-  NOTES_LANGUAGE: z.enum(LOCALES).default('en'),
+  NOTES_LANGUAGE: z.enum(['app', ...LOCALES]).default('app'),
 
   /**
    * You: the one Slack member Pace answers through your own Slack app. Pace
@@ -494,7 +494,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     slack,
     timezone: e.TIMEZONE,
-    notesLocale: e.NOTES_LANGUAGE,
+    // Same as the app: the language the app told Pace (src/index.ts)
+    notesLocale: e.NOTES_LANGUAGE === 'app' ? getLocale() : e.NOTES_LANGUAGE,
     mention: {
       ...(slack.kind === 'app' ? { owner: owners[0]! } : {}),
       workspace,

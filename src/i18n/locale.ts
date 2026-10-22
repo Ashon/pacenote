@@ -13,6 +13,12 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   ko: '한국어',
 }
 
+/** Each language as an instruction to an AI names it: "write in Korean" */
+export const LANGUAGE_FOR_AI: Record<Locale, string> = {
+  en: 'English',
+  ko: 'Korean',
+}
+
 /** The tag dates and numbers are formatted with */
 export const LOCALE_TAGS: Record<Locale, string> = {
   en: 'en-US',

@@ -244,6 +244,16 @@ describe('the handoff', () => {
     expect(prompt).toContain('wait for the user before you change anything')
     expect(prompt).toContain('Do not post to Slack')
     expect(prompt).toContain('close_task with id C1:1791871374.047569')
+    // In the user's language: the app's (English here), or one given
+    expect(prompt).toContain('Talk to the user in English')
+    expect(
+      handoffPrompt(task, context, {
+        marker: 'm1',
+        planFirst: true,
+        tool: 'claude',
+        locale: 'ko',
+      })
+    ).toContain('Talk to the user in Korean')
     expect(
       handoffPrompt(task, context, {
         marker: 'm1',

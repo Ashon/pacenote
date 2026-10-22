@@ -132,7 +132,16 @@ describe('systemPrompt', () => {
       '<thread> is conversation context for reference'
     )
     expect(systemPrompt(slack)).toContain(
-      'Reply in the language of the conversation.'
+      'Reply in the language the request is written in.'
+    )
+  })
+
+  it("answers in the request's language, else in the language of the person Pace works for", () => {
+    expect(systemPrompt(slack, { language: 'ko' })).toContain(
+      'reply in Korean, the language of the person you work for'
+    )
+    expect(systemPrompt(slack, { language: 'en' })).toContain(
+      'reply in English, the language of the person you work for'
     )
   })
 

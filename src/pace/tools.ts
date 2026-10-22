@@ -15,6 +15,7 @@ import type { TaskView } from '../tasks/types.js'
 import { addThreadTasks, closeTask } from '../tasks/write.js'
 import type { Audience } from '../you/areas.js'
 import { readYou } from '../you/store.js'
+import { getLocale, LANGUAGE_FOR_AI } from '../i18n/locale.js'
 
 /**
  * Pace's own tools: what Pacenote keeps for the person Pace answers (their
@@ -182,7 +183,7 @@ export function createOwnToolsServer(
               title: z
                 .string()
                 .describe(
-                  'What to do, short and imperative, in their language'
+                  `What to do, short and imperative, in ${LANGUAGE_FOR_AI[getLocale()]}, the language of the person you work for (names, code and quoted words stay as they are)`
                 ),
               why: z
                 .string()

@@ -70,7 +70,7 @@ Each table is one group of the file. Select values are in the last column; the S
 | `answers.timeoutSec` | `REASONER_TIMEOUT_SEC` | `900` | Timeout (seconds) |
 | `answers.concurrency` | `MENTION_CONCURRENCY` | `2` | Concurrent requests |
 | `answers.timeZone` | `TIMEZONE` | this Mac's | Time zone |
-| `answers.notesLanguage` | `NOTES_LANGUAGE` | `en` | Pace's own notes: `en` or `ko`, the language of what Pace posts itself (the line under answers, notes only the asker sees, failure replies); answers follow the conversation ([Languages](i18n.md)) |
+| `answers.notesLanguage` | `NOTES_LANGUAGE` | `app` | Pace's own notes: `app` (the app's language), `en` or `ko`, the language of what Pace posts itself (the line under answers, notes only the asker sees, failure replies); answers follow the request ([Languages](i18n.md)) |
 | `answers.referenceDir` | `MENTION_WORKSPACE` | | Reference directory |
 | `answers.diagrams` | `RENDER_DIAGRAMS` | `true` | Render diagrams |
 | `answers.imageMaxPx` | `GENERATED_IMAGE_MAX_PX` | `512` | Generated image max size (px) |

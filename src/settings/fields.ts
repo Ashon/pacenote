@@ -433,11 +433,14 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'answers.notesLanguage',
     group: 'requests',
     label: "Pace's own notes",
-    help: 'The language of what Pace writes itself: the line under each answer, notes only the asker sees, and replies when an answer fails. Answers follow the language of the conversation.',
+    help: "The language of what Pace writes itself: the line under each answer, notes only the asker sees, and replies when an answer fails. Same as the app follows the app's language. Answers follow the language of the request.",
     type: 'select',
-    options: LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] })),
+    options: [
+      { value: 'app', label: 'Same as the app' },
+      ...LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] })),
+    ],
     segmented: true,
-    default: 'en',
+    default: 'app',
   },
   {
     key: 'MENTION_WORKSPACE',

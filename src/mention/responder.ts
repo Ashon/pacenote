@@ -3,7 +3,7 @@ import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { Config } from '../config.js'
 import type { HistoryStore, RunHandle } from '../history/recorder.js'
-import { localized, type Locale } from '../i18n/locale.js'
+import { getLocale, localized, type Locale } from '../i18n/locale.js'
 import { redactAnswer } from '../broker/redact.js'
 import type { Logger } from '../logger.js'
 import {
@@ -444,6 +444,8 @@ export class MentionResponder {
         ownTools: reasoner.mcpServerNames.includes('pacenote'),
         diagrams: this.deps.renderer !== undefined,
         imageGeneration: reasoner.backend === 'codex',
+        // The app tells Pace its language (PACENOTE_LOCALE, src/index.ts)
+        language: getLocale(),
       })
       run?.setPrompt(system, prompt)
       reasoning = true

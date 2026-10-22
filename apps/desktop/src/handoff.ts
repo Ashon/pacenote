@@ -14,7 +14,12 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
-import { localized } from '../../../src/i18n/locale.js'
+import {
+  getLocale,
+  LANGUAGE_FOR_AI,
+  localized,
+  type Locale,
+} from '../../../src/i18n/locale.js'
 import { TOOL_LABEL } from '../../../src/tasks/context.js'
 import { codexLogs, head } from '../../../src/tasks/folders.js'
 import type {
@@ -74,6 +79,8 @@ export function handoffPrompt(
     tool: WorkTool
     /** What came before it left out, for task_context to give (a link's) */
     brief?: boolean
+    /** The language the user reads Pacenote in (the app's) */
+    locale?: Locale
   }
 ): string {
   const earlier = options.brief
@@ -126,8 +133,9 @@ export function handoffPrompt(
     options.planFirst
       ? 'Start by summing up the task and your plan, then wait for the user before you change anything.'
       : 'Go ahead with the task, and stop to ask the user when a choice is theirs.',
-    'Do not post to Slack. When a reply is needed, draft it for the user to send.',
+    'Do not post to Slack. When a reply is needed, draft it for the user to send, in the language of its thread.',
     `When the task is done, call Pacenote's close_task with id ${task.id}, why "resolved", a note on what you did and, if the person who asked waits for an answer, a reply for the user to send. task_context gives the task and what came before it again.`,
+    `Talk to the user in ${LANGUAGE_FOR_AI[options.locale ?? getLocale()]}, the language they read Pacenote in.`,
   ]
   return redactSecrets(lines.filter((line) => line !== undefined).join('\n'))
 }

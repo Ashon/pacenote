@@ -317,6 +317,8 @@ describe('a recap', () => {
         '- Still open: Review the payment retry PR (mina asked you · due Friday)'
       )
       expect(prompt).not.toMatch(/[가-힣]/)
+      // The write-up itself is in the user's language, the app's
+      expect(prompt).toContain('Write in Korean, the language the user reads')
     })
   })
 })

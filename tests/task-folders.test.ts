@@ -22,7 +22,7 @@ import {
 import {
   collectPrompt,
   registerTaskTools,
-  TASK_RULES,
+  taskRules,
 } from '../src/tasks/mcp.js'
 import type { TaskView } from '../src/tasks/types.js'
 
@@ -250,7 +250,7 @@ describe('a task’s folder', () => {
       'Ashon/payments',
     ])
     expect(content!.text).not.toContain(home)
-    expect(TASK_RULES).toContain('repositories collect_context lists')
+    expect(taskRules('en')).toContain('repositories collect_context lists')
     expect(collectPrompt()).toContain(
       'or no repo while its thread plainly means one'
     )
