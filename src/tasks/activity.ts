@@ -1,6 +1,5 @@
 import {
   appendFileSync,
-  existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
@@ -50,11 +49,9 @@ export function readActivity(
   dataDir: string,
   now = Date.now()
 ): TaskActivity[] {
-  const file = path.join(dataDir, ACTIVITY_FILE)
-  if (!existsSync(file)) return []
   let text: string
   try {
-    text = readFileSync(file, 'utf8')
+    text = readFileSync(path.join(dataDir, ACTIVITY_FILE), 'utf8')
   } catch {
     return []
   }

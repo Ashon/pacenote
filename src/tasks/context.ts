@@ -86,13 +86,10 @@ export function outcomeWords(
     case 'done':
       return outcome.tool ? t.doneIn(TOOL_LABEL[outcome.tool]) : t.done
     case 'replied':
-      return t.replied
     case 'checked':
-      return t.checked
     case 'settled':
-      return t.settled
     case 'dismissed':
-      return t.dismissed
+      return t[outcome.kind]
     case 'done-already':
       return t.doneAlready
     case 'worked':

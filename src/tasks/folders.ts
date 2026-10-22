@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { dayDirFor } from '../history/layout.js'
 import { localized } from '../i18n/locale.js'
 import { text } from './folders.text.js'
 import { readJson, writeJson } from './store.js'
@@ -67,6 +68,12 @@ export function remoteRepo(remote: string): string | undefined {
   return match ? `${match[1]}/${match[2]}` : undefined
 }
 
+/** remoteRepo, for a remote that is a URL or user@host:path, not a folder */
+export function originRepo(remote: string | undefined): string | undefined {
+  const url = remote?.trim() ?? ''
+  return /^[a-z+]+:\/\/|^[\w.-]+@/i.test(url) ? remoteRepo(url) : undefined
+}
+
 /** The repository of a folder's checkout, by its origin, as owner/name */
 export async function folderRepo(folder: string): Promise<string | undefined> {
   const remote = await git(folder, ['remote', 'get-url', 'origin'])
@@ -99,10 +106,7 @@ async function git(
   args: string[]
 ): Promise<string | undefined> {
   try {
-    const { stdout } = await run('git', ['-C', folder, ...args], {
-      timeout: 5000,
-    })
-    return stdout
+    return (await run('git', ['-C', folder, ...args], { timeout: 5000 })).stdout
   } catch {
     return undefined
   }
@@ -187,6 +191,8 @@ export function head(file: string, bytes = 256 * 1024): string {
   }
 }
 
+const DAY = 86_400_000
+
 /** Codex's session logs since a time: ~/.codex/sessions/YYYY/MM/DD/*.jsonl */
 export function codexLogs(
   home: string,
@@ -195,18 +201,8 @@ export function codexLogs(
 ): string[] {
   const root = path.join(home, '.codex', 'sessions')
   const files: string[] = []
-  for (
-    let day = since - 86_400_000;
-    day <= now + 86_400_000;
-    day += 86_400_000
-  ) {
-    const date = new Date(day)
-    const dir = path.join(
-      root,
-      String(date.getFullYear()),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0')
-    )
+  for (let day = since - DAY; day <= now + DAY; day += DAY) {
+    const dir = path.join(root, ...dayDirFor(new Date(day)).split('-'))
     if (!existsSync(dir)) continue
     for (const name of readdirSync(dir))
       if (name.endsWith('.jsonl')) files.push(path.join(dir, name))
@@ -311,12 +307,7 @@ function real(folder: string): string {
 
 /** The folder a session log says it ran in: its first "cwd" */
 function folderIn(file: string): string | undefined {
-  let text: string
-  try {
-    text = head(file, 64 * 1024)
-  } catch {
-    return undefined
-  }
+  const text = attempt(() => head(file, 64 * 1024), '')
   const folder = logField(text, 'cwd')
   return folder && path.isAbsolute(folder) ? folder : undefined
 }
@@ -348,29 +339,20 @@ const temporary = (folder: string) =>
 const inside = (dir: string, folder: string) =>
   folder === dir || folder.startsWith(dir.endsWith('/') ? dir : `${dir}/`)
 
-function list(dir: string): string[] {
+/** What read gives, or fallback when it throws */
+function attempt<T>(read: () => T, fallback: T): T {
   try {
-    return readdirSync(dir)
+    return read()
   } catch {
-    return []
+    return fallback
   }
 }
 
-function modified(file: string): number | undefined {
-  try {
-    return statSync(file).mtimeMs
-  } catch {
-    return undefined
-  }
-}
-
-function isFolder(folder: string): boolean {
-  try {
-    return statSync(folder).isDirectory()
-  } catch {
-    return false
-  }
-}
+const list = (dir: string) => attempt(() => readdirSync(dir), [] as string[])
+const modified = (file: string) =>
+  attempt<number | undefined>(() => statSync(file).mtimeMs, undefined)
+const isFolder = (folder: string) =>
+  attempt(() => statSync(folder).isDirectory(), false)
 
 // ---------------------------------------------------------------------------
 // A task's folder
@@ -456,13 +438,7 @@ export async function yourRepos(
     const remotes = await Promise.all(
       recent.map((folder) => git(folder.path, ['remote', 'get-url', 'origin']))
     )
-    for (const remote of remotes) {
-      const url = remote?.trim() ?? ''
-      // A URL or user@host:path, not a folder on this Mac
-      if (!/^[a-z+]+:\/\/|^[\w.-]+@/i.test(url)) continue
-      const repo = remoteRepo(url)
-      if (repo) repos.push(repo)
-    }
+    repos.push(...remotes.flatMap((remote) => originRepo(remote) ?? []))
   }
   return onceBy(repos, (repo) => repo.toLowerCase()).slice(0, limit)
 }

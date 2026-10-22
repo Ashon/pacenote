@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import {
   codexLogs,
   logField,
-  remoteRepo,
+  originRepo,
   yourFolder,
 } from '../tasks/folders.js'
 import type { WorkTool } from '../tasks/types.js'
@@ -68,11 +68,7 @@ function repoOf(cwd: string, now = Date.now()) {
   const repo = run('git', ['-C', cwd, 'config', '--get', 'remote.origin.url'], {
     timeout: 5_000,
   }).then(
-    ({ stdout }) => {
-      const url = stdout.trim()
-      // A URL or user@host:path, not a folder on this Mac
-      return /^[a-z+]+:\/\/|^[\w.-]+@/i.test(url) ? remoteRepo(url) : undefined
-    },
+    ({ stdout }) => originRepo(stdout),
     () => undefined
   )
   repos.set(cwd, { at: now, repo })

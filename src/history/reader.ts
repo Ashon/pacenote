@@ -171,15 +171,12 @@ export class HistoryReader {
       failed: 0,
       interrupted: 0,
     }
-    const daily = new Map<string, { runs: number; failed: number }>()
-    for (let i = 13; i >= 0; i -= 1) {
-      daily.set(dayDirFor(new Date(now.getTime() - i * 86_400_000)), {
-        runs: 0,
-        failed: 0,
-      })
-    }
+    const days = Array.from({ length: 14 }, (_, i) =>
+      dayDirFor(new Date(now.getTime() - (13 - i) * 86_400_000))
+    )
+    const daily = new Map(days.map((day) => [day, { runs: 0, failed: 0 }]))
     const tokenDays = new Map(
-      [...daily.keys()].map((day) => [
+      days.map((day) => [
         day,
         { mentions: NO_USAGE, collections: NO_USAGE, recaps: NO_USAGE },
       ])
