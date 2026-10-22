@@ -122,18 +122,11 @@ const SECTION_ICON: Record<Section, LucideIcon> = {
   macs: Laptop,
 }
 
-/** A section's name, help and icon, in the app's language */
-function sectionInfo(section: Section): {
-  label: string
-  help: string
-  icon: LucideIcon
-} {
-  const t = localized(text)
-  const words =
-    section === 'general' || section === 'macs'
-      ? t.sections[section]
-      : settingSections().find((info) => info.id === section)!
-  return { label: words.label, help: words.help, icon: SECTION_ICON[section] }
+/** A section's name and help, in the app's language */
+function sectionInfo(section: Section): { label: string; help: string } {
+  return section === 'general' || section === 'macs'
+    ? localized(text).sections[section]
+    : settingSections().find((info) => info.id === section)!
 }
 
 /**
@@ -297,6 +290,13 @@ export function SettingsPage() {
 
   const set = (key: string, value: string) =>
     setDraft((d) => ({ ...d, [key]: value }))
+  /** Drops what was typed for these settings */
+  const drop = (...keys: string[]) =>
+    setDraft((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).filter(([key]) => !keys.includes(key))
+      )
+    )
   /** Opens a secret's input, or closes it and drops what was typed. */
   const edit = (key: string, on: boolean) => {
     setEditing((prev) => {
@@ -305,13 +305,7 @@ export function SettingsPage() {
       else next.delete(key)
       return next
     })
-    if (!on) {
-      setDraft((prev) => {
-        const next = { ...prev }
-        delete next[key]
-        return next
-      })
-    }
+    if (!on) drop(key)
   }
   const reset = () => {
     setDraft({})
@@ -331,84 +325,79 @@ export function SettingsPage() {
   const botChanged = SETTING_FIELDS.some(
     (field) => field.applies !== 'app' && field.key in changes
   )
-  const save = (restart: boolean) => {
+  /**
+   * Saves values, then reads the settings again; done says how it went.
+   * Issues found instead stay beside their fields.
+   */
+  const store = (
+    values: SettingsChanges,
+    restart: boolean,
+    done: (restarted: boolean) => void
+  ) => {
     setSaving(true)
     void settings
-      .save(changes, restart)
+      .save(values, restart)
       .then(({ issues: found, restarted }) => {
-        if (found.length > 0) {
-          setIssues(found)
-          return
-        }
-        reset()
+        if (found.length > 0) return setIssues(found)
+        done(restarted)
         load()
         sandbox.refresh()
-        setNotice(
-          restarted || !botChanged
-            ? {
-                tone: 'ok',
-                text: restarted
-                  ? botLive
-                    ? t.savedRestarted
-                    : t.savedStarted
-                  : t.saved,
-              }
-            : {
-                tone: 'warn',
-                text: t.savedRestart,
-                restart: Boolean(supervisor),
-              }
-        )
       })
       .finally(() => setSaving(false))
   }
+  const save = (restart: boolean) =>
+    store(changes, restart, (restarted) => {
+      reset()
+      setNotice(
+        restarted || !botChanged
+          ? {
+              tone: 'ok',
+              text: restarted
+                ? botLive
+                  ? t.savedRestarted
+                  : t.savedStarted
+                : t.saved,
+            }
+          : {
+              tone: 'warn',
+              text: t.savedRestart,
+              restart: Boolean(supervisor),
+            }
+      )
+    })
   // A secret's own Save: stores just that value and closes its input, leaving
   // the other unsaved changes as they are.
   const saveField = (field: SettingField) => {
     const value = draft[field.key]?.trim()
     if (!value) return
-    setSaving(true)
-    void settings
-      .save({ [field.key]: value }, false)
-      .then(({ issues: found }) => {
-        if (found.length > 0) {
-          setIssues(found)
-          return
-        }
-        edit(field.key, false)
-        load()
-        sandbox.refresh()
-        const label = settingLabel(field.key)
-        // Your own Slack app needs both tokens before the bot can start.
-        const other = SLACK_APP_TOKENS.includes(field.key)
-          ? SLACK_APP_TOKENS.find(
-              (key) => key !== field.key && !view.secrets[key]?.set
-            )
-          : undefined
-        // With both tokens in, your own app still answers no one until it
-        // knows who you are.
-        const askers =
-          SLACK_APP_TOKENS.includes(field.key) &&
-          !isSet('MENTION_ALLOWED_USERS')
-        setNotice(
-          other
+    store({ [field.key]: value }, false, () => {
+      edit(field.key, false)
+      const label = settingLabel(field.key)
+      // Your own Slack app needs both tokens before the bot can start.
+      const other = SLACK_APP_TOKENS.includes(field.key)
+        ? SLACK_APP_TOKENS.find(
+            (key) => key !== field.key && !view.secrets[key]?.set
+          )
+        : undefined
+      // With both tokens in, your own app still answers no one until it
+      // knows who you are.
+      const askers =
+        SLACK_APP_TOKENS.includes(field.key) && !isSet('MENTION_ALLOWED_USERS')
+      setNotice(
+        other
+          ? { tone: 'ok', text: t.savedEnterNext(label, settingLabel(other)) }
+          : askers
             ? {
                 tone: 'ok',
-                text: t.savedEnterNext(label, settingLabel(other)),
+                text: t.savedAddMemberId(label, groupsById().access.label),
               }
-            : askers
-              ? {
-                  tone: 'ok',
-                  text: t.savedAddMemberId(label, groupsById().access.label),
-                }
-              : {
-                  tone: 'warn',
-                  text: t.savedStartToUse(label, botLive),
-                  restart: true,
-                }
-        )
-      })
-      .finally(() => setSaving(false))
+            : {
+                tone: 'warn',
+                text: t.savedStartToUse(label, botLive),
+                restart: true,
+              }
+      )
+    })
   }
   const issueOf = (key: string) =>
     issues.find((issue) => issue.key === key)?.message
@@ -442,7 +431,8 @@ export function SettingsPage() {
   const pending = sandbox.status?.pending ?? []
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
   // Pace answers only you; with your own app, once it knows who you are
-  const opsReady = builtIn && (hubMode || isSet('MENTION_ALLOWED_USERS'))
+  const onlyYou = hubMode || isSet('MENTION_ALLOWED_USERS')
+  const opsReady = builtIn && onlyYou
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
     : isSet('SLACK_APP_TOKEN') && isSet('SLACK_BOT_TOKEN')
@@ -548,14 +538,16 @@ export function SettingsPage() {
           : 'partial'
     return card(id, {
       chip: (
-        <StateChip
-          state={state}
+        <Chip
+          tone={STATE_TONE[state]}
           title={
             state === 'partial'
               ? t.stillNeeded(missing.map(settingLabel))
               : undefined
           }
-        />
+        >
+          {t.state[state]}
+        </Chip>
       ),
     })
   }
@@ -595,12 +587,7 @@ export function SettingsPage() {
               onPaired={(text) => {
                 // Pairing saved the connection itself; drop those drafts and
                 // show what is saved now.
-                setDraft((prev) => {
-                  const next = { ...prev }
-                  delete next.SLACK_CONNECTION
-                  delete next.HUB_URL
-                  return next
-                })
+                drop('SLACK_CONNECTION', 'HUB_URL')
                 setCheck(undefined)
                 load()
                 setNotice({ tone: 'ok', text })
@@ -628,13 +615,8 @@ export function SettingsPage() {
           {messengerCards[id]()}
         </div>
       )),
-    answers: () => (
-      <>
-        {card('reasoner')}
-        {card('requests')}
-        {card('diagrams')}
-      </>
-    ),
+    answers: () =>
+      (['reasoner', 'requests', 'diagrams'] as const).map((id) => card(id)),
     sandbox: () => (
       <>
         {card('environment', {
@@ -645,7 +627,7 @@ export function SettingsPage() {
         })}
         {builtIn &&
           card('credentials', {
-            help: credentialsHelp(valueOf('REASONER')),
+            help: t.credentialsHelp(valueOf('REASONER')),
             after: (
               <>
                 <LoginChecks sandbox={sandbox} />
@@ -681,27 +663,13 @@ export function SettingsPage() {
                   ok: builtIn,
                   label: t.builtInSandbox,
                   detail: builtIn ? t.builtInOn : t.builtInOff,
-                  action: builtIn
-                    ? undefined
-                    : {
-                        label: t.openSection(sectionInfo('sandbox').label),
-                        section: 'sandbox',
-                      },
+                  section: 'sandbox',
                 },
                 {
-                  ok: hubMode || isSet('MENTION_ALLOWED_USERS'),
+                  ok: onlyYou,
                   label: t.onlyYou,
-                  detail:
-                    hubMode || isSet('MENTION_ALLOWED_USERS')
-                      ? t.onlyYouOn
-                      : t.onlyYouOff,
-                  action:
-                    hubMode || isSet('MENTION_ALLOWED_USERS')
-                      ? undefined
-                      : {
-                          label: t.openSection(sectionInfo('messengers').label),
-                          section: 'messengers',
-                        },
+                  detail: onlyYou ? t.onlyYouOn : t.onlyYouOff,
+                  section: 'messengers',
                 },
               ]}
               onOpen={go}
@@ -712,11 +680,7 @@ export function SettingsPage() {
           <BrokerCard sandbox={sandbox} />
         )}
         <SubHeading title={t.integrations} help={t.integrationsHelp(opsOn)} />
-        {integration('files')}
-        {integration('github')}
-        {integration('jira')}
-        {integration('k8s')}
-        {integration('ssh')}
+        {(['files', 'github', 'jira', 'k8s', 'ssh'] as const).map(integration)}
       </>
     ),
     tasks: () => (
@@ -1137,17 +1101,20 @@ function NavItem({
   )
 }
 
+/** A heading, its chip and a line of help: over cards, or in a card's header */
 function SubHeading({
   title,
   help,
   chip,
+  className = 'pt-3',
 }: {
   title: string
-  help?: string
+  help?: React.ReactNode
   chip?: React.ReactNode
+  className?: string
 }) {
   return (
-    <div className="pt-3">
+    <div className={className}>
       <h3 className="flex items-center gap-2 text-section">
         {title}
         {chip}
@@ -1158,27 +1125,14 @@ function SubHeading({
 }
 
 function CardHeader({
-  title,
-  help,
-  chip,
   action,
-}: {
-  title: string
-  help?: React.ReactNode
-  chip?: React.ReactNode
+  ...heading
+}: Omit<React.ComponentProps<typeof SubHeading>, 'className'> & {
   action?: React.ReactNode
 }) {
   return (
     <header className="flex items-start gap-3 border-b border-border px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <h3 className="flex items-center gap-2 text-section">
-          {title}
-          {chip}
-        </h3>
-        {help && (
-          <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>
-        )}
-      </div>
+      <SubHeading {...heading} className="min-w-0 flex-1" />
       {action}
     </header>
   )
@@ -1267,25 +1221,6 @@ function Chip({
 
 /** An integration's state, in the chip's tone */
 const STATE_TONE = { on: 'ok', partial: 'warn', off: 'off' } as const
-
-function StateChip({
-  state,
-  title,
-}: {
-  state: keyof typeof STATE_TONE
-  title?: string
-}) {
-  const t = useText(text)
-  return (
-    <Chip tone={STATE_TONE[state]} title={title}>
-      {t.state[state]}
-    </Chip>
-  )
-}
-
-function credentialsHelp(reasoner: string): string {
-  return localized(text).credentialsHelp(reasoner)
-}
 
 /**
  * Pairs this desktop with the team hub: get a code, send "@Pace connect
@@ -1451,14 +1386,10 @@ function Requirements({
   items,
   onOpen,
 }: {
-  items: {
-    ok: boolean
-    label: string
-    detail: string
-    action?: { label: string; section: Section }
-  }[]
+  items: { ok: boolean; label: string; detail: string; section: Section }[]
   onOpen: (section: Section) => void
 }) {
+  const t = useText(text)
   return (
     <ul className="space-y-1.5 border-t border-border bg-well/60 px-4 py-2.5">
       {items.map((item) => (
@@ -1472,13 +1403,13 @@ function Requirements({
           <span className="min-w-0 flex-1 text-muted-foreground select-text">
             {item.detail}
           </span>
-          {item.action && (
+          {!item.ok && (
             <Button
               size="xs"
               variant="outline"
-              onClick={() => onOpen(item.action!.section)}
+              onClick={() => onOpen(item.section)}
             >
-              {item.action.label}
+              {t.openSection(sectionInfo(item.section).label)}
               <ChevronRight />
             </Button>
           )}
@@ -1522,33 +1453,28 @@ interface ChoiceExtras {
   below?: React.ReactNode
 }
 
-function FieldRow({
-  field,
-  extras,
-  view,
-  value,
-  changed,
-  editing,
-  issue,
-  onChange,
-  onEdit,
-  onSave,
-  saving,
-}: {
+/** What a field's control shows and edits */
+interface ControlProps {
   field: SettingField
-  extras?: ChoiceExtras
   view: SettingsView
   value: string
-  changed: boolean
   editing: boolean
-  issue?: string
   onChange: (value: string) => void
   onEdit: (on: boolean) => void
+  /** Saves just this secret (Enter); Escape cancels */
   onSave: () => void
   saving: boolean
-}) {
+}
+
+function FieldRow({
+  extras,
+  changed,
+  issue,
+  ...control
+}: ControlProps & { extras?: ChoiceExtras; changed: boolean; issue?: string }) {
   const t = useText(text)
-  const overridden = view.overridden.includes(field.key)
+  const { field, value, onChange } = control
+  const overridden = control.view.overridden.includes(field.key)
   const label = (
     <span className="flex items-center gap-1.5">
       {field.label}
@@ -1586,16 +1512,7 @@ function FieldRow({
       warning={warning}
       below={extras?.below}
     >
-      <Control
-        field={field}
-        view={view}
-        value={value}
-        editing={editing}
-        onChange={onChange}
-        onEdit={onEdit}
-        onSave={onSave}
-        saving={saving}
-      />
+      <Control {...control} />
     </Row>
   )
 }
@@ -1690,17 +1607,7 @@ function Control({
   onEdit,
   onSave,
   saving,
-}: {
-  field: SettingField
-  view: SettingsView
-  value: string
-  editing: boolean
-  onChange: (value: string) => void
-  onEdit: (on: boolean) => void
-  /** Saves just this secret (Enter); Escape cancels */
-  onSave: () => void
-  saving: boolean
-}) {
+}: ControlProps) {
   const t = useText(text)
   switch (field.type) {
     case 'secret': {
