@@ -79,7 +79,12 @@ import {
   latestCollection,
   recentCollections,
 } from '../../../src/tasks/collections.js'
-import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
+import {
+  outcomeOf,
+  taskContext,
+  threadOf,
+  TOOL_LABEL,
+} from '../../../src/tasks/context.js'
 import {
   allTaskViews,
   buildView,
@@ -525,12 +530,15 @@ const ownWork = (cli: OwnCli) => ({
   cwd: dataDir,
 })
 
+/** The MCP server as the app's own collections and drafts launch it */
+function appMcpLaunch() {
+  const { command, args, env } = mcpLaunch()
+  return { command, args, env: { ...env, PACENOTE_MCP_FROM_APP: '1' } }
+}
+
 /** Collect now on the Todo screen: the AI reads Slack, read only */
 const taskCollector = new TaskCollector({
-  launch: () => {
-    const { command, args, env } = mcpLaunch()
-    return { command, args, env: { ...env, PACENOTE_MCP_FROM_APP: '1' } }
-  },
+  launch: appMcpLaunch,
   toolPath,
   cwd: dataDir,
   ai: ownAi,
@@ -981,10 +989,7 @@ function updateTray(): void {
           ? { label: t.restart, click: () => void supervisor.restart() }
           : phase === 'setup'
             ? setup.view().open
-              ? {
-                  label: t.setUp,
-                  click: () => showMainWindow('#/setup'),
-                }
+              ? { label: t.setUp, click: () => showMainWindow('#/setup') }
               : {
                   label: t.openSettings,
                   click: () =>
@@ -1007,12 +1012,7 @@ function updateTray(): void {
       { label: t.status(summary.label), enabled: false },
       ...notes.map((note) => ({ label: note, enabled: false })),
       ...(summary.active > 0
-        ? [
-            {
-              label: t.activeRequests(summary.active),
-              enabled: false,
-            },
-          ]
+        ? [{ label: t.activeRequests(summary.active), enabled: false }]
         : []),
       ...controls,
       { type: 'separator' },
@@ -1046,10 +1046,7 @@ function diagnostics(): string {
       packaged: app.isPackaged,
       electron: process.versions.electron,
       node: process.versions.node,
-      os:
-        process.platform === 'darwin'
-          ? `macOS ${process.getSystemVersion()}`
-          : `${process.platform} ${process.getSystemVersion()}`,
+      os: `${process.platform === 'darwin' ? 'macOS' : process.platform} ${process.getSystemVersion()}`,
       arch: process.arch,
     },
     supervisor: supervisor?.current,
@@ -1101,16 +1098,30 @@ function registerBotIpc(): void {
     ipcMain.handle(channel, (event, ...args: unknown[]) =>
       fromMainWindow(event) ? run(...args) : denied
     )
+  /** run's answer, or { error }: a thrown error loses its message over IPC */
+  const orError = async <T>(run: () => T | Promise<T>) => {
+    try {
+      return await run()
+    } catch (err) {
+      return { error: (err as Error).message }
+    }
+  }
+  /** A channel that answers { error } when it throws, and to other windows */
+  const handleOrError = (
+    channel: string,
+    run: (...args: unknown[]) => Promise<unknown>
+  ) =>
+    ipcMain.handle(channel, (event, ...args: unknown[]) =>
+      fromMainWindow(event)
+        ? orError(() => run(...args))
+        : { error: localized(text).notAllowed }
+    )
   handle('pacenote:bot:state', null, () => supervisor?.current ?? null)
-  handle('pacenote:bot:start', undefined, async () => {
-    await supervisor?.start()
-  })
-  handle('pacenote:bot:stop', undefined, async () => {
-    await supervisor?.stop()
-  })
-  handle('pacenote:bot:restart', undefined, async (rebuild) => {
-    await supervisor?.restart({ rebuild: rebuild === true })
-  })
+  handle('pacenote:bot:start', undefined, () => supervisor?.start())
+  handle('pacenote:bot:stop', undefined, () => supervisor?.stop())
+  handle('pacenote:bot:restart', undefined, (rebuild) =>
+    supervisor?.restart({ rebuild: rebuild === true })
+  )
   handle('pacenote:bot:auto-start', undefined, (value) => {
     if (typeof value === 'boolean') supervisor?.setAutoStart(value)
   })
@@ -1136,9 +1147,7 @@ function registerBotIpc(): void {
   })
   // Settings > Macs: your Macs, and where Pace answers
   handle('pacenote:macs:view', null, () => macs?.view() ?? null)
-  handle('pacenote:macs:answer-here', undefined, () => {
-    macs?.answerHere()
-  })
+  handle('pacenote:macs:answer-here', undefined, () => macs?.answerHere())
   ipcMain.handle('pacenote:macs:follow', async (event, on: unknown) => {
     if (fromMainWindow(event) && typeof on === 'boolean')
       await macs?.setFollow(on)
@@ -1159,18 +1168,10 @@ function registerBotIpc(): void {
     false,
     async () => (await macs?.startAdding()) ?? false
   )
-  handle('pacenote:macs:add-stop', undefined, () => {
-    macs?.stopAdding()
-  })
-  handle('pacenote:macs:add-allow', undefined, () => {
-    macs?.allowAdding()
-  })
-  handle('pacenote:macs:add-decline', undefined, () => {
-    macs?.declineAdding()
-  })
-  handle('pacenote:macs:add-close', undefined, () => {
-    macs?.closeAdding()
-  })
+  handle('pacenote:macs:add-stop', undefined, () => macs?.stopAdding())
+  handle('pacenote:macs:add-allow', undefined, () => macs?.allowAdding())
+  handle('pacenote:macs:add-decline', undefined, () => macs?.declineAdding())
+  handle('pacenote:macs:add-close', undefined, () => macs?.closeAdding())
   handle('pacenote:macs:open-privacy', undefined, () => {
     void shell.openExternal(
       'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork'
@@ -1321,26 +1322,20 @@ function registerBotIpc(): void {
   }
   const short = (value: unknown) =>
     typeof value === 'string' && value.length < 200 ? value : undefined
+  /** A fix to an area by one more name: its new name, a part, another area */
+  const fixArea =
+    (fix: (file: YouFile, area: string, other: string) => YouFile) =>
+    (id: unknown, value: unknown) => {
+      const area = short(id)
+      const other = short(value)
+      return area && other ? fixYou((file) => fix(file, area, other)) : null
+    }
   handle('pacenote:you:confirm', null, () =>
     fixYou((file) => ({ ...file, confirmedAt: new Date().toISOString() }))
   )
-  handle('pacenote:you:rename', null, (id, name) => {
-    const area = short(id)
-    const to = short(name)
-    return area && to ? fixYou((file) => renameArea(file, area, to)) : null
-  })
-  handle('pacenote:you:take-out', null, (id, part) => {
-    const area = short(id)
-    const key = short(part)
-    return area && key ? fixYou((file) => takeOut(file, area, key)) : null
-  })
-  handle('pacenote:you:merge', null, (id, into) => {
-    const area = short(id)
-    const target = short(into)
-    return area && target
-      ? fixYou((file) => mergeAreas(file, area, target))
-      : null
-  })
+  handle('pacenote:you:rename', null, fixArea(renameArea))
+  handle('pacenote:you:take-out', null, fixArea(takeOut))
+  handle('pacenote:you:merge', null, fixArea(mergeAreas))
   handle('pacenote:you:leave', null, (id, left) => {
     const area = short(id)
     return area ? fixYou((file) => leaveArea(file, area, left === true)) : null
@@ -1457,9 +1452,7 @@ function registerBotIpc(): void {
       }
     return taskCollector.run()
   })
-  handle('pacenote:tasks:collect-stop', undefined, () => {
-    taskCollector.cancel()
-  })
+  handle('pacenote:tasks:collect-stop', undefined, () => taskCollector.cancel())
   handle('pacenote:tasks:decide', undefined, (id, decision) => {
     if (typeof id !== 'string') return
     decide(dataDir, id, taskDecision(decision))
@@ -1487,14 +1480,12 @@ function registerBotIpc(): void {
   })
   // Pacenote's own work signed out: claude auth login (or codex login), in
   // your terminal
-  handle('pacenote:tasks:sign-in', undefined, async (cli) => {
-    try {
+  handle('pacenote:tasks:sign-in', undefined, (cli) =>
+    orError(async () => {
       await signInCli(handoff(), cli === 'codex' ? 'codex' : 'claude')
       return {}
-    } catch (error) {
-      return { error: (error as Error).message }
-    }
-  })
+    })
+  )
   // Sessions you started yourself, from Claude Code's and Codex's logs on
   // this Mac (Settings > Todo > Show sessions you start yourself): linked to
   // the task they worked on, or suggested for you to say, at most every 30
@@ -1588,9 +1579,7 @@ function registerBotIpc(): void {
             ? summary.branch
             : undefined,
       }
-    return {
-      lastActiveAt: lastActive(homedir(), entry as Session),
-    }
+    return { lastActiveAt: lastActive(homedir(), entry as Session) }
   }
   // A task whose latest session went quiet: whether it looks done
   // (done-watch.ts), a pass at a time, while Todo is open. End-to-end tests
@@ -1739,19 +1728,12 @@ function registerBotIpc(): void {
       // A session on another of your Macs has its log there
       work: workFor(work, id).map((entry) =>
         entry.kind === 'session' && !entry.mac
-          ? {
-              ...entry,
-              ...sessionNow(entry),
-              resume: resumeCommand(entry),
-            }
+          ? { ...entry, ...sessionNow(entry), resume: resumeCommand(entry) }
           : entry
       ),
       suggested: (file.suggested ?? [])
         .filter((s) => s.task === id)
-        .map((s) => ({
-          ...s,
-          lastActiveAt: sessionNow(s).lastActiveAt,
-        })),
+        .map((s) => ({ ...s, lastActiveAt: sessionNow(s).lastActiveAt })),
       folder: task.repo ? repoFolder(dataDir, task.repo) : undefined,
       cli:
         env().TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
@@ -1770,8 +1752,6 @@ function registerBotIpc(): void {
   )
   // What a task's quiet session looked like: close the task with how it
   // ended, or not yet; or keep a thing left after it as a task
-  const proposalOf = (id: string) =>
-    openProposals(readWork(dataDir), new Set([id]))[id]
   const answered = (id: string, change: (p: Proposal) => Proposal) =>
     changeWork(dataDir, (work) => ({
       ...work,
@@ -1781,7 +1761,7 @@ function registerBotIpc(): void {
     }))
   handle('pacenote:tasks:answer-proposal', undefined, (id, answer) => {
     if (typeof id !== 'string') return undefined
-    const proposal = proposalOf(id)
+    const proposal = openProposals(readWork(dataDir), new Set([id]))[id]
     if (!proposal) return { error: localized(text).nothingToAnswer }
     if (answer === 'close') {
       // Done in its session; how it ended is the wrap-up, not a note too
@@ -1861,7 +1841,7 @@ function registerBotIpc(): void {
     if (!detail) return { error: t.noSuchTask }
     if (typeof folder !== 'string' || !folder)
       return { error: t.chooseFolderFirst }
-    try {
+    return orError(async () => {
       if (detail.task.repo) saveRepo(dataDir, detail.task.repo, folder)
       const { entry, note } = await openSession(
         handoff(),
@@ -1872,9 +1852,7 @@ function registerBotIpc(): void {
       )
       addWork(dataDir, entry)
       return { entry, note }
-    } catch (error) {
-      return { error: (error as Error).message }
-    }
+    })
   })
   handle('pacenote:tasks:resume', undefined, async (entryId) => {
     const t = localized(text)
@@ -1887,7 +1865,7 @@ function registerBotIpc(): void {
             t.otherMac
         ),
       }
-    try {
+    return orError(async () => {
       await resumeSession(handoff(), entry)
       updateWork(dataDir, entry.id, (e) =>
         e.kind === 'session'
@@ -1898,9 +1876,7 @@ function registerBotIpc(): void {
           : e
       )
       return {}
-    } catch (error) {
-      return { error: (error as Error).message }
-    }
+    })
   })
   const drafting = new Set<string>()
   handle('pacenote:tasks:draft', undefined, async (id) => {
@@ -1911,16 +1887,12 @@ function registerBotIpc(): void {
     if (drafting.has(id)) return { error: t.drafting }
     drafting.add(id)
     try {
-      const { command, args, env: launchEnv } = mcpLaunch()
+      const launch = appMcpLaunch()
       const ran = await ownAi.run(
         (cli) =>
           draftReply({
             ...ownWork(cli),
-            launch: {
-              command,
-              args,
-              env: { ...launchEnv, PACENOTE_MCP_FROM_APP: '1' },
-            },
+            launch,
             task: detail.task,
             context: detail.context,
           }),
@@ -1978,17 +1950,8 @@ function registerBotIpc(): void {
     const entry = sessionEntry(entryId)
     if (!entry) return { error: t.noSuchSession }
     const file = sessionFile(homedir(), entry)
-    if (!file)
-      return {
-        error: t.noSessionLog(
-          entry.tool === 'claude' ? 'Claude Code' : 'Codex'
-        ),
-      }
-    try {
-      return { items: readSessionLog(file, entry.tool) }
-    } catch (error) {
-      return { error: (error as Error).message }
-    }
+    if (!file) return { error: t.noSessionLog(TOOL_LABEL[entry.tool]) }
+    return orError(() => ({ items: readSessionLog(file, entry.tool) }))
   })
   handle('pacenote:settings:get', null, () => settings.view())
   handle('pacenote:settings:validate', [], (changes) =>
@@ -2003,12 +1966,7 @@ function registerBotIpc(): void {
     if (!supervisor) return false
     const phase = supervisor.current.phase
     if (phase === 'running' || phase === 'starting') await supervisor.restart()
-    else if (
-      phase === 'idle' ||
-      phase === 'setup' ||
-      phase === 'failed' ||
-      phase === 'crashed'
-    )
+    else if (['idle', 'setup', 'failed', 'crashed'].includes(phase))
       await supervisor.start()
     else return false
     return true
@@ -2023,36 +1981,17 @@ function registerBotIpc(): void {
       return { issues, restarted: await applySettings() }
     }
   )
-  // Team hub pairing. Errors reach the UI as { error }, since thrown errors
-  // lose their message over IPC.
-  const hubCall = async <T>(
-    event: Electron.IpcMainInvokeEvent,
-    run: () => Promise<T>
-  ) => {
-    if (!fromMainWindow(event)) return { error: localized(text).notAllowed }
-    try {
-      return await run()
-    } catch (err) {
-      return { error: (err as Error).message }
-    }
-  }
-  ipcMain.handle('pacenote:hub:pair-start', (event, url: unknown) =>
-    hubCall(event, () => hubPairing.start(url))
-  )
-  ipcMain.handle('pacenote:hub:pair-status', (event) =>
-    hubCall(event, () => hubPairing.status())
-  )
+  // Team hub pairing
+  handleOrError('pacenote:hub:pair-start', (url) => hubPairing.start(url))
+  handleOrError('pacenote:hub:pair-status', () => hubPairing.status())
   // Settings starts Pace once paired; setup starts it after its review.
-  ipcMain.handle('pacenote:hub:pair-confirm', (event, options: unknown) =>
-    hubCall(event, async () => {
-      const confirmed = await hubPairing.confirm()
-      const start =
-        (options as { start?: unknown } | undefined)?.start !== false
-      const started =
-        start && confirmed.issues.length === 0 && (await applySettings())
-      return { ...confirmed, started }
-    })
-  )
+  handleOrError('pacenote:hub:pair-confirm', async (options) => {
+    const confirmed = await hubPairing.confirm()
+    const start = (options as { start?: unknown } | undefined)?.start !== false
+    const started =
+      start && confirmed.issues.length === 0 && (await applySettings())
+    return { ...confirmed, started }
+  })
   // The first-run wizard: where it got to, what this Mac has, and "@Pace
   // it's me" on your own Slack app.
   handle('pacenote:setup:state', null, () => setup.view())
@@ -2099,9 +2038,7 @@ function registerBotIpc(): void {
   }
   // Connect to your other Mac: setup takes your Slack app from it
   handle('pacenote:setup:mac-state', null, () => fromMac?.current ?? null)
-  handle('pacenote:setup:mac-look', undefined, () => {
-    fromMac?.look()
-  })
+  handle('pacenote:setup:mac-look', undefined, () => fromMac?.look())
   handle('pacenote:setup:mac-connect', undefined, (raw) => {
     const target = (raw ?? {}) as { instance?: unknown; address?: unknown }
     if (typeof target.instance === 'string')
@@ -2109,9 +2046,7 @@ function registerBotIpc(): void {
     else if (typeof target.address === 'string')
       void fromMac?.connect({ address: target.address })
   })
-  handle('pacenote:setup:mac-cancel', undefined, () => {
-    fromMac?.cancel()
-  })
+  handle('pacenote:setup:mac-cancel', undefined, () => fromMac?.cancel())
   handle('pacenote:setup:detect', null, async () => ({
     cli: await detectClis(),
     sandbox: { unsupported: vmUnsupported() },
@@ -2131,61 +2066,57 @@ function registerBotIpc(): void {
       },
     }
   })
-  ipcMain.handle('pacenote:setup:claim-start', (event) =>
-    hubCall(event, () =>
-      claimStep(async () => {
-        await stopClaim()
-        const env = settings.effectiveEnv()
-        const appToken = env.SLACK_APP_TOKEN?.trim()
-        const botToken = env.SLACK_BOT_TOKEN?.trim()
-        if (!appToken || !botToken)
-          throw new Error(localized(text).bothTokensFirst)
-        if (supervisor?.current.phase === 'external')
-          throw new Error(localized(text).runningElsewhere)
-        // Pace on the same app would take some of the mentions meanwhile.
-        if (supervisor?.managing) {
-          claimPaused = true
-          await supervisor.stop()
-        }
-        claim = await listenForClaim({
-          appToken,
-          botToken,
-          apiUrl: env.SLACK_API_URL,
-          // The reply is for you: in Pace's notes language once chosen, the
-          // app's until then
-          notesLocale: isLocale(env.NOTES_LANGUAGE)
-            ? env.NOTES_LANGUAGE
-            : getLocale(),
-          log: log.child('setup'),
-          onMention: (user) =>
-            mainWindow?.webContents.send('pacenote:setup:claimed', user),
-        })
-        return { ok: true as const }
+  handleOrError('pacenote:setup:claim-start', () =>
+    claimStep(async () => {
+      await stopClaim()
+      const env = settings.effectiveEnv()
+      const appToken = env.SLACK_APP_TOKEN?.trim()
+      const botToken = env.SLACK_BOT_TOKEN?.trim()
+      if (!appToken || !botToken)
+        throw new Error(localized(text).bothTokensFirst)
+      if (supervisor?.current.phase === 'external')
+        throw new Error(localized(text).runningElsewhere)
+      // Pace on the same app would take some of the mentions meanwhile.
+      if (supervisor?.managing) {
+        claimPaused = true
+        await supervisor.stop()
+      }
+      claim = await listenForClaim({
+        appToken,
+        botToken,
+        apiUrl: env.SLACK_API_URL,
+        // The reply is for you: in Pace's notes language once chosen, the
+        // app's until then
+        notesLocale: isLocale(env.NOTES_LANGUAGE)
+          ? env.NOTES_LANGUAGE
+          : getLocale(),
+        log: log.child('setup'),
+        onMention: (user) =>
+          mainWindow?.webContents.send('pacenote:setup:claimed', user),
       })
-    )
+      return { ok: true as const }
+    })
   )
-  ipcMain.handle('pacenote:setup:claim-confirm', (event, raw: unknown) =>
-    hubCall(event, () =>
-      claimStep(async () => {
-        const user = (raw ?? {}) as { id?: unknown; name?: unknown }
-        if (
-          typeof user.id !== 'string' ||
-          !/^[UW][A-Z0-9]+$/.test(user.id) ||
-          typeof user.name !== 'string'
-        )
-          throw new Error(localized(text).notAMember)
-        await stopClaim()
-        // Pace answers only you, so this is the one it answers: saying it
-        // again replaces the one before, and a wrong "Yes" is undone by the
-        // right one.
-        const issues = settings.save({ MENTION_ALLOWED_USERS: user.id })
-        if (issues.length === 0) {
-          claimPaused = false
-          setup.save({ me: { id: user.id, name: user.name } })
-        }
-        return { issues }
-      })
-    )
+  handleOrError('pacenote:setup:claim-confirm', (raw) =>
+    claimStep(async () => {
+      const user = (raw ?? {}) as { id?: unknown; name?: unknown }
+      if (
+        typeof user.id !== 'string' ||
+        !/^[UW][A-Z0-9]+$/.test(user.id) ||
+        typeof user.name !== 'string'
+      )
+        throw new Error(localized(text).notAMember)
+      await stopClaim()
+      // Pace answers only you, so this is the one it answers: saying it
+      // again replaces the one before, and a wrong "Yes" is undone by the
+      // right one.
+      const issues = settings.save({ MENTION_ALLOWED_USERS: user.id })
+      if (issues.length === 0) {
+        claimPaused = false
+        setup.save({ me: { id: user.id, name: user.name } })
+      }
+      return { issues }
+    })
   )
   // Left without confirming: Pace runs again if listening stopped it.
   handle('pacenote:setup:claim-stop', undefined, () =>
@@ -2197,16 +2128,12 @@ function registerBotIpc(): void {
       }
     })
   )
-  handle('pacenote:hub:pair-cancel', undefined, () => {
-    hubPairing.cancel()
+  handle('pacenote:hub:pair-cancel', undefined, () => hubPairing.cancel())
+  handleOrError('pacenote:hub:disconnect', async () => {
+    const issues = await hubPairing.disconnect(settings.effectiveEnv())
+    if (issues.length === 0) await applySettings()
+    return { issues }
   })
-  ipcMain.handle('pacenote:hub:disconnect', (event) =>
-    hubCall(event, async () => {
-      const issues = await hubPairing.disconnect(settings.effectiveEnv())
-      if (issues.length === 0) await applySettings()
-      return { issues }
-    })
-  )
   handle('pacenote:settings:open-data-dir', undefined, () => {
     void shell.openPath(dataDir)
   })
@@ -2340,9 +2267,6 @@ async function createWindow(route = ''): Promise<void> {
       window.hide()
     }
   })
-  window.on('closed', () => {
-    if (mainWindow === window) mainWindow = undefined
-  })
   // A window whose process ended is blank: it loads again, unless that keeps
   // happening.
   const gone: number[] = []
@@ -2388,6 +2312,7 @@ async function createWindow(route = ''): Promise<void> {
   })
   mainScreen = screen
   window.on('closed', () => {
+    if (mainWindow === window) mainWindow = undefined
     if (mainScreen === screen) mainScreen = undefined
   })
   window.webContents.on('will-navigate', (event, url) => {
