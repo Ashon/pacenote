@@ -175,45 +175,52 @@ export async function yourCommits(options: {
   since: Date
   until: Date
 }): Promise<{ commits: Commit[]; emails: string[] }> {
+  const log = async (folder: string) => {
+    const own = (await git(folder, ['config', 'user.email']))?.trim()
+    const emails = [...new Set([...options.emails, ...(own ? [own] : [])])]
+      .map((email) => email.trim())
+      .filter((email) => email.includes('@'))
+    if (emails.length === 0) return undefined
+    return git(folder, [
+      'log',
+      '--all',
+      '--no-merges',
+      `--since=${options.since.toISOString()}`,
+      `--until=${options.until.toISOString()}`,
+      ...emails.map((email) => `--author=${email}`),
+      '--format=%H%x1f%aI%x1f%ae%x1f%s',
+      '-n',
+      '1000',
+    ])
+  }
+  // Every folder asked at once, its answer read in the order given
+  const logs = await Promise.all(
+    [...options.folders].flatMap(([repo, folders]) =>
+      folders
+        .slice(0, FOLDERS_PER_REPO)
+        .map(async (folder) => ({ repo, out: await log(folder) }))
+    )
+  )
   const seen = new Set<string>()
   const commits: Commit[] = []
   const used = new Set<string>()
-  for (const [repo, folders] of options.folders) {
-    for (const folder of folders.slice(0, FOLDERS_PER_REPO)) {
-      const own = (await git(folder, ['config', 'user.email']))?.trim()
-      const emails = [...new Set([...options.emails, ...(own ? [own] : [])])]
-        .map((email) => email.trim())
-        .filter((email) => email.includes('@'))
-      if (emails.length === 0) continue
-      const out = await git(folder, [
-        'log',
-        '--all',
-        '--no-merges',
-        `--since=${options.since.toISOString()}`,
-        `--until=${options.until.toISOString()}`,
-        ...emails.map((email) => `--author=${email}`),
-        '--format=%H%x1f%aI%x1f%ae%x1f%s',
-        '-n',
-        '1000',
-      ])
-      for (const line of (out ?? '').split('\n')) {
-        const [hash, at, author, subject] = line.split('\x1f')
-        // The same commit under another hash (a history rewritten, a
-        // cherry-pick) is one commit too.
-        const same = `${repo}\x1f${at}\x1f${subject}`
-        if (!hash || !at || seen.has(hash) || seen.has(same)) continue
-        seen.add(hash)
-        seen.add(same)
-        if (author) used.add(author.toLowerCase())
-        commits.push({
-          repo,
-          hash,
-          at,
-          subject: (subject ?? '').trim().slice(0, 200),
-        })
-      }
+  for (const { repo, out } of logs)
+    for (const line of (out ?? '').split('\n')) {
+      const [hash, at, author, subject] = line.split('\x1f')
+      // The same commit under another hash (a history rewritten, a
+      // cherry-pick) is one commit too.
+      const same = `${repo}\x1f${at}\x1f${subject}`
+      if (!hash || !at || seen.has(hash) || seen.has(same)) continue
+      seen.add(hash)
+      seen.add(same)
+      if (author) used.add(author.toLowerCase())
+      commits.push({
+        repo,
+        hash,
+        at,
+        subject: (subject ?? '').trim().slice(0, 200),
+      })
     }
-  }
   commits.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
   return { commits, emails: [...used] }
 }

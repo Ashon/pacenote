@@ -125,6 +125,10 @@ export async function sessionMarks(
       lastAt,
     })
   }
-  for (const mark of marks) mark.repo = await repoOf(mark.cwd, now)
+  await Promise.all(
+    marks.map(async (mark) => {
+      mark.repo = await repoOf(mark.cwd, now)
+    })
+  )
   return marks.sort((a, b) => Date.parse(b.lastAt) - Date.parse(a.lastAt))
 }
