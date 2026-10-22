@@ -30,7 +30,7 @@ import {
   mergeDecisions,
   mergeTasks,
   mergeWork,
-  mergeWritten,
+  mergeLatest,
   mergeYou,
   type TakenBack,
 } from './sync.js'
@@ -176,11 +176,8 @@ export class TodoSync {
   }
 
   private knownFor(peer: string): Map<Part, string> {
-    let known = this.known.get(peer)
-    if (!known) {
-      known = new Map()
-      this.known.set(peer, known)
-    }
+    const known = this.known.get(peer) ?? new Map<Part, string>()
+    this.known.set(peer, known)
     return known
   }
 
@@ -229,7 +226,7 @@ export class TodoSync {
       if (parts.written) {
         known.set('written', hash(parts.written))
         const local = readWritten(dataDir)
-        write(local, mergeWritten(local, parts.written), (merged) => {
+        write(local, mergeLatest(local, parts.written), (merged) => {
           const file = path.join(dataDir, RECAPS_FILE)
           writeJson(file, {
             ...readJson<object>(file, {}),

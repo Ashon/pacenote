@@ -9,7 +9,7 @@ import {
   mergeTask,
   mergeTasks,
   mergeWork,
-  mergeWritten,
+  mergeLatest,
   mergeYou,
 } from '../src/macs/sync.js'
 import { TodoSync } from '../src/macs/todo-sync.js'
@@ -190,7 +190,7 @@ describe('merging your Todo from two Macs', () => {
 
   it("keeps the latest write-up, your areas from both, and the other Mac's collections", () => {
     expect(
-      mergeWritten(
+      mergeLatest(
         { 'day:2026-10-20': { text: 'old', at: at(-60), by: 'claude' } },
         {
           'day:2026-10-20': { text: 'new', at: at(-5), by: 'codex' },

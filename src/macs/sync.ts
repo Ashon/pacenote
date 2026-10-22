@@ -7,7 +7,7 @@ import type {
   WorkEntry,
   WorkFile,
 } from '../tasks/types.js'
-import type { AreaRecord, Written, YouFile } from '../you/types.js'
+import type { AreaRecord, YouFile } from '../you/types.js'
 
 /**
  * Your Todo, the same on each of your Macs: how what one Mac has meets what
@@ -27,6 +27,12 @@ import type { AreaRecord, Written, YouFile } from '../you/types.js'
 const later = (a: string | undefined, b: string | undefined) =>
   !a ? b : !b ? a : Date.parse(a) >= Date.parse(b) ? a : b
 
+/** a and b as [newer, older] by at: on a tie, the larger as JSON first */
+const newerFirst = <T>(a: T, b: T, at: (value: T) => number): [T, T] =>
+  at(a) > at(b) || (at(a) === at(b) && JSON.stringify(a) >= JSON.stringify(b))
+    ? [a, b]
+    : [b, a]
+
 /** When a task last changed: found, updated, closed or wrapped up */
 function changedAt(task: Task): number {
   return Math.max(
@@ -39,14 +45,7 @@ function changedAt(task: Task): number {
 
 /** The same task from two Macs: the version changed last, all updates kept */
 export function mergeTask(a: Task, b: Task): Task {
-  const [newer, older] =
-    changedAt(a) !== changedAt(b)
-      ? changedAt(a) > changedAt(b)
-        ? [a, b]
-        : [b, a]
-      : JSON.stringify(a) >= JSON.stringify(b)
-        ? [a, b]
-        : [b, a]
+  const [newer, older] = newerFirst(a, b, changedAt)
   const updates = new Map(
     [...(older.updates ?? []), ...(newer.updates ?? [])].map((update) => [
       `${update.at}\n${update.why}`,
@@ -137,20 +136,7 @@ export function mergeDecisions(
   const takenBack: TakenBack = { ...local.takenBack }
   for (const [id, at] of Object.entries(remote.takenBack))
     takenBack[id] = later(takenBack[id], at)!
-  const decisions: TaskDecisions = {}
-  for (const [id, decision] of [
-    ...Object.entries(local.decisions),
-    ...Object.entries(remote.decisions),
-  ]) {
-    const seen = decisions[id]
-    if (
-      !seen ||
-      Date.parse(decision.at) > Date.parse(seen.at) ||
-      (decision.at === seen.at &&
-        JSON.stringify(decision) > JSON.stringify(seen))
-    )
-      decisions[id] = decision
-  }
+  const decisions = mergeLatest(local.decisions, remote.decisions)
   for (const [id, decision] of Object.entries(decisions)) {
     const back = takenBack[id]
     if (back && Date.parse(back) >= Date.parse(decision.at))
@@ -205,15 +191,7 @@ export function mergeWork(
         byId.set(entry.id, entry)
         continue
       }
-      const newer =
-        touchedAt(entry) !== touchedAt(seen)
-          ? touchedAt(entry) > touchedAt(seen)
-            ? entry
-            : seen
-          : JSON.stringify(entry) > JSON.stringify(seen)
-            ? entry
-            : seen
-      const other = newer === entry ? seen : entry
+      const [newer, other] = newerFirst(seen, entry, touchedAt)
       if (newer.kind === 'session' && other.kind === 'session') {
         const resumedAt = [
           ...new Set([...(newer.resumedAt ?? []), ...(other.resumedAt ?? [])]),
@@ -247,20 +225,23 @@ export function mergeWork(
 const touchedAtStart = (entry: WorkEntry) =>
   Date.parse(entry.kind === 'session' ? entry.startedAt : entry.at) || 0
 
-/** What Write it up wrote, from two Macs: each period's latest */
-export function mergeWritten(
-  local: Record<string, Written>,
-  remote: Record<string, Written>
-): Record<string, Written> {
-  const all: Record<string, Written> = { ...local }
-  for (const [key, written] of Object.entries(remote)) {
+/**
+ * Records by key from two Macs, each key's latest: your decisions by task,
+ * what Write it up wrote by period
+ */
+export function mergeLatest<T extends { at: string }>(
+  local: Record<string, T>,
+  remote: Record<string, T>
+): Record<string, T> {
+  const all: Record<string, T> = { ...local }
+  for (const [key, record] of Object.entries(remote)) {
     const seen = all[key]
     if (
       !seen ||
-      Date.parse(written.at) > Date.parse(seen.at) ||
-      (written.at === seen.at && JSON.stringify(written) > JSON.stringify(seen))
+      Date.parse(record.at) > Date.parse(seen.at) ||
+      (record.at === seen.at && JSON.stringify(record) > JSON.stringify(seen))
     )
-      all[key] = written
+      all[key] = record
   }
   return sorted(all)
 }

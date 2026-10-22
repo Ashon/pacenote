@@ -151,12 +151,7 @@ export class Bonjour {
     this.children.splice(this.children.indexOf(child), 1)
     const look = this.options.look
     if (this.stopped || !result || !look?.accept(result.txt)) return
-    look.found({
-      instance,
-      host: result.host,
-      port: result.port,
-      txt: result.txt,
-    })
+    look.found({ instance, ...result })
   }
 
   private run(args: string[]): ChildProcess {
