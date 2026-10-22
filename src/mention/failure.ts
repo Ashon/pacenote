@@ -37,11 +37,6 @@ export function failureCause(error: string): FailureCause {
   return CAUSES.find(([, pattern]) => pattern.test(error))?.[0] ?? 'other'
 }
 
-/** "Claude", "Codex": the reasoner as the asker knows it */
-function service(backend: string): string {
-  return backend.charAt(0).toUpperCase() + backend.slice(1)
-}
-
 /** "15 minutes", "90 seconds" */
 function duration(ms: number, t: (typeof text)[Locale]): string {
   const seconds = Math.round(ms / 1000)
@@ -71,14 +66,14 @@ export function failureReply(
   { own = false, timeoutMs, locale = 'en' }: FailureReplyOptions = {}
 ): string {
   const t = localized(text, locale)
-  const name = service(backend)
+  // "Claude", "Codex": the reasoner as the asker knows it
+  const name = backend.charAt(0).toUpperCase() + backend.slice(1)
   switch (cause) {
     case 'auth':
       return own ? t.reply.authOwn(name) : t.reply.auth(name)
     case 'limit':
-      return t.reply.limit(name)
     case 'unavailable':
-      return t.reply.unavailable(name)
+      return t.reply[cause](name)
     case 'setup':
       return own ? t.reply.setupOwn : t.reply.setup
     case 'timeout':

@@ -68,6 +68,9 @@ export function aiNote(
   )
 }
 
+/** The requests being answered and answered so far (bot status file) */
+type Requests = { active: number; handled: number; lastAt?: string }
+
 interface MentionResponderDeps {
   config: Config
   /**
@@ -109,11 +112,7 @@ interface MentionResponderDeps {
   /**
    * Called whenever the active/handled request counts change. (bot status file)
    */
-  onActivity?: (requests: {
-    active: number
-    handled: number
-    lastAt?: string
-  }) => void
+  onActivity?: (requests: Requests) => void
 }
 
 /**
@@ -181,14 +180,7 @@ export class MentionResponder {
   /** Set once shutting down: nothing more starts */
   private stopping = false
   private readonly messengers: Map<MessengerId, Messenger>
-  private readonly requests: {
-    active: number
-    handled: number
-    lastAt?: string
-  } = {
-    active: 0,
-    handled: 0,
-  }
+  private readonly requests: Requests = { active: 0, handled: 0 }
 
   /**
    * Where attachment images are downloaded temporarily: the data folder
@@ -604,6 +596,9 @@ export class MentionResponder {
       )
     if (!inflight) return
     for (const entry of entries) {
+      const interrupt = (error: string) =>
+        entry.runId &&
+        history?.reopen(entry.runId)?.finish('interrupted', { error })
       this.seen.add(entry.key)
       const messenger = this.messengers.get(entry.mention.messenger)
       if (!messenger) {
@@ -635,10 +630,7 @@ export class MentionResponder {
       if (!isOwner(entry.mention, messenger.owner)) {
         this.forget(entry.key)
         await this.clearMarks(messenger, entry.mention)
-        if (entry.runId)
-          history?.reopen(entry.runId)?.finish('interrupted', {
-            error: 'Not resumed: Pace answers only the person it works for',
-          })
+        interrupt('Not resumed: Pace answers only the person it works for')
         log.warn(
           `Dropping ${entry.key}: it was asked by someone other than the owner`
         )
@@ -655,11 +647,7 @@ export class MentionResponder {
       if (this.limiter.full) {
         this.forget(entry.key)
         await this.giveUp(messenger, entry.mention)
-        if (entry.runId) {
-          history?.reopen(entry.runId)?.finish('interrupted', {
-            error: 'Could not resume because the queue was full',
-          })
-        }
+        interrupt('Could not resume because the queue was full')
         continue
       }
       log.info(

@@ -161,42 +161,23 @@ export function planAttachments(candidates: FileCandidate[]): {
   let documents = 0
   for (const candidate of candidates) {
     const { file } = candidate
-    const name = file.name
-    if (file.unreadable) {
-      skipped.push({ name, reason: file.unreadable })
-      continue
-    }
+    const skip = (reason: string) => skipped.push({ name: file.name, reason })
     const kind = classify(file)
-    if (kind === 'unsupported') {
-      skipped.push({
-        name,
-        reason: `Unsupported format (${file.filetype || file.mimetype || '?'})`,
-      })
-      continue
-    }
     const size = file.size ?? 0
-    const limit =
-      kind === 'image'
-        ? LIMITS.imageBytes
-        : kind === 'pdf'
-          ? LIMITS.pdfBytes
-          : LIMITS.textBytes
-    if (size > limit) {
-      skipped.push({
-        name,
-        reason: `Size limit exceeded (${Math.round(size / 1024)}KB)`,
-      })
-      continue
-    }
-    if (
+    if (file.unreadable) skip(file.unreadable)
+    else if (kind === 'unsupported')
+      skip(`Unsupported format (${file.filetype || file.mimetype || '?'})`)
+    else if (size > LIMITS[`${kind}Bytes`])
+      skip(`Size limit exceeded (${Math.round(size / 1024)}KB)`)
+    else if (
       kind === 'image' ? images >= LIMITS.images : documents >= LIMITS.documents
-    ) {
-      skipped.push({ name, reason: 'Count limit exceeded' })
-      continue
+    )
+      skip('Count limit exceeded')
+    else {
+      if (kind === 'image') images += 1
+      else documents += 1
+      planned.push({ ...candidate, kind })
     }
-    if (kind === 'image') images += 1
-    else documents += 1
-    planned.push({ ...candidate, kind })
   }
   return { planned, skipped }
 }
@@ -212,11 +193,6 @@ export function safeFileName(
     .replace(/[^A-Za-z0-9._-]+/g, '_')
     .slice(0, 40)
   return `${index + 1}-${base || 'file'}.${extension}`
-}
-
-/** Whether the content looks like text (no NUL bytes near the start) */
-function looksLikeText(buffer: Buffer): boolean {
-  return !buffer.subarray(0, 8192).includes(0)
 }
 
 /** Prevents the content from closing the prompt boundary tag. */
@@ -254,6 +230,11 @@ export async function loadAttachments(
     const name = item.file.name
     try {
       const { contentType: type, data: buffer } = await deps.download(item.file)
+      const save = async (extension: string) => {
+        const file = path.join(deps.dir, safeFileName(index, name, extension))
+        await writeFile(file, buffer)
+        return file
+      }
 
       if (item.kind === 'image') {
         if (!type.startsWith('image/'))
@@ -261,11 +242,7 @@ export async function loadAttachments(
         if (buffer.length > LIMITS.imageBytes)
           throw new Error('Size limit exceeded')
         const mimetype = item.file.mimetype!
-        const filePath = path.join(
-          deps.dir,
-          safeFileName(index, item.file.name, IMAGE_TYPES[mimetype]!)
-        )
-        await writeFile(filePath, buffer)
+        const filePath = await save(IMAGE_TYPES[mimetype]!)
         images.push({ path: filePath, mimetype, name, source: item.source })
         continue
       }
@@ -274,12 +251,7 @@ export async function loadAttachments(
       if (item.kind === 'pdf') {
         if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-')
           throw new Error('Response is not a PDF')
-        const filePath = path.join(
-          deps.dir,
-          safeFileName(index, item.file.name, 'pdf')
-        )
-        await writeFile(filePath, buffer)
-        text = await deps.extractPdfText(filePath)
+        text = await deps.extractPdfText(await save('pdf'))
         if (!text.trim())
           throw new Error(
             'No text found in the PDF (it may be a scanned image)'
@@ -287,7 +259,9 @@ export async function loadAttachments(
       } else {
         if (buffer.length > LIMITS.textBytes)
           throw new Error('Size limit exceeded')
-        if (!looksLikeText(buffer)) throw new Error('Not a text file')
+        // Text has no NUL bytes near the start
+        if (buffer.subarray(0, 8192).includes(0))
+          throw new Error('Not a text file')
         text = buffer.toString('utf8')
       }
       if (remainingChars <= 0) throw new Error('Total length limit exceeded')

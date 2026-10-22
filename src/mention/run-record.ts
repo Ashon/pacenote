@@ -17,42 +17,22 @@ export async function recordAttachments(
   failed: SkippedFile[]
 ): Promise<void> {
   const attachments: RunAttachment[] = []
-  for (const [i, image] of images.entries()) {
-    const file = await readFile(image.path)
+  for (const [i, { path: saved, name, source }] of images.entries()) {
+    const file = await readFile(saved)
       .then((data) =>
-        run.saveArtifact(`input-${i + 1}${path.extname(image.path)}`, data)
+        run.saveArtifact(`input-${i + 1}${path.extname(saved)}`, data)
       )
       .catch(() => undefined)
-    attachments.push({
-      name: image.name,
-      source: image.source,
-      kind: 'image',
-      status: 'read',
-      file,
-    })
+    attachments.push({ name, source, kind: 'image', status: 'read', file })
   }
-  for (const doc of documents) {
-    attachments.push({
-      name: doc.name,
-      source: doc.source,
-      kind: doc.kind,
-      status: 'read',
-    })
-  }
+  for (const { name, source, kind } of documents)
+    attachments.push({ name, source, kind, status: 'read' })
   for (const [list, status] of [
     [skipped, 'skipped'],
     [failed, 'failed'],
-  ] as const) {
-    for (const item of list) {
-      attachments.push({
-        name: item.name,
-        source: '',
-        kind: 'other',
-        status,
-        reason: item.reason,
-      })
-    }
-  }
+  ] as const)
+    for (const { name, reason } of list)
+      attachments.push({ name, source: '', kind: 'other', status, reason })
   run.patch({ attachments })
 }
 
