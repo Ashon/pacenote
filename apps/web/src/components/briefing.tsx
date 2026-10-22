@@ -16,10 +16,6 @@ export function lastBriefing(): number {
   return Number(readStored(LINES_KEY)) || 0
 }
 
-function rememberBriefing(lines: number) {
-  writeStored(LINES_KEY, String(lines))
-}
-
 /** One row per line, each one line tall, so its place is known ahead */
 const GRID =
   'mt-7 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-copy'
@@ -49,7 +45,7 @@ export function Briefing({ open }: { open: number | undefined }) {
   const desktop = Boolean(window.pacenoteDesktop)
   const ready = !desktop || recap.isFetched
   const lines = briefLines(recap.data, open)
-  if (ready && desktop) rememberBriefing(lines.length)
+  if (ready && desktop) writeStored(LINES_KEY, String(lines.length))
   return (
     <Placeholder
       ready={ready}

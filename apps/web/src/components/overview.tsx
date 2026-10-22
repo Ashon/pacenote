@@ -31,7 +31,7 @@ import {
 } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { useTaskTrend } from '@/lib/tasks'
-import { cn } from '@/lib/utils'
+import { cn, go } from '@/lib/utils'
 import { Briefing, BriefingSkeleton, lastBriefing } from './briefing'
 import { text } from './overview.text'
 import { ResumeSetup, SetupFacts } from './setup/resume'
@@ -65,10 +65,7 @@ function SetupCard({
           {t.stepByStep}
         </Button>
       )}
-      <Button
-        size="sm"
-        onClick={() => (window.location.hash = setupSettingsRoute(issues))}
-      >
+      <Button size="sm" onClick={() => go(setupSettingsRoute(issues))}>
         <Settings />
         {t.openSettings}
       </Button>
@@ -115,7 +112,7 @@ export function Overview() {
     Boolean(data) &&
     (!desktop ||
       (setup.view !== undefined && supervisor !== undefined && trend.isFetched))
-  if (ready && desktop) rememberTaskBand(Boolean(trend.data))
+  if (ready && desktop) writeStored(TASK_BAND_KEY, trend.data ? '1' : '0')
 
   return (
     // One surface, no cards: the figures share a row split by hairlines, and
@@ -132,8 +129,8 @@ export function Overview() {
         ready={ready}
         skeleton={
           <OverviewSkeleton
-            taskBand={lastTaskBand()}
-            setupCard={lastSetupCard()}
+            taskBand={readStored(TASK_BAND_KEY) === '1'}
+            setupCard={Number(readStored(SETUP_CARD_KEY)) || 0}
             briefing={lastBriefing()}
           />
         }
@@ -142,7 +139,8 @@ export function Overview() {
         <div
           ref={(element) => {
             // How tall the setup card is, with its margin (0 for none)
-            if (element) rememberSetupCard(element.offsetHeight)
+            if (element)
+              writeStored(SETUP_CARD_KEY, String(element.offsetHeight))
           }}
           className="flow-root"
         >
@@ -150,9 +148,9 @@ export function Overview() {
             <ResumeSetup
               view={setup.view}
               onFinish={() =>
-                void setup.save({ finished: true }).then(() => {
-                  window.location.hash = setupSettingsRoute(supervisor?.issues)
-                })
+                void setup
+                  .save({ finished: true })
+                  .then(() => go(setupSettingsRoute(supervisor?.issues)))
               }
             />
           ) : (
@@ -163,9 +161,9 @@ export function Overview() {
                 onGuide={
                   setup.view
                     ? () =>
-                        void setup.save({ finished: false }).then(() => {
-                          window.location.hash = '#/setup'
-                        })
+                        void setup
+                          .save({ finished: false })
+                          .then(() => go('#/setup'))
                     : undefined
                 }
               />
@@ -295,24 +293,8 @@ export function Overview() {
 /** How tall the setup card was last time, with its margin; 0 for none */
 const SETUP_CARD_KEY = 'pacenote.overview.setup-card'
 
-function lastSetupCard(): number {
-  return Number(readStored(SETUP_CARD_KEY)) || 0
-}
-
-function rememberSetupCard(height: number) {
-  writeStored(SETUP_CARD_KEY, String(height))
-}
-
 /** Whether the tasks band showed last time: the skeleton holds its place */
 const TASK_BAND_KEY = 'pacenote.overview.task-band'
-
-function lastTaskBand(): boolean {
-  return readStored(TASK_BAND_KEY) === '1'
-}
-
-function rememberTaskBand(shown: boolean) {
-  writeStored(TASK_BAND_KEY, shown ? '1' : '0')
-}
 
 /** A figure's place: its label as it is, its number and line as bars */
 function MetricSkeleton({

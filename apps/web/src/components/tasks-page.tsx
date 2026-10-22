@@ -182,7 +182,7 @@ export function TasksPage({
     )
 
   const open = data.tasks.filter((task) => task.status === 'open')
-  rememberRows(open.length)
+  writeStored(ROWS_KEY, String(open.length))
   rememberYourWork(data.collectedAt ? you : undefined)
   const maybe = data.tasks.filter((task) => task.status === 'maybe')
   const kept = (task: TaskView) =>
@@ -267,7 +267,7 @@ export function TasksPage({
       />
       <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
-        <Banner>
+        <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy">
           <span className="flex-1">
             {t.leaveOutOffer(offer.count, offer.label)}
           </span>
@@ -281,7 +281,7 @@ export function TasksPage({
           >
             {t.notNow}
           </Button>
-        </Banner>
+        </div>
       )}
 
       <TaskTabs
@@ -373,10 +373,6 @@ export function TasksPage({
       <RecentCollections collections={data.collections ?? []} />
     </Page>
   )
-}
-
-function rememberRows(rows: number) {
-  writeStored(ROWS_KEY, String(rows))
 }
 
 /** Open, Maybe and Done, with their counts once the tasks are in */
@@ -494,14 +490,6 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
           {t.newTasks(said.current)}
         </button>
       )}
-    </div>
-  )
-}
-
-function Banner({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy">
-      {children}
     </div>
   )
 }

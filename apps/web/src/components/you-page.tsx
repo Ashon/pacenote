@@ -78,7 +78,7 @@ export function YouPage({ openId }: { openId?: string }) {
       </Page>
     )
   const active = data.areas.filter((area) => area.state === 'active')
-  rememberAreas(active.length)
+  writeStored(AREAS_KEY, String(active.length))
   const resting = data.areas.filter((area) => area.state === 'resting')
   const accounts = accountsSentence(data.accounts)
   const row = (area: AreaView) => (
@@ -181,10 +181,6 @@ const AREAS_KEY = 'pacenote.you.rows'
 function lastAreas(): number {
   const rows = Number(readStored(AREAS_KEY))
   return rows > 0 ? Math.min(rows, 6) : 3
-}
-
-function rememberAreas(rows: number) {
-  writeStored(AREAS_KEY, String(rows))
 }
 
 /** Widths for skeleton rows, so they do not read as one block */
