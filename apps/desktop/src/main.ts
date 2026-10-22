@@ -81,7 +81,9 @@ import {
 import { outcomeOf, taskContext, threadOf } from '../../../src/tasks/context.js'
 import {
   allTaskViews,
+  buildView,
   decide,
+  readDecisions,
   readTasks,
   tasksView,
 } from '../../../src/tasks/store.js'
@@ -94,6 +96,7 @@ import {
 import { liveTasks, readActivity } from '../../../src/tasks/activity.js'
 import { taskTrend } from '../../../src/tasks/trend.js'
 import type {
+  CollectionRecord,
   Proposal,
   TaskDecision,
   TasksCollect,
@@ -530,13 +533,13 @@ function taskCollectorRunning(): string | undefined {
 
 /**
  * Collect now as Todo shows it: this Mac's, or one another of your Macs ran
- * since, or runs now
+ * since, or runs now. collections: the last days', newest first
  */
-function collectState(): TasksCollect {
+function collectState(collections: CollectionRecord[]): TasksCollect {
   const state = taskCollector.state
   if (state.running) return state
   const elsewhere = macs?.view().macs.find((mac) => !mac.here && mac.collecting)
-  const latest = recentCollections(dataDir, collectionRuns(7))[0]
+  const latest = collections[0]
   const last =
     latest?.mac &&
     (!state.last || Date.parse(latest.at) > Date.parse(state.last.at))
@@ -1213,29 +1216,32 @@ function registerBotIpc(): void {
       } satisfies Record<WorkTool, OpenIn>,
     }
   }
+  // Asked every few seconds while Todo is open: each file is read once.
   handle('pacenote:tasks:list', null, () => {
     const current = tasksSettings()
-    const view = tasksView(dataDir, current.exclude)
+    const file = readTasks(dataDir)
+    const view = buildView(file, readDecisions(dataDir), {
+      excluded: current.exclude,
+    })
     linkSessionsSoon()
     judgeSoon()
     const open = view.tasks.filter((task) => task.status === 'open')
     const yours = yourGroups(current)
     const areas = readYou(dataDir).areas
+    const work = readWork(dataDir)
+    const collections = recentCollections(dataDir, collectionRuns(7))
     return {
       settings: current,
-      collect: collectState(),
+      collect: collectState(collections),
       ai: ownAi.now(),
-      collections: recentCollections(dataDir, collectionRuns(7)),
+      collections,
       ...view,
-      working: working(open),
-      proposals: openProposals(
-        readWork(dataDir),
-        new Set(open.map((task) => task.id))
-      ),
+      working: working(open, work.entries),
+      proposals: openProposals(work, new Set(open.map((task) => task.id))),
       // A Maybe from a group neither list has asks whether it means you.
       groups: {
         yours,
-        notYours: notYourGroups(readTasks(dataDir), yours),
+        notYours: notYourGroups(file, yours),
       },
       // The area each task is in, for its row (src/you)
       areas: Object.fromEntries(
@@ -1665,11 +1671,17 @@ function registerBotIpc(): void {
       })
   }
   /** Each open task's latest session, for its row: the tool and when */
-  const working = (tasks: { id: string }[]) => {
-    const work = readWork(dataDir).entries
+  const working = (tasks: { id: string }[], entries: WorkEntry[]) => {
+    // The entries by task, sorted out once rather than for each task
+    const byTask = new Map<string, WorkEntry[]>()
+    for (const entry of entries) {
+      const group = byTask.get(entry.task)
+      if (group) group.push(entry)
+      else byTask.set(entry.task, [entry])
+    }
     const rows: Record<string, { tool: WorkTool; at: string }> = {}
     for (const task of tasks) {
-      const latest = workFor(work, task.id).find(
+      const latest = workFor(byTask.get(task.id) ?? [], task.id).find(
         (e): e is Session => e.kind === 'session' && !!e.session
       )
       const at = latest && !latest.mac && sessionNow(latest).lastActiveAt
