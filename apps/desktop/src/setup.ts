@@ -39,7 +39,12 @@ export class SetupStore {
   }
 
   view(): SetupView {
-    const { view, migrated } = setupView(this.read(), this.before())
+    const record = this.read()
+    // Asked only without a record, the one time setupView reads it
+    const { view, migrated } = setupView(
+      record,
+      record ? { configured: false, answered: false } : this.before()
+    )
     if (migrated) this.write(migrated)
     return view
   }

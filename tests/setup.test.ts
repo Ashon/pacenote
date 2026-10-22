@@ -108,6 +108,22 @@ describe('first-run setup', () => {
       finishedAt: expect.any(String),
     })
   })
+
+  it('asks whether it was set up before only while it has no record', () => {
+    const dir = mkdtempSync(path.join(root, 'asked-'))
+    let asked = 0
+    const store = new SetupStore(dir, () => {
+      asked += 1
+      return { configured: false, answered: false }
+    })
+    expect(store.view().record.step).toBe('ai')
+    expect(asked).toBe(1)
+    store.save({ step: 'slack' })
+    expect(asked).toBe(2)
+    expect(store.view().record.step).toBe('slack')
+    store.save({ step: 'runtime' })
+    expect(asked).toBe(2)
+  })
 })
 
 describe('what keeps Pace from starting', () => {

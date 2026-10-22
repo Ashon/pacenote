@@ -433,7 +433,7 @@ const hubPairing = new HubPairing(settings)
  */
 const setup = new SetupStore(dataDir, () => ({
   configured: setupProblem(settings.effectiveEnv()) === undefined,
-  answered: reader.list({ kind: 'mention' }).length > 0,
+  answered: reader.list({ kind: 'mention', limit: 1 }).length > 0,
 }))
 /** Setup listening for "@Pace it's me" on your own Slack app */
 let claim: ClaimListener | undefined
