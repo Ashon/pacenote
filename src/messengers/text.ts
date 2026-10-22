@@ -79,13 +79,21 @@ export function isTimeZone(name: string): boolean {
   }
 }
 
+/** formatTime's formatters by time zone, since making one is slow */
+const timeFormats = new Map<string, Intl.DateTimeFormat>()
+
 export function formatTime(ms: number, timezone: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(ms))
+  let format = timeFormats.get(timezone)
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    timeFormats.set(timezone, format)
+  }
+  return format.format(new Date(ms))
 }
