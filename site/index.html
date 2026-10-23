@@ -181,6 +181,21 @@
             </div>
           </figure>
         </div>
+        <div class="row">
+          <div class="copy">
+            <h2>Share one Slack app with your team</h2>
+            <p>With a Pacenote hub, your team shares one Slack app, and each mention still goes to the Mac of the person
+              who wrote it, answered with their own login. Pacenote writes the one command that installs the hub on a
+              Linux server.</p>
+            <a class="more" href="how-it-works/#teams">Teammates and the hub</a>
+          </div>
+          <figure class="shot">
+            <div class="av av-hub" role="img"
+              aria-label="Settings, Messengers, Slack: the connection is Team hub, at http://10.0.0.5:8790, not paired yet. Under No hub yet, Pacenote has written and copied the command that installs a hub on a Linux server, and waits for the hub at that address: when it answers, Pace switches to it on its own, with no code to send in Slack.">
+              <div class="av-hub-head"><b>Slack</b><span class="av-badge due">Not paired</span></div><div class="av-hub-row"><div class="av-hub-text"><b>Connection</b><span>How this desktop reaches Slack: through your team's hub, or a Slack app of your own.</span></div><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#plug"/></svg>Check connection</span></div><div class="av-choices"><div class="av-choice on"><b><span class="av-radio"></span>Team hub</b><span>Your team's hub server holds the Slack app. This desktop answers your own mentions through it, and keeps no Slack token.</span></div><div class="av-choice"><b><span class="av-radio"></span>Your own Slack app</b><span>Socket Mode with the app token and bot token of a Slack app you created. For using Pacenote on your own.</span></div></div><div class="av-pair"><div class="av-hub-row"><div class="av-hub-text"><b>Pair this desktop</b><span>You get a code to send to Pace in Slack. Mentions you make then come to this desktop.</span></div><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#plug"/></svg>Connect</span></div><div class="av-disclosure"><svg class="av-i s14" aria-hidden="true"><use href="icons.svg#server"/></svg><span>No hub yet? Install one on a Linux server</span><svg class="av-i s14 av-muted" aria-hidden="true"><use href="icons.svg#chevron-down"/></svg></div><div class="av-install"><span>Pacenote writes one command for the server. It asks for the Slack app's two tokens there, so they never leave the server, and starts the hub with Docker.</span><div class="av-command"><code>curl -fsSL https://raw.githubusercontent.com/Ashon/pacenote/v0.6.7/deploy/hub/install.sh | sh -s -- --url http://10.0.0.5:8790 --version 0.6.7 --lang en --pair U04MINA:2a19090a0e565d76fa3758afb602fc99a8a9dbe72d42c5b1e21c0fc9d1aec6a1</code><svg class="av-i s14" aria-hidden="true"><use href="icons.svg#copy"/></svg></div><span class="av-muted">Copied. Paste it in the server's shell. <span class="av-link">Read the script first</span></span><div class="av-wait"><svg class="av-i" aria-hidden="true"><use href="icons.svg#loader-circle"/></svg><div class="av-hub-text"><b>Waiting for the hub at http://10.0.0.5:8790</b><span>When it answers, Pace switches to it on its own: no code to send in Slack.</span></div><span class="av-btn secondary">Stop waiting</span></div></div></div>
+            </div>
+          </figure>
+        </div>
       </section>
 
       <section class="block" aria-labelledby="never-title">

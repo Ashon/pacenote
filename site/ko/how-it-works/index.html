@@ -188,11 +188,70 @@
         <h2 id="teams-title">팀원과 팀 허브</h2>
         <p>Pace는 나에게만 답해요. 다른 사람이 멘션하면 그 사람에게만 보이는 안내를 받아요. 팀원은 각자 자기 Mac에서 자기
           로그인으로 자기 Pace를 실행해요.</p>
-        <p>팀은 Pacenote 허브로 Slack 앱 하나를 함께 쓸 수 있어요. 허브는 각 멘션을 쓴 사람의 데스크톱으로 보내고, Pace는
-          거기서 그 사람의 로그인으로 답하며, Slack 토큰은 허브에 머물러요. 허브는 팀의 누군가가 Pacenote가 만들어 주는
-          명령 한 줄로 Linux 서버에 설치해요.</p>
+        <p>팀은 작은 서버 하나에 두는 Pacenote 허브로 Slack 앱 하나를 함께 쓸 수 있어요. 허브는 각 멘션을 쓴 사람의 Mac으로
+          보내고, Pace는 거기서 그 사람의 로그인으로 답하며, Slack 토큰은 허브에 머물러요. 다른 사람은 Slack 앱을 만들 필요가
+          없어요.</p>
         <p>회사가 Slack에 추가하는 어시스턴트와 다른 점이 바로 이거예요. 그런 어시스턴트는 관리자가 설정하고 회사 계정으로
           돌아가요. Pace는 내가 직접, 내 Mac에서, 내 요금제로 설정하는 어시스턴트예요.</p>
+        <figure class="arch" aria-labelledby="hub-title">
+          <p class="arch-head"><span id="hub-title">팀에 Slack 앱 하나, 멘션마다 쓴 사람의 Mac에서 답해요</span></p>
+          <div class="arch-map">
+            <div class="arch-group">
+              <p class="arch-title">Slack <span>내 워크스페이스</span></p>
+              <div class="arch-card hub-route"><b>@Pace #482에서 바뀐 재시도는?</b><span>#payments에서 mina님의 멘션</span></div>
+              <div class="arch-card"><b>@Pace web-01 확인해 줘</b><span>#ops에서 hyun님의 멘션</span></div>
+              <div class="arch-card"><b>@Pace 이 스레드 요약해 줘</b><span>#design에서 jun님의 멘션</span></div>
+              <div class="arch-chip">모두가 쓰는 Slack 앱 하나</div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">허브 <span>팀의 Linux 서버</span></p>
+              <div class="arch-card"><b>Slack 앱 토큰</b><span>여기에만 있어요. 어떤 Mac도 갖지 않아요</span></div>
+              <div class="arch-card hub-route"><b>멘션을 주인에게</b><span>멘션을 쓴 사람의 Mac으로 보내요</span></div>
+              <div class="arch-card"><b>스레드 하나, 2시간</b><span>Mac은 자기에게 온 스레드에만 닿아요</span></div>
+              <div class="arch-chip">페어링한 Mac만 기억해요</div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">팀원의 Mac <span>각자의 Pace</span></p>
+              <div class="arch-card hub-route"><b>mina님의 Mac</b><span>mina님에게 claude로 답해요</span></div>
+              <div class="arch-card"><b>hyun님의 Mac</b><span>hyun님에게 codex로 답해요</span></div>
+              <div class="arch-card hub-off"><b>jun님, 페어링 안 함</b><span>jun님에게만 보이는 안내를 받아요</span></div>
+              <div class="arch-chip">로그인, 실행 기록, 할 일은 여기에</div>
+            </div>
+          </div>
+          <p class="hub-caption">mina님의 멘션은 mina님의 Mac으로만 가고, Pace는 mina님의 로그인으로 스레드에 답해요.</p>
+        </figure>
+        <h3 class="sub">네 단계로 설정해요</h3>
+        <ol class="steps">
+          <li><b>Slack 앱을 만들어요.</b> Pacenote의 매니페스트로, Socket Mode를 켜서요. 내 앱을 허브로 옮긴다면 그 앱의
+            토큰을 써요.</li>
+          <li><b>명령 한 줄을 복사해요.</b> 설정 &gt; 메신저 &gt; Slack의 "허브가 없나요?"에서 멤버가 접속할 주소와 쓸 수 있는
+            사람을 정해요.</li>
+          <li><b>서버에 붙여 넣어요.</b> 토큰 두 개는 서버에서 입력받고, Docker로 허브를 띄운 뒤 응답을 기다려요. 내 Pace는
+            알아서 허브로 전환돼요.</li>
+          <li><b>팀원이 페어링해요.</b> 각자 허브 주소를 넣고, Pacenote가 보여 주는 코드를 Slack에서 <code>@Pace</code>에게
+            보내요.</li>
+        </ol>
+        <ul class="wells two">
+          <li>
+            <h3>내 네트워크 안에서</h3>
+            <code>http://10.0.0.5:8790</code>
+            <p>사설 주소나 내 네트워크에서만 쓰는 이름이면 http로도 돼요. 이때 허브 토큰과 스레드는 암호화되지 않은
+              채 그 네트워크를 지나요.</p>
+          </li>
+          <li>
+            <h3>그 밖의 곳에서</h3>
+            <code>https://pacenote-hub.example.com</code>
+            <p>허브는 서버 안에서만 열리고, 앞에 둔 Caddy 같은 프록시가 HTTPS로 내보내요.</p>
+          </li>
+        </ul>
+        <div class="promise sub">
+          <h3>허브가 보는 것과 남기는 것</h3>
+          <dl class="keeps">
+            <div><dt>지나가는 동안 보는 것</dt><dd>멘션과 그 스레드, Pace의 답변이에요. Slack 서버가 보는 것처럼요.</dd></div>
+            <div><dt>남기는 것</dt><dd>Slack 앱 토큰, 그리고 페어링한 Mac(토큰의 해시)이에요.</dd></div>
+            <div><dt>절대 갖지 않는 것</dt><dd>누구의 AI 로그인도, 실행 기록도, 할 일도요. 모두 각자의 Mac에 남아요.</dd></div>
+          </dl>
+        </div>
         <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">팀 허브<span aria-hidden="true"> ↗</span></a>
       </section>
 

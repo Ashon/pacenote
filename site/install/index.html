@@ -78,6 +78,47 @@
         </ol>
       </section>
 
+      <section class="block" id="team" aria-labelledby="team-title">
+        <h2 id="team-title">Starting with your team</h2>
+        <p>One person sets up a hub on a Linux server with Docker, and everyone else pairs with it. Only the hub needs a
+          Slack app, so nobody else waits for an admin.</p>
+        <div class="row">
+          <div class="copy">
+            <h3>If you set up the hub</h3>
+            <ol class="steps down">
+              <li>Create the Slack app from Pacenote's manifest, with Socket Mode and an app token.</li>
+              <li>In Settings &gt; Messengers &gt; Slack, open <b>No hub yet?</b>, give the address members will use, and copy
+                the command.</li>
+              <li>Paste it in the server's shell. It asks for the two tokens there, so they never leave the server. When the
+                hub answers, your Pace switches to it.</li>
+            </ol>
+          </div>
+          <figure class="shot">
+            <div class="av av-term" role="img"
+              aria-label="The command pasted in a server's shell: it says the Slack app's tokens stay on the server, asks for the app token and the bot token, checks them with Slack, starts the hub and ends with a link that opens Pacenote on it.">
+              <div class="av-term-bar"><svg class="av-i s14" aria-hidden="true"><use href="../icons.svg#square-terminal"/></svg>ops@hub-01: ~</div><div class="av-term-lines"><span><span class="prompt">ops@hub-01:~$</span> curl -fsSL https://raw.githubusercontent.com/Ashon/pacenote/v0.6.7/deploy/hub/install.sh | sh -s -- --url http://10.0.0.5:8790 --version 0.6.7 --lang en --pair U04MINA:2a19090a0e565d76fa3758afb602fc99a8a9dbe72d42c5b1e21c0fc9d1aec6a1</span><span class="dim">The Slack app's tokens stay on this server, in /home/ops/pacenote-hub/hub.env.</span><span>App token (xapp-..., Basic Information &gt; App-Level Tokens):</span><span>Bot token (xoxb-..., OAuth &amp; Permissions):</span><span>Slack: Acme, @pace</span><span>Starting the hub (0.6.7) in /home/ops/pacenote-hub</span><span class="gap"></span><span class="ok">The hub is running: http://10.0.0.5:8790</span><span>Pacenote on your Mac switches Pace to this hub on its own.</span><span class="link">Open in Pacenote</span><span class="dim">pacenote://hub/connect?url=http%3A%2F%2F10.0.0.5%3A8790</span></div>
+            </div>
+          </figure>
+        </div>
+        <div class="well">
+          <h3>If your team already has one</h3>
+          <p>Choose <b>Join your team's hub</b> in setup, or Team hub in Settings &gt; Messengers &gt; Slack. Enter the
+            address you were given and choose Connect, send the code Pacenote shows to <code>@Pace</code> in a channel it
+            is in, then confirm in Pacenote that the account is yours.</p>
+        </div>
+        <div class="qa sub">
+          <h3>Who can use the hub?</h3>
+          <p>Everyone in the workspace, or only the Slack members you list when you copy the command.</p>
+          <h3>Does it need a domain or HTTPS?</h3>
+          <p>Not on your own network: http at a private address works. Anywhere else, serve it over HTTPS.</p>
+          <h3>What if a teammate's Mac is off?</h3>
+          <p>Their mention gets a note only they can see, saying their Pace is not connected.</p>
+          <h3>How do I update it?</h3>
+          <p>Copy the command again from the Pacenote you updated to, and run it. The tokens stay, and the hub takes that
+            version.</p>
+        </div>
+      </section>
+
       <section class="block" id="update" aria-labelledby="update-title">
         <h2 id="update-title">Update or remove</h2>
         <p>Run <code>brew upgrade --cask pacenote</code> to update; the app tells you when a new version is out. Run
@@ -94,7 +135,7 @@
           <h3>Do I need my Slack admin?</h3>
           <p>You need to be able to create and install an app in your workspace, and some workspaces ask an admin to
             approve new apps. If your team runs a Pacenote hub, you pair your Mac with it instead: only the hub needs the
-            app. Pacenote writes the one command that installs a hub on a Linux server.</p>
+            app. See <a href="#team">Starting with your team</a>.</p>
           <h3>Does it work on Intel Macs, Windows or Microsoft Teams?</h3>
           <p>Not today. Pacenote runs on Apple silicon Macs and works with Slack.</p>
         </div>

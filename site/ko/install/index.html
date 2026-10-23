@@ -78,6 +78,46 @@
         </ol>
       </section>
 
+      <section class="block" id="team" aria-labelledby="team-title">
+        <h2 id="team-title">팀으로 시작하기</h2>
+        <p>한 사람이 Docker가 있는 Linux 서버에 허브를 설치하고, 나머지는 허브와 페어링해요. Slack 앱은 허브에만 있으면
+          되니, 다른 사람은 관리자를 기다릴 필요가 없어요.</p>
+        <div class="row">
+          <div class="copy">
+            <h3>허브를 설치한다면</h3>
+            <ol class="steps down">
+              <li>Pacenote의 매니페스트로 Socket Mode를 켠 Slack 앱과 앱 토큰을 만들어요.</li>
+              <li>설정 &gt; 메신저 &gt; Slack에서 <b>허브가 없나요?</b>를 열고, 멤버가 접속할 주소를 넣은 뒤 명령을
+                복사해요.</li>
+              <li>서버의 셸에 붙여 넣어요. 토큰 두 개는 서버에서 입력받아 서버 밖으로 나가지 않아요. 허브가 응답하면 내
+                Pace가 허브로 전환돼요.</li>
+            </ol>
+          </div>
+          <figure class="shot">
+            <div class="av av-term" role="img"
+              aria-label="서버의 셸에 붙여 넣은 명령: Slack 앱 토큰이 서버에만 남는다고 알리고, 앱 토큰과 봇 토큰을 묻고, Slack으로 확인한 뒤 허브를 시작하고, Pacenote에서 허브를 여는 링크로 끝나요.">
+              <div class="av-term-bar"><svg class="av-i s14" aria-hidden="true"><use href="../../icons.svg#square-terminal"/></svg>ops@hub-01: ~</div><div class="av-term-lines"><span><span class="prompt">ops@hub-01:~$</span> curl -fsSL https://raw.githubusercontent.com/Ashon/pacenote/v0.6.7/deploy/hub/install.sh | sh -s -- --url http://10.0.0.5:8790 --version 0.6.7 --lang ko --pair U04MINA:2a19090a0e565d76fa3758afb602fc99a8a9dbe72d42c5b1e21c0fc9d1aec6a1</span><span class="dim">Slack 앱 토큰은 이 서버의 /home/ops/pacenote-hub/hub.env에만 남아요.</span><span>앱 토큰 (xapp-..., Basic Information &gt; App-Level Tokens):</span><span>봇 토큰 (xoxb-..., OAuth &amp; Permissions):</span><span>Slack: Acme, @pace</span><span>/home/ops/pacenote-hub에서 허브(0.6.7)를 시작하는 중</span><span class="gap"></span><span class="ok">허브가 실행 중이에요: http://10.0.0.5:8790</span><span>Mac의 Pacenote가 Pace를 이 허브로 알아서 전환해요.</span><span class="link">Pacenote에서 열기</span><span class="dim">pacenote://hub/connect?url=http%3A%2F%2F10.0.0.5%3A8790</span></div>
+            </div>
+          </figure>
+        </div>
+        <div class="well">
+          <h3>팀에 이미 허브가 있다면</h3>
+          <p>초기 설정에서 <b>팀 허브에 참여</b>를 고르거나, 설정 &gt; 메신저 &gt; Slack에서 팀 허브를 골라요. 받은 주소를
+            넣고 연결을 누른 뒤, Pacenote가 보여 주는 코드를 Pace가 있는 채널에서 <code>@Pace</code>에게 보내고,
+            Pacenote에서 내 계정이 맞는지 확인해요.</p>
+        </div>
+        <div class="qa sub">
+          <h3>허브는 누가 쓸 수 있나요?</h3>
+          <p>워크스페이스의 모두, 또는 명령을 복사할 때 적은 Slack 멤버만요.</p>
+          <h3>도메인이나 HTTPS가 꼭 필요한가요?</h3>
+          <p>내 네트워크 안에서는 아니에요. 사설 주소에서 http로 돼요. 그 밖의 곳에서는 HTTPS로 내보내세요.</p>
+          <h3>팀원의 Mac이 꺼져 있으면요?</h3>
+          <p>그 사람의 멘션에는 Pace가 연결되어 있지 않다는 안내가 그 사람에게만 보이게 가요.</p>
+          <h3>허브는 어떻게 업데이트하나요?</h3>
+          <p>업데이트한 Pacenote에서 명령을 다시 복사해 실행하세요. 토큰은 그대로 두고, 허브는 그 버전으로 바뀌어요.</p>
+        </div>
+      </section>
+
       <section class="block" id="update" aria-labelledby="update-title">
         <h2 id="update-title">업데이트와 삭제</h2>
         <p>업데이트하려면 <code>brew upgrade --cask pacenote</code>를 실행하세요. 새 버전이 나오면 앱이 알려 줘요. 삭제하려면
@@ -94,7 +134,7 @@
           <h3>Slack 관리자가 필요한가요?</h3>
           <p>워크스페이스에서 앱을 만들고 설치할 수 있어야 해요. 워크스페이스에 따라 새 앱에 관리자 승인이 필요할 수도
             있어요. 팀에서 Pacenote 허브를 운영한다면, 대신 내 Mac을 허브와 페어링하면 돼요. 앱은 허브에만 있으면 돼요.
-            Linux 서버에 허브를 설치하는 명령 한 줄은 Pacenote가 만들어 줘요.</p>
+            <a href="#team">팀으로 시작하기</a>를 보세요.</p>
           <h3>Intel Mac, Windows, Microsoft Teams에서도 되나요?</h3>
           <p>지금은 안 돼요. Pacenote는 Apple silicon Mac에서 돌아가고, Slack을 지원해요.</p>
         </div>

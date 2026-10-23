@@ -1320,6 +1320,187 @@ code {
   font-weight: 600;
 }
 
+/* Team hub: Settings > Messengers > Slack as the app draws it, with "No hub yet?" open and waiting */
+.av-hub {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+}
+.av-hub-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 4px;
+}
+.av-hub-head b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.av-hub-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 20px 12px;
+}
+.av-hub-row + .av-hub-row,
+.av-choices + .av-hub-row {
+  border-top: 1px solid var(--border);
+}
+.av-hub-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.av-hub-text b,
+.av-choice b {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.av-hub-text span,
+.av-choice span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.av-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 20px 14px;
+  border-top: 1px solid var(--border);
+}
+.av-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.av-choice.on {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--selected) 35%, var(--card));
+}
+.av-choice b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.av-radio {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+}
+.av-choice.on .av-radio {
+  border-color: var(--primary);
+  background: radial-gradient(circle, var(--primary) 0 3px, transparent 3.5px);
+}
+.av-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 18px;
+  background: var(--well);
+}
+.av-pair .av-hub-row {
+  padding: 0;
+}
+.av-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.av-disclosure span {
+  flex: 1;
+}
+.av-install {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 12px;
+}
+.av-command {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--well);
+}
+.av-command code {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.av-command .av-i,
+.av-wait > .av-i {
+  color: var(--muted-foreground);
+}
+.av-link {
+  color: var(--primary);
+}
+.av-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.av-wait .av-hub-text b {
+  font-weight: 400;
+}
+
+/* The hub's installer in a server's shell: a terminal, dark in both themes */
+.av-term {
+  background: #13221e;
+  color: #d6e6df;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.av-term-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #1a2d27;
+  color: #a3b9b1;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 550;
+}
+.av-term-lines {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 18px;
+  overflow-wrap: anywhere;
+}
+.av-term .prompt,
+.av-term .ok {
+  color: #5fd3a8;
+}
+.av-term .ok {
+  font-weight: 600;
+}
+.av-term .dim {
+  color: #a3b9b1;
+}
+.av-term .link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.av-term .gap {
+  height: 10px;
+}
+
 /* Motion controls: pause, play or replay an animation that runs by itself (WCAG 2.2.2) */
 .motion-control {
   display: inline-flex;
@@ -1682,6 +1863,75 @@ code {
   background: var(--secondary-hover);
 }
 
+/* How it works: the team hub, the architecture's cards standing still, one mention's way marked */
+.hub-route {
+  background: var(--card-accent);
+  outline: 1.5px solid var(--track);
+  outline-offset: -1.5px;
+}
+.hub-off {
+  border-style: dashed;
+  background: transparent;
+}
+.hub-caption {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.875rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+.hub-caption::before {
+  content: '';
+  flex: none;
+  width: 1.5rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--track);
+}
+.wells.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wells code {
+  display: inline-block;
+  margin-top: 0.375rem;
+}
+.promise h3 + .keeps {
+  margin-top: 1rem;
+}
+.keeps {
+  margin: 1.5rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 2rem;
+}
+.keeps div {
+  padding: 0.875rem 0;
+  border-top: 1px solid var(--border);
+}
+.keeps dt {
+  font-weight: 600;
+}
+.keeps dd {
+  margin: 0.25rem 0 0;
+  color: var(--muted-foreground);
+}
+.block .sub {
+  margin-top: 3rem;
+}
+.block p + .row {
+  margin-top: 2.25rem;
+}
+.well {
+  margin-top: 2rem;
+  background: var(--well);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 1.25rem 1.375rem;
+}
+.well p {
+  margin: 0.375rem 0 0;
+}
+
 /* The last word on each page: one next step */
 .closing .get {
   margin-top: 1.25rem;
@@ -1728,6 +1978,9 @@ code {
 
 @media (max-width: 60rem) {
   .arch-map {
+    grid-template-columns: 1fr;
+  }
+  .keeps {
     grid-template-columns: 1fr;
   }
   .row,
@@ -1804,6 +2057,18 @@ code {
     top: calc(1.25rem + 14px);
     right: 1.5rem;
     transform: translateY(-50%);
+  }
+  /* The team hub's card keeps what the hub needs: the chosen connection, the command and the wait */
+  .av-choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .av-choice:not(.on),
+  .av-hub-row > .av-btn.outline,
+  .av-wait > .av-btn {
+    display: none;
+  }
+  .wells.two {
+    grid-template-columns: 1fr;
   }
   /* The install command wraps between its halves rather than hide its end */
   .command code {

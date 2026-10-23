@@ -190,11 +190,70 @@
         <h2 id="teams-title">Teammates and the hub</h2>
         <p>Pace answers only you. Anyone else who mentions it gets a note only they can see. Teammates each run their own
           Pace, on their own Mac and login.</p>
-        <p>A team can share one Slack app through a Pacenote hub. The hub sends each mention to the desktop of the person
-          who wrote it, where Pace answers with that person's login, and the Slack tokens stay on the hub. Someone on the
-          team installs it on a Linux server with one command that Pacenote writes.</p>
+        <p>A team can share one Slack app through a Pacenote hub, a small server of its own. The hub sends each mention to
+          the Mac of the person who wrote it, where Pace answers with that person's login, and the Slack tokens stay on the
+          hub. Nobody else has to create a Slack app.</p>
         <p>That is the difference from an assistant a company adds to Slack: that one is set up by an admin and runs
           under the company's account. Pace is one you set up yourself, on your Mac, with your own plan.</p>
+        <figure class="arch" aria-labelledby="hub-title">
+          <p class="arch-head"><span id="hub-title">One Slack app for the team, each mention answered on its owner's Mac</span></p>
+          <div class="arch-map">
+            <div class="arch-group">
+              <p class="arch-title">Slack <span>Your workspace</span></p>
+              <div class="arch-card hub-route"><b>@Pace which retries changed in #482?</b><span>mina's mention in #payments</span></div>
+              <div class="arch-card"><b>@Pace check web-01</b><span>hyun's mention in #ops</span></div>
+              <div class="arch-card"><b>@Pace sum up this thread</b><span>jun's mention in #design</span></div>
+              <div class="arch-chip">One Slack app, for everyone</div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">Hub <span>A Linux server of your team's</span></p>
+              <div class="arch-card"><b>The Slack app's tokens</b><span>Only here: no Mac ever gets one</span></div>
+              <div class="arch-card hub-route"><b>Sends each mention home</b><span>To the Mac of the person who wrote it</span></div>
+              <div class="arch-card"><b>One thread, for 2 hours</b><span>A Mac reaches only the thread it was sent</span></div>
+              <div class="arch-chip">Keeps only the paired Macs</div>
+            </div>
+            <div class="arch-group">
+              <p class="arch-title">Teammates' Macs <span>Their own Pace</span></p>
+              <div class="arch-card hub-route"><b>mina's Mac</b><span>Answers mina, with claude</span></div>
+              <div class="arch-card"><b>hyun's Mac</b><span>Answers hyun, with codex</span></div>
+              <div class="arch-card hub-off"><b>jun, not paired</b><span>Gets a note only jun can see</span></div>
+              <div class="arch-chip">Logins, runs and Todo stay here</div>
+            </div>
+          </div>
+          <p class="hub-caption">mina's mention goes only to mina's Mac, and Pace answers in the thread with mina's own login.</p>
+        </figure>
+        <h3 class="sub">Set up in four steps</h3>
+        <ol class="steps">
+          <li><b>Create the Slack app</b> from Pacenote's manifest, with Socket Mode. Moving your own app to the hub? Use its
+            tokens.</li>
+          <li><b>Copy one command</b> in Settings &gt; Messengers &gt; Slack, under "No hub yet?": the address members will use
+            and who can use it.</li>
+          <li><b>Paste it on the server.</b> It asks for the two tokens there, starts the hub with Docker and waits for it.
+            Your Pace switches to it on its own.</li>
+          <li><b>Teammates pair.</b> Each enters the hub's address and sends the code Pacenote shows to <code>@Pace</code> in
+            Slack.</li>
+        </ol>
+        <ul class="wells two">
+          <li>
+            <h3>On your own network</h3>
+            <code>http://10.0.0.5:8790</code>
+            <p>Plain http works at a private address or a name only your network knows. The hub token and the
+              threads then cross that network unencrypted.</p>
+          </li>
+          <li>
+            <h3>Anywhere else</h3>
+            <code>https://pacenote-hub.example.com</code>
+            <p>The hub listens on the server itself, and Caddy or another proxy in front serves it over HTTPS.</p>
+          </li>
+        </ul>
+        <div class="promise sub">
+          <h3>What the hub sees and keeps</h3>
+          <dl class="keeps">
+            <div><dt>Sees, on the way</dt><dd>Mentions, their threads and Pace's answers, as Slack's own servers do.</dd></div>
+            <div><dt>Keeps</dt><dd>The Slack app's tokens, and the paired Macs as hashes of their tokens.</dd></div>
+            <div><dt>Never has</dt><dd>Anyone's AI login, runs or Todo. Those stay on each Mac.</dd></div>
+          </dl>
+        </div>
         <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">The team hub<span aria-hidden="true"> ↗</span></a>
       </section>
 

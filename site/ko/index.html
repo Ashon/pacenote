@@ -172,6 +172,20 @@
             </div>
           </figure>
         </div>
+        <div class="row">
+          <div class="copy">
+            <h2>팀과 Slack 앱 하나를 함께 쓰세요</h2>
+            <p>Pacenote 허브를 두면 팀이 Slack 앱 하나를 함께 쓰고, 멘션은 여전히 쓴 사람의 Mac으로 가서 그 사람의
+              로그인으로 답해요. 허브를 Linux 서버에 설치하는 명령 한 줄은 Pacenote가 만들어 줘요.</p>
+            <a class="more" href="how-it-works/#teams">팀원과 팀 허브</a>
+          </div>
+          <figure class="shot">
+            <div class="av av-hub" role="img"
+              aria-label="설정 &gt; 메신저 &gt; Slack: 연결은 팀 허브, 주소는 http://10.0.0.5:8790이고 아직 페어링 전이에요. '허브가 없나요?' 아래에 Pacenote가 Linux 서버에 허브를 설치하는 명령을 만들어 복사해 두었고, 그 주소에서 허브를 기다려요. 허브가 응답하면 Slack에 코드를 보내지 않아도 Pace가 알아서 허브로 전환돼요.">
+              <div class="av-hub-head"><b>Slack</b><span class="av-badge due">페어링 안 됨</span></div><div class="av-hub-row"><div class="av-hub-text"><b>연결</b><span>이 데스크톱이 Slack에 닿는 방법이에요. 팀 허브를 거치거나 직접 만든 Slack 앱을 써요.</span></div><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#plug"/></svg>연결 확인</span></div><div class="av-choices"><div class="av-choice on"><b><span class="av-radio"></span>팀 허브</b><span>팀의 허브 서버가 Slack 앱을 맡아요. 이 데스크톱은 허브를 거쳐 내 멘션에 답하고, Slack 토큰은 갖지 않아요.</span></div><div class="av-choice"><b><span class="av-radio"></span>내 Slack 앱</b><span>직접 만든 Slack 앱의 앱 토큰과 봇 토큰으로 Socket Mode에 연결해요. Pacenote를 혼자 쓸 때 골라요.</span></div></div><div class="av-pair"><div class="av-hub-row"><div class="av-hub-text"><b>이 데스크톱 페어링</b><span>Slack에서 Pace에게 보낼 코드를 받아요. 그 뒤로 내가 한 멘션은 이 데스크톱으로 와요.</span></div><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#plug"/></svg>연결</span></div><div class="av-disclosure"><svg class="av-i s14" aria-hidden="true"><use href="../icons.svg#server"/></svg><span>허브가 없나요? Linux 서버에 설치하기</span><svg class="av-i s14 av-muted" aria-hidden="true"><use href="../icons.svg#chevron-down"/></svg></div><div class="av-install"><span>Pacenote가 서버에서 실행할 명령 한 줄을 만들어요. Slack 앱 토큰 두 개는 서버에서 입력받아 서버 밖으로 나가지 않고, 허브는 Docker로 실행돼요.</span><div class="av-command"><code>curl -fsSL https://raw.githubusercontent.com/Ashon/pacenote/v0.6.7/deploy/hub/install.sh | sh -s -- --url http://10.0.0.5:8790 --version 0.6.7 --lang ko --pair U04MINA:2a19090a0e565d76fa3758afb602fc99a8a9dbe72d42c5b1e21c0fc9d1aec6a1</code><svg class="av-i s14" aria-hidden="true"><use href="../icons.svg#copy"/></svg></div><span class="av-muted">복사했어요. 서버의 셸에 붙여 넣으세요. <span class="av-link">스크립트 먼저 보기</span></span><div class="av-wait"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#loader-circle"/></svg><div class="av-hub-text"><b>http://10.0.0.5:8790에서 허브를 기다리는 중</b><span>허브가 응답하면 Pace가 알아서 허브로 전환돼요. Slack에 코드를 보낼 필요가 없어요.</span></div><span class="av-btn secondary">그만 기다리기</span></div></div></div>
+            </div>
+          </figure>
+        </div>
       </section>
 
       <section class="block" aria-labelledby="never-title">
