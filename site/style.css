@@ -681,13 +681,16 @@ code {
 
 /* App views: the app drawn in HTML with its own tokens, sizes and icons (icons.svg, from the app's
    lucide), in place of screenshots, so a screen stays sharp at any density, follows light and dark,
-   and its words are text. Each is role="img" with a description; nothing in it takes focus. */
+   and its words are text. Each is role="img" with a description; it is a picture, so nothing in it
+   takes focus, the pointer or a selection. */
 .av {
   font-size: 13px;
   line-height: 1.45;
   color: var(--foreground);
   text-align: left;
-  cursor: default;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .av-i {
   flex: none;
