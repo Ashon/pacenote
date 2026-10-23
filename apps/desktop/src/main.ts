@@ -203,6 +203,7 @@ import {
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
+import { OpencodeSessions } from './opencode-sessions.js'
 import { hubFromLink } from '../../../src/hub/install.js'
 import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
@@ -571,6 +572,14 @@ const cliBins = (): Bins => {
     opencode: env.OPENCODE_BIN?.trim() || 'opencode',
   }
 }
+/**
+ * opencode's sessions for the tasks continued in it, asked of its CLI in the
+ * background while Todo is open
+ */
+const opencodeSessions = new OpencodeSessions({
+  bin: () => cliBins().opencode,
+  env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
+})
 /** How Pacenote's own work runs a CLI on this Mac */
 const ownWork = (cli: OwnCli) => ({
   cli,
@@ -1242,6 +1251,14 @@ function registerBotIpc(): void {
   // and keeps your decisions (tasks-decisions.json, which only the app writes).
   // The Claude app and the Codex app, when on this Mac: sessions can open in
   // them (Open sessions in); tests list them in PACENOTE_HANDOFF_APPS.
+  /** Whether a command is on the PATH Pacenote runs the CLIs with */
+  const WORK_TOOLS: WorkTool[] = ['claude', 'codex', 'opencode']
+  const onPath = (bin: string) =>
+    bin.includes('/')
+      ? existsSync(bin)
+      : toolPath()
+          .split(':')
+          .some((dir) => dir && existsSync(path.join(dir, bin)))
   const hasApp = (tool: WorkTool) =>
     process.env.PACENOTE_HANDOFF_APPS === undefined
       ? Boolean(app.getApplicationNameForProtocol(`${tool}://`))
@@ -1256,11 +1273,20 @@ function registerBotIpc(): void {
       names: listOf(env.TASKS_NAMES),
       groups: listOf(env.TASKS_GROUPS),
       /** Where code tasks continue */
-      cli: env.TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
+      cli:
+        env.TASKS_CLI === 'codex' || env.TASKS_CLI === 'opencode'
+          ? env.TASKS_CLI
+          : ('claude' as const),
+      /** The tools a code task can continue in here */
+      tools: WORK_TOOLS.filter(
+        (tool) => tool !== 'opencode' || onPath(cliBins().opencode)
+      ),
       /** Where each tool's new sessions open: its app, when on this Mac */
       opensIn: {
         claude: inApp && hasApp('claude') ? 'app' : 'terminal',
         codex: inApp && hasApp('codex') ? 'app' : 'terminal',
+        // opencode has no app to write the task into
+        opencode: 'terminal',
       } satisfies Record<WorkTool, OpenIn>,
     }
   }
@@ -1273,6 +1299,14 @@ function registerBotIpc(): void {
     })
     linkSessionsSoon()
     judgeSoon()
+    // opencode's sessions: found once started, and when each last wrote
+    void opencodeSessions.refreshSoon(
+      readWork(dataDir).entries.filter(
+        (entry): entry is Session => entry.kind === 'session' && !entry.mac
+      ),
+      (entry, session) =>
+        updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
+    )
     const open = view.tasks.filter((task) => task.status === 'open')
     const yours = yourGroups(current)
     const areas = readYou(dataDir).areas
@@ -1595,6 +1629,12 @@ function registerBotIpc(): void {
   const sessionNow = (
     entry: Pick<Session, 'session' | 'tool' | 'startedAt'>
   ): { lastActiveAt?: string; branch?: string } => {
+    if (entry.tool === 'opencode')
+      return {
+        lastActiveAt: entry.session
+          ? opencodeSessions.activeAt(entry.session)
+          : undefined,
+      }
     const summary = entry.session && sessionIndex.session(entry.session)
     if (summary)
       return {
@@ -1626,7 +1666,12 @@ function registerBotIpc(): void {
       })
       for (const { task, entry, activeAt } of due) {
         const file = sessionFile(homedir(), entry)
-        const items = file ? readSessionLog(file, entry.tool) : []
+        const items =
+          entry.tool === 'opencode'
+            ? ((await opencodeSessions.log(entry)) ?? [])
+            : file
+              ? readSessionLog(file, entry.tool)
+              : []
         const pr = await pullRequestOf(
           task.repo,
           entry.branch ?? sessionNow(entry).branch,
@@ -1728,10 +1773,13 @@ function registerBotIpc(): void {
         !entry.mac &&
         (!entry.app || Date.now() - Date.parse(entry.startedAt) <= UNSENT_MS)
       ) {
+        // opencode's are found in the background (opencodeSessions)
         const session =
           entry.tool === 'codex'
             ? findCodexSession(homedir(), entry)
-            : findClaudeSession(homedir(), entry)
+            : entry.tool === 'claude'
+              ? findClaudeSession(homedir(), entry)
+              : undefined
         if (session) updateWork(dataDir, entry.id, (e) => ({ ...e, session }))
       }
     linkSessionsSoon()
@@ -1856,6 +1904,7 @@ function registerBotIpc(): void {
   handle('pacenote:tasks:apps', null, () => ({
     claude: hasApp('claude'),
     codex: hasApp('codex'),
+    opencode: false,
   }))
   handle('pacenote:tasks:set-repo', {}, (repo, folder) => {
     if (typeof repo !== 'string') return {}
@@ -1981,6 +2030,12 @@ function registerBotIpc(): void {
     const t = localized(text)
     const entry = sessionEntry(entryId)
     if (!entry) return { error: t.noSuchSession }
+    if (entry.tool === 'opencode')
+      return opencodeSessions
+        .log(entry)
+        .then((items) =>
+          items ? { items } : { error: t.noSessionLog(TOOL_LABEL.opencode) }
+        )
     const file = sessionFile(homedir(), entry)
     if (!file) return { error: t.noSessionLog(TOOL_LABEL[entry.tool]) }
     return orError(() => ({ items: readSessionLog(file, entry.tool) }))

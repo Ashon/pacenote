@@ -300,6 +300,23 @@ describe('the handoff', () => {
     expect(
       commandScript({ cwd: '/w', bin: 'codex', tool: 'codex', resume: 's2' })
     ).toContain(`'codex' resume 's2'`)
+    // opencode: the task as its first prompt, and its session by id
+    expect(
+      commandScript({
+        cwd: '/w',
+        bin: 'opencode',
+        tool: 'opencode',
+        promptFile: '/p.md',
+      })
+    ).toContain(`'opencode' --prompt "$(cat '/p.md')"`)
+    expect(
+      commandScript({
+        cwd: '/w',
+        bin: 'opencode',
+        tool: 'opencode',
+        resume: 'ses_1',
+      })
+    ).toContain(`'opencode' --session 'ses_1'`)
   })
 
   it('opens a session in the folder and continues it later', async () => {
@@ -560,6 +577,31 @@ describe('the handoff', () => {
     expect(terminal.note).toBeUndefined()
     expect(terminal.entry.session).toMatch(/^[0-9a-f-]{36}$/)
     expect(scripts).toHaveLength(3)
+
+    // opencode opens in the terminal whatever Open sessions in says, with
+    // its session found later by the marker
+    openIn = 'app'
+    apps.add('opencode')
+    const opencode = await openSession(
+      options,
+      task,
+      context,
+      'opencode',
+      '/w/payments'
+    )
+    expect(opencode.note).toBe(
+      'opencode opens in your terminal: it has no desktop app to write the task into.'
+    )
+    expect(opencode.entry).toMatchObject({
+      tool: 'opencode',
+      session: undefined,
+    })
+    expect(readFileSync(scripts[3]!, 'utf8')).toContain(
+      `'/opt/opencode' --prompt "$(cat`
+    )
+    expect(resumeCommand({ ...opencode.entry, session: 'ses_9' })).toBe(
+      `cd '/w/payments' && opencode --session ses_9`
+    )
   })
 })
 

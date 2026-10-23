@@ -378,7 +378,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   TASKS_OPEN_IN: {
     label: '세션을 열 곳',
-    help: '데스크톱 앱은 Claude 앱의 Code 탭이나 Codex 앱을 할 일이 입력된 채로 열고, 보내기는 내가 해요. 터미널은 내 터미널에서 claude나 codex를 실행해요.',
+    help: '데스크톱 앱은 Claude 앱의 Code 탭이나 Codex 앱을 할 일이 입력된 채로 열고, 보내기는 내가 해요. 터미널은 내 터미널에서 claude, codex, opencode를 실행해요. opencode는 언제나 터미널에서 열려요.',
     options: {
       terminal: { label: '터미널' },
       app: { label: '데스크톱 앱' },

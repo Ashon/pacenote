@@ -65,7 +65,7 @@ Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the c
 
 ### Collecting from inside your AI tool
 
-Add Pacenote to Claude Code or Codex in Settings > Todo (one click per tool, [details](history-mcp.md#adding-it-to-a-tool))
+Add Pacenote to Claude Code, Codex or opencode in Settings > Todo (one click per tool, [details](history-mcp.md#adding-it-to-a-tool))
 to ask them about your tasks (`my_tasks`), or to collect from inside them: in Claude Code, `/mcp__pacenote__collect_tasks`;
 in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, if it has a Slack connector.
 
@@ -127,6 +127,13 @@ the marker in its first prompt. A Codex session continues in the Codex app; a Cl
 terminal (`claude --resume`), as the Claude app has no link to continue one. Without the app on this Mac, Continue opens
 your terminal instead and says so. A link carries a prompt of up to 12,000 characters; a longer one leaves what came
 before to `task_context`.
+
+**Continue in opencode** (Open code tasks in: opencode) opens `opencode --prompt` in your terminal, whatever Open sessions
+in says, as opencode has no app to write the task into. opencode keeps its sessions in its own service rather than in
+files, so while the Todo screen is open Pacenote asks its CLI every 10 seconds or so: `opencode session list` in the
+task's folder finds the session whose first message has the task's marker, and says when it last wrote; `opencode
+session export` reads it for the session's log and for "looks done". It continues with `opencode --session <id>`. A
+task row's menu offers the other tools that are on this Mac, opencode among them once its CLI is on the PATH.
 
 With "Show sessions you start yourself" on (Settings > Todo), the work log also has the sessions you started on your
 own, from Claude Code's and Codex's logs on this Mac (the last 14 days; Claude Code's in the Claude app and IDE

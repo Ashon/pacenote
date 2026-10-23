@@ -9,7 +9,9 @@ const en = {
   didNotOpen: (terminal: string, error: string) =>
     `${terminal} did not open (${error}). Choose another terminal in Settings > Todo.`,
   noApp: (tool: WorkTool) =>
-    `The ${tool === 'codex' ? 'Codex app' : 'Claude app'} isn't on this Mac, so the session opened in your terminal.`,
+    tool === 'opencode'
+      ? 'opencode opens in your terminal: it has no desktop app to write the task into.'
+      : `The ${tool === 'codex' ? 'Codex app' : 'Claude app'} isn't on this Mac, so the session opened in your terminal.`,
   openedInClaude:
     'Opened in the Claude app with the task written in. Confirm the folder there, then send it.',
   openedInCodex:
@@ -24,7 +26,9 @@ const ko: typeof en = {
   didNotOpen: (terminal, error) =>
     `${josa(terminal, '이/가')} 열리지 않았어요(${error}). 설정 > 할 일에서 다른 터미널을 선택하세요.`,
   noApp: (tool) =>
-    `이 Mac에 ${tool === 'codex' ? 'Codex 앱이' : 'Claude 앱이'} 없어서 터미널에서 세션을 열었어요.`,
+    tool === 'opencode'
+      ? 'opencode는 할 일을 적어 둘 데스크톱 앱이 없어서 터미널에서 열었어요.'
+      : `이 Mac에 ${tool === 'codex' ? 'Codex 앱이' : 'Claude 앱이'} 없어서 터미널에서 세션을 열었어요.`,
   openedInClaude:
     'Claude 앱에 할 일을 적어 열었어요. 그곳에서 폴더를 확인한 뒤 보내세요.',
   openedInCodex: 'Codex 앱에 할 일을 적어 열었어요. 그곳에서 보내면 시작돼요.',

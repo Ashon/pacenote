@@ -24,6 +24,9 @@ await build({
   outfile: path.join(distDir, 'main.js'),
   external: ['electron'],
   format: 'esm',
+  // jsonc-parser's main build is UMD, whose modules it requires at run time,
+  // which a bundle does not have: its ES build bundles whole.
+  alias: { 'jsonc-parser': 'jsonc-parser/lib/esm/main.js' },
   // CommonJS packages bundled in (Slack's Bolt, for setup's "@Pace it's me")
   // require Node's modules at run time, which ESM has no require for.
   banner: {

@@ -23,6 +23,7 @@ const SHOWN = 3
 export const TOOL_LABEL: Record<WorkTool, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  opencode: 'opencode',
 }
 
 /** The AI tool that closed a task, by its MCP client name ("claude-code") */

@@ -218,7 +218,7 @@ export const EnvSchema = z.object({
    * you start yourself are looked for, and whether a quiet session is read
    * for whether its task looks done
    */
-  TASKS_CLI: z.enum(['claude', 'codex']).default('claude'),
+  TASKS_CLI: z.enum(['claude', 'codex', 'opencode']).default('claude'),
   /**
    * Where those sessions open: a terminal, or the tool's desktop app (the
    * Claude app's Code tab, the Codex app) by its link, the task written in

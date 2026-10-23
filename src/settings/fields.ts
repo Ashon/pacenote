@@ -897,6 +897,7 @@ export const SETTING_FIELDS: SettingField[] = [
     options: [
       { value: 'claude', label: 'Claude Code' },
       { value: 'codex', label: 'Codex' },
+      { value: 'opencode', label: 'opencode' },
     ],
     default: 'claude',
     ...WITH_TODO,
@@ -906,7 +907,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.sessionsIn',
     group: 'work',
     label: 'Open sessions in',
-    help: "Desktop app opens the Claude app's Code tab or the Codex app with the task written in, for you to send. Terminal runs claude or codex in your terminal.",
+    help: "Desktop app opens the Claude app's Code tab or the Codex app with the task written in, for you to send. Terminal runs claude, codex or opencode in your terminal; opencode always opens there.",
     type: 'select',
     segmented: true,
     options: [

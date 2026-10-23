@@ -296,8 +296,8 @@ export interface TasksCollect {
   elsewhere?: { name: string; since: string }
 }
 
-/** Where a task's work went on: Claude Code or Codex on this Mac */
-export type WorkTool = 'claude' | 'codex'
+/** Where a task's work went on: Claude Code, Codex or opencode on this Mac */
+export type WorkTool = 'claude' | 'codex' | 'opencode'
 
 /**
  * How a session you started yourself was known as a task's work: it used

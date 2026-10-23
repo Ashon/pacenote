@@ -89,8 +89,6 @@ import { text } from './task-row.text'
 /** A Codex session from the Codex app continues there; others in a terminal */
 const resumesInApp = (session: Session) =>
   !!session.app && session.tool === 'codex'
-const other = (tool: WorkTool): WorkTool =>
-  tool === 'claude' ? 'codex' : 'claude'
 
 const DISMISS_REASONS: DismissReason[] = [
   'not-mine',
@@ -159,6 +157,7 @@ export function TaskRow({
   task,
   motion,
   cli,
+  tools = ['claude', 'codex'],
   opensIn,
   working,
   live,
@@ -177,6 +176,8 @@ export function TaskRow({
   motion?: Parameters<typeof motionItem>[0]
   /** Where code tasks continue */
   cli: WorkTool
+  /** The tools a code task can continue in here */
+  tools?: readonly WorkTool[]
   /** Where each tool's new sessions open: its desktop app, or a terminal */
   opensIn?: Record<WorkTool, 'app' | 'terminal'>
   /** Its latest session: the tool and when it was last active */
@@ -319,7 +320,7 @@ export function TaskRow({
   // The steps the row's own button does not take
   const more: { label: string; icon: React.ReactNode; run: () => void }[] = [
     ...(task.action === 'code' ? [] : [continueItem(cli)]),
-    continueItem(other(cli)),
+    ...tools.filter((tool) => tool !== cli).map(continueItem),
     ...(folder
       ? [
           {
@@ -1491,7 +1492,11 @@ function SessionLogPanel({
   const entry = found?.entry
   const tool = entry ? CLI_NAMES[entry.tool] : t.theSession
   const resumeWith =
-    entry?.tool === 'claude' ? 'claude --resume' : 'codex resume'
+    entry?.tool === 'claude'
+      ? 'claude --resume'
+      : entry?.tool === 'opencode'
+        ? 'opencode --session'
+        : 'codex resume'
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

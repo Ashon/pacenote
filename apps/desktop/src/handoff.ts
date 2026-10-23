@@ -164,10 +164,14 @@ export function commandScript(options: {
   const command = options.resume
     ? tool === 'claude'
       ? `${shellQuote(bin)} --resume ${shellQuote(options.resume)}`
-      : `${shellQuote(bin)} resume ${shellQuote(options.resume)}`
+      : tool === 'opencode'
+        ? `${shellQuote(bin)} --session ${shellQuote(options.resume)}`
+        : `${shellQuote(bin)} resume ${shellQuote(options.resume)}`
     : tool === 'claude'
       ? `${shellQuote(bin)} --session-id ${shellQuote(options.session!)} -n "$(cat ${shellQuote(options.titleFile!)})" "$(cat ${shellQuote(options.promptFile!)})"`
-      : `${shellQuote(bin)} "$(cat ${shellQuote(options.promptFile!)})"`
+      : tool === 'opencode'
+        ? `${shellQuote(bin)} --prompt "$(cat ${shellQuote(options.promptFile!)})"`
+        : `${shellQuote(bin)} "$(cat ${shellQuote(options.promptFile!)})"`
   return [
     '#!/bin/zsh -l',
     '# Written by Pacenote to continue a task; safe to delete.',
@@ -429,7 +433,8 @@ export async function openSession(
   if (options.openIn?.() !== 'app')
     return { entry: await startSession(options, task, context, tool, cwd) }
   const t = localized(text)
-  if (!options.hasApp?.(tool))
+  // opencode has no desktop app to write the task into
+  if (tool === 'opencode' || !options.hasApp?.(tool))
     return {
       entry: await startSession(options, task, context, tool, cwd),
       note: t.noApp(tool),
@@ -507,7 +512,13 @@ export async function signInCli(
 /** The command that continues a session, for copying */
 export const resumeCommand = (entry: Session) =>
   entry.session
-    ? `cd ${shellQuote(entry.cwd)} && ${entry.tool === 'claude' ? `claude --resume ${entry.session}` : `codex resume ${entry.session}`}`
+    ? `cd ${shellQuote(entry.cwd)} && ${
+        entry.tool === 'claude'
+          ? `claude --resume ${entry.session}`
+          : entry.tool === 'opencode'
+            ? `opencode --session ${entry.session}`
+            : `codex resume ${entry.session}`
+      }`
     : undefined
 
 // ---------------------------------------------------------------------------
@@ -636,7 +647,8 @@ export function lastActive(home: string, entry: Session): string | undefined {
 
 /** Looks through the tool's logs for a session's */
 function findSessionFile(home: string, entry: Session): string | undefined {
-  if (!entry.session) return undefined
+  // opencode keeps its sessions in its service (opencode-sessions.ts)
+  if (!entry.session || entry.tool === 'opencode') return undefined
   if (entry.tool === 'claude') {
     const root = path.join(home, '.claude', 'projects')
     if (!existsSync(root)) return undefined
@@ -656,7 +668,7 @@ const ITEM_CHARS = 2000
 const SAID = ['text', 'input_text', 'output_text']
 
 /** What a tool step was about, in a line: its command, file or task */
-function stepLine(input: unknown): string {
+export function stepLine(input: unknown): string {
   if (!input || typeof input !== 'object') return ''
   const value = input as Record<string, unknown>
   const first = ['command', 'file_path', 'path', 'pattern', 'task', 'query']

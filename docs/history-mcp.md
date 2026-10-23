@@ -11,7 +11,7 @@ Add for that tool. How it fits with your tasks is drawn in [Architecture](archit
 ## Adding it to a tool
 
 Turn on **Share with AI tools** (or, for your tasks, Settings > Todo > Gather my tasks from Slack). The same settings card then
-lists Claude Code and Codex, each with its state and one button:
+lists Claude Code, Codex and opencode, each with its state and one button:
 
 | State | What it means | Button |
 | --- | --- | --- |
@@ -22,9 +22,11 @@ lists Claude Code and Codex, each with its state and one button:
 | Not installed | The tool's CLI is not on the PATH | |
 
 The buttons run the tools' own CLIs: `claude mcp add-json --scope user` (after `claude mcp remove`, since Claude Code does not
-replace a server of the same name) and `codex mcp add`, so every project has the server. To check, Pacenote asks Claude Code
-(`claude mcp get pacenote`, which starts the server), and for Codex starts the server Codex has registered and lists its tools
-over MCP. Check again runs them once more.
+replace a server of the same name), `codex mcp add` and `opencode mcp add --global`, so every project has the server. To
+check, Pacenote asks Claude Code (`claude mcp get pacenote`, which starts the server), and for Codex and opencode starts the
+server they have registered and lists its tools over MCP. opencode's CLI cannot take a server out, so Remove takes it out of
+opencode's global config (`~/.config/opencode/opencode.jsonc` or `opencode.json`, or under `$XDG_CONFIG_HOME`) itself,
+leaving its comments and other servers as they were. Check again runs them once more.
 
 To add it by hand instead, **Add it by hand** under the list shows the commands, filled in with the paths of the app you are
 running:

@@ -346,6 +346,7 @@ export function TasksPage({
                     task={task}
                     motion={motion}
                     cli={data.settings.cli}
+                    tools={data.settings.tools}
                     opensIn={data.settings.opensIn}
                     working={data.working?.[task.id]}
                     live={live?.working[task.id]}

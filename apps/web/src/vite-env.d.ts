@@ -141,6 +141,8 @@ declare global {
                 exclude: string[]
                 /** Where code tasks continue */
                 cli: WorkTool
+                /** The tools a code task can continue in here */
+                tools: WorkTool[]
                 /** Where each tool's sessions open: its app or a terminal */
                 opensIn: Record<WorkTool, 'app' | 'terminal'>
               }

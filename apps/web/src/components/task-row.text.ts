@@ -6,7 +6,7 @@ const en = {
   /** Tasks from a session on this Mac, as their source */
   thisMac: 'This Mac',
   /** The desktop app each tool's sessions can open in (Open sessions in) */
-  app: { claude: 'Claude app', codex: 'Codex app' },
+  app: { claude: 'Claude app', codex: 'Codex app', opencode: 'opencode' },
   dismissReason: {
     'not-mine': 'Not for me',
     'done-already': 'Already done',
@@ -209,7 +209,7 @@ const PR_STATES: Record<string, string> = {
 
 const ko: typeof en = {
   thisMac: '이 Mac',
-  app: { claude: 'Claude 앱', codex: 'Codex 앱' },
+  app: { claude: 'Claude 앱', codex: 'Codex 앱', opencode: 'opencode' },
   dismissReason: {
     'not-mine': '내 일 아님',
     'done-already': '이미 끝남',
