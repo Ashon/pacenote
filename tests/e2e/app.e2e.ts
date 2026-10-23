@@ -25,6 +25,7 @@ import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
 import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { saveRepo } from '../../src/tasks/folders.js'
+import { decide } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
 import { withHub } from './support/hub.js'
@@ -2327,6 +2328,116 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       }
     )
     expect(script).toContain(`'${world.claudeBin}' auth login`)
+  })
+
+  it('lists the latest settled tasks and more on a click, and the collections under a tab of their own', async () => {
+    world = await World.create([])
+    const { home } = world
+    const MINUTE = 60_000
+    const now = Date.now()
+    const on = { on: true, dms: false, exclude: [] }
+    // Two weeks' work: 13 settled, the latest a minute ago, and one open
+    const tasks = addTasks(
+      home,
+      Array.from({ length: 14 }, (_, i) => ({
+        title: `Task ${i + 1}`,
+        asked_by: 'mina',
+        where: '#ops',
+        link: `https://acme.slack.com/archives/C0OPS/p${Math.floor((now - (i + 1) * 60 * MINUTE) / 1000)}000100`,
+        confidence: 'sure' as const,
+      })),
+      { settings: on, now: new Date(now - 20 * 60 * MINUTE), finished: true }
+    ).added
+    // Done one by one, and three of them dismissed
+    tasks
+      .slice(1)
+      .forEach((task, i) =>
+        decide(
+          home,
+          task.id,
+          { status: i % 4 === 3 ? 'dismissed' : 'done' },
+          new Date(now - (i + 1) * MINUTE)
+        )
+      )
+    // And 12 collections in the last 7 days
+    const store = new HistoryStore(home)
+    for (let i = 0; i < 12; i++)
+      store
+        .startCollection(
+          { trigger: 'now', backend: { reasoner: 'claude', sandbox: 'host' } },
+          new Date(now - (i + 1) * 3 * 60 * MINUTE)
+        )
+        .finish(
+          'succeeded',
+          { reads: i + 1, found: { added: 1, maybe: 0, skipped: 0 } },
+          new Date(now - (i + 1) * 3 * 60 * MINUTE + MINUTE)
+        )
+    const page = await launch(world, { settings: ['TASKS=on'] })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const rows = page.locator('[data-task-row]')
+    await page.getByRole('tab', { name: 'Open 1' }).waitFor()
+    // Nothing waits below the open list: the collections have their own tab.
+    await rows.first().waitFor()
+    expect(await rows.count()).toBe(1)
+    expect(await page.getByText(/Last 7 days ·/).count()).toBe(0)
+
+    // Done: how many you dismissed, over the ten settled last, the latest
+    // first, and three more on a click
+    await page.getByRole('tab', { name: 'Done' }).click()
+    const note = page.getByText(/^You dismissed 23% of the tasks you settled/)
+    await note.waitFor()
+    await eventually(
+      'the ten settled last',
+      async () =>
+        JSON.stringify(
+          await rows.locator('[data-task-title]').allInnerTexts()
+        ) ===
+        JSON.stringify(Array.from({ length: 10 }, (_, i) => `Task ${i + 2}`))
+    )
+    const [noteBox, firstBox] = await Promise.all([
+      note.boundingBox(),
+      rows.first().boundingBox(),
+    ])
+    expect(noteBox!.y).toBeLessThan(firstBox!.y)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-done-more.png'),
+    })
+    await page.getByRole('button', { name: 'Show 3 more' }).click()
+    await eventually('all 13', async () => (await rows.count()) === 13)
+    expect(
+      await page.getByRole('button', { name: /^Show \d+ more$/ }).count()
+    ).toBe(0)
+
+    // A settled task opened from a link is listed, however far down it is.
+    await page.getByRole('tab', { name: 'Open 1' }).click()
+    await rows.first().waitFor()
+    await page.evaluate(
+      `window.location.hash = ${JSON.stringify(`#/tasks/${encodeURIComponent(tasks[13]!.id)}`)}`
+    )
+    await page.getByRole('tab', { name: 'Done', selected: true }).waitFor()
+    await page
+      .locator(`[data-task-row="${tasks[13]!.id}"]`)
+      .getByText('Task 14')
+      .waitFor()
+    expect(await rows.count()).toBe(13)
+
+    // Collections: the latest ten, and the other two on a click
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page.getByRole('tab', { name: 'Collections' }).click()
+    await page.getByText('Last 7 days · 12 collections · 0 new').waitFor()
+    const collections = page.locator('a[href^="#/runs/"]')
+    await eventually(
+      'ten collections',
+      async () => (await collections.count()) === 10
+    )
+    expect(await collections.first().textContent()).toContain(
+      '1 lookup · 1 task'
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-collections.png'),
+    })
+    await page.getByRole('button', { name: 'Show 2 more' }).click()
+    await eventually('all 12', async () => (await collections.count()) === 12)
   })
 
   it("hands Pacenote's own work to Codex while Claude Code is at its usage limit, and says so in Todo and Settings", async () => {

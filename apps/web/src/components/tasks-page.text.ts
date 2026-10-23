@@ -28,6 +28,8 @@ const en = {
   tabOpen: 'Open',
   tabMaybe: 'Maybe',
   tabDone: 'Done',
+  tabCollections: 'Collections',
+  showMore: (n: number) => `Show ${n} more`,
   newTasks: (n: number) => `${n} new ${n === 1 ? 'task' : 'tasks'}`,
 
   // Collect now
@@ -83,12 +85,11 @@ const en = {
   couldNotEither: (switched: string, cli: string) =>
     `${switched}, and ${cli} could not either.`,
 
-  // Recent collections
-  recent: 'Recent collections',
+  // Collections
   recentSummary: (n: number, tokens: string) =>
     `Last 7 days · ${n} ${n === 1 ? 'collection' : 'collections'} · ${tokens} new`,
+  noCollections: 'No collections in the last 7 days.',
   newTokens: (tokens: string) => `${tokens} new`,
-  moreRecent: (n: number) => `${n} more in the last 7 days.`,
   openRun: "Open this collection's run",
   trigger: { now: 'Collect now' },
   /** "23 lookups · 2 tasks, 1 Maybe" */
@@ -147,6 +148,8 @@ const ko: typeof en = {
   tabOpen: '열림',
   tabMaybe: '후보',
   tabDone: '완료',
+  tabCollections: '모으기 기록',
+  showMore: (n) => `${n}개 더 보기`,
   newTasks: (n) => `새 할 일 ${n}개`,
 
   collectingOn: (mac) => `${mac}에서 모으는 중`,
@@ -199,11 +202,10 @@ const ko: typeof en = {
   couldNotEither: (switched, cli) =>
     `${sentence(switched)}. ${cli}도 모으지 못했어요.`,
 
-  recent: '최근 모으기',
   recentSummary: (n, tokens) =>
     `지난 7일 · 모으기 ${n}번 · 신규 토큰 ${tokens}`,
+  noCollections: '지난 7일 동안 모으기가 없어요.',
   newTokens: (tokens) => `신규 ${tokens}`,
-  moreRecent: (n) => `지난 7일 동안의 모으기가 ${n}번 더 있어요.`,
   openRun: '이 모으기의 실행 열기',
   trigger: { now: '지금 모으기' },
   note: (reads, added, maybe) => {

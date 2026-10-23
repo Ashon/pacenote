@@ -6,8 +6,8 @@ import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
 import {
   ArrowRightLeft,
+  ChevronDown,
   ChevronRight,
-  History,
   LoaderCircle,
   RefreshCw,
   Settings,
@@ -56,7 +56,10 @@ import {
   YourWorkSkeleton,
 } from './your-work'
 
-type Tab = 'open' | 'maybe' | 'done'
+type Tab = 'open' | 'maybe' | 'done' | 'collections'
+
+/** How many rows a long list shows at first, and Show more adds each time */
+const ROWS_AT_ONCE = 10
 
 /** The tab a task is listed under */
 const tabOf = (task: TaskView): Tab =>
@@ -83,7 +86,8 @@ function lastRows(): number {
 
 /**
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): the
- * open ones, the Maybes kept aside, and what is settled. An AI tool with a
+ * open ones, the Maybes kept aside, what is settled (the latest first, more on
+ * a click), and the collections that found them. An AI tool with a
  * Slack connector collects them through Pacenote's MCP server; Done and
  * Dismiss are one click. A task opens in its row (#/tasks/<id>), one at a
  * time: up and down step through the list, Esc closes it.
@@ -117,6 +121,8 @@ export function TasksPage({
   // The open task and the tab it was opened in: settled meanwhile (in its
   // session, say), it stays where it was until it is closed.
   const [held, setHeld] = useState<{ id: string; tab: Tab }>()
+  // How many settled tasks Done lists, the latest first
+  const [doneRows, setDoneRows] = useState(ROWS_AT_ONCE)
   const data = tasks.data
   // The tasks you have seen listed. Others that come into the tab wait for
   // you to show them; moving to a tab shows all of its tasks.
@@ -203,6 +209,17 @@ export function TasksPage({
   const shown = listed.filter((task) => !waiting.includes(task))
   if (seen && shown.some((task) => !seen.has(task.id)))
     setSeen(new Set([...seen, ...shown.map((task) => task.id)]))
+  // Done lists as many as you asked for, down to the task open in it
+  const rows =
+    tab === 'done'
+      ? Math.max(doneRows, shown.findIndex((task) => task.id === openId) + 1)
+      : shown.length
+  const note =
+    tab === 'maybe'
+      ? t.maybeNote
+      : tab === 'done' && data.dismissRate !== undefined
+        ? t.dismissRate(Math.round(data.dismissRate * 100))
+        : undefined
 
   // Up and down step through the tasks (the open one follows); Esc closes it.
   const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
@@ -289,6 +306,7 @@ export function TasksPage({
         tab={tab}
         onTab={(value) => {
           setTab(value)
+          setDoneRows(ROWS_AT_ONCE)
           showAll()
         }}
         counts={{ open: open.length, maybe: maybe.length }}
@@ -301,81 +319,89 @@ export function TasksPage({
         skeleton={<TaskRowsSkeleton count={lastRows()} />}
       >
         <Swap id={tab}>
-          <NewTasks
-            count={waiting.length}
-            onShow={() => {
-              showAll()
-              setRevealed(waiting[0]?.id)
-            }}
-          />
-          {tab === 'maybe' && (
-            <p className="mt-3 text-meta text-muted-foreground">
-              {t.maybeNote}
-            </p>
-          )}
-          <TaskList
-            tasks={shown}
-            onKeyDown={onKeyDown}
-            revealed={revealed}
-            row={(task, motion) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                motion={motion}
-                cli={data.settings.cli}
-                opensIn={data.settings.opensIn}
-                working={data.working?.[task.id]}
-                live={live?.working[task.id]}
-                proposal={data.proposals?.[task.id]}
-                area={data.areas?.[task.id]}
-                askGroup={
-                  task.status === 'maybe' &&
-                  task.group &&
-                  !data.groups?.yours.includes(task.group) &&
-                  !data.groups?.notYours.includes(task.group)
-                    ? task.group
-                    : undefined
-                }
-                follows={
-                  task.follows
-                    ? data.tasks.find((each) => each.id === task.follows)?.title
-                    : undefined
-                }
-                open={task.id === openId}
-                gone={tabOf(task) !== tab}
-                logEntry={task.id === openId ? logEntry : undefined}
-                onToggle={() =>
-                  go(task.id === openId ? '#/tasks' : taskHash(task.id))
-                }
-                onDecide={(decision) => void decide(task.id, decision)}
+          {tab === 'collections' ? (
+            <RecentCollections collections={data.collections ?? []} />
+          ) : (
+            <>
+              <NewTasks
+                count={waiting.length}
+                onShow={() => {
+                  showAll()
+                  // Settled just now, they go first: the rows you were
+                  // reading stay listed below them
+                  if (tab === 'done') setDoneRows(rows + waiting.length)
+                  setRevealed(waiting[0]?.id)
+                }}
               />
-            )}
-          />
-          {shown.length === 0 && (
-            <p className="border-t border-border py-8 text-copy text-muted-foreground">
-              {tab === 'open'
-                ? data.collectedAt
-                  ? t.nothingOpen
-                  : t.nothingYet
-                : tab === 'maybe'
-                  ? t.noMaybes
-                  : t.nothingSettled}
-            </p>
-          )}
-          {tab === 'done' && data.dismissRate !== undefined && (
-            <p className="mt-4 text-meta text-muted-foreground">
-              {t.dismissRate(Math.round(data.dismissRate * 100))}
-            </p>
+              {note && (
+                <p className="mt-3 text-meta text-muted-foreground">{note}</p>
+              )}
+              <TaskList
+                tasks={shown.slice(0, rows)}
+                onKeyDown={onKeyDown}
+                revealed={revealed}
+                row={(task, motion) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    motion={motion}
+                    cli={data.settings.cli}
+                    opensIn={data.settings.opensIn}
+                    working={data.working?.[task.id]}
+                    live={live?.working[task.id]}
+                    proposal={data.proposals?.[task.id]}
+                    area={data.areas?.[task.id]}
+                    askGroup={
+                      task.status === 'maybe' &&
+                      task.group &&
+                      !data.groups?.yours.includes(task.group) &&
+                      !data.groups?.notYours.includes(task.group)
+                        ? task.group
+                        : undefined
+                    }
+                    follows={
+                      task.follows
+                        ? data.tasks.find((each) => each.id === task.follows)
+                            ?.title
+                        : undefined
+                    }
+                    open={task.id === openId}
+                    gone={tabOf(task) !== tab}
+                    logEntry={task.id === openId ? logEntry : undefined}
+                    onToggle={() =>
+                      go(task.id === openId ? '#/tasks' : taskHash(task.id))
+                    }
+                    onDecide={(decision) => void decide(task.id, decision)}
+                  />
+                )}
+              />
+              <ShowMore
+                hidden={shown.length - rows}
+                onShow={() => setDoneRows(rows + ROWS_AT_ONCE)}
+              />
+              {shown.length === 0 && (
+                <p className="border-t border-border py-8 text-copy text-muted-foreground">
+                  {tab === 'open'
+                    ? data.collectedAt
+                      ? t.nothingOpen
+                      : t.nothingYet
+                    : tab === 'maybe'
+                      ? t.noMaybes
+                      : t.nothingSettled}
+                </p>
+              )}
+            </>
           )}
         </Swap>
       </Placeholder>
-
-      <RecentCollections collections={data.collections ?? []} />
     </Page>
   )
 }
 
-/** Open, Maybe and Done, with their counts once the tasks are in */
+/**
+ * Open, Maybe and Done, with their counts once the tasks are in, and the
+ * collections that found them
+ */
 function TaskTabs({
   tab,
   onTab,
@@ -396,6 +422,7 @@ function TaskTabs({
           {t.tabMaybe} {counts ? counts.maybe : <SkeletonWord />}
         </TabsTrigger>
         <TabsTrigger value="done">{t.tabDone}</TabsTrigger>
+        <TabsTrigger value="collections">{t.tabCollections}</TabsTrigger>
       </TabsList>
     </Tabs>
   )
@@ -458,6 +485,26 @@ function TaskList({
     <ul ref={ref} className="mt-3" onKeyDown={onKeyDown}>
       {entries.map((entry) => row(entry.item, entry))}
     </ul>
+  )
+}
+
+/** The rows a long list leaves out, ROWS_AT_ONCE more on each click */
+function ShowMore({ hidden, onShow }: { hidden: number; onShow: () => void }) {
+  const t = useText(text)
+  if (hidden <= 0) return null
+  return (
+    <div className="border-t border-border pt-2">
+      <Button
+        size="sm"
+        variant="ghost"
+        // Its chevron under the rows' own
+        className="-ml-2 text-muted-foreground"
+        onClick={onShow}
+      >
+        <ChevronDown />
+        {t.showMore(Math.min(hidden, ROWS_AT_ONCE))}
+      </Button>
+    </div>
   )
 }
 
@@ -731,13 +778,10 @@ function CollectStatus({
   )
 }
 
-/** The most recent collections the list shows; the header counts them all */
-const RECENT_SHOWN = 10
-
 /**
- * The collections the app ran in the last 7 days: when, how each ended, and
- * the new tokens it spent (the Overview has them per day). A row opens the
- * collection's run in Runs; the old log's rows have none.
+ * The collections the app ran in the last 7 days, the latest first: when, how
+ * each ended, and the new tokens it spent (the Overview has them per day). A
+ * row opens the collection's run in Runs; the old log's rows have none.
  */
 function RecentCollections({
   collections,
@@ -745,28 +789,25 @@ function RecentCollections({
   collections: CollectionRecord[]
 }) {
   const t = useText(text)
-  if (!collections.length) return null
+  const [rows, setRows] = useState(ROWS_AT_ONCE)
+  if (!collections.length)
+    return (
+      <p className="mt-3 border-t border-border py-8 text-copy text-muted-foreground">
+        {t.noCollections}
+      </p>
+    )
   const spent = collections.map((entry) =>
     entry.usage ? newTokens(entry.usage) : 0
   )
   const max = Math.max(1, ...spent)
   const total = spent.reduce((sum, value) => sum + value, 0)
   return (
-    <section
-      aria-labelledby="collections-title"
-      className="mt-10 border-t border-border pt-9"
-    >
-      <div className="flex items-center gap-2">
-        <History className="size-4 shrink-0 text-primary" />
-        <h2 id="collections-title" className="text-section">
-          {t.recent}
-        </h2>
-        <span className="ml-auto text-meta text-muted-foreground">
-          {t.recentSummary(collections.length, formatTokens(total))}
-        </span>
-      </div>
-      <ul className="mt-4 text-body">
-        {collections.slice(0, RECENT_SHOWN).map((entry, index) => (
+    <>
+      <p className="mt-3 text-meta text-muted-foreground">
+        {t.recentSummary(collections.length, formatTokens(total))}
+      </p>
+      <ul className="mt-3 text-body">
+        {collections.slice(0, rows).map((entry, index) => (
           <li key={entry.startedAt} className="border-t border-border">
             <CollectionRow entry={entry}>
               <span className="font-medium tabular-nums">
@@ -804,12 +845,11 @@ function RecentCollections({
           </li>
         ))}
       </ul>
-      {collections.length > RECENT_SHOWN && (
-        <p className="border-t border-border pt-2.5 text-meta text-muted-foreground">
-          {t.moreRecent(collections.length - RECENT_SHOWN)}
-        </p>
-      )}
-    </section>
+      <ShowMore
+        hidden={collections.length - rows}
+        onShow={() => setRows(rows + ROWS_AT_ONCE)}
+      />
+    </>
   )
 }
 

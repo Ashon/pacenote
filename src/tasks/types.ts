@@ -267,7 +267,7 @@ export type CollectOutcome = (
 }
 
 /**
- * A collection the app ran, as Recent collections lists it: from its run in
+ * A collection the app ran, as Todo's Collections lists it: from its run in
  * the history, or from the log the app kept before (tasks-collections.json).
  * Collect now is the only way the app starts one.
  */

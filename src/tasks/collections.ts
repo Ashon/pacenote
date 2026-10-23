@@ -28,7 +28,7 @@ export function readCollections(dataDir: string): CollectionRecord[] {
     : []
 }
 
-/** A collection's run as Recent collections lists it; none while it runs */
+/** A collection's run as Todo's Collections lists it; none while it runs */
 export function collectionRow(
   run: CollectionRunRecord
 ): CollectionRecord | undefined {

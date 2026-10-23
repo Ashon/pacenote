@@ -55,9 +55,9 @@ Claude Code, headless (`claude -p /mcp__pacenote__collect_tasks`), kept to the c
   sign-in ran out or was revoked, the screen says so and offers **Sign in to Claude Code**: it opens `claude auth login`
   in your terminal (the one in Settings > Todo), which goes on in the browser. Then collect again.
 - When it ends, the screen says what it added, the new tokens it spent and how many Slack lookups it made. Each collection
-  the app runs is a run in the run history, beside the answers, and is kept as long as they are: under the list,
-  **Recent collections** shows the last 7 days and opens a collection's run in Runs, and the Overview counts their tokens
-  per day. A collection's run keeps its tool calls (which tool, when, how long), what Pacenote's own tools were given and
+  the app runs is a run in the run history, beside the answers, and is kept as long as they are: Todo's **Collections**
+  tab shows the last 7 days, ten at a time, and opens a collection's run in Runs, and the Overview counts their tokens per
+  day. A collection's run keeps its tool calls (which tool, when, how long), what Pacenote's own tools were given and
   answered, and the tokens; not what Slack returned or the model's own words, which quote your messages. The run history
   MCP leaves collections out. (v0.4.4 and v0.4.5 kept a log in `PACENOTE_DATA_DIR/tasks-collections.json`, which is still
   read and no longer written.) A collection run from inside your own AI tool spends that tool's tokens, so Pacenote does
@@ -105,10 +105,11 @@ A collection is told who you are, so it can tell what is asked of you from what 
   the tool is not sure about is a **Maybe**: it stays under its own tab, out of the list and `my_tasks`, until you keep it.
 - **Done** and **Dismiss** are one click. Dismiss can say why: not for me, already done, not worth it. After three "not for
   me" from the same channel, the screen offers to leave that channel out.
-- Closed tasks show under Done with why, and Reopen brings one back.
+- Closed tasks show under Done with why, and Reopen brings one back. Done lists the ten settled last, the latest first,
+  and ten more on each **Show more**; a task opened from a link is listed however far down it is.
 - Open tasks fade after 7 days and drop after 14; done, dismissed and closed ones are kept 14 days.
-- Under Done, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked too
-  loosely.
+- Above Done's list, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked
+  too loosely.
 - The Overview shows what you handled over the last 14 days: how many each day, how they ended (in Claude Code or Codex,
   closed in Slack, or marked done), and how long they usually took from their message. Done, closed, and dismissed as
   already done count; dismissed as not for you or not worth it does not.
