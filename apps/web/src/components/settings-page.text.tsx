@@ -55,9 +55,9 @@ const en = {
   sandboxSignedIn: 'Signed in inside the sandbox. Restart Pace to use it.',
 
   mcpTasks:
-    'To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this.',
+    'To ask Claude Code, Codex or opencode about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this.',
   mcpHistory:
-    "Claude Code and Codex read the history through Pacenote's MCP server: recent runs, a search, and one run with its steps and answer.",
+    "Claude Code, Codex and opencode read the history through Pacenote's MCP server: recent runs, a search, and one run with its steps and answer.",
   credentialsHelp: (reasoner: string) =>
     `${reasoner} signs in inside the sandbox and keeps its login there, separate from your ${reasoner} login on this Mac.`,
 
@@ -270,9 +270,9 @@ const ko: typeof en = {
     '샌드박스 안에서 로그인했어요. 쓰려면 Pace를 다시 시작하세요.',
 
   mcpTasks:
-    'Claude Code나 Codex에서 내 할 일을 묻거나 그 안에서 모으려면 Pacenote를 추가하세요. 할 일 화면의 지금 모으기는 이것 없이도 돼요.',
+    'Claude Code, Codex, opencode에서 내 할 일을 묻거나 그 안에서 모으려면 Pacenote를 추가하세요. 할 일 화면의 지금 모으기는 이것 없이도 돼요.',
   mcpHistory:
-    'Claude Code와 Codex는 Pacenote의 MCP 서버로 실행 기록을 읽어요. 최근 실행, 검색, 실행 하나의 단계와 답변을 볼 수 있어요.',
+    'Claude Code, Codex, opencode는 Pacenote의 MCP 서버로 실행 기록을 읽어요. 최근 실행, 검색, 실행 하나의 단계와 답변을 볼 수 있어요.',
   credentialsHelp: (reasoner) =>
     `${josa(reasoner, '은/는')} 샌드박스 안에서 로그인하고 로그인 정보를 그곳에 보관해요. 이 Mac에 있는 내 ${reasoner} 로그인과는 별개예요.`,
 

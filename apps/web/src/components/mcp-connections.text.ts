@@ -2,7 +2,7 @@ import type { Locale } from '@src/i18n/locale'
 
 const en = {
   checkAgain: 'Check again',
-  checking: 'Checking Claude Code and Codex…',
+  checking: 'Checking Claude Code, Codex and opencode…',
   /** The change a tool's state calls for */
   action: {
     absent: 'Add',
@@ -20,11 +20,12 @@ const en = {
   byHand: 'Add it by hand',
   claudeByHand: 'Claude Code: run in a terminal',
   codexByHand: 'Codex: add to ~/.codex/config.toml',
+  opencodeByHand: 'opencode: run in a terminal',
 }
 
 const ko: typeof en = {
   checkAgain: '다시 확인',
-  checking: 'Claude Code와 Codex 확인 중…',
+  checking: 'Claude Code, Codex, opencode 확인 중…',
   action: {
     absent: '추가',
     elsewhere: '이 앱 사용',
@@ -42,6 +43,7 @@ const ko: typeof en = {
   byHand: '직접 추가하기',
   claudeByHand: 'Claude Code: 터미널에서 실행',
   codexByHand: 'Codex: ~/.codex/config.toml에 추가',
+  opencodeByHand: 'opencode: 터미널에서 실행',
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

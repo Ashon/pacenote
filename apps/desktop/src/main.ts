@@ -116,6 +116,7 @@ import {
   readRepos,
   recentFolders,
   repoFolder,
+  repoFolderRows,
   saveRepo,
   suggestFolders,
   yourFolder,
@@ -1841,6 +1842,16 @@ function registerBotIpc(): void {
     return checkFolder(folder, typeof repo === 'string' ? repo : undefined)
   })
   handle('pacenote:tasks:repos', {}, () => readRepos(dataDir))
+  // Settings > Todo: the repositories you work in, and where each opens
+  handle('pacenote:tasks:repo-rows', [], () =>
+    repoFolderRows(
+      dataDir,
+      homedir(),
+      allTaskViews(dataDir)
+        .filter((task) => task.status === 'open' && task.repo)
+        .map((task) => task.repo!)
+    )
+  )
   // Settings > Todo: whether the Claude app and the Codex app are on this Mac
   handle('pacenote:tasks:apps', null, () => ({
     claude: hasApp('claude'),

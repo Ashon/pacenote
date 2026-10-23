@@ -15,6 +15,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   recentFolders,
+  repoFolderRows,
   saveRepo,
   suggestFolders,
   yourRepos,
@@ -228,6 +229,27 @@ describe('a task’s folder', () => {
     ])
     // Without the home, only the ones with a folder remembered
     expect(await yourRepos(data, undefined)).toEqual(['Acme/billing'])
+  })
+
+  it('lists each repository with where its code tasks open', async () => {
+    const rows = await repoFolderRows(data, home, [
+      'Ashon/payments',
+      'ashon/payments',
+      'Acme/web',
+    ])
+    expect(rows.map((row) => [row.repo, row.state, row.tasks])).toEqual([
+      // A folder remembered: its tasks open there
+      ['Acme/billing', 'remembered', 0],
+      // In your open tasks, and a checkout where you worked lately
+      ['Ashon/payments', 'found', 2],
+      // In a task, with no folder anywhere yet
+      ['Acme/web', 'none', 1],
+      // Only where you worked lately
+      ['Ashon/ledger', 'found', 0],
+    ])
+    // The checkout you worked in last: the hotfix worktree
+    expect(rows[1]!.folder).toBe(worktree)
+    expect(rows[3]!.folder).toBe(ledger)
   })
 
   it('gives a collection the repositories, to tell what a thread means', async () => {

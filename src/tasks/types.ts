@@ -442,6 +442,20 @@ export interface TaskContext {
   person?: { name: string; tasks: RelatedTask[] }
 }
 
+/** A repository in Settings > Todo, and where its code tasks open */
+export interface RepoFolderRow {
+  repo: string
+  /**
+   * remembered: its tasks open there without asking; found: a folder you
+   * worked in lately is a checkout of it, offered first until one is chosen;
+   * none: chosen the first time a task needs one
+   */
+  state: 'remembered' | 'found' | 'none'
+  folder?: string
+  /** Open tasks in it */
+  tasks: number
+}
+
 /** A folder checked as a repository's checkout */
 export interface FolderCheck {
   path: string

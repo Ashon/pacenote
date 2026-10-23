@@ -1,16 +1,18 @@
 /**
- * Pacenote's MCP server in the AI tools on this Mac (Claude Code, Codex): what
- * each one has registered, compared with how this app launches the server. The
- * desktop app runs the tools' own CLIs (apps/desktop/src/mcp-clients.ts); this
- * file only reads what they print.
+ * Pacenote's MCP server in the AI tools on this Mac (Claude Code, Codex,
+ * opencode): what each one has registered, compared with how this app launches
+ * the server. The desktop app runs the tools' own CLIs
+ * (apps/desktop/src/mcp-clients.ts); this file only reads what they print, and
+ * opencode-config.ts what opencode keeps.
  */
 export const MCP_SERVER_NAME = 'pacenote'
 
-export const MCP_CLIENT_IDS = ['claude', 'codex'] as const
+export const MCP_CLIENT_IDS = ['claude', 'codex', 'opencode'] as const
 export type McpClientId = (typeof MCP_CLIENT_IDS)[number]
 export const MCP_CLIENT_NAMES: Record<McpClientId, string> = {
   claude: 'Claude Code',
   codex: 'Codex',
+  opencode: 'opencode',
 }
 
 export function isMcpClientId(value: unknown): value is McpClientId {

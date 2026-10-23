@@ -31,6 +31,7 @@ import type {
   CollectionRecord,
   CollectOutcome,
   FolderCheck,
+  RepoFolderRow,
   SessionItem,
   SlackYou,
   TaskDecision,
@@ -210,6 +211,8 @@ declare global {
         chooseFolder(repo?: string): Promise<FolderCheck | undefined>
         /** Each repository's folder (tasks-repos.json) */
         repos(): Promise<Record<string, string>>
+        /** The repositories you work in, and where each one's tasks open */
+        repoRows(): Promise<RepoFolderRow[]>
         /** Whether the Claude app and the Codex app are on this Mac */
         apps(): Promise<Record<WorkTool, boolean> | null>
         setRepo(repo: string, folder?: string): Promise<Record<string, string>>

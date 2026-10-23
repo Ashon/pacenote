@@ -23,10 +23,10 @@ import { CodeBlock } from './code-block'
 import { text } from './mcp-connections.text'
 
 /**
- * Pacenote's MCP server in Claude Code and Codex: whether each has it and
- * reaches it, with one click to add it, put this app in place of another, or
- * take it out. The commands to do it by hand stay below. about: what the tool
- * can then do.
+ * Pacenote's MCP server in Claude Code, Codex and opencode: whether each has
+ * it and reaches it, with one click to add it, put this app in place of
+ * another, or take it out. The commands to do it by hand stay below. about:
+ * what the tool can then do.
  */
 export function McpConnections({ about }: { about: string }) {
   const t = useText(text)
@@ -173,6 +173,13 @@ function ByHand() {
     shell(launch.command),
     ...launch.args.map(shell),
   ].join(' ')
+  const opencode = [
+    'opencode mcp add --global',
+    ...env.map(([key, value]) => `--env ${key}=${value}`),
+    'pacenote --',
+    shell(launch.command),
+    ...launch.args.map(shell),
+  ].join(' ')
   const codex = [
     '[mcp_servers.pacenote]',
     `command = ${JSON.stringify(launch.command)}`,
@@ -194,6 +201,7 @@ function ByHand() {
         <CollapsibleContent className="space-y-3 pt-2">
           <CodeBlock label={t.claudeByHand} code={claude} />
           <CodeBlock label={t.codexByHand} code={codex} />
+          <CodeBlock label={t.opencodeByHand} code={opencode} />
         </CollapsibleContent>
       </Collapsible>
     </>

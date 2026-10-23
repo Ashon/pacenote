@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { localized } from '../../../src/i18n/locale.js'
 import {
@@ -12,6 +13,11 @@ import {
   type McpClientStatus,
   type McpLaunch,
 } from '../../../src/history/mcp-clients.js'
+import {
+  opencodeConfigFiles,
+  opencodeWithout,
+  parseOpencodeConfig,
+} from '../../../src/history/opencode-config.js'
 import { text } from './mcp-clients.text.js'
 
 export interface CommandResult {
@@ -31,12 +37,15 @@ const COMMAND_TIMEOUT_MS = 60_000
 const PROBE_TIMEOUT_MS = 15_000
 
 /**
- * Adds Pacenote's MCP server to Claude Code and Codex with their own CLIs (user
- * scope, so every project has it), and checks that each one reaches it, so
- * nobody has to type the commands. Changes run only from a button in the app.
+ * Adds Pacenote's MCP server to Claude Code, Codex and opencode with their own
+ * CLIs (user scope, so every project has it), and checks that each one reaches
+ * it, so nobody has to type the commands. Changes run only from a button in the
+ * app.
  * - Claude Code: `claude mcp get` runs Claude's own connection check.
- * - Codex has no check of its own, so Pacenote launches what Codex has
- *   registered and lists the server's tools over MCP.
+ * - Codex and opencode have no check of their own, so Pacenote launches what
+ *   they have registered and lists the server's tools over MCP.
+ * - opencode's CLI cannot take a server out, so Pacenote takes it out of
+ *   opencode's global config itself, keeping the rest of the file as it was.
  */
 export class McpClients {
   private readonly run: RunCommand
@@ -54,6 +63,8 @@ export class McpClients {
       /** For tests */
       run?: RunCommand
       probe?: (launch: McpLaunch) => Promise<ProbeResult>
+      /** Where opencode's global config is looked for; for tests */
+      opencodeFiles?: string[]
     }
   ) {
     const env = () => ({ ...process.env, PATH: options.toolPath() })
@@ -88,6 +99,26 @@ export class McpClients {
             state: 'failed',
             error: found.issue ?? t.claudeCouldNot,
           })
+    }
+
+    if (id === 'opencode') {
+      const version = await this.run('opencode', ['--version'])
+      if (version.missing) return status({ state: 'missing' })
+      const file = this.opencodeFile()
+      if (!existsSync(file)) return status({ state: 'absent' })
+      const found = parseOpencodeConfig(readFileSync(file, 'utf8'))
+      if (!found) return status({ state: 'absent' })
+      if (!found.launch || !sameLaunch(found.launch, ours))
+        return status({
+          state: 'elsewhere',
+          command: found.launch?.command ?? found.url,
+        })
+      if (!found.enabled)
+        return status({ state: 'failed', error: t.opencodeOff })
+      const probe = await this.probe(found.launch)
+      return probe.ok
+        ? status({ state: 'connected', tools: probe.tools })
+        : status({ state: 'failed', error: probe.error })
     }
 
     const result = await this.run('codex', [
@@ -133,6 +164,21 @@ export class McpClients {
         MCP_SERVER_NAME,
         JSON.stringify({ type: 'stdio', ...ours }),
       ])
+    } else if (id === 'opencode') {
+      // opencode puts it in place of a server of the same name.
+      added = await this.run('opencode', [
+        'mcp',
+        'add',
+        '--global',
+        ...Object.entries(ours.env).flatMap(([key, value]) => [
+          '--env',
+          `${key}=${value}`,
+        ]),
+        MCP_SERVER_NAME,
+        '--',
+        ours.command,
+        ...ours.args,
+      ])
     } else {
       added = await this.run('codex', [
         'mcp',
@@ -161,6 +207,7 @@ export class McpClients {
   }
 
   private remove(id: McpClientId): Promise<CommandResult> {
+    if (id === 'opencode') return Promise.resolve(this.removeFromOpencode())
     return id === 'claude'
       ? this.run('claude', [
           'mcp',
@@ -170,6 +217,27 @@ export class McpClients {
           'user',
         ])
       : this.run('codex', ['mcp', 'remove', MCP_SERVER_NAME])
+  }
+
+  /** opencode's global config: the one it reads, or where it would write */
+  private opencodeFile(): string {
+    const files =
+      this.options.opencodeFiles ?? opencodeConfigFiles(process.env, homedir())
+    return files.find((file) => existsSync(file)) ?? files.at(-1)!
+  }
+
+  private removeFromOpencode(): CommandResult {
+    const file = this.opencodeFile()
+    try {
+      if (existsSync(file)) {
+        const text = readFileSync(file, 'utf8')
+        const next = opencodeWithout(text)
+        if (next !== text) writeFileSync(file, next)
+      }
+      return { code: 0, stdout: '', stderr: '' }
+    } catch (err) {
+      return { code: 1, stdout: '', stderr: (err as Error).message }
+    }
   }
 
   private ourLaunch(): McpLaunch {

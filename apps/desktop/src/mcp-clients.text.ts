@@ -1,10 +1,12 @@
 import type { Locale } from '../../../src/i18n/locale.js'
 
-/** Why Claude Code or Codex does not reach Pacenote's MCP server */
+/** Why Claude Code, Codex or opencode does not reach Pacenote's MCP server */
 const en = {
   claudeCouldNot: 'Claude Code could not connect to it.',
   codexUnreadable: 'Could not read what Codex has.',
   codexOff: 'It is turned off in ~/.codex/config.toml (enabled = false).',
+  opencodeOff:
+    "It is turned off in opencode's config (enabled: false). Connect again to turn it on.",
   notBuilt: 'The server is not built yet: run pnpm bundle in the repository.',
   exited: (code: number | null) => `Exited with code ${code}`,
   noAnswer: (seconds: number) =>
@@ -17,6 +19,8 @@ const ko: typeof en = {
   claudeCouldNot: 'Claude Code가 서버에 연결하지 못했어요.',
   codexUnreadable: 'Codex에 등록된 내용을 읽을 수 없어요.',
   codexOff: '~/.codex/config.toml에서 꺼져 있어요(enabled = false).',
+  opencodeOff:
+    'opencode 설정에서 꺼져 있어요(enabled: false). 다시 연결하면 켜져요.',
   notBuilt:
     '서버가 아직 빌드되지 않았어요. 저장소에서 pnpm bundle을 실행하세요.',
   exited: (code) => `종료 코드 ${code}`,

@@ -15,7 +15,7 @@ import { dayDirFor } from '../history/layout.js'
 import { localized } from '../i18n/locale.js'
 import { text } from './folders.text.js'
 import { readJson, writeJson } from './store.js'
-import type { FolderCheck, TaskView } from './types.js'
+import type { FolderCheck, RepoFolderRow, TaskView } from './types.js'
 
 /**
  * Where a task's work happens on this Mac: each repository's folder, chosen
@@ -441,6 +441,62 @@ export async function yourRepos(
     repos.push(...remotes.flatMap((remote) => originRepo(remote) ?? []))
   }
   return onceBy(repos, (repo) => repo.toLowerCase()).slice(0, limit)
+}
+
+/**
+ * The repositories you work in, each with where its code tasks open: those
+ * with a folder remembered, then those of your open tasks, then those of the
+ * folders you worked in lately (read only with a home). A repository without
+ * a folder remembered shows the newest of those folders that is its checkout.
+ */
+export async function repoFolderRows(
+  dataDir: string,
+  home: string | undefined,
+  taskRepos: readonly string[],
+  limit = 20
+): Promise<RepoFolderRow[]> {
+  const remembered = readRepos(dataDir)
+  const recent = home ? recentFolders(home, { leaveOut: [dataDir] }) : []
+  const checkouts = (
+    await Promise.all(
+      recent.map(async (folder) => ({
+        folder: folder.path,
+        repo: originRepo(
+          await git(folder.path, ['remote', 'get-url', 'origin'])
+        ),
+      }))
+    )
+  ).filter((each): each is { folder: string; repo: string } =>
+    Boolean(each.repo)
+  )
+  const key = (repo: string) => repo.toLowerCase()
+  const found = new Map<string, string>()
+  for (const each of checkouts)
+    if (!found.has(key(each.repo))) found.set(key(each.repo), each.folder)
+  const count = (repo: string) =>
+    taskRepos.filter((each) => key(each) === key(repo)).length
+  return onceBy(
+    [
+      ...Object.keys(remembered),
+      ...taskRepos,
+      ...checkouts.map((each) => each.repo),
+    ],
+    key
+  )
+    .slice(0, limit)
+    .map((repo): RepoFolderRow => {
+      const tasks = count(repo)
+      const chosen =
+        remembered[repo] ??
+        Object.entries(remembered).find(
+          ([name]) => key(name) === key(repo)
+        )?.[1]
+      if (chosen) return { repo, state: 'remembered', folder: chosen, tasks }
+      const folder = found.get(key(repo))
+      return folder
+        ? { repo, state: 'found', folder, tasks }
+        : { repo, state: 'none', tasks }
+    })
 }
 
 /** Each item once, by its key: the first one kept */

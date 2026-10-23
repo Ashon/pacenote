@@ -162,6 +162,21 @@ export function useRepoFolders() {
   })
 }
 
+export const REPO_ROWS_KEY = ['task-repo-rows']
+
+/**
+ * The repositories you work in, and where each one's code tasks open
+ * (Settings > Todo)
+ */
+export function useRepoRows() {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: REPO_ROWS_KEY,
+    queryFn: async () => (await bridge?.repoRows()) ?? [],
+    enabled: Boolean(bridge),
+  })
+}
+
 /** An open task's detail, refreshed as you work; none while it is closed */
 export function useTaskDetail(id: string, enabled = true) {
   return useQuery({
@@ -184,6 +199,7 @@ export function useTaskWork(id: string) {
     await client.invalidateQueries({ queryKey: ['task', id] })
     await client.invalidateQueries({ queryKey: ['tasks'] })
     await client.invalidateQueries({ queryKey: REPO_FOLDERS_KEY })
+    await client.invalidateQueries({ queryKey: REPO_ROWS_KEY })
   }
   return {
     continueIn: async (tool: WorkTool, folder: string) => {

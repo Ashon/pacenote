@@ -1,5 +1,15 @@
-import { existsSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { applyEdits, modify } from 'jsonc-parser'
+import { afterAll, describe, expect, it } from 'vitest'
 import {
   McpClients,
   probeMcp,
@@ -12,6 +22,14 @@ import {
   sameLaunch,
   type McpLaunch,
 } from '../src/history/mcp-clients.js'
+import {
+  opencodeConfigFiles,
+  opencodeWithout,
+  parseOpencodeConfig,
+} from '../src/history/opencode-config.js'
+
+const root = mkdtempSync(path.join(tmpdir(), 'pacenote-mcp-clients-'))
+afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 const APP = '/Applications/Pacenote.app/Contents/MacOS/Pacenote'
 const SCRIPT =
@@ -108,22 +126,64 @@ describe('reading what the AI tools have registered', () => {
   })
 })
 
-/** Fake claude and codex CLIs keeping a registration each */
+/**
+ * Fake claude and codex CLIs keeping a registration each, and an opencode
+ * that writes its global config as opencode 2 does (not installed unless
+ * opencode is given a config file)
+ */
 function fakeTools(
   start: { claude?: McpLaunch; codex?: McpLaunch } = {},
-  options: { missing?: string[]; probe?: ProbeResult; ready?: boolean } = {}
+  options: {
+    missing?: string[]
+    probe?: ProbeResult
+    ready?: boolean
+    opencode?: string
+  } = {}
 ) {
   const registered = { ...start }
   const calls: string[][] = []
   const ok = (stdout = ''): CommandResult => ({ code: 0, stdout, stderr: '' })
+  const missing = [
+    ...(options.missing ?? []),
+    ...(options.opencode ? [] : ['opencode']),
+  ]
   const clients = new McpClients({
     launch: () => ({ ...OURS, ready: options.ready ?? true }),
     toolPath: () => '/usr/bin',
     probe: async () => options.probe ?? { ok: true, tools: ['my_tasks'] },
+    opencodeFiles: options.opencode ? [options.opencode] : undefined,
     run: async (command, args) => {
       calls.push([command, ...args])
-      if (options.missing?.includes(command))
+      if (missing.includes(command))
         return { code: null, stdout: '', stderr: '', missing: true }
+      if (command === 'opencode') {
+        if (args[0] === '--version') return ok('2.1.2')
+        if (args.slice(0, 3).join(' ') === 'mcp add --global') {
+          const split = args.indexOf('--')
+          const flags = args.slice(3, split)
+          const environment = Object.fromEntries(
+            flags
+              .filter((_, index) => index % 2 === 1 && index < flags.length - 1)
+              .map((entry) => entry.split('=') as [string, string])
+          )
+          const file = options.opencode!
+          const text = existsSync(file) ? readFileSync(file, 'utf8') : '{}'
+          // As opencode writes it: in place, keeping the rest of the file
+          writeFileSync(
+            file,
+            applyEdits(
+              text,
+              modify(
+                text,
+                ['mcp', 'servers', 'pacenote'],
+                { type: 'local', command: args.slice(split + 1), environment },
+                { formattingOptions: { insertSpaces: true, tabSize: 2 } }
+              )
+            )
+          )
+          return ok()
+        }
+      }
       const [, verb] = args
       if (command === 'claude') {
         const launch = registered.claude
@@ -211,18 +271,20 @@ describe('adding Pacenote to Claude Code and Codex from the app', () => {
     ).toEqual([
       ['claude', 'absent', undefined],
       ['codex', 'elsewhere', elsewhere.command],
+      ['opencode', 'missing', undefined],
     ])
     expect(
       (
         await fakeTools({}, { missing: ['claude', 'codex'] }).clients.status()
       ).map((s) => s.state)
-    ).toEqual(['missing', 'missing'])
+    ).toEqual(['missing', 'missing', 'missing'])
     // Codex has no check of its own: Pacenote asks the server for its tools.
     expect(
       await fakeTools({ claude: OURS, codex: OURS }).clients.status()
     ).toEqual([
       { id: 'claude', name: 'Claude Code', state: 'connected' },
       { id: 'codex', name: 'Codex', state: 'connected', tools: ['my_tasks'] },
+      { id: 'opencode', name: 'opencode', state: 'missing' },
     ])
     expect(
       await fakeTools(
@@ -266,6 +328,66 @@ describe('adding Pacenote to Claude Code and Codex from the app', () => {
       state: 'absent',
     })
     expect(tools.registered).toEqual({})
+  })
+
+  it('adds it to opencode with its CLI, and takes it out of the config keeping the rest', async () => {
+    const dir = path.join(root, 'opencode')
+    mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, 'opencode.jsonc')
+    const mine = `{
+  // my model
+  "$schema": "https://opencode.ai/config.json",
+  "model": "x/y"
+}
+`
+    writeFileSync(file, mine)
+    const tools = fakeTools({}, { opencode: file })
+    expect(await tools.clients.check('opencode')).toMatchObject({
+      state: 'absent',
+    })
+    expect(await tools.clients.connect('opencode')).toMatchObject({
+      state: 'connected',
+      tools: ['my_tasks'],
+    })
+    expect(tools.calls.find((call) => call[1] === 'mcp')).toEqual([
+      'opencode',
+      'mcp',
+      'add',
+      '--global',
+      '--env',
+      'ELECTRON_RUN_AS_NODE=1',
+      'pacenote',
+      '--',
+      APP,
+      SCRIPT,
+    ])
+    // Another Pacenote added by hand, in the file with comments
+    writeFileSync(
+      file,
+      `{
+  // my model
+  "$schema": "https://opencode.ai/config.json",
+  "model": "x/y",
+  "mcp": {
+    "servers": {
+      "other": { "type": "local", "command": ["other"] },
+      "pacenote": { "type": "local", "command": ["/old/Pacenote", "${SCRIPT}"] }
+    }
+  }
+}
+`
+    )
+    expect(await tools.clients.check('opencode')).toMatchObject({
+      state: 'elsewhere',
+      command: '/old/Pacenote',
+    })
+    expect(await tools.clients.disconnect('opencode')).toMatchObject({
+      state: 'absent',
+    })
+    const left = readFileSync(file, 'utf8')
+    expect(left).toContain('// my model')
+    expect(left).toContain('"other"')
+    expect(left).not.toContain('pacenote')
   })
 
   it('does not add a server that is not built', async () => {
@@ -348,4 +470,45 @@ describe('checking that a server answers over MCP', () => {
       )
     }
   )
+})
+
+describe("opencode's config", () => {
+  it('is found where opencode reads it', () => {
+    expect(opencodeConfigFiles({}, '/Users/me')).toEqual([
+      '/Users/me/.config/opencode/opencode.jsonc',
+      '/Users/me/.config/opencode/opencode.json',
+    ])
+    expect(opencodeConfigFiles({ XDG_CONFIG_HOME: '/x' }, '/Users/me')[0]).toBe(
+      '/x/opencode/opencode.jsonc'
+    )
+  })
+
+  it('reads the server in opencode 2 and earlier, local, remote or off', () => {
+    const local = {
+      type: 'local',
+      command: [APP, SCRIPT],
+      environment: OURS.env,
+    }
+    expect(
+      parseOpencodeConfig(
+        JSON.stringify({ mcp: { servers: { pacenote: local } } })
+      )
+    ).toEqual({ launch: OURS, enabled: true })
+    expect(
+      parseOpencodeConfig(
+        `{ // comment\n "mcp": { "pacenote": ${JSON.stringify({ ...local, enabled: false })}, }, }`
+      )
+    ).toEqual({ launch: OURS, enabled: false })
+    expect(
+      parseOpencodeConfig(
+        JSON.stringify({
+          mcp: { servers: { pacenote: { type: 'remote', url: 'http://x' } } },
+        })
+      )
+    ).toEqual({ url: 'http://x', enabled: true })
+    expect(parseOpencodeConfig('{ "mcp": {} }')).toBeUndefined()
+    expect(parseOpencodeConfig('{ not json')).toBeUndefined()
+    // Taking out what is not there leaves the file alone
+    expect(opencodeWithout('{ "model": "x" }')).toBe('{ "model": "x" }')
+  })
 })
