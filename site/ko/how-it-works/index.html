@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>작동 방식 - Pacenote</title>
-  <meta name="description" content="Pace가 내 Mac이나 쓰고 버리는 VM에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 그간의 기록과 함께 Claude Code나 Codex에 넘기는 방식이에요.">
+  <meta name="description" content="Pace가 내 Mac이나 쓰고 버리는 VM에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 그간의 기록과 함께 Claude Code, Codex, opencode에 넘기는 방식이에요.">
   <link rel="canonical" href="https://pacenote.dev/ko/how-it-works/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/how-it-works/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/how-it-works/">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Pacenote 작동 방식">
-  <meta property="og:description" content="Pace는 내 Mac에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 Claude Code나 Codex에 넘겨요.">
+  <meta property="og:description" content="Pace는 내 Mac에서 Slack 멘션에 답하고, 할 일을 챙기고, 할 일마다 Claude Code, Codex, opencode에 넘겨요.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/ko/how-it-works/">
   <meta property="og:site_name" content="Pacenote">
@@ -45,7 +45,7 @@
     <div class="page-head">
       <h1>작동 방식</h1>
       <p class="lede">Pacenote는 내 Mac에서 돌아가요. Pace는 Slack에서 내게 답하고, 사람들이 내게 부탁한 일을 목록으로
-        챙기고, 할 일마다 Claude Code나 Codex에 넘겨요. 한 일은 모두 <code>~/.pacenote</code>에 남아요.</p>
+        챙기고, 할 일마다 Claude Code, Codex, opencode에 넘겨요. 한 일은 모두 <code>~/.pacenote</code>에 남아요.</p>
     </div>
 
     <div class="surface">
@@ -57,7 +57,7 @@
             <li><a href="#answer">답변이 만들어지는 과정</a></li>
             <li><a href="#sandbox">내 Mac에서, 또는 샌드박스에서</a></li>
             <li><a href="#todo">내 할 일</a></li>
-            <li><a href="#handoff">Claude Code나 Codex에 할 일 넘기기</a></li>
+            <li><a href="#handoff">Claude Code, Codex, opencode에 할 일 넘기기</a></li>
             <li><a href="#macs">내 Mac 사이를 오가기</a></li>
             <li><a href="#teams">팀원과 팀 허브</a></li>
             <li><a href="#also">Pacenote의 다른 기능</a></li>
@@ -67,7 +67,7 @@
 
       <section class="block" id="loop" aria-labelledby="loop-title">
         <h2 id="loop-title">한 바퀴 흐름</h2>
-        <p>일은 Slack 스레드로 들어오고, Claude Code나 Codex에서 끝나요. 도구마다 기록이 따로라서, 스레드를 다시 붙여
+        <p>일은 Slack 스레드로 들어오고, Claude Code, Codex, opencode에서 끝나요. 도구마다 기록이 따로라서, 스레드를 다시 붙여
           넣고, 다시 설명하고, 어디까지 했는지 다시 찾아야 해요. Pacenote는 어느 도구로 일했든 할 일마다 기록을 내 Mac에
           한데 모아 두고, Mac을 두 대 쓰면 다른 Mac에도 모아 둬요.</p>
         <ol class="track" aria-label="할 일 하나, 요청부터 마무리까지">
@@ -151,10 +151,11 @@
       <section class="block" id="handoff" aria-labelledby="handoff-title">
         <div class="row">
           <div class="copy">
-            <h2 id="handoff-title">Claude Code나 Codex에 할 일 넘기기</h2>
-            <p><b>Claude Code에서 계속</b>이나 Codex에서 계속을 누르면 할 일, 스레드, Pace가 거기서 찾은 내용, 그리고
+            <h2 id="handoff-title">Claude Code, Codex, opencode에 할 일 넘기기</h2>
+            <p><b>Claude Code에서 계속</b>이나 Codex, opencode에서 계속을 누르면 할 일, 스레드, Pace가 거기서 찾은 내용, 그리고
               지난번 관련 작업이 어떻게 끝났는지까지 담은 터미널 세션이 열려요. 그 작업을 다른 도구에서 했더라도요.
-              아니면 이 모든 내용을 적어 둔 Claude 앱이나 Codex 앱이 열리고, 보내기는 내가 해요.</p>
+              아니면 이 모든 내용을 적어 둔 Claude 앱이나 Codex 앱이 열리고, 보내기는 내가 해요. opencode는 내용을 적어 둘
+              앱이 없어서 늘 터미널에서 열려요.</p>
             <p>저장소에서 내가 직접 시작한 세션도 처음부터 열린 할 일을 전달받고, 할 일 화면에는 작업이 진행되는 대로
               보여요. 작업이 끝나면 할 일은 어떻게 끝났는지 메모와 함께 닫히고, 누군가 기다리고 있다면 내가 보낼 답장도
               함께 남아요.</p>
@@ -188,7 +189,8 @@
         <p>Pace는 나에게만 답해요. 다른 사람이 멘션하면 그 사람에게만 보이는 안내를 받아요. 팀원은 각자 자기 Mac에서 자기
           로그인으로 자기 Pace를 실행해요.</p>
         <p>팀은 Pacenote 허브로 Slack 앱 하나를 함께 쓸 수 있어요. 허브는 각 멘션을 쓴 사람의 데스크톱으로 보내고, Pace는
-          거기서 그 사람의 로그인으로 답하며, Slack 토큰은 허브에 머물러요.</p>
+          거기서 그 사람의 로그인으로 답하며, Slack 토큰은 허브에 머물러요. 허브는 팀의 누군가가 Pacenote가 만들어 주는
+          명령 한 줄로 Linux 서버에 설치해요.</p>
         <p>회사가 Slack에 추가하는 어시스턴트와 다른 점이 바로 이거예요. 그런 어시스턴트는 관리자가 설정하고 회사 계정으로
           돌아가요. Pace는 내가 직접, 내 Mac에서, 내 요금제로 설정하는 어시스턴트예요.</p>
         <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">팀 허브<span aria-hidden="true"> ↗</span></a>
@@ -209,7 +211,7 @@
           </li>
           <li>
             <h3><a href="https://github.com/Ashon/pacenote/blob/main/docs/history-mcp.md">AI 도구가 직접 찾아보게 하기</a></h3>
-            <p>Pacenote의 MCP 서버로 Claude Code, Codex, 그 밖의 MCP 클라이언트가 Pace가 한 일과 내 할 일 목록을 읽을 수
+            <p>Pacenote의 MCP 서버로 Claude Code, Codex, opencode, 그 밖의 MCP 클라이언트가 Pace가 한 일과 내 할 일 목록을 읽을 수
               있어요. 추가하기 전까지는 꺼져 있고, 추가는 클릭 한 번이면 돼요.</p>
           </li>
         </ul>
@@ -219,7 +221,7 @@
         <h2 id="next-title">내 Mac에서 써 보세요</h2>
         <div class="get">
           <div class="command" role="group" aria-label="Homebrew로 설치">
-            <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+            <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
             <button class="button secondary copy" type="button" data-copy="install-command">복사</button>
             <span class="copied" role="status" aria-live="polite"></span>
           </div>

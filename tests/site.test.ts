@@ -183,4 +183,43 @@ describe('pacenote.dev', () => {
       expect(hooks(read(`ko/${page}`))).toEqual(hooks(read(page)))
     }
   )
+
+  it('lists every page in both languages in the sitemap that robots.txt names', () => {
+    const sitemap = readFileSync(path.join(SITE, 'sitemap.xml'), 'utf8')
+    const urls = [...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(
+      ([, url]) => url!
+    )
+    expect(urls.map((url) => url.match(/<loc>([^<]+)<\/loc>/)?.[1])).toEqual(
+      ALL.map((page) => ORIGIN + page)
+    )
+    for (const [i, url] of urls.entries()) {
+      const page = PAGES[i % PAGES.length]
+      const alternates = [
+        ...url.matchAll(/hreflang="([^"]+)" href="([^"]+)"/g),
+      ].map(([, hreflang, href]) => [hreflang, href])
+      expect(alternates).toEqual([
+        ['en', `${ORIGIN}${page}`],
+        ['ko', `${ORIGIN}ko/${page}`],
+        ['x-default', `${ORIGIN}${page}`],
+      ])
+    }
+    expect(readFileSync(path.join(SITE, 'robots.txt'), 'utf8')).toContain(
+      `Sitemap: ${ORIGIN}sitemap.xml`
+    )
+  })
+
+  it('has a not-found page whose links work at any depth', () => {
+    const html = readFileSync(path.join(SITE, '404.html'), 'utf8')
+    const refs = [...html.matchAll(/(?:href|src)="([^"]+)"/g)].map(
+      ([, ref]) => ref!
+    )
+    expect(refs.length).toBeGreaterThan(0)
+    for (const ref of refs) {
+      expect(ref).toMatch(/^(\/|#|https:)/)
+      // Each page it links to is there
+      const page = ref.replace(/^\//, '')
+      if (ref.startsWith('/') && (page === '' || page.endsWith('/')))
+        expect(existsSync(path.join(SITE, page, 'index.html')), ref).toBe(true)
+    }
+  })
 })

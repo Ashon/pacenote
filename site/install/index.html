@@ -47,8 +47,8 @@
       <p class="lede">One Homebrew command, then a setup in the app that ends when Pace answers you in Slack.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
-          <code id="install-command">brew install --cask ashon/tap/pacenote</code>
-          <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
+          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <button class="button primary copy" type="button" data-copy="install-command">Copy</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
       </div>
@@ -63,7 +63,8 @@
             Business, signed in on that Mac.</li>
           <li>A Slack workspace where you can create an app, or your team's
             <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">Pacenote hub</a>.</li>
-          <li>For collecting tasks: Claude Code with your claude.ai account's Slack connector.</li>
+          <li>For collecting tasks: Claude Code with your claude.ai account's Slack connector, or Codex with ChatGPT's
+            Slack app.</li>
         </ul>
       </section>
 
@@ -92,7 +93,8 @@
             Pacenote is a personal project, open source under the Apache License 2.0 and offered as is.</p>
           <h3>Do I need my Slack admin?</h3>
           <p>You need to be able to create and install an app in your workspace, and some workspaces ask an admin to
-            approve new apps. If your team runs a Pacenote hub, you pair your Mac with it instead.</p>
+            approve new apps. If your team runs a Pacenote hub, you pair your Mac with it instead: only the hub needs the
+            app. Pacenote writes the one command that installs a hub on a Linux server.</p>
           <h3>Does it work on Intel Macs, Windows or Microsoft Teams?</h3>
           <p>Not today. Pacenote runs on Apple silicon Macs and works with Slack.</p>
         </div>

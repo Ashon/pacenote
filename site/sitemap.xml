@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every page in both languages, each with its counterpart (tests/site.test.ts keeps it in step) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://pacenote.dev/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/how-it-works/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/how-it-works/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/how-it-works/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/how-it-works/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/privacy/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/install/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/install/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/install/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/install/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/ko/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/ko/how-it-works/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/how-it-works/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/how-it-works/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/how-it-works/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/ko/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/privacy/"/>
+  </url>
+  <url>
+    <loc>https://pacenote.dev/ko/install/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://pacenote.dev/install/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/install/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pacenote.dev/install/"/>
+  </url>
+</urlset>

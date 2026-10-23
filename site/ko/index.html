@@ -52,14 +52,14 @@
 
   <main id="main">
     <section class="hero">
-      <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">v0.5.25에서 달라진 점</a>
+      <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">달라진 점</a>
       <h1>Slack에서 묻고,<br>터미널에서 이어가세요.</h1>
       <p class="lede">Pacenote는 무료 Mac 앱이에요. Slack에서 어시스턴트 Pace를 멘션하면 내 Claude Code나 Codex 로그인으로
         답하고, 할 일마다 그간의 기록을 챙겨 실제로 작업할 터미널 세션에 넘겨줘요.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Homebrew로 설치">
-          <code id="install-command">brew install --cask ashon/tap/pacenote</code>
-          <button class="button secondary copy" type="button" data-copy="install-command">복사</button>
+          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <button class="button primary copy" type="button" data-copy="install-command">복사</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
         <a class="button secondary" href="how-it-works/">작동 방식</a>
@@ -86,7 +86,7 @@
     <div class="surface">
       <section class="block" aria-labelledby="loop-title">
         <h2 id="loop-title">모든 도구가 Pacenote에 결과를 알려요</h2>
-        <p>부탁은 Slack 스레드로 들어오고, 작업은 Claude Code나 Codex에서 하고, 각 도구는 어떻게 끝났는지 Pacenote에
+        <p>부탁은 Slack 스레드로 들어오고, 작업은 Claude Code, Codex, opencode에서 하고, 각 도구는 어떻게 끝났는지 Pacenote에
           알려요. 이 모든 게 내 Mac에, 또는 두 Mac 모두에 하나의 기록으로 남아서, 다음 할 일은 어느 도구에서든, 어느
           Mac에서든 앞서 있었던 일을 알고 시작해요.</p>
         <figure class="converge" data-converge>
@@ -128,7 +128,7 @@
           <div class="copy">
             <h2>멈춘 곳에서 이어가세요</h2>
             <p><b>지금 모으기</b>를 누르면 사람들이 Slack에서 내게 부탁한 일이 목록으로 정리돼요. <b>Claude Code에서 계속</b>이나
-              Codex에서 계속을 누르면, 스레드와 Pace가 찾은 내용, 지난번 관련 작업이 어떻게 끝났는지를 이미 담은 세션이
+              Codex, opencode에서 계속을 누르면, 스레드와 Pace가 찾은 내용, 지난번 관련 작업이 어떻게 끝났는지를 이미 담은 세션이
               열려요.</p>
             <a class="more" href="how-it-works/#todo">할 일과 넘겨주기</a>
           </div>
@@ -194,7 +194,7 @@
         <h2 id="install-title">Pacenote 설치하기</h2>
         <div class="get">
           <div class="command" role="group" aria-label="Homebrew로 설치">
-            <code id="install-command-end">brew install --cask ashon/tap/pacenote</code>
+            <code id="install-command-end"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
             <button class="button secondary copy" type="button" data-copy="install-command-end">복사</button>
             <span class="copied" role="status" aria-live="polite"></span>
           </div>

@@ -30,8 +30,8 @@
 
 Mention **Pace** in a Slack thread and it answers there, from your Mac, with the Claude Code or Codex you are signed in
 to, on the subscription you already have. It keeps a list of what people ask of you, and when you pick a task up, it
-opens Claude Code or Codex with the thread, what Pace found and how related work ended last time, even when that work
-was done in the other tool.
+opens Claude Code, Codex or opencode with the thread, what Pace found and how related work ended last time, even when
+that work was done in another tool.
 
 Pace answers only you, keeps its history in `~/.pacenote` on your Mac, and sends no telemetry. In rallying, the
 co-driver reads the pace notes so the driver can keep their eyes on the road. You drive; Pace reads the notes.
@@ -97,7 +97,7 @@ network, with nothing to pair and no server in between. A new Mac's setup can ta
 
 ### Share the history with your AI tools
 
-Pacenote's MCP server lets Claude Code, Codex and other MCP clients on your Mac read what Pace did, what is on your list
+Pacenote's MCP server lets Claude Code, Codex, opencode and other MCP clients on your Mac read what Pace did, what is on your list
 and where you contribute. You add it to each tool with one click, and only if you want to.
 
 ## What Pace never does
@@ -108,7 +108,8 @@ and where you contribute. You add it to each tool with one click, and only if yo
 - **Send messages for you.** It answers in the thread you asked in; replies it drafts for your tasks are yours to send.
 - **Change your files.** On your Mac, the CLI gets read-only access to one folder you choose, and never your
   credential folders. In the built-in sandbox, each answer runs in a Linux VM that is thrown away afterwards and reaches
-  only the domains you allow.
+  only the domains you allow. With GitHub's Write on, Pace edits only its own copy of a repository and opens a draft PR
+  from a `pacenote/` branch; your working copy is left as it is.
 - **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With connections on in Settings >
   Tools, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only
   lookups and, only where you turn on Write, draft PRs and Jira issues or comments.
@@ -128,7 +129,8 @@ How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Tools]
 - Claude Code with a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later with ChatGPT Plus, Pro or
   Business, signed in on that Mac.
 - A Slack workspace where you can create an app, or your team's Pacenote hub.
-- To gather your tasks: Claude Code, with the Slack connector of your claude.ai account.
+- To gather your tasks: Claude Code, with the Slack connector of your claude.ai account, or Codex, with ChatGPT's
+  Slack app.
 
 ## Install
 
@@ -180,7 +182,7 @@ Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 | [Tools](docs/ops-tools.md) | Connections Pace reads (hosts, k8s, a work folder, GitHub, Jira) and, where you turn on Write, draft PRs and Jira issues |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
 | [Your Macs](docs/macs.md) | Pace answering on the Mac you're using, Todo the same on each, and how the Macs know each other |
-| [Your tasks from Slack](docs/tasks.md) | What people ask of you, collected on the Todo screen, and continuing it in Claude Code or Codex |
+| [Your tasks from Slack](docs/tasks.md) | What people ask of you, collected on the Todo screen, and continuing it in Claude Code, Codex or opencode |
 | [Run history for AI tools](docs/history-mcp.md) | Pacenote's MCP server: your AI tools reading what Pace did and your tasks |
 | [Installation](docs/installation.md) | Homebrew in detail, running from source, restarts and the run lock |
 | [Desktop app](docs/desktop-app.md) | The app's screens, setup, settings, sandbox controls, packaging |

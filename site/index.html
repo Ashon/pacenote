@@ -61,14 +61,14 @@
 
   <main id="main">
     <section class="hero">
-      <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">What's new in v0.5.25</a>
+      <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">What's new</a>
       <h1>Ask in Slack.<br>Pick it up in your terminal.</h1>
       <p class="lede">Pacenote is a free Mac app. Its assistant, Pace, answers you in Slack when you mention it, with your
         own Claude Code or Codex login, and hands each task, with its history, to the terminal session that does the work.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
-          <code id="install-command">brew install --cask ashon/tap/pacenote</code>
-          <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
+          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <button class="button primary copy" type="button" data-copy="install-command">Copy</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
         <a class="button secondary" href="how-it-works/">How it works</a>
@@ -95,7 +95,7 @@
     <div class="surface">
       <section class="block" aria-labelledby="loop-title">
         <h2 id="loop-title">Every tool reports back to Pacenote</h2>
-        <p>Asks come in from Slack threads, work happens in Claude Code or Codex, and each one tells Pacenote how it ended.
+        <p>Asks come in from Slack threads, work happens in Claude Code, Codex or opencode, and each one tells Pacenote how it ended.
           It all stays as one history, on your Mac or on both of your Macs, so the next task starts with what came before,
           in either tool, on either Mac.</p>
         <figure class="converge" data-converge>
@@ -137,7 +137,7 @@
         <div class="row">
           <div class="copy">
             <h2>Pick up where you left off</h2>
-            <p><b>Collect now</b> lists what people asked of you in Slack. <b>Continue in Claude Code</b> or Codex opens a
+            <p><b>Collect now</b> lists what people asked of you in Slack. <b>Continue in Claude Code</b>, Codex or opencode opens a
               session that already has the thread, what Pace found and how related work ended last time.</p>
             <a class="more" href="how-it-works/#todo">Your Todo and the handoff</a>
           </div>
@@ -203,7 +203,7 @@
         <h2 id="install-title">Install Pacenote</h2>
         <div class="get">
           <div class="command" role="group" aria-label="Install with Homebrew">
-            <code id="install-command-end">brew install --cask ashon/tap/pacenote</code>
+            <code id="install-command-end"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
             <button class="button secondary copy" type="button" data-copy="install-command-end">Copy</button>
             <span class="copied" role="status" aria-live="polite"></span>
           </div>

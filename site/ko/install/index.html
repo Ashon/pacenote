@@ -47,8 +47,8 @@
       <p class="lede">Homebrew 명령 하나면 되고, 앱 안의 초기 설정은 Slack에서 Pace가 답하면 끝나요.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Homebrew로 설치">
-          <code id="install-command">brew install --cask ashon/tap/pacenote</code>
-          <button class="button secondary copy" type="button" data-copy="install-command">복사</button>
+          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <button class="button primary copy" type="button" data-copy="install-command">복사</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
       </div>
@@ -63,7 +63,8 @@
             그 Mac에서 로그인되어 있어야 해요.</li>
           <li>앱을 만들 수 있는 Slack 워크스페이스, 또는 팀의
             <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">Pacenote 허브</a>.</li>
-          <li>할 일 모으기에는: claude.ai 계정의 Slack 커넥터를 연결한 Claude Code.</li>
+          <li>할 일 모으기에는: claude.ai 계정의 Slack 커넥터를 연결한 Claude Code, 또는 ChatGPT의 Slack 앱을 연결한
+            Codex.</li>
         </ul>
       </section>
 
@@ -92,7 +93,8 @@
             Pacenote는 개인 프로젝트로, Apache License 2.0에 따른 오픈 소스이며 있는 그대로 제공돼요.</p>
           <h3>Slack 관리자가 필요한가요?</h3>
           <p>워크스페이스에서 앱을 만들고 설치할 수 있어야 해요. 워크스페이스에 따라 새 앱에 관리자 승인이 필요할 수도
-            있어요. 팀에서 Pacenote 허브를 운영한다면, 대신 내 Mac을 허브와 페어링하면 돼요.</p>
+            있어요. 팀에서 Pacenote 허브를 운영한다면, 대신 내 Mac을 허브와 페어링하면 돼요. 앱은 허브에만 있으면 돼요.
+            Linux 서버에 허브를 설치하는 명령 한 줄은 Pacenote가 만들어 줘요.</p>
           <h3>Intel Mac, Windows, Microsoft Teams에서도 되나요?</h3>
           <p>지금은 안 돼요. Pacenote는 Apple silicon Mac에서 돌아가고, Slack을 지원해요.</p>
         </div>

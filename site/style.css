@@ -1802,6 +1802,14 @@ code {
     right: 1.5rem;
     transform: translateY(-50%);
   }
+  /* The install command wraps between its halves rather than hide its end */
+  .command code {
+    white-space: normal;
+    overflow-x: visible;
+  }
+  .command code span {
+    white-space: nowrap;
+  }
   /* The track turns to run down the page */
   .track {
     grid-template-columns: 1fr;

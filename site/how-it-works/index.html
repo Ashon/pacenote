@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How it works - Pacenote</title>
-  <meta name="description" content="How Pace answers you in Slack on your Mac or in a throwaway VM, keeps your Todo, and hands each task with its history to Claude Code or Codex.">
+  <meta name="description" content="How Pace answers you in Slack on your Mac or in a throwaway VM, keeps your Todo, and hands each task with its history to Claude Code, Codex or opencode.">
   <link rel="canonical" href="https://pacenote.dev/how-it-works/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/how-it-works/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/how-it-works/">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="How Pacenote works">
-  <meta property="og:description" content="Pace answers you in Slack on your Mac, keeps your Todo, and hands each task to Claude Code or Codex.">
+  <meta property="og:description" content="Pace answers you in Slack on your Mac, keeps your Todo, and hands each task to Claude Code, Codex or opencode.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/how-it-works/">
   <meta property="og:site_name" content="Pacenote">
@@ -45,7 +45,7 @@
     <div class="page-head">
       <h1>How it works</h1>
       <p class="lede">Pacenote runs on your Mac. Pace answers you in Slack, keeps a list of what people ask of you,
-        and hands each task to Claude Code or Codex. What it does is kept in <code>~/.pacenote</code>.</p>
+        and hands each task to Claude Code, Codex or opencode. What it does is kept in <code>~/.pacenote</code>.</p>
     </div>
 
     <div class="surface">
@@ -57,7 +57,7 @@
             <li><a href="#answer">An answer, step by step</a></li>
             <li><a href="#sandbox">On your Mac or in a sandbox</a></li>
             <li><a href="#todo">Your Todo</a></li>
-            <li><a href="#handoff">Handing a task to Claude Code or Codex</a></li>
+            <li><a href="#handoff">Handing a task to Claude Code, Codex or opencode</a></li>
             <li><a href="#macs">Moving between your Macs</a></li>
             <li><a href="#teams">Teammates and the hub</a></li>
             <li><a href="#also">Also in Pacenote</a></li>
@@ -67,7 +67,7 @@
 
       <section class="block" id="loop" aria-labelledby="loop-title">
         <h2 id="loop-title">The loop</h2>
-        <p>Work reaches you in Slack threads and gets done in Claude Code or Codex. Each keeps its own history, so you
+        <p>Work reaches you in Slack threads and gets done in Claude Code, Codex or opencode. Each keeps its own history, so you
           paste the thread again, explain it again, and hunt for where you stopped. Pacenote keeps each task's history
           together on your Mac, whichever tool did the work, and on your other Mac too if you use two.</p>
         <ol class="track" aria-label="A task, from the ask to how it ended">
@@ -152,10 +152,11 @@
       <section class="block" id="handoff" aria-labelledby="handoff-title">
         <div class="row">
           <div class="copy">
-            <h2 id="handoff-title">Handing a task to Claude Code or Codex</h2>
-            <p><b>Continue in Claude Code</b> or Codex opens a terminal session with the task, the thread, what Pace found
-              there, and how related work ended last time, even when that work was done in the other tool. Or the
-              Claude app or the Codex app opens with all of it written in, for you to send.</p>
+            <h2 id="handoff-title">Handing a task to Claude Code, Codex or opencode</h2>
+            <p><b>Continue in Claude Code</b>, Codex or opencode opens a terminal session with the task, the thread, what Pace found
+              there, and how related work ended last time, even when that work was done in another tool. Or the
+              Claude app or the Codex app opens with all of it written in, for you to send. opencode, with no app to write
+              it into, opens in the terminal.</p>
             <p>A session you start yourself in a repository is told its open tasks from the start, and Todo shows the
               work as it happens. When it is done, the task closes with a note on how it ended and, if someone is
               waiting, a reply for you to send.</p>
@@ -190,7 +191,8 @@
         <p>Pace answers only you. Anyone else who mentions it gets a note only they can see. Teammates each run their own
           Pace, on their own Mac and login.</p>
         <p>A team can share one Slack app through a Pacenote hub. The hub sends each mention to the desktop of the person
-          who wrote it, where Pace answers with that person's login, and the Slack tokens stay on the hub.</p>
+          who wrote it, where Pace answers with that person's login, and the Slack tokens stay on the hub. Someone on the
+          team installs it on a Linux server with one command that Pacenote writes.</p>
         <p>That is the difference from an assistant a company adds to Slack: that one is set up by an admin and runs
           under the company's account. Pace is one you set up yourself, on your Mac, with your own plan.</p>
         <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">The team hub<span aria-hidden="true"> ↗</span></a>
@@ -211,7 +213,7 @@
           </li>
           <li>
             <h3><a href="https://github.com/Ashon/pacenote/blob/main/docs/history-mcp.md">Let your AI tools look things up</a></h3>
-            <p>Pacenote's MCP server lets Claude Code, Codex and other MCP clients read what Pace did and what is on your
+            <p>Pacenote's MCP server lets Claude Code, Codex, opencode and other MCP clients read what Pace did and what is on your
               list. Off until you add it, in one click.</p>
           </li>
         </ul>
@@ -221,7 +223,7 @@
         <h2 id="next-title">Try it on your Mac</h2>
         <div class="get">
           <div class="command" role="group" aria-label="Install with Homebrew">
-            <code id="install-command">brew install --cask ashon/tap/pacenote</code>
+            <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
             <button class="button secondary copy" type="button" data-copy="install-command">Copy</button>
             <span class="copied" role="status" aria-live="polite"></span>
           </div>
