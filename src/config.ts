@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
 import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
+import { isHubUrl } from './hub/address.js'
 import { isTimeZone, systemTimeZone } from './messengers/text.js'
 import { getLocale, localized, LOCALES, type Locale } from './i18n/locale.js'
 import { defaultHome } from './settings/home.js'
@@ -104,14 +105,10 @@ export const EnvSchema = z.object({
     .refine(isSecureOrLocalUrl, says('secureUrl'))
     .optional(),
   /**
-   * The team hub (docs/team-hub.md). https, or http only for a hub on this
-   * computer
+   * The team hub (docs/team-hub.md). https, or http on a network of your own
+   * (isHubUrl)
    */
-  HUB_URL: z
-    .string()
-    .url()
-    .refine(isSecureOrLocalUrl, says('secureUrl'))
-    .optional(),
+  HUB_URL: z.string().url().refine(isHubUrl, says('hubUrl')).optional(),
   /**
    * This desktop's token for the hub, set by pairing in Settings > Messengers >
    * Slack

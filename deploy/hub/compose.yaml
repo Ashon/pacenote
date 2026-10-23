@@ -4,6 +4,7 @@
 #   docker compose pull && docker compose up -d # later, to update
 # From the repository instead: pnpm bundle, then docker compose up -d --build.
 # The hub listens on 127.0.0.1:8790; put HTTPS in front of it (Caddy, nginx, or a tunnel) and give members that URL.
+# Or, on a network of your own, publish it there ("8790:8790") and give members http://<the server's address>:8790.
 name: pacenote-hub
 services:
   hub:

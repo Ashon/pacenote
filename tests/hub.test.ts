@@ -12,6 +12,7 @@ import {
 } from '../apps/desktop/src/bot-readiness.js'
 import { checkConfig, loadConfig } from '../src/config.js'
 import { checkHub, HubClient, newHubToken } from '../src/hub/client.js'
+import { isHubUrl } from '../src/hub/address.js'
 import { loadHubConfig } from '../src/hub/config.js'
 import { createLogger } from '../src/logger.js'
 import { normalizeCode, Pairings, PAIRING_TTL_MS } from '../src/hub/pairing.js'
@@ -665,6 +666,37 @@ describe('desktop side of the hub', () => {
     await expect(receiver.start()).rejects.toThrow(/hub_unauthorized/)
   })
 
+  it('takes an https hub anywhere, and an http one only on your own network', () => {
+    for (const url of [
+      'https://hub.example.com',
+      'https://10.0.0.5',
+      'http://localhost:8790',
+      'http://127.0.0.1:8790',
+      'http://10.0.0.5:8790',
+      'http://192.168.1.20:8790/',
+      'http://172.20.0.5',
+      'http://100.68.0.12:8790',
+      'http://[fd7a:115c:a1e0::1]:8790',
+      'http://pacenote-hub:8790',
+      'http://hub.local:8790',
+      'http://hub.internal',
+      'http://hub.lan',
+      'http://hub.home.arpa',
+    ])
+      expect([url, isHubUrl(url)]).toEqual([url, true])
+    for (const url of [
+      'http://hub.example.com',
+      'http://8.8.8.8:8790',
+      'http://172.32.0.1',
+      'http://[2001:db8::1]',
+      'http://local.example.com',
+      'ftp://10.0.0.5',
+      'hub.local',
+      '',
+    ])
+      expect([url, isHubUrl(url)]).toEqual([url, false])
+  })
+
   it('configures the bot for the hub, and says what is missing', () => {
     const token = newHubToken().token
     const config = loadConfig({
@@ -696,6 +728,13 @@ describe('desktop side of the hub', () => {
         HUB_TOKEN: token,
       })[0]?.key
     ).toBe('HUB_URL')
+    expect(
+      checkConfig({
+        SLACK_CONNECTION: 'hub',
+        HUB_URL: 'http://10.0.0.5:8790',
+        HUB_TOKEN: token,
+      })
+    ).toEqual([])
     expect(
       setupProblem({
         SLACK_CONNECTION: 'hub',

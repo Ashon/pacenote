@@ -8,6 +8,8 @@ const en = {
     botTokenPrefix: 'Must be a bot token starting with xoxb-',
     appTokenPrefix: 'Must be an app token starting with xapp-',
     secureUrl: 'Must be an https URL (http only for localhost)',
+    hubUrl:
+      'Must be an https URL (http only on your own network: a private address or a name like hub.local)',
     hubTokenFormat: 'Must be the token pairing stored (64 hex characters)',
     timeZone: 'Must be a time zone name, such as Asia/Seoul or UTC',
     memorySize: 'Must be a size such as 2g or 1536m',
@@ -71,6 +73,8 @@ const ko: typeof en = {
     botTokenPrefix: 'xoxb-로 시작하는 봇 토큰이어야 해요',
     appTokenPrefix: 'xapp-로 시작하는 앱 토큰이어야 해요',
     secureUrl: 'https URL이어야 해요 (http는 localhost만)',
+    hubUrl:
+      'https URL이어야 해요 (http는 사내망에서만: 사설 IP나 hub.local 같은 이름)',
     hubTokenFormat: '페어링으로 저장된 토큰이어야 해요 (16진수 64자)',
     timeZone: 'Asia/Seoul, UTC 같은 시간대 이름이어야 해요',
     memorySize: '2g, 1536m 같은 크기여야 해요',

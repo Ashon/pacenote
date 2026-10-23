@@ -1,4 +1,5 @@
 import { hostname } from 'node:os'
+import { isHubUrl } from '../../../src/hub/address.js'
 import { HubClient, newHubToken } from '../../../src/hub/client.js'
 import { localized } from '../../../src/i18n/locale.js'
 import type {
@@ -9,10 +10,6 @@ import type {
 import type { SettingsIssue } from '../../../src/settings/fields.js'
 import type { SettingsStore } from './settings.js'
 import { text } from './hub-pairing.text.js'
-
-/** A hub's address: https, or http on this Mac */
-const HUB_ADDRESS =
-  /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$))/
 
 /**
  * Pairs this desktop with the team hub (docs/team-hub.md). The token is made
@@ -35,7 +32,7 @@ export class HubPairing {
   async start(url: unknown): Promise<PairStartResponse> {
     const given = typeof url === 'string' ? url.trim() : ''
     const t = localized(text)
-    if (!HUB_ADDRESS.test(given))
+    if (!isHubUrl(given))
       throw new Error(/^http:\/\//.test(given) ? t.useHttps : t.enterAddress)
     const hubUrl = given.replace(/\/+$/, '')
     const client = new HubClient(hubUrl, this.fetchImpl)

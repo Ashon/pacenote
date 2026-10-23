@@ -36,8 +36,11 @@ Running the hub (on a server of its own, with Docker):
    release publishes for amd64 and arm64 servers; name a version in `compose.yaml` instead (`:0.5.0`) to stay on one.
    Paired desktops are kept in the `hub-data` volume. To update: `docker compose pull && docker compose up -d`.
 4. The hub listens on `127.0.0.1:8790`. Serve it over HTTPS at `HUB_PUBLIC_URL`, for example with Caddy:
-   `pacenote-hub.example.com { reverse_proxy 127.0.0.1:8790 }` (WebSockets pass through). Desktops accept only https URLs
-   (http only for localhost).
+   `pacenote-hub.example.com { reverse_proxy 127.0.0.1:8790 }` (WebSockets pass through). On a network of your own,
+   plain http works too: publish the port there (`"8790:8790"` under `ports` in `compose.yaml`) and set
+   `HUB_PUBLIC_URL=http://10.0.0.5:8790`, with the server's address. Desktops take http only for localhost, a private
+   address (10.x, 172.16-31.x, 192.168.x, Tailscale's 100.64.x) or a name that exists only there (`hub.local`,
+   `hub.internal`, a name without a dot); the hub token and the threads then cross that network unencrypted.
 5. Give members the URL. `docker compose logs -f hub` shows pairings, connections, routed mentions and refused calls.
 
 From the repository instead of the published image: `pnpm install && pnpm bundle`, which writes `deploy/hub/dist/hub.mjs`,
@@ -46,7 +49,7 @@ then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the
 | Hub setting (`hub.env`) | Meaning |
 | --- | --- |
 | `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN` | The Slack app's tokens (required) |
-| `HUB_PUBLIC_URL` | The HTTPS URL members use; upload URLs handed to desktops are built from it |
+| `HUB_PUBLIC_URL` | The URL members use (https, or http on your own network); upload URLs handed to desktops are built from it |
 | `HUB_ALLOWED_USERS` | Comma-separated Slack user IDs who may pair and use the hub. Empty: everyone |
 | `HUB_NOTES_LANGUAGE` | The language of the notes the hub posts to members in Slack (pairing, not connected): `en` (default) or `ko` |
 | `HUB_PORT`, `HUB_HOST`, `HUB_DATA_DIR` | Listen port (8790, 0 for any free one), address (0.0.0.0) and data folder (`/data`) |

@@ -3,8 +3,9 @@ import type { Locale } from '../../../src/i18n/locale.js'
 /** What pairing with the team hub says when it cannot go on */
 const en = {
   useHttps:
-    "Use the hub's https:// address. Plain http works only for a hub on this Mac.",
-  enterAddress: "Enter the hub's address, starting with https://.",
+    "Use the hub's https:// address. Plain http works only on your own network: a private address such as http://10.0.0.5:8790, or a name like hub.local.",
+  enterAddress:
+    "Enter the hub's address, starting with https://, or http:// on your own network.",
   noPairing: 'No pairing in progress. Connect again.',
   unreachable: (url: string) =>
     `Couldn't reach a hub at ${url}. Check the address and your network.`,
@@ -18,8 +19,9 @@ const en = {
 
 const ko: typeof en = {
   useHttps:
-    '허브의 https:// 주소를 쓰세요. 일반 http는 이 Mac에 있는 허브에만 쓸 수 있어요.',
-  enterAddress: 'https://로 시작하는 허브 주소를 입력하세요.',
+    '허브의 https:// 주소를 쓰세요. 일반 http는 사내망 주소에서만 돼요: http://10.0.0.5:8790 같은 사설 IP나 hub.local 같은 이름.',
+  enterAddress:
+    '허브 주소를 https://로 시작해 입력하세요. 사내망에서는 http://도 돼요.',
   noPairing: '진행 중인 페어링이 없어요. 다시 연결하세요.',
   unreachable: (url) =>
     `${url}의 허브에 연결할 수 없어요. 주소와 네트워크를 확인하세요.`,
