@@ -12,6 +12,7 @@
 <p align="center">
   <a href="#install">Install</a> ·
   <a href="https://pacenote.dev">pacenote.dev</a> ·
+  <a href="https://pacenote.dev/ko/">한국어</a> ·
   <a href="https://github.com/Ashon/pacenote/issues/new?template=design-partner.yml">Become a design partner</a>
 </p>
 
