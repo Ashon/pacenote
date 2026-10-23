@@ -46,7 +46,7 @@ const en = {
   todoSettings: 'Todo settings: your names, groups and channels left out',
   followMac: "Follow the Mac you're using: on",
   stayWithEachMac:
-    'AI sign-in, the sandbox, ops tools and folders stay with each Mac.',
+    'AI sign-in, the sandbox, tools and folders stay with each Mac.',
   sameNumber: (name: string) =>
     `Check that ${name} shows the same number, then click Allow there.`,
   openAddMac: (b: Bold): ReactNode => (
@@ -195,8 +195,7 @@ const ko: typeof en = {
   paceAnswers: (name) => `Pace가 답변할 사람: ${name}`,
   todoSettings: '할 일 설정: 내 이름, 그룹, 채널은 빼고',
   followMac: '지금 쓰는 Mac 따라가기: 켬',
-  stayWithEachMac:
-    'AI 로그인, 샌드박스, 운영 도구, 폴더는 Mac마다 따로 있어요.',
+  stayWithEachMac: 'AI 로그인, 샌드박스, 도구, 폴더는 Mac마다 따로 있어요.',
   sameNumber: (name) =>
     `${name}에 같은 숫자가 보이는지 확인한 뒤 그곳에서 허용을 클릭하세요.`,
   openAddMac: (b) => (

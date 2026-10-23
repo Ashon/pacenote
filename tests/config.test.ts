@@ -161,7 +161,7 @@ describe('loadConfig', () => {
       OPS_TOOLS: 'on',
     }
     expect(() => loadConfig({ ...base, MENTION_ALLOWED_USERS: 'U1' })).toThrow(
-      /Ops tools need the built-in sandbox/
+      /Connections in Settings > Tools need the built-in sandbox/
     )
     expect(() =>
       loadConfig({ ...base, REASONER_SANDBOX: 'vm', MENTION_ANYONE: 'on' })

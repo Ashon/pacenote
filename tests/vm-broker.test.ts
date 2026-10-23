@@ -84,5 +84,7 @@ describe("the ops broker's VM", () => {
     expect(env).toContain('GIT_AUTHOR_NAME=Pace Author')
     expect(env).toContain('GIT_AUTHOR_EMAIL=pace@example.com')
     expect(env).toContain('GIT_ALLOWED_OWNERS=acme')
+    // GitHub reads; its writes wait for their switch
+    expect(env).toContain('TOOLS=github')
   })
 })

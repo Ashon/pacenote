@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -25,8 +26,14 @@ import {
   settingsText,
   settingsValues,
   updateSettingsText,
+  upgradeSettings,
   writeSettingsFile,
 } from '../src/settings/settings-file.js'
+import {
+  brokerTools,
+  connectionStates,
+  lookupIn,
+} from '../src/settings/tools.js'
 import { MESSENGER_IDS } from '../src/messengers/ids.js'
 import {
   maskSecret,
@@ -188,6 +195,47 @@ FAKE_CLAUDE_DIR='/tmp/a b'
     expect(moveEnvSettings(path.join(root, 'none', 'settings.json'))).toEqual(
       []
     )
+  })
+
+  it('keeps a connection set up before Write had a switch writing, once', () => {
+    const file = path.join(root, 'upgrade', 'settings.json')
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(
+      file,
+      settingsText({
+        OPS_TOOLS: 'on',
+        OPS_GIT_ALLOWED_OWNERS: 'acme',
+        OPS_JIRA_URL: 'https://acme.atlassian.net',
+        OPS_JIRA_EMAIL: 'me@acme.dev',
+      })
+    )
+    // GitHub was set up and kept opening draft PRs; Jira was only half set up.
+    expect(upgradeSettings(file)).toEqual([
+      'ops.write.github: on (set up before Write had a switch)',
+      'ops.write.jira: off',
+    ])
+    expect(JSON.parse(readFileSync(file, 'utf8')).ops).toMatchObject({
+      enabled: true,
+      github: { owners: ['acme'] },
+      write: { github: true, jira: false },
+    })
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    // Once: Jira finished later starts with Write off, as a new one does.
+    writeFileSync(
+      file,
+      updateSettingsText(readFileSync(file, 'utf8'), {
+        OPS_JIRA_TOKEN: 'secret',
+        OPS_JIRA_PROJECTS: 'OPS',
+      })
+    )
+    expect(upgradeSettings(file)).toEqual([])
+    expect(readSettingsValues(file).OPS_JIRA_WRITE).toBe('off')
+    // Nothing to bring up to date where there is no file, or no JSON
+    expect(upgradeSettings(path.join(root, 'none', 'settings.json'))).toEqual(
+      []
+    )
+    writeFileSync(file, '{ not json')
+    expect(upgradeSettings(file)).toEqual([])
   })
 
   it('reads values from a .env with the same rules as node', () => {
@@ -376,5 +424,69 @@ describe('connection check', () => {
         'Missing reactions:write: only the asker sees that Pace is working or failed'
       ),
     })
+  })
+})
+
+describe('connections', () => {
+  const states = (values: Record<string, string>) =>
+    Object.fromEntries(
+      connectionStates(lookupIn(values)).map((state) => [state.id, state])
+    )
+
+  it('reads once set up, and writes only when Write is on and has what it needs', () => {
+    const github = { OPS_GIT_ALLOWED_OWNERS: 'acme' }
+    expect(states(github).github).toMatchObject({
+      missing: [],
+      read: true,
+      write: false,
+      reads: true,
+      writes: false,
+    })
+    // Draft PRs start from the work folder
+    expect(states({ ...github, OPS_GIT_WRITE: 'on' }).github).toMatchObject({
+      writes: false,
+      writeMissing: ['OPS_FS_ROOT'],
+    })
+    expect(
+      states({ ...github, OPS_GIT_WRITE: 'on', OPS_FS_ROOT: '/work' }).github
+    ).toMatchObject({ writes: true, writeMissing: [] })
+    // Read off turns the connection off, its writes with it
+    expect(
+      states({
+        ...github,
+        OPS_GIT_WRITE: 'on',
+        OPS_FS_ROOT: '/work',
+        OPS_GIT_READ: 'off',
+      }).github
+    ).toMatchObject({ reads: false, writes: false })
+    // Half set up: what is still missing
+    expect(
+      states({ OPS_JIRA_URL: 'https://acme.atlassian.net' }).jira
+    ).toMatchObject({
+      reads: false,
+      missing: ['OPS_JIRA_EMAIL', 'OPS_JIRA_TOKEN', 'OPS_JIRA_PROJECTS'],
+    })
+    // A connection Pace only reads has no Write
+    expect(states({ OPS_K8S_CONTEXTS: 'prod' }).k8s).toMatchObject({
+      reads: true,
+      write: undefined,
+    })
+  })
+
+  it('tells the broker which tools it may offer', () => {
+    expect(brokerTools({})).toEqual([])
+    expect(
+      brokerTools({
+        OPS_FS_ROOT: '/work',
+        OPS_GIT_ALLOWED_OWNERS: 'acme',
+        OPS_GIT_WRITE: 'on',
+        OPS_JIRA_URL: 'https://acme.atlassian.net',
+        OPS_JIRA_EMAIL: 'me@acme.dev',
+        OPS_JIRA_TOKEN: 'secret',
+        OPS_JIRA_PROJECTS: 'OPS',
+        OPS_K8S_CONTEXTS: 'prod',
+        OPS_K8S_READ: 'off',
+      })
+    ).toEqual(['files', 'github', 'github-write', 'jira'])
   })
 })

@@ -31,7 +31,7 @@ const en = {
   botToken: 'Your own Slack app needs its bot token.',
   appToken: 'Your own Slack app needs its app token.',
   opsNeedSandbox:
-    'Ops tools need the built-in sandbox: set the run environment to the built-in sandbox.',
+    'Connections in Settings > Tools need the built-in sandbox: set the run environment to the built-in sandbox.',
   /**
    * zod's own messages (a number out of range, a value not among the
    * choices): English keeps zod's, by giving none
@@ -95,7 +95,7 @@ const ko: typeof en = {
   botToken: '내 Slack 앱에는 봇 토큰이 필요해요.',
   appToken: '내 Slack 앱에는 앱 토큰이 필요해요.',
   opsNeedSandbox:
-    '운영 도구에는 내장 샌드박스가 필요해요. 실행 환경을 내장 샌드박스로 바꾸세요.',
+    '설정 > 도구의 연결에는 내장 샌드박스가 필요해요. 실행 환경을 내장 샌드박스로 바꾸세요.',
   zodIssue: zodIssueKo,
 }
 

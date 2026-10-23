@@ -9,7 +9,7 @@ const en = {
     },
     vm: {
       label: 'Set up built-in sandbox',
-      help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with ops tools on, the broker. After an update, it builds the images that changed.',
+      help: 'Fetches the Linux kernel the first time, then builds the images in a VM: the reasoner, the diagram renderer and, with connections on, the broker. After an update, it builds the images that changed.',
     },
   },
   /**
@@ -28,7 +28,7 @@ const ko: typeof en = {
     },
     vm: {
       label: '내장 샌드박스 준비',
-      help: '처음에는 Linux 커널을 받아 온 다음, VM에서 답변 CLI, 다이어그램 렌더러, 그리고 운영 도구가 켜져 있으면 브로커의 이미지를 만들어요. 업데이트한 뒤에는 바뀐 이미지만 다시 만들어요.',
+      help: '처음에는 Linux 커널을 받아 온 다음, VM에서 답변 CLI, 다이어그램 렌더러, 그리고 연결을 쓰면 브로커의 이미지를 만들어요. 업데이트한 뒤에는 바뀐 이미지만 다시 만들어요.',
     },
   },
   jobHint: (label, script) =>

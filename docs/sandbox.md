@@ -82,8 +82,8 @@ Setup: "Set up built-in sandbox" in Settings > Sandbox, or `pnpm sandbox:vm` in 
 4. With diagrams on, the diagram renderer's image (`sandbox/vm/renderer-build.sh`): chromium for mermaid, graphviz,
    librsvg and vl-convert, with `pypi.org` and `files.pythonhosted.org` added to the build's way out, and the app's
    typeface, Pretendard, from its npm package.
-5. With ops tools on, the ops broker's image: the broker then runs in a VM of its own while Pace runs, its way out
-   limited to what its settings name (see [Ops tools](ops-tools.md#in-the-built-in-sandbox)).
+5. With connections on (Settings > Tools), the ops broker's image: the broker then runs in a VM of its own while Pace
+   runs, its way out limited to the connections in use (see [Tools](ops-tools.md#in-the-built-in-sandbox)).
 
 ### The kernel's source
 

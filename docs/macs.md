@@ -72,7 +72,7 @@ What comes over, once:
 - **From the Mac already set up:** your Slack app's tokens, who Pace answers, how Todo collects (names, groups, channels
   left out, DMs), and following turned on.
 - **Kept as this Mac chose it:** the AI that answers and the one for Todo's work, where Pace runs, CLI paths, folders
-  and ops tools.
+  and tools (Settings > Tools).
 
 An AI sign-in never comes over: each Mac signs in to Claude Code or Codex itself. Starting Pace on the new Mac moves it
 there, the Mac in use, and Todo arrives through the usual sync. Not this one, or 10 minutes without a new Mac, sends

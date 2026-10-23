@@ -86,8 +86,9 @@ export function systemPrompt(
   }
   if (opsTools) {
     lines.push(
-      '- You can use the ops tools (ops).',
+      '- You can use the tools of the connections the user set up (ops).',
       '  - Depending on the configuration, only some tools may be available. Check the tool list and descriptions for the tools and targets (hosts, clusters, organizations) you can actually use.',
+      '  - The user chooses in Pacenote, under Settings > Tools, which connections you may read and which you may write to (draft PRs, Jira issues and comments). When the tool a request needs is not in your list, or refuses the target, do not work around it: say what is missing and that the user can allow it there.',
       '  - Host status: host_list, host_check (read-only; check targets with host_list)',
       '  - k8s cluster status: k8s_get, k8s_describe, k8s_logs, k8s_events, k8s_top (read-only)',
       '  - Local work directory: fs_list, fs_find, fs_search, fs_read (read-only)',

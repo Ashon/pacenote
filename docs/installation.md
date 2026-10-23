@@ -18,7 +18,7 @@ brew install --cask pacenote
   compares the installed copy with itself and skips Pacenote. An install from before the rename to Pacenote (`verda`,
   `orbly`) trusted only the old cask name, so run `brew trust ashon/tap` once there too.
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
-  `codex` CLI login (codex 0.138 or later), and `gh` and `git` for the ops tools. The built-in sandbox, which also renders
+  `codex` CLI login (codex 0.138 or later), and `gh` and `git` for the GitHub connection. The built-in sandbox, which also renders
   diagrams, needs nothing installed, on Apple silicon with macOS 15 or later.
 - Open Pacenote. A first run opens on setup: the AI service (the CLIs found on this Mac, signed in or not), where
   answers run (the built-in sandbox where this Mac runs it, prepared in the background from the start, or this Mac),

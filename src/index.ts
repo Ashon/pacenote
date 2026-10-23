@@ -29,7 +29,7 @@ import {
 import { pacenoteHome, settingsFilePath } from './settings/paths.js'
 import { secretValues } from './settings/fields.js'
 import { loadSettings } from './settings/load-settings.js'
-import { moveEnvSettings } from './settings/settings-file.js'
+import { moveEnvSettings, upgradeSettings } from './settings/settings-file.js'
 import { readTasksSettings } from './tasks/settings.js'
 import { ANSWER_HERE } from './macs/types.js'
 import { envLocale, localized, setLocale } from './i18n/locale.js'
@@ -55,8 +55,12 @@ let startupLog: Logger | undefined
 let running = false
 
 async function main(): Promise<void> {
-  // An earlier version's .env becomes settings.json, once.
-  const moved = moveEnvSettings(settingsFilePath())
+  // An earlier version's .env becomes settings.json, and settings an earlier
+  // version wrote are brought up to date, once.
+  const moved = [
+    ...moveEnvSettings(settingsFilePath()),
+    ...upgradeSettings(settingsFilePath()),
+  ]
   loadSettings()
   // What the app shows of Pace (setup issues, problems) is in the app's
   // language, or the terminal's.

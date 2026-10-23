@@ -45,6 +45,7 @@ import {
 import { settingsFilePath } from '../../../src/settings/paths.js'
 import {
   moveEnvSettings,
+  upgradeSettings,
   readSettingsValues,
 } from '../../../src/settings/settings-file.js'
 import { BotSupervisor } from './bot.js'
@@ -255,11 +256,17 @@ securePrivateDir(path.dirname(settingsFile))
 /**
  * An earlier version's .env becomes settings.json, once, before anything reads
  * it; logged once the log is open. Settings that changed meaning are rewritten
- * as Pace reads them now.
+ * as Pace reads them now, and those an earlier version left out are filled in
+ * as it worked (upgradeSettings).
  */
 const moved = (() => {
   try {
-    return { notes: moveEnvSettings(settingsFile) }
+    return {
+      notes: [
+        ...moveEnvSettings(settingsFile),
+        ...upgradeSettings(settingsFile),
+      ],
+    }
   } catch (err) {
     return { notes: [], error: (err as Error).message }
   }

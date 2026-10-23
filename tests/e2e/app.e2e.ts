@@ -370,6 +370,99 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     )
   })
 
+  it('shows in Settings > Tools what Pace can reach, opens a connection in place and follows its switches', async () => {
+    world = await World.create([])
+    const page = await launch(world, {
+      settings: [
+        'REASONER_SANDBOX=vm',
+        `MENTION_ALLOWED_USERS=${world.alice.id}`,
+        'OPS_TOOLS=on',
+        `OPS_FS_ROOT=${world.root}`,
+        'OPS_GIT_ALLOWED_OWNERS=acme',
+        'OPS_JIRA_URL=https://acme.atlassian.net',
+      ],
+    })
+    const file = path.join(world.home, 'settings.json')
+    // GitHub was set up before Write had a switch: it keeps writing.
+    expect(JSON.parse(readFileSync(file, 'utf8')).ops.write).toEqual({
+      github: true,
+      jira: false,
+    })
+    /**
+     * Until the motion on screen has finished, for a still picture (the
+     * page's policy runs no strings as functions, so this is evaluated)
+     */
+    const settled = () =>
+      page.evaluate(
+        `Promise.all(document.getAnimations()
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+          .map((a) => a.finished))`
+      )
+
+    await page.evaluate("window.location.hash = '#/settings/tools'")
+    await page.getByRole('heading', { name: 'Tools' }).waitFor()
+    const summary = page.locator('[data-tools-summary]')
+    await summary
+      .getByText(
+        'Pace can read your work folder and GitHub, and write to GitHub.'
+      )
+      .waitFor()
+    const nav = page.getByRole('navigation', { name: 'Settings sections' })
+    await nav.getByText('2 on').waitFor()
+    const github = page.locator('[data-connection="github"]')
+    expect(await github.getByRole('button').first().textContent()).toContain(
+      'acme'
+    )
+    // Jira is half set up: it says how much is left, and offers nothing.
+    await page
+      .locator('[data-connection="jira"]')
+      .getByText('3 more to fill in')
+      .waitFor()
+    await settled()
+    await page.screenshot({ path: path.join(REPO, 'test-results/tools.png') })
+
+    // GitHub opens in place on its settings and switches.
+    await github.getByRole('button').first().click()
+    await page.getByText('Allowed GitHub orgs').waitFor()
+    const write = page.locator('[data-setting="OPS_GIT_WRITE"] [role="switch"]')
+    expect(await write.getAttribute('aria-checked')).toBe('true')
+    // What it may never do closes the connection's settings
+    await github
+      .getByText(
+        'Pace never merges, approves, or pushes outside pacenote/* branches.'
+      )
+      .waitFor()
+    // Write off: the row and the line on top follow before it is saved.
+    await write.click()
+    await summary
+      .getByText('Pace can read your work folder and GitHub.', { exact: true })
+      .waitFor()
+    expect(
+      await github.getByRole('button').first().textContent()
+    ).not.toContain('Write')
+    await settled()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/tools-github.png'),
+    })
+    // The save bar's, not the allowed domains' own
+    await page
+      .locator('footer')
+      .getByRole('button', { name: 'Save', exact: true })
+      .click()
+    await eventually('Write off in the file', () =>
+      JSON.parse(readFileSync(file, 'utf8')).ops.write.github === false
+        ? true
+        : undefined
+    )
+
+    // Read off: GitHub stays set up, and Pace reaches none of it.
+    await page.locator('[data-setting="OPS_GIT_READ"] [role="switch"]').click()
+    await summary
+      .getByText('Pace can read your work folder.', { exact: true })
+      .waitFor()
+    await github.getByText('Read is off').waitFor()
+  })
+
   it("opens in macOS's language, and changes language from Settings at once", async () => {
     world = await World.create([])
     // macOS in Korean, as PACENOTE_DESKTOP_LANGUAGE stands in for it

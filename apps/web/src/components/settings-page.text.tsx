@@ -46,23 +46,12 @@ const en = {
   hintUpdate: 'Update',
   hintOff: 'Off',
   hintNeedsSetup: 'Needs setup',
-  stillNeeded: (labels: string[]) => `Still needed: ${labels.join(', ')}`,
+  /** Connections in use, beside Tools */
+  hintOn: (n: number) => (n === 0 ? 'None set up' : `${n} on`),
   checkConnection: 'Check connection',
   hubDisconnected: 'Disconnected this desktop from the hub.',
   sandboxSignedIn: 'Signed in inside the sandbox. Restart Pace to use it.',
 
-  builtInSandbox: 'The built-in sandbox',
-  builtInOn:
-    'Requests run in the built-in sandbox, and the broker in a VM of its own.',
-  builtInOff: 'Choose the built-in sandbox as the run environment.',
-  onlyYou: 'Only you can ask',
-  onlyYouOn: 'Pace answers only you, so the tools act only for you.',
-  onlyYouOff: 'Add your Slack member ID, since the tools use your credentials.',
-  /** Opens a section: "Open Sandbox" */
-  openSection: (section: string) => `Open ${section}`,
-  integrations: 'Integrations',
-  integrationsHelp: (opsOn: boolean) =>
-    `Each one turns on once its fields are filled in. Changes apply when Pace restarts, as its broker's VM starts with it.${opsOn ? '' : ' Ops tools are off, so none are offered to the reasoner yet.'}`,
   mcpTasks:
     'To ask Claude Code or Codex about your tasks, or collect from inside them, add Pacenote to them. Collect now on the Todo screen works without this.',
   mcpHistory:
@@ -109,8 +98,6 @@ const en = {
   saveStart: 'Save and start Pace',
   cancel: 'Cancel',
   tryAgain: 'Try again',
-
-  state: { on: 'On', partial: 'Incomplete', off: 'Off' },
 
   codeExpired: 'The code expired. Connect again for a new one.',
   pairedWith: (user: string, team: string, started: boolean) =>
@@ -186,7 +173,7 @@ const en = {
   allow: 'Allow',
   notThisOne: 'Not this one',
   whatIsSent:
-    "Sends your Slack app, who Pace answers and Todo's collection settings. Not your AI sign-in, the sandbox, ops tools or folders.",
+    "Sends your Slack app, who Pace answers and Todo's collection settings. Not your AI sign-in, the sandbox, tools or folders.",
   stop: 'Stop',
   /** choice: the new Mac's option, set apart */
   openOnNewMac: (choice: (words: string) => ReactNode) => (
@@ -272,22 +259,12 @@ const ko: typeof en = {
   hintUpdate: '업데이트',
   hintOff: '꺼짐',
   hintNeedsSetup: '설정 필요',
-  stillNeeded: (labels) => `아직 필요한 항목: ${labels.join(', ')}`,
+  hintOn: (n) => (n === 0 ? '설정 전' : `${n}개 켜짐`),
   checkConnection: '연결 확인',
   hubDisconnected: '이 데스크톱과 허브의 연결을 해제했어요.',
   sandboxSignedIn:
     '샌드박스 안에서 로그인했어요. 쓰려면 Pace를 다시 시작하세요.',
 
-  builtInSandbox: '내장 샌드박스',
-  builtInOn: '요청은 내장 샌드박스에서, 브로커는 자체 VM에서 실행돼요.',
-  builtInOff: '실행 환경으로 내장 샌드박스를 선택하세요.',
-  onlyYou: '나만 물어보기',
-  onlyYouOn: 'Pace가 나에게만 답하므로 도구도 나를 위해서만 동작해요.',
-  onlyYouOff: '도구가 내 자격 증명을 쓰므로 내 Slack 멤버 ID를 추가하세요.',
-  openSection: (section) => `${section} 열기`,
-  integrations: '연동',
-  integrationsHelp: (opsOn) =>
-    `항목을 모두 채우면 켜져요. 브로커의 VM이 Pace와 함께 시작되므로 바꾼 내용은 Pace를 다시 시작하면 적용돼요.${opsOn ? '' : ' 운영 도구가 꺼져 있어서 아직 답변 CLI에 제공되는 도구는 없어요.'}`,
   mcpTasks:
     'Claude Code나 Codex에서 내 할 일을 묻거나 그 안에서 모으려면 Pacenote를 추가하세요. 할 일 화면의 지금 모으기는 이것 없이도 돼요.',
   mcpHistory:
@@ -331,8 +308,6 @@ const ko: typeof en = {
   saveStart: '저장하고 Pace 시작',
   cancel: '취소',
   tryAgain: '다시 시도',
-
-  state: { on: '켜짐', partial: '미완료', off: '꺼짐' },
 
   codeExpired: '코드가 만료됐어요. 새 코드를 받으려면 다시 연결하세요.',
   pairedWith: (user, team, started) =>
@@ -405,7 +380,7 @@ const ko: typeof en = {
   allow: '허용',
   notThisOne: '이 Mac 아님',
   whatIsSent:
-    'Slack 앱, Pace가 답하는 사람, 할 일 모으기 설정을 보내요. AI 로그인, 샌드박스, 운영 도구, 폴더는 보내지 않아요.',
+    'Slack 앱, Pace가 답하는 사람, 할 일 모으기 설정을 보내요. AI 로그인, 샌드박스, 도구, 폴더는 보내지 않아요.',
   stop: '중지',
   openOnNewMac: (choice) => (
     <>

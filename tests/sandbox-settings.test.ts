@@ -146,6 +146,7 @@ describe('broker settings', () => {
       jiraUrl: '',
       jiraEmail: '',
       jiraProjects: '',
+      tools: [],
       configured: { fsRoot: false, ssh: false },
       fsRoot: `${runtime}/unset/workspace`,
       sshKey: `${runtime}/unset/ssh-key`,
@@ -162,6 +163,7 @@ describe('broker settings', () => {
         runtime
       )
     ).toMatchObject({
+      tools: ['files', 'ssh'],
       configured: { fsRoot: true, ssh: true },
       fsRoot: '/home/me/workspaces',
       sshKey: '/home/me/.ssh/id_ed25519',
@@ -232,6 +234,11 @@ describe('sandbox status', () => {
         OPS_SSH_USER: 'ops',
         OPS_SSH_ALLOWED_CIDR: '10.0.0.0/8',
         OPS_SSH_KEY: path.join(root, 'id_ed25519'),
+        OPS_K8S_CONTEXTS: 'prod',
+        OPS_FS_ROOT: root,
+        OPS_GIT_ALLOWED_OWNERS: 'acme',
+        OPS_GIT_WRITE: 'on',
+        // Half set up, so not in use: its row says what is left
         OPS_JIRA_URL: 'https://jira.example.com',
         OPS_JIRA_PROJECTS: 'OPS',
       },
@@ -268,11 +275,6 @@ describe('sandbox status', () => {
           'None (set Inventory file in Settings, or write hosts.json by hand)',
       },
       { label: 'k8s kubeconfig', ok: true, detail: 'Present' },
-      {
-        label: 'Jira',
-        ok: false,
-        detail: 'Jira account email, Jira API token required',
-      },
       {
         label: 'GitHub login (gh)',
         ok: true,

@@ -94,14 +94,14 @@ import { SlackYou } from './slack-you'
 import { PaceSpinner } from './pace-spinner'
 import { SlackAppSetup } from './slack-app-setup'
 import {
-  AllowlistCard,
-  BrokerCard,
   EnvironmentDetails,
   LoginChecks,
   PendingList,
   VmFooter,
 } from './sandbox-panel'
 import { text } from './settings-page.text'
+import { ToolsSection } from './tools-section'
+import { connectionStates } from '@src/settings/tools'
 
 /**
  * Settings sections: the bot's own (the settings file), then the desktop app's
@@ -156,6 +156,8 @@ const SLACK_APP_TOKENS = ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN']
 function readSection(): Section {
   const id = /^#\/settings\/([a-z]+)/.exec(window.location.hash)?.[1]
   if (id === 'slack') return 'messengers'
+  // Settings > Tools, by the name it is shown under
+  if (id === 'tools') return 'ops'
   return id && id in SECTION_ICON ? (id as Section) : 'general'
 }
 
@@ -431,6 +433,10 @@ export function SettingsPage() {
   // Pace answers only you; with your own app, once it knows who you are
   const onlyYou = hubMode || isSet('MENTION_ALLOWED_USERS')
   const opsReady = builtIn && onlyYou
+  // Connections Pace reads, for the section's state in the navigation
+  const connectionsInUse = connectionStates({ value: valueOf, isSet }).filter(
+    (each) => each.reads
+  ).length
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
     : isSet('SLACK_APP_TOKEN') && isSet('SLACK_BOT_TOKEN')
@@ -462,7 +468,7 @@ export function SettingsPage() {
       ? { tone: 'muted', text: t.hintOff }
       : !opsReady
         ? { tone: 'warn', text: t.hintNeedsSetup }
-        : undefined,
+        : { tone: 'muted', text: t.hintOn(connectionsInUse) },
   }
 
   /**
@@ -524,31 +530,9 @@ export function SettingsPage() {
       />
     )
   }
-  /** An ops integration's card, with whether its fields turn it on */
-  const integration = (id: SettingGroup) => {
-    const requires = groups[id].requires ?? []
-    const missing = requires.filter((key) => !isSet(key))
-    const state =
-      missing.length === 0
-        ? 'on'
-        : missing.length === requires.length
-          ? 'off'
-          : 'partial'
-    return card(id, {
-      chip: (
-        <Chip
-          tone={STATE_TONE[state]}
-          title={
-            state === 'partial'
-              ? t.stillNeeded(missing.map(settingLabel))
-              : undefined
-          }
-        >
-          {t.state[state]}
-        </Chip>
-      ),
-    })
-  }
+  /** The fields a group shows now */
+  const fieldsOf = (id: SettingGroup) =>
+    localizedFields.filter((field) => field.group === id && shown(field))
 
   /**
    * Each messenger's cards, shown under its heading in the Messengers section;
@@ -648,38 +632,23 @@ export function SettingsPage() {
               </>
             ),
           })}
-        {builtIn && sandbox.available && <AllowlistCard sandbox={sandbox} />}
       </>
     ),
     ops: () => (
-      <>
-        {card('ops', {
-          after: (
-            <Requirements
-              items={[
-                {
-                  ok: builtIn,
-                  label: t.builtInSandbox,
-                  detail: builtIn ? t.builtInOn : t.builtInOff,
-                  section: 'sandbox',
-                },
-                {
-                  ok: onlyYou,
-                  label: t.onlyYou,
-                  detail: onlyYou ? t.onlyYouOn : t.onlyYouOff,
-                  section: 'messengers',
-                },
-              ]}
-              onOpen={go}
-            />
-          ),
-        })}
-        {builtIn && sandbox.available && opsOn && (
-          <BrokerCard sandbox={sandbox} />
-        )}
-        <SubHeading title={t.integrations} help={t.integrationsHelp(opsOn)} />
-        {(['files', 'github', 'jira', 'k8s', 'ssh'] as const).map(integration)}
-      </>
+      <ToolsSection
+        valueOf={valueOf}
+        isSet={isSet}
+        changed={(key) => key in changes}
+        hasIssue={(key) => Boolean(issueOf(key))}
+        keysOf={(id) => fieldsOf(id).map((field) => field.key)}
+        fields={(id) => <GroupBody fields={fieldsOf(id)} row={row} />}
+        card={(id, chip) => card(id, { chip })}
+        groups={groups}
+        labelOf={settingLabel}
+        sectionLabel={(id) => sectionInfo(id).label}
+        go={go}
+        sandbox={sandbox}
+      />
     ),
     tasks: () => (
       <>
@@ -1160,8 +1129,6 @@ function GroupCard({
   /** Shown after the basic fields, before the advanced ones */
   after?: React.ReactNode
 }) {
-  const basic = fields.filter((field) => !field.advanced)
-  const advanced = fields.filter((field) => field.advanced)
   return (
     <section className="surface-group">
       <CardHeader
@@ -1171,6 +1138,37 @@ function GroupCard({
         action={action}
       />
       {children}
+      <GroupBody
+        fields={fields}
+        row={row}
+        after={after}
+        bordered={Boolean(children)}
+      />
+    </section>
+  )
+}
+
+/**
+ * A group's fields without a card: its basic fields, then the advanced ones
+ * folded away (a card's body, or a connection opened in place)
+ */
+function GroupBody({
+  fields,
+  row,
+  after,
+  bordered = false,
+}: {
+  fields: SettingField[]
+  row: (field: SettingField) => React.ReactNode
+  /** Shown after the basic fields, before the advanced ones */
+  after?: React.ReactNode
+  /** Something above the fields needs a line under it */
+  bordered?: boolean
+}) {
+  const basic = fields.filter((field) => !field.advanced)
+  const advanced = fields.filter((field) => field.advanced)
+  return (
+    <>
       {basic.length > 0 && (
         <div className="divide-y divide-border">{basic.map(row)}</div>
       )}
@@ -1178,12 +1176,12 @@ function GroupCard({
       {advanced.length > 0 && (
         <Advanced
           count={advanced.length}
-          bordered={basic.length > 0 || Boolean(children)}
+          bordered={basic.length > 0 || bordered}
         >
           {advanced.map(row)}
         </Advanced>
       )}
-    </section>
+    </>
   )
 }
 
@@ -1214,9 +1212,6 @@ function Chip({
     </span>
   )
 }
-
-/** An integration's state, in the chip's tone */
-const STATE_TONE = { on: 'ok', partial: 'warn', off: 'off' } as const
 
 /**
  * Pairs this desktop with the team hub: get a code, send "@Pace connect
@@ -1378,43 +1373,6 @@ function HubPairing({
 }
 
 /** Conditions a feature needs, each with a way to the section that fixes it */
-function Requirements({
-  items,
-  onOpen,
-}: {
-  items: { ok: boolean; label: string; detail: string; section: Section }[]
-  onOpen: (section: Section) => void
-}) {
-  const t = useText(text)
-  return (
-    <ul className="space-y-1.5 border-t border-border bg-well/60 px-4 py-2.5">
-      {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-2 text-meta">
-          {item.ok ? (
-            <CircleCheck className="size-3.5 shrink-0 text-status-succeeded" />
-          ) : (
-            <CircleX className="size-3.5 shrink-0 text-status-interrupted" />
-          )}
-          <span className="w-28 shrink-0 font-medium">{item.label}</span>
-          <span className="min-w-0 flex-1 text-muted-foreground select-text">
-            {item.detail}
-          </span>
-          {!item.ok && (
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => onOpen(item.section)}
-            >
-              {t.openSection(sectionInfo(item.section).label)}
-              <ChevronRight />
-            </Button>
-          )}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function PathControl({
   path,
   label,

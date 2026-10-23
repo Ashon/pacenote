@@ -1,7 +1,7 @@
 # Team hub
 
 For several people in one workspace: one hub server holds the Slack app, and each member's Pacenote desktop answers that
-member's mentions with their own `claude` or `codex` login, sandbox and ops tools.
+member's mentions with their own `claude` or `codex` login, sandbox and tools.
 
 ```
 Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSocket over HTTPS--> each member's Pacenote

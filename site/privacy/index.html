@@ -66,8 +66,8 @@
         <div class="claim">
           <h2>Send messages for you</h2>
           <p>It replies only in the thread you asked in. Replies it drafts for your tasks are shown to you to copy, and
-            nothing is posted until you post it. Ops tools, which can open draft PRs and Jira issues or comments, are
-            off until you turn them on.</p>
+            nothing is posted until you post it. Draft PRs and Jira issues or comments are written only through
+            connections whose Write you turn on in Settings &gt; Tools; Write starts off.</p>
           <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/tasks.md">Your tasks</a></p>
         </div>
         <div class="claim">
@@ -79,10 +79,10 @@
         </div>
         <div class="claim">
           <h2>Hand your credentials to the model</h2>
-          <p>Slack and hub tokens never reach the CLI, and Pace takes its own secrets out of every answer. With ops tools
-            on, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for
-            read-only lookups, draft PRs, and Jira issues or comments.</p>
-          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">Ops tools</a></p>
+          <p>Slack and hub tokens never reach the CLI, and Pace takes its own secrets out of every answer. With
+            connections on, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks
+            for read-only lookups and, where you turn on Write, draft PRs and Jira issues or comments.</p>
+          <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">Tools</a></p>
         </div>
         <div class="claim">
           <h2>Open a public endpoint or phone home</h2>
@@ -116,7 +116,7 @@
               <tr><td>Slack messages read while collecting tasks or drafting a reply</td><td>Anthropic or OpenAI, through Claude Code's Slack connector or ChatGPT's Slack app in Codex</td><td>When you press Collect now or Draft a reply; off until you turn it on</td></tr>
               <tr><td>Task titles and commit lines for a recap</td><td>The AI you chose in Settings &gt; Todo: Anthropic or OpenAI through Claude Code or Codex, or the model you set up in opencode, such as a local model or one you host yourself</td><td>When you press Write it up</td></tr>
               <tr><td>The last turns of a quiet session, to say whether its task looks done</td><td>The same AI you chose</td><td>When a task's session has been quiet for 10 minutes; off until you turn it on</td></tr>
-              <tr><td>Lookups with ops tools</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
+              <tr><td>Lookups through connections</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
               <tr><td>Your tasks, decisions, work log, recaps and areas</td><td>Your other Macs with the same Slack app, directly and encrypted, on your own network</td><td>Only if you turn on Settings &gt; Macs on each</td></tr>
               <tr><td>Your Slack app's tokens, who Pace answers and how Todo collects</td><td>A new Mac of yours, directly and encrypted, once, after both show the same 6 digits and you Allow</td><td>Only when you click Add a Mac</td></tr>
               <tr><td>An update check</td><td>GitHub</td><td>Shortly after start, then every 12 hours</td></tr>

@@ -283,6 +283,7 @@ describe('the ops broker in its own VM', () => {
           hostsFile,
           kubeconfigFile,
           ssh: true,
+          k8s: true,
           github: true,
           jiraUrl: 'https://acme.atlassian.net',
         }),
@@ -298,13 +299,24 @@ describe('the ops broker in its own VM', () => {
         'acme.atlassian.net:443',
       ].sort()
     )
-    // What is off opens nothing, and an empty kubeconfig is no cluster.
+    // What is off opens nothing, its clusters included while Read is off,
+    // and an empty kubeconfig is no cluster.
+    expect([
+      ...brokerDestinations({
+        hostsFile,
+        kubeconfigFile,
+        ssh: false,
+        k8s: false,
+        github: false,
+      }),
+    ]).toEqual([])
     writeFileSync(kubeconfigFile, '')
     expect([
       ...brokerDestinations({
         hostsFile,
         kubeconfigFile,
         ssh: false,
+        k8s: true,
         github: false,
       }),
     ]).toEqual([])
@@ -704,7 +716,7 @@ describe('images built for another version', () => {
     )
     expect(builds[0]).toContain(`CODEX_VERSION=${VERSIONS.codex}`)
     expect(lines).toContain('Diagram renderer image: up to date')
-    expect(lines).toContain('Ops broker image: not built (ops tools are off)')
+    expect(lines).toContain('Ops broker image: not built (connections are off)')
   })
 
   it('names the images built for another version as one check issue', async () => {
@@ -794,7 +806,7 @@ describe('config', () => {
     })
     // Not without a sandbox
     expect(() => loadConfig({ ...ops, REASONER_SANDBOX: 'none' })).toThrow(
-      /Ops tools need the built-in sandbox/
+      /Connections in Settings > Tools need the built-in sandbox/
     )
   })
 })

@@ -33,5 +33,5 @@ that part is in scope.
 ## How Pacenote is meant to be safe
 
 [What Pace never does](https://pacenote.dev/privacy/) lists the limits and where each is enforced.
-[Reasoner sandbox](docs/sandbox.md), [Ops tools](docs/ops-tools.md) and [How it works](docs/how-it-works.md) describe
+[Reasoner sandbox](docs/sandbox.md), [Tools](docs/ops-tools.md) and [How it works](docs/how-it-works.md) describe
 the design behind them.

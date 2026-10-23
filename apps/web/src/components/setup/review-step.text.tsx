@@ -55,9 +55,9 @@ const en = {
   diagrams: 'Diagrams',
   diagramsWhat:
     'Mermaid and chart blocks in answers become images, made in the sandbox',
-  opsTools: 'Ops tools',
+  opsTools: 'Tools',
   opsOff:
-    'Off. GitHub, Jira, Kubernetes and SSH are in Settings when you need them.',
+    'No connections yet. GitHub, Jira, Kubernetes and SSH are in Settings > Tools when you need them.',
   runHistory: 'Run history',
   /** path: the data folder */
   keptIn: (path: ReactNode): ReactNode => <>Kept on this Mac, in {path}</>,
@@ -111,9 +111,9 @@ const ko: typeof en = {
   diagrams: '다이어그램',
   diagramsWhat:
     '답변에 있는 Mermaid와 차트 블록을 샌드박스에서 이미지로 만들어요',
-  opsTools: '운영 도구',
+  opsTools: '도구',
   opsOff:
-    '꺼져 있어요. GitHub, Jira, Kubernetes, SSH는 필요할 때 설정에서 켜세요.',
+    '아직 연결이 없어요. GitHub, Jira, Kubernetes, SSH는 필요할 때 설정 > 도구에서 연결하세요.',
   runHistory: '실행 기록',
   keptIn: (path) => <>이 Mac의 {path}에 보관해요</>,
   you: '나',

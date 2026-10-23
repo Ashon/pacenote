@@ -87,7 +87,11 @@ export async function setupVm(options: VmSetupOptions): Promise<void> {
       wanted: options.renderer,
       off: 'diagrams are off',
     },
-    { name: VM_BROKER_IMAGE, wanted: options.broker, off: 'ops tools are off' },
+    {
+      name: VM_BROKER_IMAGE,
+      wanted: options.broker,
+      off: 'connections are off',
+    },
   ]
   for (const { name, wanted, off } of images) {
     const { title } = IMAGE_RECIPES[name]!

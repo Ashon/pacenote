@@ -20,8 +20,8 @@ const en = {
       doing: 'Building the image that draws diagrams',
     },
     broker: {
-      label: 'The image the ops tools run in',
-      doing: 'Building the image the ops tools run in',
+      label: 'The image the connections run in',
+      doing: 'Building the image the connections run in',
     },
   },
 }
@@ -45,8 +45,8 @@ const ko: typeof en = {
       doing: '다이어그램을 그릴 이미지 만드는 중',
     },
     broker: {
-      label: '운영 도구가 실행되는 이미지',
-      doing: '운영 도구가 실행될 이미지 만드는 중',
+      label: '연결이 실행되는 이미지',
+      doing: '연결이 실행될 이미지 만드는 중',
     },
   },
 }

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { ConfigIssue } from '../config.js'
 import { text as configText } from '../config.text.js'
 import { localized } from '../i18n/locale.js'
+import { brokerTools } from '../settings/tools.js'
 import { text } from './env.text.js'
 
 /**
@@ -20,6 +21,9 @@ const inLanguage = () => ({ error: localized(configText).zodIssue })
 const absolutePath = z
   .string()
   .refine((value) => value.startsWith('/'), says('absolutePath'))
+
+/** A connection's switch (src/settings/tools.ts) */
+const toggle = (value: 'on' | 'off') => z.enum(['on', 'off']).default(value)
 
 /** A comma-separated list of what item matches */
 const listOf = (item: string) =>
@@ -106,6 +110,18 @@ export const BrokerEnvSchema = z.object({
     .string()
     .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, says('namespace'))
     .default('pacenote'),
+  /**
+   * Each connection's Read and Write (Settings > Tools): the broker offers a
+   * connection's tools only while its Read is on, and its writes (ws_*,
+   * jira_create_issue, jira_add_comment) only while its Write is on too.
+   */
+  OPS_FS_READ: toggle('on'),
+  OPS_GIT_READ: toggle('on'),
+  OPS_GIT_WRITE: toggle('off'),
+  OPS_JIRA_READ: toggle('on'),
+  OPS_JIRA_WRITE: toggle('off'),
+  OPS_K8S_READ: toggle('on'),
+  OPS_SSH_READ: toggle('on'),
 })
 
 export type BrokerEnv = z.infer<typeof BrokerEnvSchema>
@@ -169,6 +185,8 @@ export function brokerExpected(env: NodeJS.ProcessEnv, runtimeDir: string) {
     jiraUrl: parsed.OPS_JIRA_URL ?? '',
     jiraEmail: parsed.OPS_JIRA_EMAIL ?? '',
     jiraProjects: parsed.OPS_JIRA_PROJECTS ?? '',
+    /** What the broker may offer, by connection (its TOOLS) */
+    tools: brokerTools(env),
     /**
      * Only set values. For empty values the broker starts without that tool.
      */

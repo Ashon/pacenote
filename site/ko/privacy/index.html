@@ -65,8 +65,8 @@
         <div class="claim">
           <h2>나 대신 메시지 보내기</h2>
           <p>Pace는 내가 물어본 스레드에만 답해요. 할 일을 위해 써 둔 답장 초안은 내가 복사할 수 있게 보여 줄 뿐, 내가
-            올리기 전에는 아무것도 올라가지 않아요. 초안 PR과 Jira 이슈나 댓글을 만들 수 있는 운영 도구는 내가 켜기
-            전까지 꺼져 있어요.</p>
+            올리기 전에는 아무것도 올라가지 않아요. 초안 PR과 Jira 이슈나 댓글은 설정 &gt; 도구에서 쓰기를 켠 연결로만
+            만들어요. 쓰기는 꺼진 채 시작해요.</p>
           <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/tasks.md">할 일</a></p>
         </div>
         <div class="claim">
@@ -78,10 +78,10 @@
         </div>
         <div class="claim">
           <h2>내 자격 증명을 모델에 넘기기</h2>
-          <p>Slack과 허브 토큰은 CLI에 절대 전달되지 않고, Pace는 모든 답변에서 자신의 비밀 값을 지워요. 운영 도구를 켜면
-            SSH 키와 클러스터, GitHub, Jira 토큰은 별도의 브로커에 머물고, 모델은 읽기 전용 조회, 초안 PR, Jira 이슈나
-            댓글을 그 브로커에 요청해요.</p>
-          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">운영 도구</a></p>
+          <p>Slack과 허브 토큰은 CLI에 절대 전달되지 않고, Pace는 모든 답변에서 자신의 비밀 값을 지워요. 연결을 켜면
+            SSH 키와 클러스터, GitHub, Jira 토큰은 별도의 브로커에 머물고, 모델은 읽기 전용 조회와, 쓰기를 켠 곳에서만
+            초안 PR, Jira 이슈나 댓글을 그 브로커에 요청해요.</p>
+          <p class="check">확인하기: <a href="https://github.com/Ashon/pacenote/blob/main/docs/ops-tools.md">도구</a></p>
         </div>
         <div class="claim">
           <h2>공개 엔드포인트를 열거나 몰래 외부로 정보 보내기</h2>
@@ -114,7 +114,7 @@
               <tr><td>할 일을 모으거나 답장 초안을 쓸 때 읽는 Slack 메시지</td><td>Claude Code의 Slack 커넥터나 Codex 안의 ChatGPT Slack 앱을 통해 Anthropic이나 OpenAI로</td><td>지금 모으기나 답장 초안 쓰기를 누를 때. 켜기 전까지는 꺼져 있어요</td></tr>
               <tr><td>회고에 쓰는 할 일 제목과 커밋 메시지 한 줄</td><td>설정 &gt; 할 일에서 고른 AI로: Claude Code나 Codex를 통해 Anthropic이나 OpenAI로, 또는 로컬 모델이나 직접 호스팅하는 모델처럼 opencode에 설정한 모델로</td><td>정리하기를 누를 때</td></tr>
               <tr><td>할 일이 끝난 것 같은지 판단하려고 읽는, 조용해진 세션의 마지막 대화</td><td>위에서 고른 같은 AI로</td><td>할 일의 세션이 10분 동안 조용할 때. 켜기 전까지는 꺼져 있어요</td></tr>
-              <tr><td>운영 도구로 하는 조회</td><td>연결한 서비스로: 내 호스트와 클러스터, GitHub, Jira</td><td>Pace가 쓸 때. 켜기 전까지는 꺼져 있어요</td></tr>
+              <tr><td>연결로 하는 조회</td><td>연결한 서비스로: 내 호스트와 클러스터, GitHub, Jira</td><td>Pace가 쓸 때. 켜기 전까지는 꺼져 있어요</td></tr>
               <tr><td>내 할 일, 결정, 작업 기록, 회고, 영역</td><td>같은 Slack 앱을 쓰는 내 다른 Mac으로, 내 네트워크 안에서 직접, 암호화해서</td><td>각 Mac에서 설정 &gt; 내 Mac을 켠 경우에만</td></tr>
               <tr><td>내 Slack 앱의 토큰, Pace가 답하는 사람, 할 일 모으기 방식</td><td>내 새 Mac으로, 두 Mac에 같은 6자리 숫자가 보이고 내가 허용한 뒤 한 번, 직접, 암호화해서</td><td>Mac 추가를 누를 때만</td></tr>
               <tr><td>업데이트 확인</td><td>GitHub</td><td>시작 직후, 그다음엔 12시간마다</td></tr>

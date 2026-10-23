@@ -61,7 +61,8 @@ import { redactSecrets } from './redact.js'
  * - jira_*: Jira issue lookups in allowed projects, plus issue creation and
  *   comments on request (the token exists only in this VM)
  * Features with empty settings or an empty mounted file do not register their
- * tools.
+ * tools, nor do those TOOLS leaves out: the connections whose Read is off in
+ * Settings > Tools, and the writes whose Write is off.
  */
 const Env = z.object({
   BROKER_PORT: z.coerce.number().int().positive().default(8080),
@@ -102,8 +103,21 @@ const Env = z.object({
   COMMAND_TIMEOUT_SEC: z.coerce.number().int().positive().default(30),
   OUTPUT_LIMIT: z.coerce.number().int().positive().default(24_000),
   MAX_CONCURRENT: z.coerce.number().int().positive().default(4),
+  /**
+   * What it may offer, by connection (src/settings/tools.ts brokerTools):
+   * files, github, jira, k8s, ssh, and github-write, jira-write for their
+   * writes. Pace always says; left out, everything set up is offered.
+   */
+  TOOLS: z.string().optional(),
 })
 const env = Env.parse(process.env)
+
+/** Whether TOOLS lets the broker offer a group of tools */
+const offered = (() => {
+  if (env.TOOLS === undefined) return () => true
+  const groups = new Set(env.TOOLS.split(',').map((group) => group.trim()))
+  return (group: string) => groups.has(group)
+})()
 
 /** The way out, when the broker has one other than a network of its own */
 const PROXY_ENV: NodeJS.ProcessEnv = Object.fromEntries(
@@ -994,7 +1008,11 @@ function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
   )
 }
 
-function registerJiraTools(server: McpServer, client: JiraClient): void {
+function registerJiraTools(
+  server: McpServer,
+  client: JiraClient,
+  writes: boolean
+): void {
   const projects = client.projects.join(', ')
   const key = z
     .string()
@@ -1039,6 +1057,7 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
     async (a) =>
       logged('jira_issue', a, () => client.viewIssue(a.key, a.comments))
   )
+  if (!writes) return
 
   server.registerTool(
     'jira_create_issue',
@@ -1117,12 +1136,14 @@ function registerJiraTools(server: McpServer, client: JiraClient): void {
 
 function createMcpServer(): McpServer {
   const server = new McpServer({ name: 'ops-broker', version: '0.3.0' })
-  if (hosts.size > 0) registerHostTools(server)
-  if (k8sEnabled && clusters.length > 0) registerK8sTools(server)
-  if (fsEnabled) registerFsTools(server)
-  if (git) registerWorkspaceTools(server, git)
-  if (github) registerGitHubTools(server, github)
-  if (jira) registerJiraTools(server, jira)
+  if (hosts.size > 0 && offered('ssh')) registerHostTools(server)
+  if (k8sEnabled && clusters.length > 0 && offered('k8s'))
+    registerK8sTools(server)
+  if (fsEnabled && offered('files')) registerFsTools(server)
+  if (git && offered('github-write')) registerWorkspaceTools(server, git)
+  if (github && offered('github')) registerGitHubTools(server, github)
+  if (jira && offered('jira'))
+    registerJiraTools(server, jira, offered('jira-write'))
   return server
 }
 
@@ -1143,7 +1164,7 @@ async function handle(
     res
       .writeHead(200)
       .end(
-        `ok hosts=${hosts.size} k8s=[${clusters.join(',')}] fs=${fsEnabled ? env.FS_ROOT : 'off'} git=${git ? 'on' : 'off'} github=${github ? allowedOwners.join('|') : 'off'} jira=${jira ? jiraProjects.join('|') : 'off'}`
+        `ok hosts=${hosts.size} k8s=[${clusters.join(',')}] fs=${fsEnabled ? env.FS_ROOT : 'off'} git=${git ? 'on' : 'off'} github=${github ? allowedOwners.join('|') : 'off'} jira=${jira ? jiraProjects.join('|') : 'off'} tools=${env.TOOLS ?? 'all'}`
       )
     return
   }
@@ -1205,6 +1226,7 @@ async function start(): Promise<void> {
         ? { workRoot: env.WORK_ROOT, owners: env.GIT_ALLOWED_OWNERS }
         : null,
       jira: jira ? { url: env.JIRA_URL, projects: jiraProjects } : null,
+      tools: env.TOOLS ?? 'all',
     })
   })
 }

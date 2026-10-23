@@ -44,12 +44,12 @@ export const SETTING_SECTIONS: {
   {
     id: 'sandbox',
     label: 'Sandbox',
-    help: 'Where the reasoner CLI runs for each request. Allowed domains apply at once; everything else when Pace restarts.',
+    help: 'Where the reasoner CLI runs for each request. Changes apply when Pace restarts; the domains it may reach are in Tools.',
   },
   {
     id: 'ops',
-    label: 'Ops tools',
-    help: "Tools the reasoner can call through ops-broker. SSH keys, kubeconfig, and tokens stay in the broker's VM, never in the reasoner's. Changes apply when Pace restarts.",
+    label: 'Tools',
+    help: 'What Pace can reach when it answers you, and what it may change. Connections go through a broker that keeps their keys; the model only asks it. Allowed domains apply at once; everything else when Pace restarts.',
   },
   {
     id: 'tasks',
@@ -77,6 +77,7 @@ export type SettingGroup =
   | 'jira'
   | 'k8s'
   | 'ssh'
+  | 'reference'
   | 'ownWork'
   | 'tasks'
   | 'work'
@@ -194,28 +195,28 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
   {
     id: 'ops',
     section: 'ops',
-    label: 'Ops tools',
-    help: 'Turning them on or off applies when Pace restarts.',
+    label: 'Connections',
+    help: 'Services Pace reaches through the broker, in a VM of its own. A connection turns on once its fields are filled in and Read is on; Write, where there is one, starts off.',
   },
   {
     id: 'files',
     section: 'ops',
-    label: 'Files',
-    help: 'File tools read the work directory, and pull requests are made from repositories in it.',
+    label: 'Work folder',
+    help: 'A folder of your repositories, mounted read only in the broker. Draft PRs start from the repositories in it.',
     requires: ['OPS_FS_ROOT'],
   },
   {
     id: 'github',
     section: 'ops',
-    label: 'GitHub and pull requests',
-    help: 'GitHub queries and pull requests, limited to the orgs below. Pull requests also need the work directory.',
+    label: 'GitHub',
+    help: 'Repositories and PRs of the orgs you allow, with your gh login. Pace never merges or approves.',
     requires: ['OPS_GIT_ALLOWED_OWNERS'],
   },
   {
     id: 'jira',
     section: 'ops',
     label: 'Jira',
-    help: 'Issue queries, new issues, and comments in the allowed projects.',
+    help: 'Issues in the projects you allow, as the account below. Pace never changes their status, assigns or deletes them.',
     requires: [
       'OPS_JIRA_URL',
       'OPS_JIRA_EMAIL',
@@ -227,15 +228,21 @@ export const SETTING_GROUPS: SettingGroupInfo[] = [
     id: 'k8s',
     section: 'ops',
     label: 'Kubernetes',
-    help: 'Read-only queries through a kubeconfig built for a read-only ServiceAccount.',
+    help: 'Clusters from your kubeconfig, read with an account that can only read. Secrets stay out.',
     requires: ['OPS_K8S_CONTEXTS'],
   },
   {
     id: 'ssh',
     section: 'ops',
     label: 'SSH hosts',
-    help: 'Read-only checks on hosts in the allowed range.',
+    help: 'Fixed checks on hosts in the range you allow.',
     requires: ['OPS_SSH_USER', 'OPS_SSH_ALLOWED_CIDR', 'OPS_SSH_KEY'],
+  },
+  {
+    id: 'reference',
+    section: 'ops',
+    label: 'Reference folder',
+    help: 'A folder the CLI that answers reads by itself, read only. Claude Code reads it on this Mac and in the sandbox; Codex only on this Mac.',
   },
   {
     id: 'ownWork',
@@ -451,11 +458,11 @@ export const SETTING_FIELDS: SettingField[] = [
   {
     key: 'MENTION_WORKSPACE',
     path: 'answers.referenceDir',
-    group: 'requests',
-    label: 'Reference directory',
-    help: 'Absolute path consulted read-only when answering. Used only in run environments that can read files.',
+    group: 'reference',
+    label: 'Folder',
+    help: 'Absolute path. Leave it empty and Pace reads no files by itself.',
     type: 'text',
-    advanced: true,
+    placeholder: '/Users/me/handbook',
   },
   {
     key: 'RENDER_DIAGRAMS',
@@ -538,8 +545,8 @@ export const SETTING_FIELDS: SettingField[] = [
     key: 'OPS_TOOLS',
     path: 'ops.enabled',
     group: 'ops',
-    label: 'Enable ops tools',
-    help: 'Offers the integrations below to the reasoner. Each one stays off until its fields are filled in.',
+    label: 'Use connections',
+    help: 'Offers the connections below to Pace. They need the built-in sandbox, and Pace must answer only you.',
     type: 'toggle',
     default: 'off',
   },
@@ -551,6 +558,15 @@ export const SETTING_FIELDS: SettingField[] = [
     help: 'Work directory to mount read-only (absolute path). Leave empty to turn off the file and PR tools.',
     type: 'text',
     placeholder: '/Users/me/workspaces',
+  },
+  {
+    key: 'OPS_FS_READ',
+    path: 'ops.read.files',
+    group: 'files',
+    label: 'Read',
+    help: 'List, search and read files in the work folder. .env files, keys and kubeconfig stay out.',
+    type: 'toggle',
+    default: 'on',
   },
   {
     key: 'OPS_GIT_ALLOWED_OWNERS',
@@ -569,6 +585,7 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'PR commit author name',
     help: "Author of commits the sandbox makes. Leave empty to use the global git config (git config --global user.name). Separate from this repository's git config.",
     type: 'text',
+    advanced: true,
   },
   {
     key: 'OPS_GIT_AUTHOR_EMAIL',
@@ -577,6 +594,26 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'PR commit author email',
     help: 'Leave empty to use the global git config (git config --global user.email).',
     type: 'text',
+    advanced: true,
+  },
+  {
+    key: 'OPS_GIT_READ',
+    path: 'ops.read.github',
+    group: 'github',
+    label: 'Read',
+    help: 'Search repositories, and read PRs with their reviews, CI checks and diffs.',
+    type: 'toggle',
+    default: 'on',
+  },
+  {
+    key: 'OPS_GIT_WRITE',
+    path: 'ops.write.github',
+    group: 'github',
+    label: 'Write',
+    help: 'Open draft PRs from a workspace of its own, on pacenote/* branches: up to 10 an hour, 50 files and 3,000 lines each, never workflows or secrets. Needs the work folder.',
+    type: 'toggle',
+    default: 'off',
+    shownWhen: { key: 'OPS_GIT_READ', equals: 'on' },
   },
   {
     key: 'OPS_JIRA_URL',
@@ -614,6 +651,25 @@ export const SETTING_FIELDS: SettingField[] = [
     placeholder: 'PROJ, OPS',
   },
   {
+    key: 'OPS_JIRA_READ',
+    path: 'ops.read.jira',
+    group: 'jira',
+    label: 'Read',
+    help: 'Search issues and read them with their links and latest comments.',
+    type: 'toggle',
+    default: 'on',
+  },
+  {
+    key: 'OPS_JIRA_WRITE',
+    path: 'ops.write.jira',
+    group: 'jira',
+    label: 'Write',
+    help: 'Create issues and add comments when you ask, as the account above: up to 20 an hour.',
+    type: 'toggle',
+    default: 'off',
+    shownWhen: { key: 'OPS_JIRA_READ', equals: 'on' },
+  },
+  {
     key: 'OPS_K8S_CONTEXTS',
     path: 'ops.kubernetes.contexts',
     list: true,
@@ -621,6 +677,15 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'k8s contexts',
     help: 'Local kubeconfig contexts to build the read-only kubeconfig from. Comma-separated. Rebuild the kubeconfig after changing them.',
     type: 'text',
+  },
+  {
+    key: 'OPS_K8S_READ',
+    path: 'ops.read.kubernetes',
+    group: 'k8s',
+    label: 'Read',
+    help: 'get, describe, logs, events and top, as the read-only account.',
+    type: 'toggle',
+    default: 'on',
   },
   {
     key: 'OPS_K8S_SA',
@@ -666,6 +731,15 @@ export const SETTING_FIELDS: SettingField[] = [
     help: "Absolute path. The key is shared only into the broker's VM.",
     type: 'text',
     placeholder: '/Users/me/.ssh/id_ed25519',
+  },
+  {
+    key: 'OPS_SSH_READ',
+    path: 'ops.read.ssh',
+    group: 'ssh',
+    label: 'Read',
+    help: 'Fixed checks only: uptime, dmesg, memory, disk, top, PCI devices, failed units, services and the journal.',
+    type: 'toggle',
+    default: 'on',
   },
   {
     key: 'OPS_SSH_KNOWN_HOSTS',

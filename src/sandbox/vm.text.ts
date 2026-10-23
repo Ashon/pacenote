@@ -22,7 +22,7 @@ const en = {
   noAllowlist: (file: string, hint: string) =>
     `The allowed domains list is missing (${file}): ${hint}.`,
   vmDidNotStart: (reason: string) => `A VM did not start: ${reason}`,
-  opsTools: (problem: string) => `Ops tools: ${problem}`,
+  opsTools: (problem: string) => `Connections: ${problem}`,
   helperVersion: (helper: number | undefined, pacenote: number) =>
     `pacenote-vm speaks version ${helper}, Pacenote ${pacenote}.`,
   helperFailed: 'pacenote-vm failed.',
@@ -44,7 +44,7 @@ const ko: typeof en = {
     '내장 샌드박스에는 Apple silicon과 macOS 15 이상을 쓰는 Mac이 필요해요.',
   noAllowlist: (file, hint) => `허용 도메인 목록이 없어요 (${file}). ${hint}.`,
   vmDidNotStart: (reason) => `VM이 시작되지 않았어요: ${reason}`,
-  opsTools: (problem) => `운영 도구: ${problem}`,
+  opsTools: (problem) => `연결: ${problem}`,
   helperVersion: (helper, pacenote) =>
     `pacenote-vm의 버전(${helper})이 Pacenote(${pacenote})와 맞지 않아요.`,
   helperFailed: 'pacenote-vm이 실패했어요.',

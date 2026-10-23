@@ -36,7 +36,7 @@ Packaging:
 Using the packaged app:
 
 - `Pacenote.app` contains the UI, the bot and sandbox job bundles (`pnpm bundle`) and the `sandbox/` files, so it runs without the repository, Node or pnpm.
-  It needs a reasoner CLI login (claude or codex), and gh and git for the ops tools; the built-in sandbox comes with it.
+  It needs a reasoner CLI login (claude or codex), and gh and git for the GitHub connection; the built-in sandbox comes with it.
 - Settings (`~/.pacenote/settings.json`), history and the allowed domains list live outside the app (`PACENOTE_HOME`,
   default `~/.pacenote`), so they are kept when the app is reinstalled.
 - Sandbox jobs (the built-in sandbox's setup, the broker's kubeconfig) run the job bundle inside the app with the app's Node.
@@ -157,17 +157,18 @@ Settings:
   | --- | --- |
   | General | Theme, language, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
-  | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, reference directory, diagrams and images |
-  | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login, allowed domains |
-  | Ops tools | The on/off switch with what it needs, then one card per integration: files, GitHub and pull requests, Jira, Kubernetes, SSH hosts |
+  | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, diagrams and images |
+  | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login |
+  | Tools | A line on what Pace can reach now; the connections (work folder, GitHub, Jira, Kubernetes, SSH hosts) as rows that open in place on their settings and their Read and Write switches; the broker; the reference folder the CLI reads itself; allowed domains |
   | History & logs | Run history and retention, log level |
 
 - The section list shows what needs attention: "Not connected" when Slack tokens are missing, "Set up" for a built-in sandbox
-  that still needs its setup, "Off" for an unused sandbox or ops tools, and per section the number of unsaved changes or a red dot for
+  that still needs its setup, "Off" for an unused sandbox or connections, the connections in use beside Tools, and per section the number of unsaved changes or a red dot for
   values to fix. Changes in several sections are saved together from the bar at the bottom, which also names the section with a problem.
 - Fields show only when they apply: sandbox limits and the reasoner login only for the built-in sandbox, and only the selected
-  reasoner's (the API key or a claude token, under Advanced). Hidden values stay in the file. Each ops integration card says whether its fields turn it
-  on ("On", "Incomplete", "Off"). Rarely changed values are collapsed under "Advanced".
+  reasoner's (the API key or a claude token, under Advanced). Hidden values stay in the file. Each connection's row says what
+  it reaches, whether it reads and writes, and its state ("On", "2 more to fill in", "Read is off", "Not set up"); a flipped
+  switch shows on its row and in the line on top before it is saved. Rarely changed values are collapsed under "Advanced".
   Fields, groups and sections are defined only in `src/settings/fields.ts`, and a test checks that their defaults match the bot config (`src/config.ts`).
 - Secret values such as tokens are never sent to the UI. Only the prefix and the last 4 characters are shown; enter a new value to change one.
   The Save button next to the input (or Enter) saves just that value and closes the input; Esc cancels.
@@ -188,7 +189,7 @@ Settings:
   point the bot at a fake Slack.
 - Settings are read and written only over the app's internal IPC, like bot control. The query API and the browser dev server cannot change settings.
 
-Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
+Sandbox (the "Sandbox" and "Tools" sections of Settings):
 
 - The built-in sandbox's choice under Run environment says whether it is ready, beside "Set up built-in sandbox"
   (`sandbox:vm`), so it can be set up before it is chosen, and for diagrams with Pace on this Mac. The job's output shows
@@ -201,7 +202,7 @@ Sandbox (the "Sandbox" and "Ops tools" sections of Settings):
   code Claude's page shows ([Reasoner login](sandbox.md#reasoner-login)). The allowed domains apply from the next
   request.
 - The broker's checks (host list, kubeconfig, gh login, PR author) and "Rebuild kubeconfig" (`k8s:kubeconfig`) are in the
-  Broker card under Ops tools. The broker's VM starts with Pace, so its settings and files apply when Pace restarts.
+  Broker card under Tools. The broker's VM starts with Pace, so its settings and files apply when Pace restarts.
   Credential values are not read; only their presence is checked.
 - Allowed domains accept exact host names only (wildcards, IPs, ports and URLs are rejected). Domains the current reasoner CLI needs cannot be removed.
   Internal systems that need a token are connected as broker tools instead of opening their domains.

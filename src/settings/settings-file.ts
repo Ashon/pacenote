@@ -11,6 +11,7 @@ import { localized } from '../i18n/locale.js'
 import { migrateEnvValues, readEnvFile, readEnvValues } from './env-file.js'
 import { SETTING_FIELDS, type SettingField } from './fields.js'
 import { text as words } from './settings-file.text.js'
+import { connectionStates, lookupIn } from './tools.js'
 
 /**
  * The settings file, settings.json: Pacenote's settings as one object, grouped
@@ -240,4 +241,37 @@ export function moveEnvSettings(file: string): string[] {
     ...migrated.notes,
     `moved from ${path.basename(legacy)} to ${path.basename(file)} (the old file is ${path.basename(legacy)}.bak)`,
   ]
+}
+
+/**
+ * Brings a settings file an earlier version wrote up to date, once. Write
+ * switches for the connections came in v0.6.5: a connection already set up
+ * keeps writing as it did (draft PRs, Jira issues and comments), and one set
+ * up later starts with Write off. Returns a line for the log per change.
+ */
+export function upgradeSettings(file: string): string[] {
+  if (!existsSync(file)) return []
+  const text = readFileSync(file, 'utf8')
+  let values: Record<string, string>
+  try {
+    values = settingsValues(parseSettings(text))
+  } catch {
+    // Not JSON: the app says so where the file is shown
+    return []
+  }
+  if ('OPS_GIT_WRITE' in values || 'OPS_JIRA_WRITE' in values) return []
+  const set = new Set(
+    connectionStates(lookupIn(values))
+      .filter((state) => state.missing.length === 0)
+      .map((state) => state.id)
+  )
+  const changes = {
+    OPS_GIT_WRITE: set.has('github') ? 'on' : 'off',
+    OPS_JIRA_WRITE: set.has('jira') ? 'on' : 'off',
+  }
+  writeSettingsFile(file, updateSettingsText(text, changes))
+  return Object.entries(changes).map(
+    ([key, value]) =>
+      `${settingName(key)}: ${value}${value === 'on' ? ' (set up before Write had a switch)' : ''}`
+  )
 }

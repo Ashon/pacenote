@@ -49,14 +49,16 @@ const GUEST_SOCKET = '/run/broker/mcp.sock'
 const SSH_PROXY_COMMAND = 'node /usr/local/lib/pacenote/proxy-connect.mjs %h %p'
 
 /**
- * Where the broker's VM may connect, as host:port: the SSH hosts in hosts.json
- * on 22, each kubeconfig cluster's API server, GitHub when its tools are on,
- * and the Jira site. Nothing else, and never this Mac (EgressProxy).
+ * Where the broker's VM may connect, as host:port, for the connections in
+ * use: the SSH hosts in hosts.json on 22, each kubeconfig cluster's API
+ * server, GitHub and the Jira site. Nothing else, and never this Mac
+ * (EgressProxy).
  */
 export function brokerDestinations(input: {
   hostsFile: string
   kubeconfigFile: string
   ssh: boolean
+  k8s: boolean
   github: boolean
   jiraUrl?: string
 }): Set<string> {
@@ -86,10 +88,12 @@ export function brokerDestinations(input: {
       for (const address of Object.values(hosts))
         if (typeof address === 'string') out.add(`${address.toLowerCase()}:22`)
   }
-  const kubeconfig = read(input.kubeconfigFile) as
-    { clusters?: { cluster?: { server?: string } }[] } | undefined
-  for (const entry of kubeconfig?.clusters ?? [])
-    if (entry.cluster?.server) add(entry.cluster.server)
+  if (input.k8s) {
+    const kubeconfig = read(input.kubeconfigFile) as
+      { clusters?: { cluster?: { server?: string } }[] } | undefined
+    for (const entry of kubeconfig?.clusters ?? [])
+      if (entry.cluster?.server) add(entry.cluster.server)
+  }
   if (input.github) {
     out.add('github.com:443')
     out.add('api.github.com:443')
@@ -224,13 +228,16 @@ export class VmBroker {
     const expected = brokerExpected(options.env, runtimeDir)
     const hostsFile = path.join(runtimeDir, 'hosts.json')
     const kubeconfigFile = path.join(runtimeDir, 'kubeconfig')
+    const tools = new Set(expected.tools)
     const destinations = brokerDestinations({
       hostsFile,
       kubeconfigFile,
-      ssh: expected.configured.ssh,
-      github: Boolean(expected.allowedOwners),
-      jiraUrl: expected.jiraUrl || undefined,
+      ssh: tools.has('ssh'),
+      k8s: tools.has('k8s'),
+      github: tools.has('github'),
+      jiraUrl: tools.has('jira') ? expected.jiraUrl : undefined,
     })
+    options.log?.info(`Broker's tools: ${expected.tools.join(', ') || 'none'}`)
     options.log?.info(
       `Broker's way out: ${[...destinations].join(', ') || 'nowhere'}`
     )
@@ -301,7 +308,7 @@ export class VmBroker {
         ({ stdout }) => stdout.trim(),
         () => ''
       )
-    const github = Boolean(expected.allowedOwners)
+    const github = expected.tools.includes('github')
     // Together, and without holding up the bot meanwhile
     const [token, name, email] = await Promise.all([
       github ? env.GH_TOKEN || capture('gh', ['auth', 'token']) : '',
@@ -322,9 +329,11 @@ export class VmBroker {
       JIRA_TOKEN: env.OPS_JIRA_TOKEN ?? '',
       JIRA_PROJECTS: expected.jiraProjects,
     }
-    return Object.fromEntries(
-      Object.entries(values).filter((entry) => entry[1])
-    )
+    return {
+      ...Object.fromEntries(Object.entries(values).filter((entry) => entry[1])),
+      // Always said, so a broker with nothing in use offers nothing
+      TOOLS: expected.tools.join(',') || 'none',
+    }
   }
 
   /** Runs the broker's VM, starting it again if it stops on its own */

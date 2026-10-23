@@ -1,7 +1,9 @@
-# Ops tools (ops-broker)
-With `OPS_TOOLS=on`, the reasoner CLI can query operational state and fix code into draft PRs. Credentials and the work directory
-are never put into the reasoner's VM; only a separate relay (`ops-broker`), in a VM of its own, holds them. The reasoner can
-only request fixed queries through MCP tools.
+# Tools: connections through the ops broker
+Settings > Tools shows what Pace can reach when it answers you, and what it may change. Its connections (a work folder,
+GitHub, Jira, Kubernetes, SSH hosts) let the reasoner CLI query operational state and, where you turn on Write, fix code
+into draft PRs and write Jira issues and comments. Credentials and the work directory are never put into the
+reasoner's VM; only a separate relay (`ops-broker`), in a VM of its own, holds them. The reasoner can only request
+fixed queries through MCP tools.
 
 ```
 reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH_USER--> inventory hosts (within OPS_SSH_ALLOWED_CIDR)
@@ -30,6 +32,29 @@ reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH
 - Because it uses credentials, the bot does not start without the built-in sandbox (`REASONER_SANDBOX=vm`). Pace
   answers only you, so the tools act only for you.
 - To add checks, edit `src/broker/checks.ts` (SSH) or `src/broker/k8s.ts`, bundle the broker (`pnpm bundle`) and restart Pace.
+
+## Read and write
+
+Each connection has a Read switch and, where Pace can change something, a Write switch. Nothing finer: one Write covers
+everything a connection can change.
+
+| Connection | Read (on until turned off) | Write (off until turned on) |
+| --- | --- | --- |
+| Work folder | `fs_*` | None |
+| GitHub | `gh_*` | `ws_*`: draft PRs, which also need the work folder |
+| Jira | `jira_search`, `jira_issue` | `jira_create_issue`, `jira_add_comment` |
+| Kubernetes | `k8s_*` | None |
+| SSH hosts | `host_*` | None |
+
+- A connection is in use once its settings are filled in and its Read is on. With Read off, its settings stay and Pace
+  reaches none of it; its Write goes off with it.
+- The broker registers only the tools of what is in use (`TOOLS`, which Pace builds from the switches with
+  `brokerTools` in `src/settings/tools.ts`), so the model never sees the name of a tool that is off, and the broker's way
+  out opens only toward the connections in use.
+- When a request needs a tool that is not there, Pace says what is missing and that you can allow it in Settings > Tools.
+- Write came with its own switch in v0.6.5. The first start of v0.6.5 writes `ops.write` into the settings file once:
+  on for GitHub and Jira if they were already set up, so they keep doing what they did, and off otherwise. A connection
+  set up after that starts with Write off.
 
 ## In the built-in sandbox
 
@@ -70,7 +95,7 @@ reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:312
 - Workspaces are cleaned up after 24 hours.
 
 Setup: no value of the target environment lives in the code; all of them go into `ops` in the settings file
-(`~/.pacenote/settings.json`, from Settings > Ops tools; [Settings file](settings.md) maps each `OPS_*` name below to
+(`~/.pacenote/settings.json`, from Settings > Tools; [Settings file](settings.md) maps each `OPS_*` name below to
 its place). Each feature is optional, and the broker starts without the tools of any feature left empty.
 Files the broker generates, such as the host list and kubeconfig, are also created outside the repository, in `~/.pacenote/ops-broker/`.
 
@@ -91,5 +116,5 @@ pnpm k8s:kubeconfig
 pnpm bundle && pnpm sandbox:vm
 ```
 
-In the app, "Rebuild kubeconfig" (Settings > Ops tools > Broker) and "Set up built-in sandbox" do steps 2 and 3. When the
+In the app, "Rebuild kubeconfig" (Settings > Tools > Broker) and "Set up built-in sandbox" do steps 2 and 3. When the
 inventory or an SA token changes, run the matching step and restart Pace.

@@ -108,17 +108,17 @@ and where you contribute. You add it to each tool with one click, and only if yo
 - **Change your files.** On your Mac, the CLI gets read-only access to one folder you choose, and never your
   credential folders. In the built-in sandbox, each answer runs in a Linux VM that is thrown away afterwards and reaches
   only the domains you allow.
-- **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With ops tools on, SSH keys and
-  cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only lookups, draft PRs, and
-  Jira issues or comments.
+- **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With connections on in Settings >
+  Tools, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only
+  lookups and, only where you turn on Write, draft PRs and Jira issues or comments.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
   only your other Macs reach it, on your own network: ones with the same Slack app, or a new one while Add a Mac waits.
   Besides Slack (or your hub), your AI
-  service and the services you connect as ops tools, it talks only to GitHub to check for updates, and downloads the
+  service and the services you connect in Settings > Tools, it talks only to GitHub to check for updates, and downloads the
   sandbox's images when you set it up. There is no telemetry.
 - **Bill you or hold your AI account.** Answers use the subscription you already have, through its official CLI.
 
-How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Ops tools](docs/ops-tools.md) and
+How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Tools](docs/ops-tools.md) and
 [How it works](docs/how-it-works.md).
 
 ## Requirements
@@ -176,7 +176,7 @@ Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 | [Architecture](docs/architecture.md) | The design in seven diagrams: the pieces, one mention, your tasks and AI tools, a task's trajectory, the team hub, the layers, the code layout |
 | [How it works](docs/how-it-works.md) | The path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs |
 | [Reasoner sandbox](docs/sandbox.md) | Where answers run: on your Mac and what the CLI may read there, or the built-in VM sandbox, its allowed domains and login |
-| [Ops tools](docs/ops-tools.md) | Read-only lookups on hosts, k8s, a work directory, GitHub and Jira, and code changes as draft PRs |
+| [Tools](docs/ops-tools.md) | Connections Pace reads (hosts, k8s, a work folder, GitHub, Jira) and, where you turn on Write, draft PRs and Jira issues |
 | [Team hub](docs/team-hub.md) | One Slack app for a team, with each member's desktop answering their own mentions |
 | [Your Macs](docs/macs.md) | Pace answering on the Mac you're using, Todo the same on each, and how the Macs know each other |
 | [Your tasks from Slack](docs/tasks.md) | What people ask of you, collected on the Todo screen, and continuing it in Claude Code or Codex |

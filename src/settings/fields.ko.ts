@@ -26,11 +26,11 @@ export const SECTIONS_KO: Record<
   },
   sandbox: {
     label: '샌드박스',
-    help: '요청마다 답변 CLI가 실행되는 곳이에요. 허용 도메인은 바로 적용되고, 나머지는 Pace를 다시 시작하면 적용돼요.',
+    help: '요청마다 답변 CLI가 실행되는 곳이에요. 바꾼 내용은 Pace를 다시 시작하면 적용되고, 닿을 수 있는 도메인은 도구에 있어요.',
   },
   ops: {
-    label: '운영 도구',
-    help: '답변 CLI가 ops-broker를 거쳐 부를 수 있는 도구예요. SSH 키, kubeconfig, 토큰은 답변 CLI의 VM이 아니라 브로커의 VM에만 있어요. 바꾼 내용은 Pace를 다시 시작하면 적용돼요.',
+    label: '도구',
+    help: '답할 때 Pace가 닿는 곳과 바꿀 수 있는 것이에요. 연결은 키를 보관하는 브로커를 거치고, 모델은 브로커에 요청만 해요. 허용 도메인은 바로 적용되고, 나머지는 Pace를 다시 시작하면 적용돼요.',
   },
   tasks: {
     label: '할 일',
@@ -73,28 +73,32 @@ export const GROUPS_KO: Record<SettingGroup, { label: string; help: string }> =
       help: '선택한 답변 CLI를 위해 샌드박스에 넘겨요. 이 Mac에 있는 내 CLI 로그인은 그곳에서 쓰이지 않아요.',
     },
     ops: {
-      label: '운영 도구',
-      help: '켜고 끈 내용은 Pace를 다시 시작하면 적용돼요.',
+      label: '연결',
+      help: '브로커가 자기 VM에서 닿는 서비스예요. 항목을 채우고 읽기를 켜면 연결이 켜지고, 쓰기가 있는 연결은 쓰기가 꺼진 채 시작해요.',
     },
     files: {
-      label: '파일',
-      help: '파일 도구는 작업 디렉터리를 읽고, 풀 리퀘스트는 그 안의 저장소에서 만들어요.',
+      label: '작업 폴더',
+      help: '내 저장소가 있는 폴더로, 브로커에 읽기 전용으로 연결돼요. draft PR은 이 안의 저장소에서 시작해요.',
     },
     github: {
-      label: 'GitHub와 풀 리퀘스트',
-      help: '아래 조직으로 한정한 GitHub 조회와 풀 리퀘스트예요. 풀 리퀘스트에는 작업 디렉터리도 필요해요.',
+      label: 'GitHub',
+      help: '허용한 조직의 저장소와 PR을 내 gh 로그인으로 다뤄요. Pace는 머지하거나 승인하지 않아요.',
     },
     jira: {
       label: 'Jira',
-      help: '허용한 프로젝트의 이슈 조회, 새 이슈, 댓글이에요.',
+      help: '허용한 프로젝트의 이슈를 아래 계정으로 다뤄요. Pace는 이슈의 상태를 바꾸거나, 담당자를 정하거나, 지우지 않아요.',
     },
     k8s: {
       label: 'Kubernetes',
-      help: '읽기 전용 ServiceAccount용으로 만든 kubeconfig로 읽기만 해요.',
+      help: 'kubeconfig의 클러스터를 읽기만 하는 계정으로 읽어요. secret은 읽지 않아요.',
     },
     ssh: {
       label: 'SSH 호스트',
-      help: '허용한 범위의 호스트를 읽기 전용으로 확인해요.',
+      help: '허용한 범위의 호스트에서 정해진 점검만 해요.',
+    },
+    reference: {
+      label: '참고 폴더',
+      help: '답변 CLI가 직접 읽는 폴더로, 읽기만 해요. Claude Code는 이 Mac과 샌드박스에서, Codex는 이 Mac에서만 읽어요.',
     },
     ownWork: {
       label: 'Pacenote 자체 작업',
@@ -187,8 +191,8 @@ export const FIELDS_KO: Record<string, FieldWords> = {
     options: { app: { label: '앱과 같게' } },
   },
   MENTION_WORKSPACE: {
-    label: '참고 디렉터리',
-    help: '답변할 때 읽기 전용으로 참고하는 절대 경로예요. 파일을 읽을 수 있는 실행 환경에서만 써요.',
+    label: '폴더',
+    help: '절대 경로예요. 비워 두면 Pace가 직접 읽는 파일은 없어요.',
   },
   RENDER_DIAGRAMS: {
     label: '다이어그램 렌더링',
@@ -227,12 +231,16 @@ export const FIELDS_KO: Record<string, FieldWords> = {
     help: '샌드박스에서 Claude에 로그인하는 대신 쓰는 API 키예요.',
   },
   OPS_TOOLS: {
-    label: '운영 도구 켜기',
-    help: '아래 연동을 답변 CLI에 제공해요. 각 연동은 항목을 모두 채울 때까지 꺼져 있어요.',
+    label: '연결 사용',
+    help: '아래 연결을 Pace에 제공해요. 내장 샌드박스가 필요하고, Pace가 나에게만 답해야 해요.',
   },
   OPS_FS_ROOT: {
     label: '작업 디렉터리',
     help: '읽기 전용으로 마운트할 작업 디렉터리의 절대 경로예요. 비워 두면 파일 도구와 PR 도구가 꺼져요.',
+  },
+  OPS_FS_READ: {
+    label: '읽기',
+    help: '작업 폴더의 파일을 나열하고, 검색하고, 읽어요. .env 파일, 키, kubeconfig는 읽지 않아요.',
   },
   OPS_GIT_ALLOWED_OWNERS: {
     label: '허용 GitHub 조직',
@@ -245,6 +253,14 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   OPS_GIT_AUTHOR_EMAIL: {
     label: 'PR 커밋 작성자 이메일',
     help: '비워 두면 전역 git 설정(git config --global user.email)을 써요.',
+  },
+  OPS_GIT_READ: {
+    label: '읽기',
+    help: '저장소를 검색하고, PR을 리뷰, CI 결과, diff와 함께 읽어요.',
+  },
+  OPS_GIT_WRITE: {
+    label: '쓰기',
+    help: '자기 작업 공간에서 pacenote/* 브랜치로 draft PR을 열어요. 시간당 10개, PR마다 파일 50개와 3,000줄까지이고, 워크플로와 비밀 값은 건드리지 않아요. 작업 폴더가 필요해요.',
   },
   OPS_JIRA_URL: {
     label: 'Jira URL',
@@ -262,9 +278,21 @@ export const FIELDS_KO: Record<string, FieldWords> = {
     label: '허용 Jira 프로젝트',
     help: '조회, 생성, 댓글을 이 프로젝트로 한정해요. 프로젝트 키를 쉼표로 구분해요.',
   },
+  OPS_JIRA_READ: {
+    label: '읽기',
+    help: '이슈를 검색하고, 연결된 이슈와 최근 댓글과 함께 읽어요.',
+  },
+  OPS_JIRA_WRITE: {
+    label: '쓰기',
+    help: '내가 요청할 때 위 계정으로 이슈를 만들고 댓글을 달아요. 시간당 20개까지예요.',
+  },
   OPS_K8S_CONTEXTS: {
     label: 'k8s 컨텍스트',
     help: '읽기 전용 kubeconfig를 만들 로컬 kubeconfig 컨텍스트예요. 쉼표로 구분해요. 바꾼 뒤에는 kubeconfig를 다시 만드세요.',
+  },
+  OPS_K8S_READ: {
+    label: '읽기',
+    help: '읽기 전용 계정으로 get, describe, logs, events, top을 해요.',
   },
   OPS_K8S_SA: {
     label: 'k8s 읽기 전용 계정',
@@ -284,6 +312,10 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   OPS_SSH_KEY: {
     label: 'SSH 키 경로',
     help: '절대 경로예요. 키는 브로커의 VM에만 공유돼요.',
+  },
+  OPS_SSH_READ: {
+    label: '읽기',
+    help: '정해진 점검만 해요: uptime, dmesg, 메모리, 디스크, top, PCI 장치, 실패한 유닛, 서비스, 저널.',
   },
   OPS_SSH_KNOWN_HOSTS: {
     label: 'SSH known_hosts 경로',

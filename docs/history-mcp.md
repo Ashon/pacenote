@@ -67,7 +67,7 @@ The run tools are read-only. The history is the one the desktop app shows (`PACE
 
 - **Off by default.** The switch is read from the settings file on every call, so turning it off stops the tools at once, even
   in a session that already started the server. While it is off, every call answers with how to turn it on.
-- **Secrets are redacted** in everything the tools return, with the same patterns as the ops tools' output (tokens, keys,
+- **Secrets are redacted** in everything the tools return, with the same patterns as the broker's output (tokens, keys,
   passwords). The history can still hold your team's Slack messages and what the tools saw, such as logs and file contents,
   so share it only with tools you would show that to.
 - **Run content is data.** Requests come from Slack users and results from tools, so a run can contain text that reads like an

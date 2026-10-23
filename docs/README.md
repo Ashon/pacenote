@@ -7,7 +7,7 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
 - [How it works](how-it-works.md): the path from a mention to its answer, attachments, diagrams and images, the reasoner CLIs
 - [Reasoner sandbox](sandbox.md): where answers run: on this Mac and what the CLI may read there, or the built-in VM sandbox
   with its egress proxy, allowed domains and login
-- [Ops tools](ops-tools.md): ops-broker for hosts, k8s, the work directory, GitHub and Jira, and code changes as draft PRs
+- [Tools](ops-tools.md): connections through the ops broker (hosts, k8s, the work folder, GitHub, Jira), each with a Read and, where Pace can change something, a Write switch
 - [Team hub](team-hub.md): one Slack app for a team, with each member's desktop answering their own mentions
 - [Run history for AI tools](history-mcp.md): Pacenote's MCP server, for Claude Code, Codex and other tools on your Mac to
   read what Pace did

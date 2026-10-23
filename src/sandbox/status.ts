@@ -138,6 +138,9 @@ export async function collectSandboxStatus(options: {
   // Credentials and generated files (values are not read)
   const runtimeDir = brokerRuntimeDir(options.env, home)
   const expected = brokerExpected(values, runtimeDir)
+  // Only the connections in use are checked: one not set up, or with its Read
+  // off, says so on its own row in Settings > Tools.
+  const tools = new Set(opsOn ? expected.tools : [])
   const hostsFile = path.join(runtimeDir, 'hosts.json')
   const kubeconfig = path.join(runtimeDir, 'kubeconfig')
   const fileCheck = (label: string, file: string): SandboxCheck =>
@@ -150,7 +153,7 @@ export async function collectSandboxStatus(options: {
   status.signedIn = signed
   // What asks a command starts now, alongside the API key's check, and is
   // awaited where its check goes.
-  const logins = opsOn
+  const logins = tools.has('github')
     ? Promise.all([
         run('gh', ['auth', 'status', '--active', '--hostname', 'github.com']),
         sandboxAuthor(values, run),
@@ -187,9 +190,8 @@ export async function collectSandboxStatus(options: {
     }
     status.checks.push(check)
   }
-  // Checks only configured features. For empty features the broker starts
-  // without those tools. (Shown as off in the broker tools row)
-  if (opsOn && expected.configured.ssh) {
+  // For the others the broker starts without their tools.
+  if (tools.has('ssh')) {
     status.checks.push(fileCheck(t.sshKey, expected.sshKey))
     if (values.OPS_SSH_KNOWN_HOSTS?.trim())
       status.checks.push(fileCheck(t.knownHosts, expected.knownHosts))
@@ -215,45 +217,38 @@ export async function collectSandboxStatus(options: {
             : t.noHosts(settingLabel('OPS_SSH_INVENTORY')),
     })
   }
-  if (opsOn) {
+  if (tools.has('k8s')) {
     const kubeSize = existsSync(kubeconfig) ? statSync(kubeconfig).size : 0
     status.checks.push({
       label: t.kubeconfig,
       ok: kubeSize > 0,
       detail: kubeSize > 0 ? t.present : t.kubeconfigEmpty,
     })
-    const jiraKeys = [
-      'OPS_JIRA_URL',
-      'OPS_JIRA_EMAIL',
-      'OPS_JIRA_TOKEN',
-      'OPS_JIRA_PROJECTS',
-    ] as const
-    if (jiraKeys.some((key) => values[key]?.trim())) {
-      const missing = jiraKeys.filter((key) => !values[key]?.trim())
-      status.checks.push({
-        label: t.jira,
-        ok: missing.length === 0,
-        detail:
-          missing.length === 0
-            ? `${values.OPS_JIRA_URL} (${values.OPS_JIRA_PROJECTS}, ${values.OPS_JIRA_EMAIL})`
-            : t.required(missing.map(settingLabel)),
-      })
-    }
-    const [gh, author] = await logins!
+  }
+  if (tools.has('jira'))
+    status.checks.push({
+      label: t.jira,
+      ok: true,
+      detail: `${values.OPS_JIRA_URL} (${values.OPS_JIRA_PROJECTS}, ${values.OPS_JIRA_EMAIL})`,
+    })
+  if (logins) {
+    const [gh, author] = await logins
     const account = /account (\S+)/.exec(gh.stdout + gh.stderr)?.[1]
     status.checks.push({
       label: t.github,
       ok: gh.code === 0,
       detail: gh.code === 0 ? t.ghSignedIn(account) : t.ghSignedOut,
     })
-    status.checks.push({
-      label: t.author,
-      ok: Boolean(author.name && author.email),
-      detail:
-        author.name && author.email
-          ? `${author.name} <${author.email}> (${t.authorFrom[author.source]})`
-          : t.noAuthor,
-    })
+    // The author of the commits only draft PRs make
+    if (tools.has('github-write'))
+      status.checks.push({
+        label: t.author,
+        ok: Boolean(author.name && author.email),
+        detail:
+          author.name && author.email
+            ? `${author.name} <${author.email}> (${t.authorFrom[author.source]})`
+            : t.noAuthor,
+      })
   }
 
   // Shown when the built-in sandbox is chosen, saved or not yet; on a Mac
