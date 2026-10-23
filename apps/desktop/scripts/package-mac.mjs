@@ -190,6 +190,25 @@ plistSet(infoPlist, {
     'Pacenote finds your other Macs on this network, so Pace answers on the one you are using.',
   CFBundleDevelopmentRegion: 'en',
 })
+// pacenote:// links, such as the one the team hub's installer ends with
+// (deploy/hub/install.sh): macOS opens them in Pacenote.
+try {
+  execFileSync(
+    '/usr/libexec/PlistBuddy',
+    ['-c', 'Delete :CFBundleURLTypes', infoPlist],
+    { stdio: 'ignore' }
+  )
+} catch {
+  // Electron's own Info.plist has none.
+}
+for (const command of [
+  'Add :CFBundleURLTypes array',
+  'Add :CFBundleURLTypes:0 dict',
+  `Add :CFBundleURLTypes:0:CFBundleURLName string ${bundleId}.link`,
+  'Add :CFBundleURLTypes:0:CFBundleURLSchemes array',
+  'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string pacenote',
+])
+  run('/usr/libexec/PlistBuddy', ['-c', command, infoPlist])
 // Pacenote reads in English and Korean (docs/i18n.md). macOS takes an app's
 // languages from its lproj folders, and Electron brings an empty one for each
 // language Chromium has: those go, so macOS offers the app in its own two

@@ -57,6 +57,9 @@ export interface SlackGateway {
   userName(userId: string): Promise<string>
 }
 
+/** The installer's desktop, until it connects with its own name */
+const INSTALLER_LABEL = 'Pacenote, from the installer'
+
 interface HubOptions {
   store: DesktopStore
   pairings: Pairings
@@ -133,6 +136,28 @@ export class HubServer {
     clearInterval(this.heartbeat)
     for (const ws of this.sockets.values()) ws.close(1001, 'Hub shutting down')
     await new Promise<void>((resolve) => this.http.close(() => resolve()))
+  }
+
+  /**
+   * Pairs the desktop of whoever ran the installer (HUB_PAIR), once: their
+   * Pacenote made the token and switches to the hub as soon as it answers, with
+   * no code to send in Slack. A member the hub does not allow is left out.
+   */
+  async pairInstaller(pair: {
+    user: string
+    tokenHash: string
+  }): Promise<void> {
+    const { store, slack, log } = this.options
+    const allowed = this.options.allowedUsers ?? []
+    if (allowed.length > 0 && !allowed.includes(pair.user)) {
+      log.warn(
+        `HUB_PAIR names ${pair.user}, who is not in HUB_ALLOWED_USERS; not paired`
+      )
+      return
+    }
+    const name = await slack.userName(pair.user).catch(() => pair.user)
+    if (store.seed(pair.tokenHash, { id: pair.user, name }, INSTALLER_LABEL))
+      log.info(`Paired ${name} (${pair.user})'s desktop from the installer`)
   }
 
   /**

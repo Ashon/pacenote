@@ -44,6 +44,7 @@ async function main(): Promise<void> {
     notesLocale: config.notesLocale,
     log,
   })
+  if (config.pair) await hub.pairInstaller(config.pair)
   app.event('app_mention', async ({ body }) => {
     await hub.handleMention(body as unknown as Record<string, unknown>)
   })

@@ -56,6 +56,18 @@ const HubEnvSchema = z.object({
   HUB_ALLOWED_USERS: userIds,
   /** The language of the notes the hub posts in Slack: en, ko */
   HUB_NOTES_LANGUAGE: z.enum(LOCALES).default('en'),
+  /**
+   * The desktop of whoever ran the installer (deploy/hub/install.sh): their
+   * Slack member ID and the SHA-256 of the token their Pacenote made,
+   * "U123:<hex>". Paired once, when the hub first starts with it.
+   */
+  HUB_PAIR: z
+    .string()
+    .regex(
+      /^[UW][A-Z0-9]+:[0-9a-f]{64}$/,
+      'Must be a Slack user ID and a token hash, U...:<64 hex>'
+    )
+    .optional(),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
 
@@ -71,6 +83,8 @@ interface HubConfig {
   allowedUsers: string[]
   /** The language of the notes the hub posts in Slack */
   notesLocale: Locale
+  /** The installer's desktop, to pair once (HUB_PAIR) */
+  pair?: { user: string; tokenHash: string }
   logLevel: LogLevel
 }
 
@@ -98,6 +112,12 @@ export function loadHubConfig(env: NodeJS.ProcessEnv): HubConfig {
     publicUrl: e.HUB_PUBLIC_URL,
     allowedUsers: e.HUB_ALLOWED_USERS,
     notesLocale: e.HUB_NOTES_LANGUAGE,
+    pair: e.HUB_PAIR
+      ? {
+          user: e.HUB_PAIR.split(':')[0]!,
+          tokenHash: e.HUB_PAIR.split(':')[1]!,
+        }
+      : undefined,
     logLevel: e.LOG_LEVEL,
   }
 }

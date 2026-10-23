@@ -179,6 +179,16 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:hub:pair-confirm', options),
     pairCancel: () => ipcRenderer.invoke('pacenote:hub:pair-cancel'),
     disconnect: () => ipcRenderer.invoke('pacenote:hub:disconnect'),
+    // Installing a hub on a server: its command, then the wait for it
+    installCommand: (input: unknown) =>
+      ipcRenderer.invoke('pacenote:hub:install-command', input),
+    installState: () => ipcRenderer.invoke('pacenote:hub:install-state'),
+    installWait: () => ipcRenderer.invoke('pacenote:hub:install-wait'),
+    installCancel: () => ipcRenderer.invoke('pacenote:hub:install-cancel'),
+    onInstall: subscribe<unknown>('pacenote:hub:install-changed'),
+    // A pacenote:// link from the installer: the hub it names, once
+    takeLink: () => ipcRenderer.invoke('pacenote:hub:take-link'),
+    onLinked: subscribe<void>('pacenote:hub:linked'),
   },
   // The first-run wizard: its progress, what this Mac has, and "@Pace it's
   // me" on your own Slack app

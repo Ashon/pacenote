@@ -264,6 +264,10 @@ Other:
 
 - The query API is served only inside the app at `pacenote://app/api/*`, with no open port. Bot control uses preload IPC only.
   The dev server (`apps/web` Vite) listens only on 127.0.0.1 and attaches the same query API read-only.
+- macOS opens `pacenote://` links in the app (`CFBundleURLTypes`, written by `package-mac.mjs`). The only one it takes is
+  `pacenote://hub/connect?url=<hub>`, the team hub installer's way back ([Team hub](team-hub.md)), for an address a hub
+  can have: it opens Settings > Messengers (or setup's Slack step) with that hub filled in, and changes nothing until you
+  connect. A hub the app was waiting for after "Copy install command" is checked at once.
 - The data location is taken from the `PACENOTE_DATA_DIR` environment variable, then `dataDir` in the settings file, then
   the default home (`~/.pacenote`).
 - App icon: `assets/pacenote-icon.svg` is the source. After editing it, `pnpm --filter @pacenote/desktop icon` (macOS swift) redraws

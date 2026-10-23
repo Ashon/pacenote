@@ -1,4 +1,6 @@
 # Pacenote team hub on a server of its own (docs/team-hub.md).
+# Pacenote can write a command that does all of this instead (install.sh):
+# Settings > Messengers > Slack > Team hub > "No hub yet?".
 #   cp hub.env.example hub.env                  # the Slack app's tokens live only here
 #   docker compose up -d                        # pulls the image each release publishes
 #   docker compose pull && docker compose up -d # later, to update

@@ -4,10 +4,16 @@ import type { World } from './world.js'
 
 /**
  * Starts a team hub for the world: it holds the Slack app (Socket Mode against
- * the fake Slack) and listens on a port of its own on this computer.
+ * the fake Slack) and listens on a port of its own on this computer. env: the
+ * hub's own on top (a fixed HUB_PORT, the installer's HUB_PAIR); connections:
+ * the Socket Mode connections there are once the hub's is up.
  */
 export async function withHub(
-  world: World
+  world: World,
+  {
+    env = {},
+    connections = 1,
+  }: { env?: Record<string, string>; connections?: number } = {}
 ): Promise<{ hub: ManagedProcess; url: string }> {
   const hub = world.track(
     startHub({
@@ -19,12 +25,13 @@ export async function withHub(
       HUB_HOST: '127.0.0.1',
       HUB_DATA_DIR: path.join(world.root, 'hub'),
       LOG_LEVEL: 'debug',
+      ...env,
     })
   )
   const [, port] = await hub.waitFor(/listening on 127\.0\.0\.1:(\d+)/)
   await eventually(
     "the hub's Socket Mode connection",
-    () => world.slack.connections === 1
+    () => world.slack.connections === connections
   )
   return { hub, url: `http://127.0.0.1:${port}` }
 }

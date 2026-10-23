@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
 import { useText } from '@/lib/i18n'
+import { HubInstall } from '../hub-install'
 import { useHubPairing, type PairState } from '@/lib/hub'
 import { codeWords } from '@/lib/macs'
 import { allowedIds, useFromMac } from '@/lib/setup'
@@ -156,6 +157,19 @@ function ChooseConnection({
 
   // Leaving the step lets your other Mac go
   useEffect(() => () => void window.pacenoteDesktop?.setup?.macCancel(), [])
+  // A pacenote:// link from the hub's installer: that hub, to pair with
+  useEffect(() => {
+    const hub = window.pacenoteDesktop?.hub
+    if (!hub) return
+    const take = () =>
+      void hub.takeLink().then((linked) => {
+        if (!linked) return
+        setChosen('hub')
+        setUrl(linked)
+      })
+    take()
+    return hub.onLinked(take)
+  }, [])
 
   const start = () => startPairing(hubUrl)
   const choose = (next: Choice) => {
@@ -297,6 +311,20 @@ function ChooseConnection({
                 />
               </Swap>
             </div>
+            {(pair.step === 'idle' || pair.step === 'error') && !pairedHere && (
+              // Setup starts Pace after its review, so this Mac pairs with a
+              // code once the hub answers.
+              <HubInstall
+                switchHere={false}
+                allow=""
+                url={hubUrl}
+                onUp={(installed) => {
+                  setUrl(installed)
+                  startPairing(installed)
+                }}
+                onSwitched={() => undefined}
+              />
+            )}
           </div>
         </CollapsibleContent>
       </Collapsible>

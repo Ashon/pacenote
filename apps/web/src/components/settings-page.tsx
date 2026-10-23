@@ -101,6 +101,7 @@ import {
 } from './sandbox-panel'
 import { text } from './settings-page.text'
 import { ToolsSection } from './tools-section'
+import { HubInstall } from './hub-install'
 import { connectionStates } from '@src/settings/tools'
 
 /**
@@ -226,6 +227,24 @@ export function SettingsPage() {
     return result
   }, [draft, editing, current])
   const changeCount = Object.keys(changes).length
+
+  // A pacenote:// link from the hub's installer: Messengers, with that hub
+  // filled in to connect to. It saves nothing by itself.
+  const fileHub =
+    view?.values.SLACK_CONNECTION === 'hub' ? view.values.HUB_URL : undefined
+  useEffect(() => {
+    const hub = window.pacenoteDesktop?.hub
+    if (!hub) return
+    const take = () =>
+      void hub.takeLink().then((url) => {
+        if (!url || url === fileHub) return
+        setDraft((d) => ({ ...d, SLACK_CONNECTION: 'hub', HUB_URL: url }))
+        window.location.hash = '#/settings/messengers'
+        setNotice({ tone: 'ok', text: t.openedFromInstaller(url) })
+      })
+    take()
+    return hub.onLinked(take)
+  }, [fileHub, t])
 
   useEffect(() => {
     if (!settings || changeCount === 0) {
@@ -562,6 +581,8 @@ export function SettingsPage() {
           after: hubMode ? (
             <HubPairing
               hubUrl={valueOf('HUB_URL')}
+              allow={valueOf('MENTION_ALLOWED_USERS')}
+              onAddress={(url) => set('HUB_URL', url)}
               paired={
                 view.values.SLACK_CONNECTION === 'hub' &&
                 Boolean(view.secrets.HUB_TOKEN?.set)
@@ -1221,11 +1242,17 @@ function Chip({
  */
 function HubPairing({
   hubUrl,
+  allow,
+  onAddress,
   paired,
   onPaired,
   onDisconnected,
 }: {
   hubUrl: string
+  /** Who Pace answers now, for a hub installed from here */
+  allow: string
+  /** A hub installed from here answers at this address */
+  onAddress: (url: string) => void
   paired: boolean
   onPaired: (notice: string) => void
   onDisconnected: () => void
@@ -1272,17 +1299,37 @@ function HubPairing({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-row">{t.pairTitle}</p>
-              <p className="mt-0.5 text-meta text-muted-foreground">
-                {state.note ?? t.pairHelp}
-              </p>
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-row">{t.pairTitle}</p>
+                <p className="mt-0.5 text-meta text-muted-foreground">
+                  {state.note ?? t.pairHelp}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => start(hubUrl)}
+                disabled={!hubUrl}
+              >
+                <Plug />
+                {t.connect}
+              </Button>
             </div>
-            <Button size="sm" onClick={() => start(hubUrl)} disabled={!hubUrl}>
-              <Plug />
-              {t.connect}
-            </Button>
+            <HubInstall
+              switchHere
+              allow={allow}
+              url={hubUrl}
+              onUp={(url) => {
+                onAddress(url)
+                start(url)
+              }}
+              onSwitched={(done) =>
+                onPaired(
+                  t.pairedWith(done.user.name, done.team.name, done.started)
+                )
+              }
+            />
           </div>
         )
       case 'starting':
@@ -1372,7 +1419,6 @@ function HubPairing({
   )
 }
 
-/** Conditions a feature needs, each with a way to the section that fixes it */
 function PathControl({
   path,
   label,

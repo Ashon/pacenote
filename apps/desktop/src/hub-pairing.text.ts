@@ -15,6 +15,7 @@ const en = {
     `The hub at ${url} had a problem (${error}). Try again in a moment, or tell whoever runs it.`,
   turnedDown: (url: string, error: string) =>
     `The hub at ${url} turned the pairing down: ${error}`,
+  memberIds: 'Who can use it takes Slack member IDs, such as U012AB3CD.',
 }
 
 const ko: typeof en = {
@@ -30,6 +31,7 @@ const ko: typeof en = {
   hubProblem: (url, error) =>
     `${url}의 허브에 문제가 생겼어요(${error}). 잠시 후 다시 시도하거나 허브를 운영하는 사람에게 알려 주세요.`,
   turnedDown: (url, error) => `${url}의 허브가 페어링을 거절했어요: ${error}`,
+  memberIds: '쓸 수 있는 사람에는 U012AB3CD처럼 Slack 멤버 ID를 넣어요.',
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

@@ -50,6 +50,8 @@ const en = {
   hintOn: (n: number) => (n === 0 ? 'None set up' : `${n} on`),
   checkConnection: 'Check connection',
   hubDisconnected: 'Disconnected this desktop from the hub.',
+  openedFromInstaller: (url: string) =>
+    `Opened from the hub's installer: connect to ${url} under Slack to pair this Mac.`,
   sandboxSignedIn: 'Signed in inside the sandbox. Restart Pace to use it.',
 
   mcpTasks:
@@ -262,6 +264,8 @@ const ko: typeof en = {
   hintOn: (n) => (n === 0 ? '설정 전' : `${n}개 켜짐`),
   checkConnection: '연결 확인',
   hubDisconnected: '이 데스크톱과 허브의 연결을 해제했어요.',
+  openedFromInstaller: (url: string) =>
+    `허브 인스톨러에서 열었어요. Slack 아래에서 ${url}에 연결해 이 Mac을 페어링하세요.`,
   sandboxSignedIn:
     '샌드박스 안에서 로그인했어요. 쓰려면 Pace를 다시 시작하세요.',
 

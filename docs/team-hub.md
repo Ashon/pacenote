@@ -22,7 +22,32 @@ Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSo
 - The hub sees mentions and thread content in transit (as Slack's own servers do) and stores only paired desktops.
   Grants are kept in memory, so restarting the hub ends edits to answers in progress.
 
-Running the hub (on a server of its own, with Docker):
+Installing it from Pacenote (on a Linux server with Docker):
+
+1. Create the Slack app from `slack-app-manifest.yaml` (Socket Mode), install it, and create an app-level token with
+   `connections:write`. To move your own Slack app to the hub, use its tokens.
+2. In Pacenote, Settings > Messengers > Slack, choose Team hub, open "No hub yet? Install one on a Linux server", give
+   the address members will use and who can use it, and choose "Copy install command". In setup, it is under "Join your
+   team's hub".
+3. Paste the command in the server's shell. It runs `deploy/hub/install.sh` from the release that matches your
+   Pacenote, which:
+   - writes `compose.yaml` and `hub.env` in `~/pacenote-hub` (`--dir` for another folder), with the image of the same
+     version. http addresses are published on the server's network at their port; https ones stay on `127.0.0.1:8790`
+     for what serves https in front.
+   - asks for the two tokens on the server's terminal without showing them, so they never leave it (or reads
+     `SLACK_APP_TOKEN` and `SLACK_BOT_TOKEN` from the environment), and checks them with Slack.
+   - starts the hub, waits until `/health` answers, and ends with a `pacenote://hub/connect?url=...` link that opens
+     Pacenote on the hub (a click in most Mac terminals, OSC 8).
+4. Pacenote waits for the hub at that address. Copied from Settings while Pace answers on your own Slack app, the
+   command carries `--pair <your member ID>:<hash>`: the SHA-256 of a hub token Pacenote made and keeps. The hub pairs it
+   once, when it first starts with it (`HUB_PAIR`), and Pacenote switches Pace to the hub as soon as the hub answers,
+   with no code to send in Slack. Otherwise (in setup, or with no member ID yet) it pairs with a code as usual once the
+   hub answers.
+
+Running the same command again updates the hub: the tokens stay, the image follows the version. The command holds no
+secret, and the link only fills the address and asks before anything changes.
+
+Running the hub by hand (on a server of its own, with Docker):
 
 1. Create the Slack app from `slack-app-manifest.yaml` (Socket Mode), install it, and create an app-level token with
    `connections:write`.
@@ -52,6 +77,7 @@ then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the
 | `HUB_PUBLIC_URL` | The URL members use (https, or http on your own network); upload URLs handed to desktops are built from it |
 | `HUB_ALLOWED_USERS` | Comma-separated Slack user IDs who may pair and use the hub. Empty: everyone |
 | `HUB_NOTES_LANGUAGE` | The language of the notes the hub posts to members in Slack (pairing, not connected): `en` (default) or `ko` |
+| `HUB_PAIR` | Written by the installer: the member who installed it and the SHA-256 of their Pacenote's token (`U...:<hex>`). Paired once, the first time the hub starts with it, and left alone after, so a later pairing or disconnect stays |
 | `HUB_PORT`, `HUB_HOST`, `HUB_DATA_DIR` | Listen port (8790, 0 for any free one), address (0.0.0.0) and data folder (`/data`) |
 | `SLACK_API_URL` | Slack's Web API (default `https://slack.com/api/`): `https://slack-gov.com/api/` for GovSlack. The hub fetches files only from that Slack's file host |
 | `LOG_LEVEL` | debug, info (default), warn, error |

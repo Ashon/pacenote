@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { once } from 'node:events'
+import { createServer, type AddressInfo } from 'node:net'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -461,6 +462,84 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .getByText('Pace can read your work folder.', { exact: true })
       .waitFor()
     await github.getByText('Read is off').waitFor()
+  })
+
+  it('installs a team hub from Settings, and Pace switches to it once it answers', async () => {
+    world = await World.create([])
+    const { slack, alice } = world
+    // The address the hub will answer at, on this computer
+    const port = await new Promise<number>((resolve) => {
+      const probe = createServer().listen(0, '127.0.0.1', () => {
+        const { port } = probe.address() as AddressInfo
+        probe.close(() => resolve(port))
+      })
+    })
+    const url = `http://127.0.0.1:${port}`
+    const page = await launch(world, {
+      settings: [
+        `SLACK_APP_TOKEN=${slack.appToken}`,
+        `SLACK_BOT_TOKEN=${slack.botToken}`,
+        `MENTION_ALLOWED_USERS=${alice.id}`,
+      ],
+    })
+    await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+
+    // The installer's link opens Settings on that hub; it saves nothing.
+    await app!.evaluate(
+      ({ app: electron }, link) =>
+        electron.emit('open-url', { preventDefault() {} }, link),
+      `pacenote://hub/connect?url=${encodeURIComponent(url)}`
+    )
+    await page
+      .getByText(`Opened from the hub's installer: connect to ${url}`, {
+        exact: false,
+      })
+      .waitFor()
+    const file = path.join(world.home, 'settings.json')
+    expect(JSON.parse(readFileSync(file, 'utf8')).slack.connection).toBe(
+      undefined
+    )
+
+    // No hub yet: Pacenote writes the command for the server.
+    const install = page.locator('[data-hub-install]')
+    await install.getByText('No hub yet? Install one on a Linux server').click()
+    await install.getByRole('button', { name: 'Copy install command' }).click()
+    const command = await install.locator('[data-hub-command]').textContent()
+    expect(command).toContain(`--url ${url}`)
+    expect(command).toContain(`--allow ${alice.id}`)
+    const pair = new RegExp(`--pair (${alice.id}:[0-9a-f]{64})`).exec(
+      command ?? ''
+    )?.[1]
+    expect(pair).toBeDefined()
+    await install.getByText(`Waiting for the hub at ${url}`).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/hub-install-waiting.png'),
+    })
+
+    // The server runs it: the hub starts with this Mac's pairing, and Pace
+    // switches to it with no code to send in Slack.
+    const { hub } = await withHub(world, {
+      env: { HUB_PORT: String(port), HUB_PAIR: pair! },
+      connections: 2,
+    })
+    await hub.waitFor(/Paired alice \(U0ALICE\)'s desktop from the installer/)
+    await page
+      .getByText('Paired with the hub as alice @', { exact: false })
+      .waitFor({ timeout: 30_000 })
+    await eventually('Pace on the hub', async () =>
+      JSON.parse(readFileSync(file, 'utf8')).slack.connection === 'hub'
+        ? true
+        : undefined
+    )
+    const saved = JSON.parse(readFileSync(file, 'utf8')).slack
+    expect(saved.hub.url).toBe(url)
+    await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+    await hub.waitFor(
+      /alice's desktop "Pacenote, from the installer" connected/
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/hub-install-switched.png'),
+    })
   })
 
   it("opens in macOS's language, and changes language from Settings at once", async () => {

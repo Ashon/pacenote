@@ -45,6 +45,24 @@ export type HubMessage =
 export const PING = 'ping'
 export const PONG = 'pong'
 
+/** Where installing a hub from Pacenote has got to (Settings, setup) */
+export type HubInstallState =
+  | { step: 'idle' }
+  /** The command is out; waiting for the hub to answer at its address */
+  | { step: 'waiting'; url: string; command: string; switches: boolean }
+  /** It answers, and this Mac pairs with a code as usual */
+  | { step: 'up'; url: string }
+  /** It answers and knows this Mac: Pace answers through it now */
+  | {
+      step: 'switched'
+      url: string
+      user: HubUser
+      team: HubTeam
+      started: boolean
+    }
+  /** It did not answer in time; the command still works */
+  | { step: 'gave-up'; url: string; command: string }
+
 export const HUB_PATHS = {
   health: '/health',
   connect: '/connect',

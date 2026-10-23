@@ -24,6 +24,8 @@ export interface DesktopRecord {
 interface StoreFile {
   version: 1
   desktops: DesktopRecord[]
+  /** Token hashes the installer paired (HUB_PAIR), each paired only once */
+  seeded?: string[]
 }
 
 /**
@@ -33,11 +35,14 @@ interface StoreFile {
  */
 export class DesktopStore {
   private desktops: DesktopRecord[]
+  private seeded: string[]
 
   constructor(private readonly file: string) {
-    this.desktops = existsSync(file)
-      ? (JSON.parse(readFileSync(file, 'utf8')) as StoreFile).desktops
-      : []
+    const stored = existsSync(file)
+      ? (JSON.parse(readFileSync(file, 'utf8')) as StoreFile)
+      : undefined
+    this.desktops = stored?.desktops ?? []
+    this.seeded = stored?.seeded ?? []
   }
 
   list(): readonly DesktopRecord[] {
@@ -77,6 +82,18 @@ export class DesktopStore {
     return { desktop, replaced }
   }
 
+  /**
+   * Pairs the installer's desktop, the first time the hub starts with it.
+   * Later starts leave it alone, so a desktop the member paired since, or
+   * disconnected, stays as they left it. Returns whether it paired now.
+   */
+  seed(tokenHash: string, user: HubUser, label: string): boolean {
+    if (this.seeded.includes(tokenHash)) return false
+    this.seeded = [...this.seeded, tokenHash]
+    this.add(tokenHash, user, label)
+    return true
+  }
+
   remove(id: string): void {
     this.desktops = this.desktops.filter((d) => d.id !== id)
     this.save()
@@ -92,7 +109,11 @@ export class DesktopStore {
   private save(): void {
     mkdirSync(path.dirname(this.file), { recursive: true })
     const tmp = `${this.file}.tmp`
-    const data: StoreFile = { version: 1, desktops: this.desktops }
+    const data: StoreFile = {
+      version: 1,
+      desktops: this.desktops,
+      ...(this.seeded.length > 0 ? { seeded: this.seeded } : {}),
+    }
     writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 })
     renameSync(tmp, this.file)
   }

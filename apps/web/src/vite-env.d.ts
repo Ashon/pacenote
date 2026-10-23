@@ -6,6 +6,7 @@ import type {
   UpdateState,
 } from '@runtime/types'
 import type {
+  HubInstallState,
   HubTeam,
   HubUser,
   PairStartResponse,
@@ -321,6 +322,25 @@ declare global {
         >
         pairCancel(): Promise<void>
         disconnect(): Promise<{ issues: SettingsIssue[] } | { error: string }>
+        /**
+         * The command that installs a hub on a server (deploy/hub/install.sh),
+         * then the wait for it. switchHere: Pace switches to the hub once it
+         * answers; otherwise this Mac pairs with a code.
+         */
+        installCommand(input: {
+          url: string
+          allow: string
+          lang: 'en' | 'ko'
+          switchHere: boolean
+        }): Promise<HubInstallState | { error: string }>
+        installState(): Promise<HubInstallState>
+        /** Waits again for the same command, after giving up */
+        installWait(): Promise<HubInstallState>
+        installCancel(): Promise<void>
+        onInstall(callback: (state: HubInstallState) => void): () => void
+        /** The hub a pacenote:// link named, once */
+        takeLink(): Promise<string | null>
+        onLinked(callback: () => void): () => void
       }
       /** The first-run wizard. Calls that can fail return { error }. */
       setup: {

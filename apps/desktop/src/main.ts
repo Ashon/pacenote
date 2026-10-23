@@ -201,6 +201,8 @@ import {
 } from '../../../src/tasks/own-ai.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubPairing } from './hub-pairing.js'
+import { HubInstall } from './hub-install.js'
+import { hubFromLink } from '../../../src/hub/install.js'
 import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
@@ -437,6 +439,49 @@ function toolPath(): string {
  */
 const settings = new SettingsStore({ settingsFile, dataDir, env: process.env })
 const hubPairing = new HubPairing(settings)
+/** Restarts or starts Pace on saved settings, once the IPC is set up */
+let applyAfterSave: () => Promise<boolean> = () => Promise.resolve(false)
+/**
+ * A team hub installed from Settings: Pace switches to it as soon as it
+ * answers (docs/team-hub.md)
+ */
+const hubInstall = new HubInstall({
+  settings,
+  version: app.getVersion(),
+  apply: () => applyAfterSave(),
+  onChange: (state) => {
+    log.info(
+      `Hub install: ${state.step}${'url' in state ? ` (${state.url})` : ''}`
+    )
+    mainWindow?.webContents.send('pacenote:hub:install-changed', state)
+  },
+})
+/** The hub a pacenote:// link opened, until the window takes it */
+let linkedHub: string | undefined
+/**
+ * pacenote://hub/connect?url=... from the hub's installer: Pacenote opens on
+ * that hub, which it switches to if it was waiting for it, and otherwise only
+ * offers to connect. A link changes nothing by itself.
+ */
+function openLink(link: string): void {
+  const url = hubFromLink(link)
+  if (!url) {
+    log.warn(`Not a link Pacenote opens: ${link.slice(0, 120)}`)
+    return
+  }
+  log.info(`Opened from a link to the hub at ${url}`)
+  linkedHub = url
+  void hubInstall.check(url)
+  if (!app.isReady()) return
+  // Settings takes it, or setup where it is
+  showMainWindow(setup.view().open ? undefined : '#/settings/messengers')
+  mainWindow?.webContents.send('pacenote:hub:linked')
+}
+// Before ready: a link that opened the app comes before it is
+app.on('open-url', (event, link) => {
+  event.preventDefault()
+  openLink(link)
+})
 /**
  * The first-run wizard's progress. A Pacenote that could already start Pace,
  * or has answered, was set up before the wizard and never opens on it.
@@ -1938,6 +1983,7 @@ function registerBotIpc(): void {
   )
   // New settings take effect only after the bot restarts. A stopped bot is
   // started fresh.
+  applyAfterSave = () => applySettings()
   const applySettings = async (): Promise<boolean> => {
     if (!supervisor) return false
     const phase = supervisor.current.phase
@@ -2105,6 +2151,23 @@ function registerBotIpc(): void {
     })
   )
   handle('pacenote:hub:pair-cancel', undefined, () => hubPairing.cancel())
+  // Installing a hub from Settings or setup (deploy/hub/install.sh)
+  handleOrError('pacenote:hub:install-command', async (input) =>
+    hubInstall.command(input)
+  )
+  handle('pacenote:hub:install-state', { step: 'idle' }, () =>
+    hubInstall.current()
+  )
+  handle('pacenote:hub:install-wait', { step: 'idle' }, () =>
+    hubInstall.resume()
+  )
+  handle('pacenote:hub:install-cancel', undefined, () => hubInstall.cancel())
+  // The hub a pacenote:// link opened, once
+  handle('pacenote:hub:take-link', null, () => {
+    const url = linkedHub
+    linkedHub = undefined
+    return url ?? null
+  })
   handleOrError('pacenote:hub:disconnect', async () => {
     const issues = await hubPairing.disconnect(settings.effectiveEnv())
     if (issues.length === 0) await applySettings()
@@ -2394,6 +2457,8 @@ if (!app.requestSingleInstanceLock()) {
     .whenReady()
     .then(async () => {
       registerAppProtocol()
+      // pacenote:// links (the hub installer's), for this copy of the app
+      if (app.isPackaged) app.setAsDefaultProtocolClient('pacenote')
       registerBotIpc()
       setAppMenu(appName)
       // Opened only to be told to quit (see before-quit): no tray, window or
@@ -2427,7 +2492,15 @@ if (!app.requestSingleInstanceLock()) {
       // A test server answers at once; GitHub can wait for the app to settle.
       updates?.start(updateUrl ? 1_000 : 30_000)
       if (atLogin) log.info('Opened at login; the window waits')
-      else await createWindow(setup.view().open ? '#/setup' : '')
+      else
+        await createWindow(
+          setup.view().open
+            ? '#/setup'
+            : // Opened by a link from the hub's installer
+              linkedHub
+              ? '#/settings/messengers'
+              : ''
+        )
       openOnActivate()
     })
     .catch(reportStartupError)
