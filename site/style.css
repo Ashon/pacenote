@@ -258,6 +258,10 @@ code {
   overflow-x: auto;
   white-space: nowrap;
 }
+/* One command to a line: tap, trust, install. Copy takes the lines between them too */
+.command code span {
+  display: block;
+}
 .command .copy {
   min-height: 2.25rem;
   padding: 0 0.875rem;
@@ -2070,13 +2074,14 @@ code {
   .wells.two {
     grid-template-columns: 1fr;
   }
-  /* The install command wraps between its halves rather than hide its end */
+  /* A command too long for the box wraps under itself, indented, rather than hide its end */
   .command code {
     white-space: normal;
     overflow-x: visible;
   }
   .command code span {
-    white-space: nowrap;
+    padding-inline-start: 2ch;
+    text-indent: -2ch;
   }
   /* The track turns to run down the page */
   .track {

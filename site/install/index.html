@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Install Pacenote">
-  <meta property="og:description" content="One Homebrew command, then a setup that ends when Pace answers you in Slack.">
+  <meta property="og:description" content="Three Homebrew commands, then a setup that ends when Pace answers you in Slack.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/install/">
   <meta property="og:site_name" content="Pacenote">
@@ -44,10 +44,12 @@
   <main id="main">
     <div class="page-head">
       <h1>Install Pacenote</h1>
-      <p class="lede">One Homebrew command, then a setup in the app that ends when Pace answers you in Slack.</p>
+      <p class="lede">Three Homebrew commands, then a setup in the app that ends when Pace answers you in Slack.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
-          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <code id="install-command"><span>brew tap ashon/tap</span>
+<span>brew trust ashon/tap</span>
+<span>brew install --cask pacenote</span></code>
           <button class="button primary copy" type="button" data-copy="install-command">Copy</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
@@ -71,7 +73,9 @@
       <section class="block" id="setup" aria-labelledby="setup-title">
         <h2 id="setup-title">Setup ends with Pace's first answer</h2>
         <ol class="steps down">
-          <li>Install with Homebrew: <code>brew install --cask ashon/tap/pacenote</code></li>
+          <li>Install with Homebrew: add the tap with <code>brew tap ashon/tap</code>, trust it with
+            <code>brew trust ashon/tap</code>, then run <code>brew install --cask pacenote</code>. Homebrew loads casks only
+            from taps you trust, so without the trust it refuses the install.</li>
           <li>Open Pacenote. Setup walks you through your AI service, where answers run, Slack, and a review. Stop at any
             step and pick it up later from Overview.</li>
           <li>Mention <code>@Pace</code> in a thread. Setup is done when Pace answers you there.</li>
@@ -121,7 +125,8 @@
 
       <section class="block" id="update" aria-labelledby="update-title">
         <h2 id="update-title">Update or remove</h2>
-        <p>Run <code>brew upgrade --cask pacenote</code> to update; the app tells you when a new version is out. Run
+        <p>Run <code>brew upgrade --cask pacenote</code> to update; the app tells you when a new version is out. If
+          the upgrade skips Pacenote, trust the tap first with <code>brew trust ashon/tap</code>. Run
           <code>brew uninstall --cask pacenote</code> to remove it. Settings and run history stay in
           <code>~/.pacenote</code> across both; delete that folder to remove them too.</p>
       </section>

@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Pacenote 설치하기">
-  <meta property="og:description" content="Homebrew 명령 하나, 그리고 Slack에서 Pace가 답하면 끝나는 초기 설정.">
+  <meta property="og:description" content="Homebrew 명령 세 줄, 그리고 Slack에서 Pace가 답하면 끝나는 초기 설정.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/ko/install/">
   <meta property="og:site_name" content="Pacenote">
@@ -44,10 +44,12 @@
   <main id="main">
     <div class="page-head">
       <h1>Pacenote 설치하기</h1>
-      <p class="lede">Homebrew 명령 하나면 되고, 앱 안의 초기 설정은 Slack에서 Pace가 답하면 끝나요.</p>
+      <p class="lede">Homebrew 명령 세 줄이면 되고, 앱 안의 초기 설정은 Slack에서 Pace가 답하면 끝나요.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Homebrew로 설치">
-          <code id="install-command"><span>brew install --cask</span> <span>ashon/tap/pacenote</span></code>
+          <code id="install-command"><span>brew tap ashon/tap</span>
+<span>brew trust ashon/tap</span>
+<span>brew install --cask pacenote</span></code>
           <button class="button primary copy" type="button" data-copy="install-command">복사</button>
           <span class="copied" role="status" aria-live="polite"></span>
         </div>
@@ -71,7 +73,9 @@
       <section class="block" id="setup" aria-labelledby="setup-title">
         <h2 id="setup-title">초기 설정은 Pace의 첫 답변으로 끝나요</h2>
         <ol class="steps down">
-          <li>Homebrew로 설치하세요: <code>brew install --cask ashon/tap/pacenote</code></li>
+          <li>Homebrew로 설치하세요: <code>brew tap ashon/tap</code>으로 tap을 추가하고, <code>brew trust ashon/tap</code>으로
+            신뢰한 다음 <code>brew install --cask pacenote</code>를 실행해요. Homebrew는 신뢰한 tap의 cask만 불러오기 때문에,
+            신뢰하지 않으면 설치를 거부해요.</li>
           <li>Pacenote를 여세요. 초기 설정이 AI 서비스, 답변을 실행할 곳, Slack, 마지막 확인까지 차례로 안내해요. 어느
             단계에서든 멈췄다가 나중에 개요에서 이어서 할 수 있어요.</li>
           <li>스레드에서 <code>@Pace</code>를 멘션하세요. Pace가 거기서 답하면 초기 설정이 끝나요.</li>
@@ -120,7 +124,8 @@
 
       <section class="block" id="update" aria-labelledby="update-title">
         <h2 id="update-title">업데이트와 삭제</h2>
-        <p>업데이트하려면 <code>brew upgrade --cask pacenote</code>를 실행하세요. 새 버전이 나오면 앱이 알려 줘요. 삭제하려면
+        <p>업데이트하려면 <code>brew upgrade --cask pacenote</code>를 실행하세요. 새 버전이 나오면 앱이 알려 줘요. 업그레이드가
+          Pacenote를 건너뛰면 먼저 <code>brew trust ashon/tap</code>으로 tap을 신뢰하세요. 삭제하려면
           <code>brew uninstall --cask pacenote</code>를 실행하세요. 어느 쪽이든 설정과 실행 기록은
           <code>~/.pacenote</code>에 남으니, 함께 지우려면 그 폴더를 삭제하세요.</p>
       </section>
