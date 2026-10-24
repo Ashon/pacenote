@@ -1292,7 +1292,7 @@ function teamHub(c) {
   c.heading(376, TOP + 30, 368, {
     icon: 'server',
     title: 'Team hub',
-    meta: 'deploy/hub, behind HTTPS',
+    meta: 'deploy/hub, on a server of yours',
   })
   c.rows(376, TOP + 46, 368, [
     {

@@ -4,7 +4,7 @@ For several people in one workspace: one hub server holds the Slack app, and eac
 member's mentions with their own `claude` or `codex` login, sandbox and tools.
 
 ```
-Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSocket over HTTPS--> each member's Pacenote
+Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSocket (https, or http on your own network)--> each member's Pacenote
 ```
 
 - The Slack tokens live only on the hub. Desktops never get one: their Slack Web API calls, file downloads and uploads go
