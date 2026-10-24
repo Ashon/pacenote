@@ -104,7 +104,9 @@ Bot management:
   files as it opens, or anything else). The window tries again, quickly at first and then every 30 seconds at most, and
   after a few tries says why in the screen's place with "Try again" (`apps/desktop/src/screen.ts`). Pace and the menu bar
   go on meanwhile. While the bundle is being swapped it waits quietly, and a new version put in place opens instead.
-  Opened again while it quits (Pace finishing a request), the app opens once it is gone.
+  Opened again while it quits (Pace finishing a request), the app opens once it is gone. Opened within 5 seconds of a
+  quit, it waits 2 seconds for a quit request before it starts anything: a quit request to an app that is not running
+  opens it first, as Homebrew's do during an upgrade, and that copy then goes at once (`apps/desktop/src/quit-mark.ts`).
 - When Pace needs attention, the app tells you once with a macOS notification, unless its window is in front: Pace stopped
   (until it runs again), it needs setup, it lost Slack for 2 minutes or more, or a problem the Pace screen lists (a sign-in
   the reasoner rejected, a usage limit, the built-in sandbox's setup). Clicking it opens the screen to look at. While any of it lasts,

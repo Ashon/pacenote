@@ -3338,6 +3338,65 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(text).not.toMatch(/ERROR \[desktop\] Could not start/)
   })
 
+  it('goes at once when opened again only to be handed a quit, so the upgrade goes on', async () => {
+    world = await World.create()
+    const { slack } = world
+    const settings = [
+      `SLACK_APP_TOKEN=${slack.appToken}`,
+      `SLACK_BOT_TOKEN=${slack.botToken}`,
+      `MENTION_ALLOWED_USERS=${world.alice.id}`,
+    ]
+    const desktopLog = () =>
+      readFileSync(path.join(world!.home, 'logs/desktop.log'), 'utf8')
+    const count = (pattern: RegExp) => desktopLog().match(pattern)?.length ?? 0
+
+    // Running, with Pace answering, when Homebrew asks it to quit
+    const page = await launch(world, { settings })
+    await page.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+    const closed = app!.waitForEvent('close', { timeout: 60_000 })
+    await app!.evaluate(({ app }) => app.quit())
+    await closed
+    app = undefined
+
+    // Homebrew asks again and finds it gone, so macOS opens it to hand it the
+    // quit, which lands once that copy has started.
+    // (Spawned as is: it may be gone before Playwright could attach.)
+    const starts = count(/\[desktop\] Starting /g)
+    const botExits = count(/bot exited/g)
+    const again = spawn(ELECTRON, [path.join(REPO, 'apps/desktop')], {
+      env: appEnv(world),
+      stdio: 'ignore',
+    })
+    const exited = once(again, 'exit') as Promise<[number | null]>
+    try {
+      await eventually(
+        'the copy starting',
+        () => count(/\[desktop\] Starting /g) > starts
+      )
+      await new Promise((resolve) => setTimeout(resolve, 1_000))
+      again.kill('SIGTERM')
+      const [code] = await Promise.race([
+        exited,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('It did not go at once')), 5_000)
+        ),
+      ])
+      expect(code).toBe(0)
+    } finally {
+      again.kill('SIGKILL')
+    }
+    // Gone without starting Pace, so Homebrew finds it gone, counts the quit
+    // as done and opens the new version itself.
+    expect(count(/bot exited/g)).toBe(botExits)
+    expect(world.status()).toBeUndefined()
+
+    // Opened again as soon by you, with no quit to come: Pace starts once the
+    // moment it waits is over.
+    const reopened = await launch(world, { settings })
+    await reopened.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
+    expect(desktopLog()).toMatch(/Opened right after quitting/)
+  })
+
   it('keeps going when its screen will not load: it says why in the window, and loads it once it can', async () => {
     world = await World.create()
     // The screen's page cannot be read, as one moved away cannot.

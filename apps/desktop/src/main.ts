@@ -209,6 +209,7 @@ import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
+import { markQuit, QUIT_MARK_FILE, quitWithin } from './quit-mark.js'
 import { ScreenLoader, unavailablePage } from './screen.js'
 import { setupProblem } from './bot-readiness.js'
 import {
@@ -2503,6 +2504,13 @@ async function reportStartupError(error: unknown): Promise<void> {
   showMainWindow()
 }
 
+/** When this copy last quit, for the next one to read (quit-mark.ts) */
+const quitMark = path.join(dataDir, QUIT_MARK_FILE)
+/** How soon after a quit a copy opened may be one opened to be handed a quit */
+const OPENED_AGAIN_MS = 5_000
+/** How long that copy waits for the quit before it starts */
+const QUIT_REQUEST_WAIT_MS = 2_000
+
 let opensOnActivate = false
 /** From when the app has started, the Dock icon and opening it again show it */
 function openOnActivate(): void {
@@ -2531,6 +2539,17 @@ if (!app.requestSingleInstanceLock()) {
       // Pace for the moment it lasts. Opened from a bundle already replaced:
       // straight on to the new version.
       if (isQuitting || bundleWatch?.check()) return
+      // Opened moments after a copy quit: maybe to be handed a quit request
+      // that found that copy gone, which comes only now that this one has
+      // started. It waits a moment for one before it starts anything, so that
+      // one ends it at once.
+      if (quitWithin(quitMark, OPENED_AGAIN_MS)) {
+        log.info(
+          'Opened right after quitting; waiting a moment for a quit request'
+        )
+        await sleep(QUIT_REQUEST_WAIT_MS)
+        if (isQuitting || bundleWatch?.check()) return
+      }
       bundleWatch?.start()
       if (process.platform === 'darwin' && !app.isPackaged)
         app.dock?.setIcon(nativeImage.createFromPath(appIcon))
@@ -2576,10 +2595,11 @@ let botStopped = false
 let botStopping: Promise<void> | undefined
 /**
  * Homebrew quits the app before an upgrade by asking again and again until it
- * is gone. A request that lands just as the app exits makes macOS open the app
- * again to deliver it, and that copy is told to quit while it starts. So from
- * the first request on, nothing starts Pace again, and one stop answers them
- * all.
+ * is gone. A request that finds the app gone makes macOS open it again to
+ * hand it the request, which that copy gets only once it has started: opened
+ * moments after a quit, it waits for one before it starts anything (whenReady
+ * and quit-mark.ts), so it goes at once and Homebrew finds it gone. From the
+ * first request on, nothing starts Pace again, and one stop answers them all.
  *
  * Homebrew opens the new version only for an app gone within 10 seconds. One
  * that takes longer (Pace finishing a request) finds the new version on disk
@@ -2610,6 +2630,8 @@ app.on('before-quit', (event) => {
       })
   }
 })
+// When this copy went, for one opened right after
+app.on('will-quit', () => markQuit(quitMark))
 app.on('window-all-closed', () => {
   if (isQuitting) app.quit()
 })
