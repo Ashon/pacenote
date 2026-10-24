@@ -22,7 +22,7 @@ describe('third-party notices', () => {
     })
     const text = readFileSync(out, 'utf8')
     const heading = (name: string) =>
-      new RegExp(`^${name.replace(/[/.]/g, '\\$&')} \\S+`, 'm')
+      new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')} \\S+`, 'm')
     for (const file of [
       'package.json',
       'apps/web/package.json',

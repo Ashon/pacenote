@@ -184,7 +184,11 @@ const ICONS = [
 ]
 
 const esc = (s) =>
-  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 
 /** About how wide text sets in the system font, for badges and alignment */
 function textWidth(value, size, { mono = false, weight = 400 } = {}) {
