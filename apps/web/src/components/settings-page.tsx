@@ -302,8 +302,14 @@ export function SettingsPage() {
     return value || field.default || ''
   }
   const isSet = (key: string) => valueOf(key) !== ''
+  /** In the file now, as saved */
+  const saved = (field: SettingField) =>
+    field.type === 'secret'
+      ? Boolean(view.secrets[field.key]?.set)
+      : Boolean(view.values[field.key])
   const shown = (field: SettingField) =>
     !field.internal &&
+    (!field.retiring || saved(field)) &&
     (!field.shownWhen ||
       shownFor(field.shownWhen, valueOf(field.shownWhen.key)))
 
@@ -643,6 +649,8 @@ export function SettingsPage() {
                   )}
                   onSignedIn={() => {
                     sandbox.refresh()
+                    // A claude token set by hand is gone from the file now.
+                    load()
                     setNotice({
                       tone: 'warn',
                       text: t.sandboxSignedIn,

@@ -2114,6 +2114,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
           `SLACK_APP_TOKEN=${slack.appToken}`,
           `SLACK_BOT_TOKEN=${slack.botToken}`,
           `MENTION_ALLOWED_USERS=${alice.id}`,
+          // A claude token set by hand before, which the sandbox still reads
+          // while Claude is not signed in there
+          'SANDBOX_CLAUDE_OAUTH_TOKEN=sk-ant-oat01-e2e',
         ],
         env: {
           PACENOTE_VM_BIN: vm.BIN,
@@ -2126,18 +2129,6 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
       await page.evaluate("window.location.hash = '#/settings/sandbox'")
       await page.getByRole('radio', { name: /^Built-in sandbox/ }).click()
-      // A claude token instead of signing in there, under Advanced
-      await page
-        .locator('section')
-        .filter({ hasText: 'Reasoner login' })
-        .getByRole('button', { name: /^Advanced/ })
-        .click()
-      await enterSecret(
-        page,
-        'SANDBOX_CLAUDE_OAUTH_TOKEN',
-        'sk-ant-oat01-e2e',
-        'enter'
-      )
       // The built-in sandbox's choice says it is ready, beside the job that
       // sets it up; under the choices, what it has ready.
       const builtInChoice = page.locator('[data-choice="vm"]')
@@ -3395,6 +3386,57 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const reopened = await launch(world, { settings })
     await reopened.getByText(/Pace: Connected/).waitFor({ timeout: 30_000 })
     expect(desktopLog()).toMatch(/Opened right after quitting/)
+  })
+
+  it('removes a claude token set by hand once Claude is signed in inside the sandbox, and offers it no more', async () => {
+    world = await World.create()
+    const vmRoot = path.join(world.root, 'vm')
+    const options = {
+      settings: [
+        'REASONER_SANDBOX=vm',
+        'SANDBOX_CLAUDE_OAUTH_TOKEN=sk-ant-oat01-e2e',
+      ],
+      env: { PACENOTE_VM_ROOT: vmRoot },
+    }
+    const tokenRow = (page: Page) =>
+      page
+        .locator('section')
+        .filter({ hasText: 'Reasoner login' })
+        .locator('[data-setting="SANDBOX_CLAUDE_OAUTH_TOKEN"]')
+
+    // Not signed in there yet: the token is what Pace uses, so it stays, its
+    // row shows under Advanced, and the status asks you to sign in.
+    const before = await launch(world, options)
+    await before.evaluate("window.location.hash = '#/settings/sandbox'")
+    await before
+      .locator('section')
+      .filter({ hasText: 'Reasoner login' })
+      .getByRole('button', { name: /^Advanced/ })
+      .click()
+    await tokenRow(before).waitFor()
+    await before.getByText(/Uses the claude token set by hand/).waitFor()
+    expect(saved(world).SANDBOX_CLAUDE_OAUTH_TOKEN).toBe('sk-ant-oat01-e2e')
+    await app!.close()
+    app = undefined
+
+    // Claude signed in inside the sandbox since: its login folder holds the
+    // credentials file, which Pacenote only looks for.
+    mkdirSync(path.join(vmRoot, 'login/claude'), { recursive: true })
+    writeFileSync(path.join(vmRoot, 'login/claude/.credentials.json'), '{}')
+    const page = await launch(world, options)
+    // Gone from the file as the app starts, and the log says why
+    expect(saved(world).SANDBOX_CLAUDE_OAUTH_TOKEN).toBeUndefined()
+    expect(
+      readFileSync(path.join(world.home, 'logs/desktop.log'), 'utf8')
+    ).toMatch(
+      /Settings: sandbox\.claudeToken is removed: Claude is signed in inside the sandbox/
+    )
+    // Settings > Sandbox offers no claude token any more; the API key stays.
+    await page.evaluate("window.location.hash = '#/settings/sandbox'")
+    const login = page.locator('section').filter({ hasText: 'Reasoner login' })
+    await login.getByRole('button', { name: /^Advanced/ }).click()
+    await login.locator('[data-setting="SANDBOX_ANTHROPIC_API_KEY"]').waitFor()
+    expect(await tokenRow(page).count()).toBe(0)
   })
 
   it('keeps going when its screen will not load: it says why in the window, and loads it once it can', async () => {

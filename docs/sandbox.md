@@ -133,8 +133,11 @@ renews its login.
 
 Not signed in yet, Pace still starts, and the status bar says what to do. An Anthropic API key
 (`SANDBOX_ANTHROPIC_API_KEY`) works instead of signing in to Claude, and is checked with a call that uses no quota (the
-model list) when Pace starts and in Settings > Sandbox's status. A token from `claude setup-token` you run yourself
-(`sandbox.claudeToken`) is still read, after the sign-in. Pacenote never calls Anthropic's API with a claude.ai token.
+model list) when Pace starts and in Settings > Sandbox's status. A token from `claude setup-token` you set yourself
+(`sandbox.claudeToken`) is still read while Claude is not signed in there, and is going away: Settings > Sandbox's
+status asks you to sign in, and once Claude is signed in inside the sandbox Pacenote removes the token from
+`settings.json` (and from `.env.bak`), when you sign in and whenever the app starts. Its row in Settings shows only while
+a token is there. Pacenote never calls Anthropic's API with a claude.ai token.
 
 ## Before the built-in sandbox
 

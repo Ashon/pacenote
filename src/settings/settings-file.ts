@@ -244,6 +244,49 @@ export function moveEnvSettings(file: string): string[] {
 }
 
 /**
+ * Takes a claude token set by hand out of the settings once Claude is signed
+ * in inside the sandbox: Pace uses the sign-in first, so the token goes unused,
+ * and Pacenote keeps no claude.ai token it does not use. The old .env's backup
+ * (moveEnvSettings) loses it too. Returns a line for the log per change.
+ */
+export function dropClaudeToken(file: string, signedIn: boolean): string[] {
+  if (!signedIn) return []
+  const key = 'SANDBOX_CLAUDE_OAUTH_TOKEN'
+  const notes: string[] = []
+  if (existsSync(file)) {
+    const text = readFileSync(file, 'utf8')
+    let values: Record<string, string> = {}
+    try {
+      values = settingsValues(parseSettings(text))
+    } catch {
+      // Not JSON: the app says so where the file is shown
+    }
+    if (values[key]) {
+      writeSettingsFile(file, updateSettingsText(text, { [key]: null }))
+      notes.push(
+        `${settingName(key)} is removed: Claude is signed in inside the sandbox`
+      )
+    }
+  }
+  const backup = `${legacyEnvFile(file)}.bak`
+  if (existsSync(backup)) {
+    const text = readFileSync(backup, 'utf8')
+    const kept = text.replace(
+      new RegExp(
+        `^[ \\t]*(?:export[ \\t]+)?${key}[ \\t]*=.*(?:\\r?\\n|$)`,
+        'gm'
+      ),
+      ''
+    )
+    if (kept !== text) {
+      writeSettingsFile(backup, kept)
+      notes.push(`${key} is removed from ${path.basename(backup)}`)
+    }
+  }
+  return notes
+}
+
+/**
  * Brings a settings file an earlier version wrote up to date, once. Write
  * switches for the connections came in v0.6.5: a connection already set up
  * keeps writing as it did (draft PRs, Jira issues and comments), and one set

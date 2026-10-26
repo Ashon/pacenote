@@ -82,7 +82,7 @@ Each table is one group of the file. Select values are in the last column; the S
 | `sandbox.runIn` | `REASONER_SANDBOX` | `none` | Run environment: `vm` (built-in sandbox) or `none` (on this Mac) |
 | `sandbox.memory` | `SANDBOX_MEMORY` | `2g` | Memory limit |
 | `sandbox.cpus` | `SANDBOX_CPUS` | `2` | CPU limit |
-| `sandbox.claudeToken` | `SANDBOX_CLAUDE_OAUTH_TOKEN` | | claude token from `claude setup-token`, instead of signing in (advanced) |
+| `sandbox.claudeToken` | `SANDBOX_CLAUDE_OAUTH_TOKEN` | | claude token from `claude setup-token`, read only while Claude is not signed in inside the sandbox, and removed once it is; going away (advanced, shown only while set) |
 | `sandbox.anthropicApiKey` | `SANDBOX_ANTHROPIC_API_KEY` | | Anthropic API key, instead of signing in (advanced) |
 
 ### ops

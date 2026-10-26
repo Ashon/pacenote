@@ -11,7 +11,7 @@ const en = {
   /** name: Claude or Codex */
   notSignedIn: (name: string) => `Not signed in: Sign in to ${name} below`,
   usesToken:
-    'Uses the claude token set by hand: signing in to Claude below replaces it',
+    'Uses the claude token set by hand, which is going away: sign in to Claude below, and Pacenote then removes the token',
   keyRejected:
     'The Anthropic API key is rejected: sign in to Claude below, or set another key',
   usesKey: 'Uses the Anthropic API key',
@@ -50,7 +50,7 @@ const ko: typeof en = {
   signedIn: '샌드박스 안에서 로그인됨',
   notSignedIn: (name) => `로그인 안 됨: 아래에서 ${name}에 로그인하세요`,
   usesToken:
-    '직접 설정한 claude 토큰을 써요. 아래에서 Claude에 로그인하면 로그인으로 바뀌어요',
+    '직접 설정한 claude 토큰을 써요. 이 토큰은 곧 없어지니 아래에서 Claude에 로그인하세요. 로그인하면 Pacenote가 토큰을 지워요',
   keyRejected:
     'Anthropic API 키가 거부됐어요. 아래에서 Claude에 로그인하거나 다른 키를 설정하세요',
   usesKey: 'Anthropic API 키를 써요',

@@ -18,6 +18,7 @@ import {
   readEnvValues,
 } from '../src/settings/env-file.js'
 import {
+  dropClaudeToken,
   moveEnvSettings,
   parseSettings,
   readSettingsValues,
@@ -195,6 +196,51 @@ FAKE_CLAUDE_DIR='/tmp/a b'
     expect(moveEnvSettings(path.join(root, 'none', 'settings.json'))).toEqual(
       []
     )
+  })
+
+  it('removes a claude token set by hand once Claude is signed in inside the sandbox', () => {
+    const home = mkdtempSync(path.join(root, 'token-'))
+    const file = path.join(home, 'settings.json')
+    const backup = path.join(home, '.env.bak')
+    writeFileSync(
+      file,
+      settingsText({
+        REASONER: 'claude',
+        SANDBOX_CLAUDE_OAUTH_TOKEN: 'sk-ant-oat01-x',
+        SANDBOX_ANTHROPIC_API_KEY: 'sk-ant-api03-y',
+      })
+    )
+    writeFileSync(
+      backup,
+      'SLACK_BOT_TOKEN=xoxb-1\nexport SANDBOX_CLAUDE_OAUTH_TOKEN=sk-ant-oat01-old\nTASKS=on\n',
+      { mode: 0o600 }
+    )
+    // Not signed in there: the token is what Pace uses, so it stays.
+    expect(dropClaudeToken(file, false)).toEqual([])
+    expect(readSettingsValues(file).SANDBOX_CLAUDE_OAUTH_TOKEN).toBe(
+      'sk-ant-oat01-x'
+    )
+    expect(dropClaudeToken(file, true)).toEqual([
+      'sandbox.claudeToken is removed: Claude is signed in inside the sandbox',
+      'SANDBOX_CLAUDE_OAUTH_TOKEN is removed from .env.bak',
+    ])
+    // The rest stays, the API key too, and both files stay to this account.
+    expect(readSettingsValues(file)).toEqual({
+      REASONER: 'claude',
+      SANDBOX_ANTHROPIC_API_KEY: 'sk-ant-api03-y',
+    })
+    expect(readFileSync(backup, 'utf8')).toBe(
+      'SLACK_BOT_TOKEN=xoxb-1\nTASKS=on\n'
+    )
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    expect(statSync(backup).mode & 0o777).toBe(0o600)
+    // Nothing left to remove, and nothing where there is no file or no JSON
+    expect(dropClaudeToken(file, true)).toEqual([])
+    expect(
+      dropClaudeToken(path.join(root, 'none', 'settings.json'), true)
+    ).toEqual([])
+    writeFileSync(file, '{ not json')
+    expect(dropClaudeToken(file, true)).toEqual([])
   })
 
   it('keeps a connection set up before Write had a switch writing, once', () => {

@@ -224,7 +224,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   SANDBOX_CLAUDE_OAUTH_TOKEN: {
     label: 'claude 토큰',
-    help: '샌드박스에서 Claude에 로그인하는 대신 쓰는 claude setup-token의 토큰이에요. 보통은 로그인을 써요.',
+    help: '샌드박스가 Claude에 직접 로그인하기 전에 손으로 넣던 claude setup-token의 토큰이에요. 샌드박스에서 Claude에 로그인하면 로그인으로 바뀌고, Pacenote가 이 토큰을 지워요.',
   },
   SANDBOX_ANTHROPIC_API_KEY: {
     label: 'Anthropic API 키',

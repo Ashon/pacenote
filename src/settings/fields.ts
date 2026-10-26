@@ -128,6 +128,12 @@ export interface SettingField {
    * sets it some other way (e.g. hub pairing)
    */
   internal?: boolean
+  /**
+   * Going away: shown only while the file still has a value, so it is no
+   * longer offered to set (e.g. the claude token, which signing in inside the
+   * sandbox replaces)
+   */
+  retiring?: boolean
 }
 
 export interface SettingGroupInfo {
@@ -526,9 +532,10 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'sandbox.claudeToken',
     group: 'credentials',
     label: 'claude token',
-    help: 'A token from claude setup-token, for the sandbox instead of signing in to Claude there. Signing in is the usual way.',
+    help: 'A token from claude setup-token, set by hand before the sandbox could sign in to Claude itself. Signing in to Claude there replaces it, and Pacenote then removes it.',
     type: 'secret',
     advanced: true,
+    retiring: true,
     shownWhen: { key: 'REASONER', equals: 'claude' },
   },
   {

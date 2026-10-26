@@ -42,8 +42,9 @@ import {
   securePrivateDir,
   securePrivateFile,
 } from '../../../src/settings/home.js'
-import { settingsFilePath } from '../../../src/settings/paths.js'
+import { settingsFilePath, vmRootPath } from '../../../src/settings/paths.js'
 import {
+  dropClaudeToken,
   moveEnvSettings,
   upgradeSettings,
   readSettingsValues,
@@ -224,6 +225,7 @@ import {
 import { hostEnv } from '../../../src/sandbox/host.js'
 import { runProcess } from '../../../src/sandbox/process.js'
 import { vmUnsupported } from '../../../src/sandbox/vm.js'
+import { signedIn } from '../../../src/sandbox/vm-login.js'
 
 /**
  * Pacenote desktop app. Runs and manages Pace (the bot) (Slack Socket Mode) as
@@ -262,7 +264,8 @@ securePrivateDir(path.dirname(settingsFile))
  * An earlier version's .env becomes settings.json, once, before anything reads
  * it; logged once the log is open. Settings that changed meaning are rewritten
  * as Pace reads them now, and those an earlier version left out are filled in
- * as it worked (upgradeSettings).
+ * as it worked (upgradeSettings). A claude token set by hand goes once Claude
+ * is signed in inside the sandbox (dropClaudeToken).
  */
 const moved = (() => {
   try {
@@ -270,6 +273,10 @@ const moved = (() => {
       notes: [
         ...moveEnvSettings(settingsFile),
         ...upgradeSettings(settingsFile),
+        ...dropClaudeToken(
+          settingsFile,
+          signedIn(vmRootPath(process.env), 'claude')
+        ),
       ],
     }
   } catch (err) {
@@ -2265,11 +2272,19 @@ function registerBotIpc(): void {
   handle('pacenote:sandbox:save-allowlist', [], (domains) =>
     sandbox.saveAllowlist(domains)
   )
-  ipcMain.handle('pacenote:sandbox:login', (event, cli: unknown) =>
-    fromMainWindow(event)
-      ? sandboxSignIn.run(cli)
-      : { ok: false, error: localized(text).notAllowed }
-  )
+  ipcMain.handle('pacenote:sandbox:login', async (event, cli: unknown) => {
+    if (!fromMainWindow(event))
+      return { ok: false, error: localized(text).notAllowed }
+    const result = await sandboxSignIn.run(cli)
+    // Signed in to Claude: a claude token set by hand goes unused, so it goes.
+    if (result.ok && cli === 'claude')
+      for (const note of dropClaudeToken(
+        settingsFile,
+        signedIn(vmRootPath(process.env), 'claude')
+      ))
+        log.info(`Settings: ${note}`)
+    return result
+  })
   handle('pacenote:sandbox:login-code', undefined, (code) => {
     sandboxSignIn.submit(code)
   })
