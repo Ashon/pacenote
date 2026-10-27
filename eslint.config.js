@@ -15,6 +15,8 @@ export default tseslint.config(
       'coverage/',
       'release/',
       'data/',
+      // pacenote.dev as built (pnpm site:build)
+      '_site/',
     ],
   },
   eslint.configs.recommended,

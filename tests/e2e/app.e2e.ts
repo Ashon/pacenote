@@ -53,6 +53,30 @@ const ELECTRON = createRequire(path.join(REPO, 'apps/desktop/package.json'))(
 
 let world: World | undefined
 let app: ElectronApplication | undefined
+/**
+ * A screen for pacenote.dev's guide and news (site/shots/<lang>/<name>.png),
+ * in English and in Korean, when E2E_SITE_SHOTS=1 (pnpm site:shots). The app
+ * goes back to the language it had.
+ */
+async function siteShot(page: Page, name: string) {
+  if (!process.env.E2E_SITE_SHOTS) return
+  const language = async (preference: string, lang: string) => {
+    await page.evaluate(
+      `window.pacenoteDesktop.language.set(${JSON.stringify(preference)})`
+    )
+    await page.waitForFunction(`document.documentElement.lang === '${lang}'`)
+  }
+  for (const lang of ['en', 'ko']) {
+    await language(lang, lang)
+    // The screen in its new words, settled
+    await page.waitForTimeout(600)
+    const file = path.join(REPO, 'site/shots', lang, `${name}.png`)
+    mkdirSync(path.dirname(file), { recursive: true })
+    await page.screenshot({ path: file })
+  }
+  await language('system', 'en')
+}
+
 afterEach(async (context) => {
   // A failed step leaves a screenshot of the window behind (the path is in the
   // error output).
@@ -552,6 +576,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.screenshot({
       path: path.join(REPO, 'test-results/hub-share.png'),
     })
+    await siteShot(page, 'messengers-hub')
   })
 
   it("opens in macOS's language, and changes language from Settings at once", async () => {
@@ -602,6 +627,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     const services = page.getByRole('radiogroup', { name: 'AI service' })
     await services.getByText('Signed in').waitFor()
     await services.getByText('Not on this Mac').waitFor()
+    await siteShot(page, 'setup-start')
     await page.getByRole('button', { name: 'Use Claude' }).click()
 
     // 2. Where it runs: this Mac, as its settings say.
@@ -709,6 +735,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('heading', { name: 'Review and start Pace' }).waitFor()
     await page.getByText(`Through the hub at ${url}`).waitFor()
     await page.getByText('@alice', { exact: true }).waitFor()
+    await siteShot(page, 'setup-hub')
     expect(
       await page.evaluate('window.pacenoteDesktop.bot.state()')
     ).toMatchObject({
@@ -1117,6 +1144,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-open.png'),
     })
+    await siteShot(page, 'todo')
 
     // Continuing it opens the same session again: the terminal icon, named
     // in its tooltip.

@@ -34,5 +34,6 @@ data/
 test-results/
 coverage/
 
-# pacenote.dev pictures, copied in by the pages workflow
+# pacenote.dev as published (pnpm site:build), and the pictures it copies in
+_site/
 site/media/

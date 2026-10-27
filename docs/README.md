@@ -18,4 +18,6 @@ Start with the [project README](../README.md) for what Pacenote is and how to in
 - [Settings file](settings.md): `~/.pacenote/settings.json`, every setting's place, and environment variables over it
 - [Desktop app](desktop-app.md): the app's screens, bot management, settings, sandbox controls, packaging
 - [Development](development.md): checks, end-to-end tests and coverage, adding a messenger
-- [Releases](releases): release notes
+- [Releases](releases): release notes, with their Korean in `releases/ko` from v0.6.11
+- [Guide](guide) and [news](news): pacenote.dev's guide and feature posts in English and Korean, made into pages with
+  the release notes ([Development](development.md#pacenotedev))

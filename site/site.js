@@ -152,6 +152,21 @@ if (join) {
   }
 }
 
+// News: the kind buttons show features, releases or both.
+for (const filter of document.querySelectorAll('.news-filter')) {
+  const buttons = filter.querySelectorAll('[data-news-filter]')
+  const section = filter.closest('section')
+  for (const button of buttons) {
+    button.addEventListener('click', () => {
+      const kind = button.dataset.newsFilter
+      for (const other of buttons)
+        other.setAttribute('aria-pressed', String(other === button))
+      for (const item of section.querySelectorAll('[data-kind]'))
+        item.hidden = kind !== 'all' && item.dataset.kind !== kind
+    })
+  }
+}
+
 /** The hub a join link names after its #: an http or https address, or none */
 function linkedHub(hash) {
   const value = new URLSearchParams(hash.slice(1))

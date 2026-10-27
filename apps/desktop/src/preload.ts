@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     initial: ipcRenderer.sendSync('pacenote:app:language') as unknown,
     set: (preference: string) =>
       ipcRenderer.invoke('pacenote:app:set-language', preference),
+    onChanged: subscribe<unknown>('pacenote:app:language-changed'),
   },
   // The error screen tells the app's log what broke.
   reportError: (report: { message: string; stack?: string }) =>

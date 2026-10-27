@@ -4,6 +4,7 @@ import {
   createElement,
   Fragment,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from 'react'
@@ -78,6 +79,20 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setState(apply(next))
     void queryClient.invalidateQueries()
   }
+  // Set from elsewhere, as the end-to-end tests do: the same, from the top
+  useEffect(
+    () =>
+      window.pacenoteDesktop?.language.onChanged?.((next) => {
+        if (!isLocale(next?.locale)) return
+        setState((current) =>
+          current.locale === next.locale &&
+          current.preference === next.preference
+            ? current
+            : apply(next)
+        )
+      }),
+    []
+  )
   return createElement(
     LanguageContext.Provider,
     { value: { ...state, setPreference } },

@@ -1,11 +1,14 @@
 <!doctype html>
 <!--
-  pacenote.dev, plain HTML and CSS with no build step: this page, how-it-works/, privacy/ and
-  install/, which share the header, the footer, style.css and site.js (tests/site.test.ts holds the
-  nav and the links together). The app's pictures are not kept here: the Pages workflow
-  (.github/workflows/pages.yml) copies the mark into media/ from assets. Screens of the app are drawn
-  in HTML (the av-* styles, icons.svg from scripts/site-icons.mjs), not pictures. To preview, run that workflow's "stage" step from
-  the repository root and serve site/ over http (python3 -m http.server -d site).
+  pacenote.dev: this page, how-it-works/, privacy/ and install/, plain HTML and CSS, which share the
+  header, the footer, style.css and site.js. The guide and the news are made from markdown in docs/guide
+  and docs/news, and from the release notes, by scripts/site-pages.mjs, in install/'s header and footer;
+  it also writes the sitemap, the feeds and the home pages' link to the latest news, and copies the mark
+  into media/ from assets. The Pages workflow (.github/workflows/pages.yml) runs it, and
+  tests/site.test.ts builds the site the same way to hold the nav and the links together. Screens of
+  the app are drawn in HTML here (the av-* styles, icons.svg from scripts/site-icons.mjs); the guide's
+  are the e2e tests' screenshots in shots/ (pnpm site:shots). To preview, run pnpm site:build and serve
+  _site/ over http (python3 -m http.server -d _site).
 
   ko/ has the same four pages in Korean, in the same markup, with the app's Korean words (docs/i18n.md); site.js picks its
   own words by <html lang>. Each page names its counterpart (hreflang) and links to it from the header. join/, in both
@@ -53,9 +56,10 @@
     </a>
     <nav aria-label="Pages">
       <a href="how-it-works/">How it works</a>
+      <a href="guide/">Guide</a>
+      <a href="news/">News</a>
       <a href="privacy/">Privacy</a>
       <a href="install/">Install</a>
-      <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
       <a class="lang" href="ko/" lang="ko" hreflang="ko">한국어</a>
       <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
     </nav>
@@ -241,6 +245,9 @@
   <footer class="status">
     <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote is made by one person and offered as is.</p>
     <nav aria-label="Project">
+      <a href="guide/">Guide</a>
+      <a href="news/">News</a>
+      <a href="feed.xml">RSS</a>
       <a href="privacy/">Privacy</a>
       <a href="https://github.com/Ashon/pacenote">GitHub</a>
       <a href="https://github.com/Ashon/pacenote/tree/main/docs">Docs</a>

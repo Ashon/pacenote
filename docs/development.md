@@ -6,6 +6,7 @@ pnpm test
 pnpm test:e2e       # end-to-end: the bot and the hub against a fake Slack, claude and codex (about 15 s)
 pnpm test:e2e:coverage  # the same, with the bot's and the hub's coverage (coverage/e2e/index.html)
 pnpm test:e2e:app   # end-to-end through the desktop app's window (builds first; opens a window)
+pnpm site:build     # pacenote.dev into _site/, with the guide and the news
 ```
 
 ## Code style
@@ -48,6 +49,28 @@ CI (`.github/workflows/ci.yml`) runs `pnpm check` and `pnpm test:e2e:coverage` o
 request, puts the coverage per folder in the job summary, and keeps the report as the `e2e-coverage` artifact. On
 main it also updates the coverage badge above (the `badges` branch). The app test runs on a macOS runner when the
 workflow is started by hand.
+
+## pacenote.dev
+
+`site/` holds the hand-written pages. `scripts/site-pages.mjs` (`pnpm site:build`) copies them into `_site/` and adds the
+pages it makes from markdown, in the header and footer of `install/` in each language:
+
+- **The guide**, from `docs/guide/en` and `docs/guide/ko`: one file per page, the same names in both languages, with
+  front matter: `title`, `summary`, `kind` (`start` for a walkthrough, `screen` for a screen of the app), `order` and
+  `shot`. Links to `guide:<page>` go to another page of the guide, and relative links to files in the repository go to
+  GitHub.
+- **The news**, from feature posts in `docs/news/en` and `docs/news/ko` (front matter: `title`, `summary`, and the
+  `version` it comes with, or a `date`) and the release notes in `docs/releases`. Only released versions show: the
+  Pages workflow passes GitHub's releases, and a local build takes the repository's tags. From v0.6.11, each release
+  note has its Korean in `docs/releases/ko`, and the build stops without it; older ones show in English on the Korean
+  news, marked EN.
+- The sitemap, an Atom feed per language (`feed.xml`, `ko/feed.xml`), and the home pages' link to the latest news.
+
+Its markdown is the small part these pages use: `##` and `###` headings, paragraphs, `-` and `1.` lists, `code`,
+**bold**, links, ```` ```sh ```` blocks (a command with a Copy button), and `![...](shot:<name>)` on a line of its own:
+the app's screen from `site/shots/<lang>/<name>.png`. Those are taken by the app's end-to-end tests, at `siteShot`
+points, in English and in Korean: `pnpm site:shots` runs them and writes the pictures. `tests/site.test.ts` builds the
+site and checks it.
 
 ## Adding a messenger
 

@@ -1,17 +1,21 @@
 name: pages
 
-# pacenote.dev: site/ published to GitHub Pages, with the custom domain set in the repository's Pages
-# settings (build_type workflow, so no CNAME file is needed).
+# pacenote.dev: site/ and the pages scripts/site-pages.mjs makes from docs/ (the guide, the news), published to GitHub
+# Pages, with the custom domain set in the repository's Pages settings (build_type workflow, so no CNAME file is needed).
 on:
   push:
     branches: [main]
     paths:
       - 'site/**'
+      - 'docs/guide/**'
+      - 'docs/news/**'
+      - 'docs/releases/**'
+      - 'scripts/site-pages.mjs'
       - 'assets/pacenote-mark.svg'
       - '.github/workflows/pages.yml'
-  # The release link above the headline names the latest release. Releases are published with the maintainer's own gh, so
-  # the release event does reach this workflow. It runs on the release's tag, which the github-pages environment does not
-  # deploy from, so it only starts this workflow again on main (relay below).
+  # The news lists only released versions, and the link above the headline names the latest. Releases are published with
+  # the maintainer's own gh, so the release event does reach this workflow. It runs on the release's tag, which the
+  # github-pages environment does not deploy from, so it only starts this workflow again on main (relay below).
   release:
     types: [published]
   workflow_dispatch:
@@ -47,32 +51,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The mark has one home, beside the app's other assets; the site gets a copy.
-      - name: stage
-        run: |
-          set -euo pipefail
-          mkdir -p site/media
-          cp assets/pacenote-mark.svg site/media/
-      - name: stamp the latest release
+      # site/ with the guide and the news made from markdown, the sitemap and the feeds, in _site. The news lists what
+      # is released, as GitHub's releases say, and the home pages link to the latest of it.
+      - name: build
         env:
           # Authenticated: an anonymous call from a runner shares its rate limit with every other runner on that IP
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)
-          test -n "$version" || { echo "could not read the latest release tag" >&2; exit 1; }
-          # Each home page's link, in its language: the English one and the Korean one in ko/
-          stamp() {
-            local page=$1 words=$2
-            test "$(grep -c 'id="release-link"' "$page")" -eq 1 || { echo "expected one release-link in $page" >&2; exit 1; }
-            sed -i -E "s|(<a class=\"release\" id=\"release-link\" href=\")[^\"]*(\">)[^<]*</a>|\1https://github.com/${{ github.repository }}/releases/tag/${version}\2${words}</a>|" "$page"
-            grep -o '<a class="release" id="release-link"[^<]*</a>' "$page" | grep -F "$words"
-          }
-          stamp site/index.html "What's new in ${version}"
-          stamp site/ko/index.html "${version}에서 달라진 점"
+          gh api "repos/${{ github.repository }}/releases?per_page=100" --paginate \
+            --jq '.[] | {tag: .tag_name, date: .published_at, draft, prerelease} | tojson' >"$RUNNER_TEMP/releases.jsonl"
+          test -s "$RUNNER_TEMP/releases.jsonl" || { echo "could not read the releases" >&2; exit 1; }
+          node scripts/site-pages.mjs --out _site --releases "$RUNNER_TEMP/releases.jsonl"
+          grep -o '<a class="release" id="release-link"[^<]*</a>' _site/index.html _site/ko/index.html
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

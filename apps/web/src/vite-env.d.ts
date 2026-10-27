@@ -77,6 +77,8 @@ declare global {
       language: {
         initial: LanguageState
         set(preference: LanguagePreference): Promise<LanguageState>
+        /** The language set, from here or elsewhere */
+        onChanged(callback: (state: LanguageState) => void): () => void
       }
       /** Writes a screen's render error to the app's log */
       reportError(report: { message: string; stack?: string }): Promise<void>

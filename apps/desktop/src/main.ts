@@ -1198,6 +1198,8 @@ function registerBotIpc(): void {
     setAppMenu(appName)
     lastTrayKey = ''
     updateTray()
+    // The window takes it wherever it was set, as the end-to-end tests do
+    mainWindow?.webContents.send('pacenote:app:language-changed', language)
     return language
   })
   // Settings > Macs: your Macs, and where Pace answers
