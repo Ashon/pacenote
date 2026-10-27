@@ -36,6 +36,8 @@ const REPO_URL = 'https://github.com/Ashon/pacenote'
 const KO_NOTES_FROM = '0.6.11'
 /** News rows on a list page; older releases are on GitHub */
 const LIST_LIMIT = 30
+/** The latest news beside a news page */
+const RECENT_LIMIT = 8
 const FEED_LIMIT = 20
 
 const LANGS = /** @type {const} */ (['en', 'ko'])
@@ -66,6 +68,7 @@ const TEXT = {
       `New features and release notes in one place. Updating is always ${command}.`,
     newsDescription: "What's new in Pacenote: new features and release notes.",
     subscribe: 'Subscribe with RSS',
+    recent: 'Recent news',
     filter: 'Kind',
     all: 'All',
     posts: 'Features',
@@ -111,6 +114,7 @@ const TEXT = {
       `새 기능 이야기와 릴리스 노트를 한곳에서. 업데이트는 언제나 ${command}.`,
     newsDescription: 'Pacenote의 새 기능과 릴리스 노트.',
     subscribe: 'RSS로 구독',
+    recent: '최근 소식',
     filter: '종류',
     all: '전체',
     posts: '새 기능',
@@ -505,6 +509,7 @@ export function buildSite({ root, out, releases }) {
             lang,
             at: row.at,
             row,
+            rows,
             older: own[n + 1],
             newer: own[n - 1],
           }),
@@ -884,8 +889,9 @@ ${renderMarkdown(p.body, markdownFor({ lang, at, source: p.source }))}
 
 function newsIndex({ lang, at, rows }) {
   const t = TEXT[lang]
+  // The latest feature post leads, in a card of its own; the list has the rest
   const featured = rows.find((row) => row.kind === 'post')
-  const list = rows.slice(0, LIST_LIMIT)
+  const list = rows.filter((row) => row !== featured).slice(0, LIST_LIMIT)
   const command = `<code>${esc('brew upgrade --cask pacenote')}</code>`
   const href = (row) => relative(at, row.at)
   return `    <div class="page-head news-head">
@@ -897,7 +903,7 @@ function newsIndex({ lang, at, rows }) {
     </div>
 
     <div class="surface">
-      <section class="block">
+      <section class="block news-block">
         <div class="news-filter" role="group" aria-label="${esc(t.filter)}">
           <button type="button" data-news-filter="all" aria-pressed="true">${esc(t.all)}</button>
           <button type="button" data-news-filter="post" aria-pressed="false">${esc(t.posts)}</button>
@@ -933,30 +939,39 @@ ${list
     </div>`
 }
 
-function newsPage({ lang, at, row, older, newer }) {
+function newsPage({ lang, at, row, rows, older, newer }) {
   const t = TEXT[lang]
   const md = markdownFor({ lang, at, source: row.source })
   const meta = [row.version && `v${row.version}`, t.date(row.date)].filter(
     Boolean
   )
-  return `    <article class="news-article">
-      <p class="crumb"><a href="${relative(at, `${DIR[lang]}news/`)}">${esc(t.news)}</a> › ${esc(row.label)}</p>
-      <p class="news-meta"><span class="badge badge-${row.kind}">${esc(row.label)}</span>${esc(meta.join(' · '))}</p>
-      <h1>${esc(row.title)}</h1>
-      <p class="lede">${esc(row.summary)}</p>
+  const recent = rows.slice(0, RECENT_LIMIT)
+  // In the guide's frame: the latest news beside it, as the guide's contents
+  return `    <div class="guide">
+      <nav class="guide-nav news-nav" aria-label="${esc(t.recent)}">
+        <a class="guide-nav-home" href="${relative(at, `${DIR[lang]}news/`)}">${esc(t.news)}</a>
+        <p class="guide-nav-group">${esc(t.recent)}</p>
+${recent.map((q) => `        <a href="${relative(at, q.at)}"${q.at === row.at ? ' aria-current="page"' : ''}${q.english ? ' hreflang="en"' : ''}>${esc(q.title)}<span class="news-nav-date">${esc(t.date(q.date))}</span></a>`).join('\n')}
+        <a class="news-nav-feed" href="${relative(at, `${DIR[lang]}feed.xml`)}">${esc(t.subscribe)}</a>
+      </nav>
+
+      <article class="guide-page news-article">
+        <p class="crumb"><a href="${relative(at, `${DIR[lang]}news/`)}">${esc(t.news)}</a> › ${esc(row.label)}</p>
+        <p class="news-meta"><span class="badge badge-${row.kind}">${esc(row.label)}</span>${esc(meta.join(' · '))}</p>
+        <h1>${esc(row.title)}</h1>
+        <p class="lede">${esc(row.summary)}</p>
 ${row.shot ? md.shot(row.shot, row.title) : ''}
-      <div class="surface">
-        <div class="block prose">
+        <div class="prose">
 ${renderMarkdown(row.body, md)}
 ${row.kind === 'post' ? `<h2>${esc(t.update)}</h2>\n${md.command(UPDATE_COMMAND)}` : ''}
         </div>
-      </div>
-      <nav class="pager" aria-label="${esc(t.news)}">
-        ${older ? `<a href="${relative(at, older.at)}">← ${esc(older.title)}</a>` : '<span></span>'}
-        <a class="edit" href="${relative(at, `${DIR[lang]}feed.xml`)}">RSS</a>
-        ${newer ? `<a href="${relative(at, newer.at)}">${esc(newer.title)} →</a>` : '<span></span>'}
-      </nav>
-    </article>`
+        <nav class="pager" aria-label="${esc(t.news)}">
+          ${older ? `<a href="${relative(at, older.at)}">← ${esc(older.title)}</a>` : '<span></span>'}
+          <a class="edit" href="${relative(at, `${DIR[lang]}feed.xml`)}">RSS</a>
+          ${newer ? `<a href="${relative(at, newer.at)}">${esc(newer.title)} →</a>` : '<span></span>'}
+        </nav>
+      </article>
+    </div>`
 }
 
 /** An Atom feed of a language's news */

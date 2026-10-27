@@ -365,14 +365,18 @@ describe('the news', () => {
     )
 
   it("lists feature posts and released versions' notes, newest first", () => {
-    expect(rows('news/').slice(0, 3)).toEqual([
-      'post share-your-hub/',
+    // The latest post leads in a card of its own, and the list has the rest
+    for (const dir of ['', 'ko/'])
+      expect(read(`${dir}news/`)).toContain(
+        '<a class="news-featured" href="share-your-hub/" data-kind="post">'
+      )
+    expect(rows('news/').slice(0, 2)).toEqual([
       'release v0.6.11/',
       'release v0.6.10/',
     ])
+    expect(rows('news/')).not.toContain('post share-your-hub/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 3)).toEqual([
-      'post share-your-hub/',
+    expect(rows('ko/news/').slice(0, 2)).toEqual([
       'release v0.6.11/',
       'release ../../news/v0.6.10/',
     ])
@@ -381,6 +385,26 @@ describe('the news', () => {
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
     expect(EVERY).not.toContain('news/v0.6.12/')
+  })
+
+  it('shows the latest news beside a news page, marking the one open', () => {
+    const recent = (page: string) =>
+      [
+        ...read(page).matchAll(
+          /<a href="([^"]+)"( aria-current="page")?[^>]*>[^<]*<span class="news-nav-date">/g
+        ),
+      ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
+    expect(recent('news/v0.6.11/').slice(0, 3)).toEqual([
+      '../share-your-hub/',
+      './ *',
+      '../v0.6.10/',
+    ])
+    // The Korean rail has the English notes too, as the Korean list has
+    expect(recent('ko/news/share-your-hub/').slice(0, 3)).toEqual([
+      './ *',
+      '../v0.6.11/',
+      '../../../news/v0.6.10/',
+    ])
   })
 
   it("points the home page's link at the latest news", () => {
