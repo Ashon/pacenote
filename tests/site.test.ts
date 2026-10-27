@@ -8,18 +8,26 @@ import { describe, expect, it } from 'vitest'
  * ko/. This holds them together: the same nav on every page of a language,
  * every link inside the site landing on a page, a picture or an anchor that
  * is there, the home page's claims the same as the privacy page's headings,
- * and each page naming its counterpart in the other language.
+ * and each page naming its counterpart in the other language. The join page,
+ * which a teammate's share link to a team hub opens, shares the header and the
+ * footer but stays out of the sitemap, search and the visit count.
  */
 const SITE = path.resolve(__dirname, '../site')
 const ORIGIN = 'https://pacenote.dev/'
 const PAGES = ['', 'how-it-works/', 'privacy/', 'install/']
+/** Pages only a link leads to: in neither the nav nor the sitemap */
+const UNLISTED = ['join/']
 /** Where each language's pages are, and what the page says it is in */
 const LANGUAGES = [
   { lang: 'en', dir: '', locale: 'en_US' },
   { lang: 'ko', dir: 'ko/', locale: 'ko_KR' },
 ]
-/** Every page, as a site path: '' and 'ko/' for the home pages */
+/** Every listed page, as a site path: '' and 'ko/' for the home pages */
 const ALL = LANGUAGES.flatMap(({ dir }) => PAGES.map((page) => dir + page))
+/** Every page, the unlisted ones too */
+const EVERY = LANGUAGES.flatMap(({ dir }) =>
+  [...PAGES, ...UNLISTED].map((page) => dir + page)
+)
 
 /** Where the Pages workflow copies each picture in media/ from */
 const MEDIA: Record<string, string> = {
@@ -73,16 +81,17 @@ describe('pacenote.dev', () => {
   it.each(LANGUAGES)(
     'has the same nav and footer on every $lang page, marking the one you are on',
     ({ dir }) => {
-      const navs = PAGES.map((page) => {
+      const pages = [...PAGES, ...UNLISTED]
+      const navs = pages.map((page) => {
         const at = dir + page
         const nav = header(at).replace(LANGUAGE_LINK, '')
         const current = [...nav.matchAll(/href="([^"]+)" aria-current="page"/g)]
         expect(current.map(([, href]) => resolve(at, href!))).toEqual(
-          page ? [at] : []
+          PAGES.includes(page) && page ? [at] : []
         )
         return links(at, nav)
       })
-      const footers = PAGES.map((page) =>
+      const footers = pages.map((page) =>
         links(dir + page, between(read(dir + page), /<footer/, '</footer>'))
       )
       for (const nav of navs) expect(nav).toEqual(navs[0])
@@ -93,14 +102,14 @@ describe('pacenote.dev', () => {
   it("names the copyright holder NOTICE names, on every page's footer", () => {
     const notice = readFileSync(path.resolve(SITE, '../NOTICE'), 'utf8')
     const [, year, holder] = notice.match(/^Copyright (\d{4}) (.+)$/m)!
-    for (const page of ALL) {
+    for (const page of EVERY) {
       const footer = between(read(page), /<footer/, '</footer>')
       expect(footer, page || 'home').toContain(`© ${year} ${holder}.`)
     }
   })
 
   it('links only to pages, pictures and anchors that are there', () => {
-    for (const page of ALL) {
+    for (const page of EVERY) {
       const html = read(page)
       const srcs = [...html.matchAll(/(?:src|srcset|href)="([^"]+)"/g)].map(
         ([, ref]) => ref!
@@ -142,14 +151,19 @@ describe('pacenote.dev', () => {
     }
   )
 
-  it.each(PAGES.map((page) => ({ page: page || 'home', path: page })))(
+  it.each(
+    [...PAGES, ...UNLISTED].map((page) => ({
+      page: page || 'home',
+      path: page,
+    }))
+  )(
     'has $page in both languages, each naming and linking to the other',
     ({ path: page }) => {
       for (const { lang, dir, locale } of LANGUAGES) {
         const at = dir + page
         const html = read(at)
         const head = between(html, /<head>/, '</head>')
-        expect(html, at).toContain(`<html lang="${lang}">`)
+        expect(html, at).toMatch(new RegExp(`<html lang="${lang}"[ >]`))
         expect(head).toContain(`<link rel="canonical" href="${ORIGIN}${at}">`)
         expect(head).toContain(
           `<meta property="og:url" content="${ORIGIN}${at}">`
@@ -205,6 +219,32 @@ describe('pacenote.dev', () => {
     }
     expect(readFileSync(path.join(SITE, 'robots.txt'), 'utf8')).toContain(
       `Sitemap: ${ORIGIN}sitemap.xml`
+    )
+  })
+
+  it.each(LANGUAGES)(
+    'keeps the $lang join page out of search, the sitemap and the visit count',
+    ({ dir }) => {
+      const html = read(`${dir}join/`)
+      expect(html).toContain('data-analytics="off"')
+      expect(between(html, /<head>/, '</head>')).toContain(
+        '<meta name="robots" content="noindex">'
+      )
+      const sitemap = readFileSync(path.join(SITE, 'sitemap.xml'), 'utf8')
+      expect(sitemap).not.toContain(`${ORIGIN}${dir}join/`)
+      // What site.js fills in and shows
+      for (const hook of ['data-join', 'data-join-hub', 'data-join-none'])
+        expect(html).toContain(hook)
+      for (const id of ['join-open', 'join-address'])
+        expect(ids(html).has(id), id).toBe(true)
+    }
+  )
+
+  it('counts no visit on a page marked data-analytics="off"', () => {
+    const script = readFileSync(path.join(SITE, 'site.js'), 'utf8')
+    const guard = between(script, /const ANALYTICS_ID/, 'window.dataLayer')
+    expect(guard).toContain(
+      "document.documentElement.dataset.analytics !== 'off'"
     )
   })
 

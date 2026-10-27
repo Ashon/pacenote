@@ -1,0 +1,125 @@
+<!doctype html>
+<!--
+  The page a teammate's share link opens (Settings > Messengers > Slack > Share with teammates, src/hub/share.ts):
+  https://pacenote.dev/join/#url=<the hub's address>. The address is after the #, which a browser never sends, so
+  neither the site's host nor a link preview sees it, and the analytics mark on <html> keeps site.js from counting the
+  page.
+  site.js shows the hub and points Open in Pacenote at pacenote://hub/connect, the link the hub's installer ends with;
+  Pacenote checks the address again and changes nothing until you connect. Without a link the page means nothing, so
+  it stays out of the sitemap and of search.
+-->
+<html lang="en" data-analytics="off">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join your team's hub - Pacenote</title>
+  <meta name="description" content="A teammate shared their Pacenote hub with you. Open it in Pacenote and pair your Mac.">
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://pacenote.dev/join/">
+  <link rel="alternate" hreflang="en" href="https://pacenote.dev/join/">
+  <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/join/">
+  <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/join/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Join your team's Pacenote hub">
+  <meta property="og:description" content="Open it in Pacenote and pair your Mac. Pace answers only you, on your own Claude or ChatGPT plan.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/join/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../media/pacenote-mark.svg">
+  <link rel="stylesheet" href="../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote home">
+      <img src="../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="Pages">
+      <a href="../how-it-works/">How it works</a>
+      <a href="../privacy/">Privacy</a>
+      <a href="../install/">Install</a>
+      <a href="https://github.com/Ashon/pacenote#readme">Docs<span aria-hidden="true"> ↗</span></a>
+      <a class="lang" href="../ko/join/" lang="ko" hreflang="ko">한국어</a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head" data-join>
+      <h1>Join your team's hub</h1>
+      <p class="lede">A teammate shared their team's Pacenote hub with you. Open it in Pacenote, then pair your Mac with
+        your own Slack account.</p>
+      <div data-join-hub hidden>
+        <div class="get">
+          <a class="button primary" id="join-open" href="#steps">Open in Pacenote</a>
+        </div>
+        <p class="next">The hub: <code id="join-address"></code></p>
+      </div>
+      <p class="next" data-join-none hidden>This link names no hub. Ask your teammate to copy it again, or enter the
+        hub's address in Pacenote under Settings &gt; Messengers &gt; Slack.</p>
+      <noscript><p class="next">Turn on JavaScript to open the hub in Pacenote, or enter its address, after
+        <code>url=</code> in this link, under Settings &gt; Messengers &gt; Slack.</p></noscript>
+    </div>
+
+    <div class="surface">
+      <section class="block" id="steps" aria-labelledby="steps-title">
+        <h2 id="steps-title">Pair in three steps</h2>
+        <ol class="steps down">
+          <li>Choose <b>Open in Pacenote</b>. Settings &gt; Messengers &gt; Slack opens with the hub filled in, or setup's
+            Slack step while you set Pacenote up. Nothing changes until you connect.</li>
+          <li>Choose <b>Connect</b>, then mention <code>@Pace</code> with the code Pacenote shows, in a channel Pace is
+            in.</li>
+          <li>Confirm in Pacenote that the Slack account is yours. Your mentions then come to your Mac, and Pace answers
+            only you.</li>
+        </ol>
+      </section>
+
+      <section class="block" id="install" aria-labelledby="install-title">
+        <h2 id="install-title">No Pacenote yet?</h2>
+        <p>Install it with Homebrew on an Apple silicon Mac where Claude Code or Codex is signed in, then open this link
+          again: setup's Slack step takes the hub from it.</p>
+        <div class="get">
+          <div class="command" role="group" aria-label="Install with Homebrew">
+            <code id="install-command"><span>brew tap ashon/tap</span>
+<span>brew trust ashon/tap</span>
+<span>brew install --cask pacenote</span></code>
+            <button class="button primary copy" type="button" data-copy="install-command">Copy</button>
+            <span class="copied" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+        <p>What you need and how setup goes are on <a href="../install/">Install</a>.</p>
+      </section>
+
+      <section class="block closing" id="address" aria-labelledby="address-title">
+        <h2 id="address-title">The hub's address stays with you</h2>
+        <p>It is after the # in this link, which your browser never sends: pacenote.dev and link previews never see it,
+          and this page counts nothing. A hub on your company's network answers only where your Mac can reach that
+          network.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote is made by one person and offered as is.</p>
+    <nav aria-label="Project">
+      <a href="../privacy/">Privacy</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">Docs</a>
+      <a href="https://github.com/Ashon/pacenote/releases">Releases</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">License</a>
+    </nav>
+    <p class="legal">Pacenote is an independent project, not made, endorsed or supported by Anthropic, OpenAI or Slack.
+      Claude, Claude Code, Codex, ChatGPT and Slack are trademarks of their owners.</p>
+    <p class="legal">© 2026 Ashon. Pacenote is open source under the Apache License 2.0.</p>
+  </footer>
+
+  <script src="../site.js"></script>
+</body>
+</html>

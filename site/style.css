@@ -1936,6 +1936,15 @@ code {
   margin: 0.375rem 0 0;
 }
 
+/* Join: site.js shows the hub a teammate's link names, or says it names none.
+   Hidden wins over a block's own display, such as .get's. */
+[data-join] [hidden] {
+  display: none;
+}
+#join-address {
+  overflow-wrap: anywhere;
+}
+
 /* The last word on each page: one next step */
 .closing .get {
   margin-top: 1.25rem;

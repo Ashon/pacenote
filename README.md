@@ -168,8 +168,8 @@ The design, one mention end to end, and the code layout are drawn in [Architectu
 
 ## For teams
 
-A team can share one Slack app through a Pacenote hub. Each member pairs their own Mac once, and the hub sends each
-mention to the desktop of the person who wrote it, where Pace answers with that person's login, sandbox and tools. The
+A team can share one Slack app through a Pacenote hub. Each member pairs their own Mac once, from a link a paired
+teammate shares or with the hub's address, and the hub sends each mention to the desktop of the person who wrote it, where Pace answers with that person's login, sandbox and tools. The
 Slack tokens stay on the hub. See [Team hub](docs/team-hub.md).
 
 ## Documentation

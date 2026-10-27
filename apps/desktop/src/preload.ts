@@ -187,7 +187,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     installWait: () => ipcRenderer.invoke('pacenote:hub:install-wait'),
     installCancel: () => ipcRenderer.invoke('pacenote:hub:install-cancel'),
     onInstall: subscribe<unknown>('pacenote:hub:install-changed'),
-    // A pacenote:// link from the installer: the hub it names, once
+    // A pacenote:// link from the installer or a teammate's share link: the
+    // hub it names, once
     takeLink: () => ipcRenderer.invoke('pacenote:hub:take-link'),
     onLinked: subscribe<void>('pacenote:hub:linked'),
   },

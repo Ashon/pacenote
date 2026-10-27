@@ -157,7 +157,8 @@ function ChooseConnection({
 
   // Leaving the step lets your other Mac go
   useEffect(() => () => void window.pacenoteDesktop?.setup?.macCancel(), [])
-  // A pacenote:// link from the hub's installer: that hub, to pair with
+  // A pacenote:// link from the hub's installer or a teammate's share link:
+  // that hub, to pair with
   useEffect(() => {
     const hub = window.pacenoteDesktop?.hub
     if (!hub) return

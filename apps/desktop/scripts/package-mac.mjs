@@ -191,7 +191,8 @@ plistSet(infoPlist, {
   CFBundleDevelopmentRegion: 'en',
 })
 // pacenote:// links, such as the one the team hub's installer ends with
-// (deploy/hub/install.sh): macOS opens them in Pacenote.
+// (deploy/hub/install.sh) and the one pacenote.dev's join page opens for a
+// teammate's share link: macOS opens them in Pacenote.
 try {
   execFileSync(
     '/usr/libexec/PlistBuddy',

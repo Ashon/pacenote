@@ -32,6 +32,7 @@ import {
   FolderOpen,
   History,
   Laptop,
+  Link2,
   ListChecks,
   LoaderCircle,
   MessagesSquare,
@@ -77,8 +78,14 @@ import {
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
 import { useSettingsView } from '@/lib/setup'
-import { useLanguage, useText, type LanguagePreference } from '@/lib/i18n'
+import {
+  useLanguage,
+  useLocale,
+  useText,
+  type LanguagePreference,
+} from '@/lib/i18n'
 import { useHubPairing } from '@/lib/hub'
+import { hubShareLink } from '@src/hub/share'
 import { codeWords, macsControl, useMacs } from '@/lib/macs'
 import type { AddingView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
@@ -228,8 +235,9 @@ export function SettingsPage() {
   }, [draft, editing, current])
   const changeCount = Object.keys(changes).length
 
-  // A pacenote:// link from the hub's installer: Messengers, with that hub
-  // filled in to connect to. It saves nothing by itself.
+  // A pacenote:// link from the hub's installer, or from the join page a
+  // teammate's link opens: Messengers, with that hub filled in to connect to.
+  // It saves nothing by itself.
   const fileHub =
     view?.values.SLACK_CONNECTION === 'hub' ? view.values.HUB_URL : undefined
   useEffect(() => {
@@ -240,7 +248,7 @@ export function SettingsPage() {
         if (!url || url === fileHub) return
         setDraft((d) => ({ ...d, SLACK_CONNECTION: 'hub', HUB_URL: url }))
         window.location.hash = '#/settings/messengers'
-        setNotice({ tone: 'ok', text: t.openedFromInstaller(url) })
+        setNotice({ tone: 'ok', text: t.openedFromLink(url) })
       })
     take()
     return hub.onLinked(take)
@@ -1293,18 +1301,21 @@ function HubPairing({
     switch (state.step) {
       case 'idle':
         return paired ? (
-          <div className="flex items-center gap-3">
-            <CircleCheck className="size-4 shrink-0 text-status-succeeded" />
-            <p className="min-w-0 flex-1 text-copy">{t.hubPaired}</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={disconnect}
-              disabled={busy}
-            >
-              {busy && <LoaderCircle className="animate-spin" />}
-              {t.disconnect}
-            </Button>
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-3">
+              <CircleCheck className="size-4 shrink-0 text-status-succeeded" />
+              <p className="min-w-0 flex-1 text-copy">{t.hubPaired}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={disconnect}
+                disabled={busy}
+              >
+                {busy && <LoaderCircle className="animate-spin" />}
+                {t.disconnect}
+              </Button>
+            </div>
+            <HubShare url={hubUrl} />
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -1424,6 +1435,46 @@ function HubPairing({
   })()
   return (
     <div className="border-t border-border bg-well/60 px-4 py-3">{body}</div>
+  )
+}
+
+/**
+ * A link for teammates to pair with the same hub, each with their own Slack
+ * account: pacenote.dev's join page, which opens Pacenote on it or says how to
+ * install Pacenote first (hubShareLink)
+ */
+function HubShare({ url }: { url: string }) {
+  const t = useText(text)
+  const locale = useLocale()
+  const [copied, setCopied] = useState<'yes' | 'failed'>()
+  useEffect(() => {
+    if (copied !== 'yes') return
+    const timer = setTimeout(() => setCopied(undefined), 1_500)
+    return () => clearTimeout(timer)
+  }, [copied])
+  const copy = () =>
+    void navigator.clipboard.writeText(hubShareLink(url, locale)).then(
+      () => setCopied('yes'),
+      () => setCopied('failed')
+    )
+  return (
+    <div className="flex items-center gap-3" data-hub-share>
+      <div className="min-w-0 flex-1">
+        <p className="text-row">{t.shareHub}</p>
+        <p
+          className={cn(
+            'mt-0.5 text-meta',
+            copied === 'failed' ? 'text-status-failed' : 'text-muted-foreground'
+          )}
+        >
+          {copied === 'failed' ? t.shareHubFailed : t.shareHubHelp}
+        </p>
+      </div>
+      <Button size="sm" variant="outline" onClick={copy} disabled={!url}>
+        {copied === 'yes' ? <Check /> : <Link2 />}
+        {copied === 'yes' ? t.copied : t.copyShareLink}
+      </Button>
+    </div>
   )
 }
 

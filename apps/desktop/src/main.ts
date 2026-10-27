@@ -469,7 +469,8 @@ const hubInstall = new HubInstall({
 /** The hub a pacenote:// link opened, until the window takes it */
 let linkedHub: string | undefined
 /**
- * pacenote://hub/connect?url=... from the hub's installer: Pacenote opens on
+ * pacenote://hub/connect?url=... from the hub's installer, or from the join
+ * page a teammate's share link opens (src/hub/share.ts): Pacenote opens on
  * that hub, which it switches to if it was waiting for it, and otherwise only
  * offers to connect. A link changes nothing by itself.
  */
@@ -2546,7 +2547,8 @@ if (!app.requestSingleInstanceLock()) {
     .whenReady()
     .then(async () => {
       registerAppProtocol()
-      // pacenote:// links (the hub installer's), for this copy of the app
+      // pacenote:// links (the hub installer's, a teammate's share link's),
+      // for this copy of the app
       if (app.isPackaged) app.setAsDefaultProtocolClient('pacenote')
       registerBotIpc()
       setAppMenu(appName)

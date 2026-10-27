@@ -491,7 +491,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       `pacenote://hub/connect?url=${encodeURIComponent(url)}`
     )
     await page
-      .getByText(`Opened from the hub's installer: connect to ${url}`, {
+      .getByText(`Opened from a link to the team hub: connect to ${url}`, {
         exact: false,
       })
       .waitFor()
@@ -539,6 +539,18 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     )
     await page.screenshot({
       path: path.join(REPO, 'test-results/hub-install-switched.png'),
+    })
+
+    // Paired: a link for teammates, to pacenote.dev's join page with the hub
+    // after the #, which opens Pacenote on it as the installer's link does.
+    const share = page.locator('[data-hub-share]')
+    await share.getByRole('button', { name: 'Copy share link' }).click()
+    await share.getByRole('button', { name: 'Copied' }).waitFor()
+    expect(await app!.evaluate(({ clipboard }) => clipboard.readText())).toBe(
+      `https://pacenote.dev/join/#url=${encodeURIComponent(url)}`
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/hub-share.png'),
     })
   })
 

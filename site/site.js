@@ -85,8 +85,13 @@ const T = TEXT[document.documentElement.lang.startsWith('ko') ? 'ko' : 'en']
 
 // Visits to pacenote.dev are counted with Google Analytics, as the Privacy
 // page says; a local preview of the site counts nothing, and the app has none.
+// Nor does a page marked data-analytics="off": the join page, whose link holds
+// a team hub's address.
 const ANALYTICS_ID = 'G-HSPB6E8SST'
-if (location.hostname === 'pacenote.dev') {
+if (
+  location.hostname === 'pacenote.dev' &&
+  document.documentElement.dataset.analytics !== 'off'
+) {
   window.dataLayer = window.dataLayer || []
   // gtag.js reads each call as an arguments object, not an array.
   window.gtag = function () {
@@ -127,6 +132,40 @@ for (const button of document.querySelectorAll('[data-copy]')) {
       status.textContent = ''
     }, 2000)
   })
+}
+
+// Join: the page a teammate's share link opens, with their team hub's address
+// after the # (src/hub/share.ts). It shows that hub and points Open in
+// Pacenote at the link the hub's installer ends with, which Pacenote checks
+// again; the other language's page gets the same hub.
+const join = document.querySelector('[data-join]')
+if (join) {
+  const hub = linkedHub(location.hash)
+  for (const el of join.querySelectorAll('[data-join-hub]')) el.hidden = !hub
+  for (const el of join.querySelectorAll('[data-join-none]')) el.hidden = !!hub
+  if (hub) {
+    document.getElementById('join-address').textContent = hub
+    document.getElementById('join-open').href =
+      `pacenote://hub/connect?url=${encodeURIComponent(hub)}`
+    const other = document.querySelector('.top .lang')
+    if (other) other.hash = location.hash
+  }
+}
+
+/** The hub a join link names after its #: an http or https address, or none */
+function linkedHub(hash) {
+  const value = new URLSearchParams(hash.slice(1))
+    .get('url')
+    ?.trim()
+    .replace(/\/+$/, '')
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    const web = url.protocol === 'https:' || url.protocol === 'http:'
+    return web && !url.username && !url.password ? value : undefined
+  } catch {
+    return undefined
+  }
 }
 
 // The track's line draws once, the first time it is seen. The stages are

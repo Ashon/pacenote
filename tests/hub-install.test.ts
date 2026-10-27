@@ -12,6 +12,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { runInNewContext } from 'node:vm'
 import { afterAll, describe, expect, it } from 'vitest'
 import { HubInstall } from '../apps/desktop/src/hub-install.js'
 import type { SettingsStore } from '../apps/desktop/src/settings.js'
@@ -24,6 +25,7 @@ import {
 } from '../src/hub/install.js'
 import type { HubInstallState } from '../src/hub/protocol.js'
 import { Pairings } from '../src/hub/pairing.js'
+import { hubShareLink } from '../src/hub/share.js'
 import { HubServer, type SlackGateway } from '../src/hub/server.js'
 import { DesktopStore } from '../src/hub/store.js'
 import { createLogger } from '../src/logger.js'
@@ -80,6 +82,59 @@ describe('the install command', () => {
       'not a link',
     ])
       expect(hubFromLink(link)).toBeUndefined()
+  })
+})
+
+/** site.js's linkedHub: how the join page reads the hub after a link's # */
+function joinPageReader(): (hash: string) => string | undefined {
+  const script = readFileSync(path.join(REPO, 'site/site.js'), 'utf8')
+  const source = /^function linkedHub\(hash\) \{[\s\S]*?^\}/m.exec(script)?.[0]
+  expect(source).toBeDefined()
+  return runInNewContext(`${source}\nlinkedHub`, { URL, URLSearchParams })
+}
+
+describe('sharing a hub with teammates', () => {
+  it("links to pacenote.dev's join page, which opens Pacenote on the hub", () => {
+    const url = 'http://10.0.0.5:8790'
+    expect(hubShareLink(url, 'en')).toBe(
+      'https://pacenote.dev/join/#url=http%3A%2F%2F10.0.0.5%3A8790'
+    )
+    expect(hubShareLink(url, 'ko')).toBe(
+      'https://pacenote.dev/ko/join/#url=http%3A%2F%2F10.0.0.5%3A8790'
+    )
+    // The page for each language is on the site.
+    for (const lang of ['en', 'ko'] as const) {
+      const page = new URL(hubShareLink(url, lang)).pathname
+      expect(existsSync(path.join(REPO, 'site', page, 'index.html'))).toBe(true)
+    }
+
+    // The page reads the same hub back and opens the installer's link to it.
+    const linkedHub = joinPageReader()
+    for (const hub of [
+      url,
+      'https://hub.example.com',
+      'http://hub.local:8790',
+    ]) {
+      const hash = new URL(hubShareLink(hub, 'en')).hash
+      expect(linkedHub(hash)).toBe(hub)
+      expect(hubFromLink(hubLink(linkedHub(hash)!))).toBe(hub)
+    }
+    expect(linkedHub(new URL(hubShareLink(`${url}/`, 'en')).hash)).toBe(url)
+    expect(readFileSync(path.join(REPO, 'site/site.js'), 'utf8')).toContain(
+      '`pacenote://hub/connect?url=${encodeURIComponent(hub)}`'
+    )
+    // Pacenote checks the address again (hubFromLink); the page only wants an
+    // http or https address with no account in it.
+    for (const hash of [
+      '',
+      '#',
+      '#url=',
+      '#hub=http%3A%2F%2F10.0.0.5',
+      '#url=javascript%3Aalert(1)',
+      '#url=http%3A%2F%2Fu%3Ap%4010.0.0.5',
+      '#url=not%20an%20address',
+    ])
+      expect(linkedHub(hash), hash).toBeUndefined()
   })
 })
 

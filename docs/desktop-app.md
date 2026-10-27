@@ -158,7 +158,7 @@ Settings:
   | Section | What it holds |
   | --- | --- |
   | General | Theme, language, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
-  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
+  | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing and, once paired, "Copy share link" for teammates, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, diagrams and images |
   | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login |
   | Tools | A line on what Pace can reach now; the connections (work folder, GitHub, Jira, Kubernetes, SSH hosts) as rows that open in place on their settings and their Read and Write switches; the broker; the reference folder the CLI reads itself; allowed domains |
@@ -267,9 +267,10 @@ Other:
 - The query API is served only inside the app at `pacenote://app/api/*`, with no open port. Bot control uses preload IPC only.
   The dev server (`apps/web` Vite) listens only on 127.0.0.1 and attaches the same query API read-only.
 - macOS opens `pacenote://` links in the app (`CFBundleURLTypes`, written by `package-mac.mjs`). The only one it takes is
-  `pacenote://hub/connect?url=<hub>`, the team hub installer's way back ([Team hub](team-hub.md)), for an address a hub
-  can have: it opens Settings > Messengers (or setup's Slack step) with that hub filled in, and changes nothing until you
-  connect. A hub the app was waiting for after "Copy install command" is checked at once.
+  `pacenote://hub/connect?url=<hub>`, the team hub installer's way back and what pacenote.dev's join page opens for a
+  teammate's share link ([Team hub](team-hub.md)), for an address a hub can have: it opens Settings > Messengers (or
+  setup's Slack step) with that hub filled in, and changes nothing until you connect. A hub the app was waiting for after
+  "Copy install command" is checked at once.
 - The data location is taken from the `PACENOTE_DATA_DIR` environment variable, then `dataDir` in the settings file, then
   the default home (`~/.pacenote`).
 - App icon: `assets/pacenote-icon.svg` is the source. After editing it, `pnpm --filter @pacenote/desktop icon` (macOS swift) redraws

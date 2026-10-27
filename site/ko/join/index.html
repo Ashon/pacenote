@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko" data-analytics="off">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>팀 허브에 참여 - Pacenote</title>
+  <meta name="description" content="팀원이 Pacenote 허브를 공유했어요. Pacenote에서 열고 내 Mac을 페어링하세요.">
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://pacenote.dev/ko/join/">
+  <link rel="alternate" hreflang="en" href="https://pacenote.dev/join/">
+  <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/join/">
+  <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/join/">
+  <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="팀의 Pacenote 허브에 참여하기">
+  <meta property="og:description" content="Pacenote에서 열고 내 Mac을 페어링하세요. Pace는 내 Claude나 ChatGPT 요금제로, 나에게만 답해요.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pacenote.dev/ko/join/">
+  <meta property="og:site_name" content="Pacenote">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:image" content="https://pacenote.dev/assets/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="../../media/pacenote-mark.svg">
+  <link rel="stylesheet" href="../../style.css">
+  <script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <header class="top">
+    <a class="brand" href="../" aria-label="Pacenote 홈">
+      <img src="../../media/pacenote-mark.svg" alt="" width="28" height="28">
+      <span>Pacenote</span>
+    </a>
+    <nav aria-label="페이지">
+      <a href="../how-it-works/">작동 방식</a>
+      <a href="../privacy/">개인정보 보호</a>
+      <a href="../install/">설치</a>
+      <a href="https://github.com/Ashon/pacenote#readme">문서<span aria-hidden="true"> ↗</span></a>
+      <a class="lang" href="../../join/" lang="en" hreflang="en">English</a>
+      <a class="button secondary" href="https://github.com/Ashon/pacenote">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="page-head" data-join>
+      <h1>팀 허브에 참여</h1>
+      <p class="lede">팀원이 팀의 Pacenote 허브를 공유했어요. Pacenote에서 열고, 내 Slack 계정으로 내 Mac을
+        페어링하세요.</p>
+      <div data-join-hub hidden>
+        <div class="get">
+          <a class="button primary" id="join-open" href="#steps">Pacenote에서 열기</a>
+        </div>
+        <p class="next">허브: <code id="join-address"></code></p>
+      </div>
+      <p class="next" data-join-none hidden>이 링크에는 허브가 없어요. 팀원에게 다시 복사해 달라고 하거나, Pacenote의
+        설정 &gt; 메신저 &gt; Slack에서 허브 주소를 넣으세요.</p>
+      <noscript><p class="next">Pacenote에서 허브를 열려면 JavaScript를 켜세요. 또는 이 링크의 <code>url=</code> 뒤에
+        있는 주소를 설정 &gt; 메신저 &gt; Slack에 넣으세요.</p></noscript>
+    </div>
+
+    <div class="surface">
+      <section class="block" id="steps" aria-labelledby="steps-title">
+        <h2 id="steps-title">세 단계로 페어링</h2>
+        <ol class="steps down">
+          <li><b>Pacenote에서 열기</b>를 누르세요. 설정 &gt; 메신저 &gt; Slack이 허브가 채워진 채로 열려요. 초기 설정
+            중이면 Slack 단계에 채워져요. 연결하기 전에는 아무것도 바뀌지 않아요.</li>
+          <li><b>연결</b>을 누르고, Pacenote가 보여 주는 코드로 Pace가 있는 채널에서 <code>@Pace</code>를
+            멘션하세요.</li>
+          <li>Pacenote에서 내 Slack 계정이 맞는지 확인하세요. 그 뒤로 내 멘션은 내 Mac으로 오고, Pace는 나에게만
+            답해요.</li>
+        </ol>
+      </section>
+
+      <section class="block" id="install" aria-labelledby="install-title">
+        <h2 id="install-title">아직 Pacenote가 없다면</h2>
+        <p>Claude Code나 Codex에 로그인한 Apple silicon Mac에 Homebrew로 설치한 뒤, 이 링크를 다시 여세요. 초기 설정의
+          Slack 단계가 링크의 허브를 받아요.</p>
+        <div class="get">
+          <div class="command" role="group" aria-label="Homebrew로 설치">
+            <code id="install-command"><span>brew tap ashon/tap</span>
+<span>brew trust ashon/tap</span>
+<span>brew install --cask pacenote</span></code>
+            <button class="button primary copy" type="button" data-copy="install-command">복사</button>
+            <span class="copied" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+        <p>필요한 것과 초기 설정은 <a href="../install/">설치</a>에 있어요.</p>
+      </section>
+
+      <section class="block closing" id="address" aria-labelledby="address-title">
+        <h2 id="address-title">허브 주소는 내 브라우저에만 있어요</h2>
+        <p>주소는 이 링크의 # 뒤에 있고, 브라우저는 # 뒤를 보내지 않아요. 그래서 pacenote.dev도 링크 미리보기도 주소를 보지
+          못하고, 이 페이지는 아무것도 집계하지 않아요. 회사 네트워크의 허브는 내 Mac이 그 네트워크에 닿을 때만 응답해요.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="status">
+    <p class="state"><span class="dot" aria-hidden="true"></span>Pacenote는 한 사람이 만들고, 있는 그대로 제공해요.</p>
+    <nav aria-label="프로젝트">
+      <a href="../privacy/">개인정보 보호</a>
+      <a href="https://github.com/Ashon/pacenote">GitHub</a>
+      <a href="https://github.com/Ashon/pacenote/tree/main/docs">문서</a>
+      <a href="https://github.com/Ashon/pacenote/releases">릴리스</a>
+      <a href="https://github.com/Ashon/pacenote/blob/main/LICENSE">라이선스</a>
+    </nav>
+    <p class="legal">Pacenote는 독립 프로젝트로, Anthropic, OpenAI, Slack이 만들거나 보증하거나 지원하지 않아요.
+      Claude, Claude Code, Codex, ChatGPT, Slack은 각 소유자의 상표예요.</p>
+    <p class="legal">© 2026 Ashon. Pacenote는 Apache License 2.0에 따른 오픈 소스예요.</p>
+  </footer>
+
+  <script src="../../site.js"></script>
+</body>
+</html>

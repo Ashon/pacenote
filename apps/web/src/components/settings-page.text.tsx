@@ -50,8 +50,8 @@ const en = {
   hintOn: (n: number) => (n === 0 ? 'None set up' : `${n} on`),
   checkConnection: 'Check connection',
   hubDisconnected: 'Disconnected this desktop from the hub.',
-  openedFromInstaller: (url: string) =>
-    `Opened from the hub's installer: connect to ${url} under Slack to pair this Mac.`,
+  openedFromLink: (url: string) =>
+    `Opened from a link to the team hub: connect to ${url} under Slack to pair this Mac.`,
   sandboxSignedIn: 'Signed in inside the sandbox. Restart Pace to use it.',
 
   mcpTasks:
@@ -107,6 +107,11 @@ const en = {
   hubPaired:
     'This desktop is paired with the hub. Use Check connection to see as whom.',
   disconnect: 'Disconnect',
+  shareHub: 'Share with teammates',
+  shareHubHelp:
+    'A link that opens Pacenote on this hub. Each teammate pairs their own Mac, with their own Slack account.',
+  shareHubFailed: 'Could not copy the link.',
+  copyShareLink: 'Copy share link',
   pairTitle: 'Pair this desktop',
   pairHelp:
     'You get a code to send to Pace in Slack. Mentions you make then come to this desktop.',
@@ -264,8 +269,8 @@ const ko: typeof en = {
   hintOn: (n) => (n === 0 ? '설정 전' : `${n}개 켜짐`),
   checkConnection: '연결 확인',
   hubDisconnected: '이 데스크톱과 허브의 연결을 해제했어요.',
-  openedFromInstaller: (url: string) =>
-    `허브 인스톨러에서 열었어요. Slack 아래에서 ${url}에 연결해 이 Mac을 페어링하세요.`,
+  openedFromLink: (url: string) =>
+    `팀 허브 링크로 열었어요. Slack 아래에서 ${url}에 연결해 이 Mac을 페어링하세요.`,
   sandboxSignedIn:
     '샌드박스 안에서 로그인했어요. 쓰려면 Pace를 다시 시작하세요.',
 
@@ -319,6 +324,11 @@ const ko: typeof en = {
   hubPaired:
     '이 데스크톱은 허브와 페어링되어 있어요. 어느 계정인지는 연결 확인으로 볼 수 있어요.',
   disconnect: '연결 해제',
+  shareHub: '팀원에게 공유',
+  shareHubHelp:
+    'Pacenote를 이 허브로 여는 링크예요. 팀원마다 자기 Slack 계정으로 자기 Mac을 페어링해요.',
+  shareHubFailed: '링크를 복사하지 못했어요.',
+  copyShareLink: '공유 링크 복사',
   pairTitle: '이 데스크톱 페어링',
   pairHelp:
     'Slack에서 Pace에게 보낼 코드를 받아요. 그 뒤로 내가 한 멘션은 이 데스크톱으로 와요.',

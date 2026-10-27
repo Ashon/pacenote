@@ -18,6 +18,13 @@ Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSo
   `@Pace connect <code>` in a channel Pacenote is in, then confirm in Pacenote that the Slack account shown is yours.
   The confirmation is what counts, so a code someone else saw and sent first is turned down on the desktop.
   The desktop keeps a random token in its settings file (`slack.hub.token`); the hub stores only its SHA-256.
+- Sharing: once paired, "Share with teammates" there copies a link to pacenote.dev's join page,
+  `https://pacenote.dev/join/#url=<hub>` (`ko/join/` with Pacenote in Korean; `src/hub/share.ts`). It opens Pacenote on
+  the hub with the installer's `pacenote://hub/connect` link, which fills in the address (setup's Slack step during
+  setup) and changes nothing until the teammate connects, and says how to install Pacenote on a Mac without it. The
+  address is after the `#`, which browsers never send, so neither the site nor a link preview sees it, and the page
+  counts nothing. The link holds no secret: each teammate still pairs with a code from their own Slack account, and a hub
+  set to listed members (`HUB_ALLOWED_USERS`, the installer's `--allow`) needs theirs added first.
 - One desktop per member: pairing again replaces the previous desktop. Settings > Messengers > Slack > Disconnect unpairs it.
 - The hub sees mentions and thread content in transit (as Slack's own servers do) and stores only paired desktops.
   Grants are kept in memory, so restarting the hub ends edits to answers in progress.
@@ -66,7 +73,8 @@ Running the hub by hand (on a server of its own, with Docker):
    `HUB_PUBLIC_URL=http://10.0.0.5:8790`, with the server's address. Desktops take http only for localhost, a private
    address (10.x, 172.16-31.x, 192.168.x, Tailscale's 100.64.x) or a name that exists only there (`hub.local`,
    `hub.internal`, a name without a dot); the hub token and the threads then cross that network unencrypted.
-5. Give members the URL. `docker compose logs -f hub` shows pairings, connections, routed mentions and refused calls.
+5. Give members the URL, or pair your own Pacenote and share the link from "Share with teammates". `docker compose logs
+   -f hub` shows pairings, connections, routed mentions and refused calls.
 
 From the repository instead of the published image: `pnpm install && pnpm bundle`, which writes `deploy/hub/dist/hub.mjs`,
 then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the same image without starting it).
