@@ -367,15 +367,16 @@ describe('the news', () => {
   it("lists feature posts and released versions' notes, newest first", () => {
     expect(rows('news/').slice(0, 3)).toEqual([
       'post share-your-hub/',
+      'release v0.6.11/',
       'release v0.6.10/',
-      'release v0.6.9/',
     ])
-    // Notes written only in English: the English page, marked so
+    // Notes in Korean from v0.6.11; before, the English page, marked so
     expect(rows('ko/news/').slice(0, 3)).toEqual([
       'post share-your-hub/',
+      'release v0.6.11/',
       'release ../../news/v0.6.10/',
-      'release ../../news/v0.6.9/',
     ])
+    expect(EVERY).toContain('ko/news/v0.6.11/')
     expect(read('ko/news/')).toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
