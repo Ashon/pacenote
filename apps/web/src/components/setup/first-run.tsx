@@ -209,7 +209,16 @@ function SourcesStep({
         </>
       }
     >
+      {/* This Mac first: your own work is the ground, and Slack one source
+          read through your AI's connector */}
       <ul className="flex flex-col divide-y divide-border rounded-xl bg-well">
+        <li className="flex items-start gap-3 px-4 py-3">
+          <MonitorSmartphone className="mt-0.5 size-4 shrink-0 text-primary" />
+          <div>
+            <p className="text-row">{t.thisMac}</p>
+            <p className="text-meta text-muted-foreground">{t.thisMacHow}</p>
+          </div>
+        </li>
         <li className="flex items-start gap-3 px-4 py-3">
           <MessageSquare className="mt-0.5 size-4 shrink-0 text-primary" />
           <div>
@@ -217,13 +226,6 @@ function SourcesStep({
             <p className="text-meta text-muted-foreground">
               {t.slackHow(CLI_NAMES[reader])}
             </p>
-          </div>
-        </li>
-        <li className="flex items-start gap-3 px-4 py-3">
-          <MonitorSmartphone className="mt-0.5 size-4 shrink-0 text-primary" />
-          <div>
-            <p className="text-row">{t.thisMac}</p>
-            <p className="text-meta text-muted-foreground">{t.thisMacHow}</p>
           </div>
         </li>
       </ul>

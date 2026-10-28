@@ -28,8 +28,8 @@ brew install --cask pacenote
 Open Pacenote. A new install opens on three steps, with no Slack app to make:
 
 1. **Your AI.** Choose Claude Code or Codex. Pacenote checks that it is on this Mac and signed in.
-2. **Where your work is.** Slack, read only through your AI tool's own Slack connector, and the sessions and commits on
-   this Mac. Connect Slack in claude.ai's Settings > Connectors (or ChatGPT's Settings > Apps) if it is not yet.
+2. **Where your work is.** The sessions and commits on this Mac, and Slack, read only through your AI tool's own Slack
+   connector. Connect Slack in claude.ai's Settings > Connectors (or ChatGPT's Settings > Apps) if it is not yet.
 3. **A first look.** **Collect now** reads your last 7 days in Slack and finds your projects. Then Todo opens.
 
 Pace, which answers when you mention it in Slack, stays off until you set it up: **Set up Pace instead** on the first

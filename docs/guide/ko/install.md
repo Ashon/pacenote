@@ -28,7 +28,7 @@ brew install --cask pacenote
 Pacenote를 열어요. 새로 설치하면 세 단계로 시작하고, Slack 앱은 만들지 않아요.
 
 1. **내 AI.** Claude Code나 Codex를 골라요. 이 Mac에 있고 로그인했는지 확인해요.
-2. **일이 있는 곳.** AI 도구의 Slack 커넥터로 읽기만 하는 Slack, 그리고 이 Mac의 세션과 커밋이에요. 아직이라면
+2. **일이 있는 곳.** 이 Mac의 세션과 커밋, 그리고 AI 도구의 Slack 커넥터로 읽기만 하는 Slack이에요. 아직이라면
    claude.ai의 설정 > 커넥터(또는 ChatGPT의 설정 > 앱)에서 Slack을 연결하세요.
 3. **첫 모으기.** **지금 모으기**가 지난 7일의 Slack을 읽고 내 프로젝트를 찾아요. 그다음 할 일이 열려요.
 

@@ -120,8 +120,8 @@ Bot management:
 - Stop and app quit send SIGTERM. The bot gives requests in progress up to 15 seconds, then stops their reasoner runs (the CLI
   and whatever it started, or the container). Those, and the mentions still waiting their turn, resume on the next start.
 - A new install opens on Todo's first run (`#/start`, `apps/web/src/components/setup/first-run.tsx`): your AI, where your
-  work is (Slack through the AI tool's own connector, this Mac's sessions and commits), and a first collection with the
-  projects it finds. It writes `TASKS=on` and ends on Todo. Pace is off meanwhile and after (`desktop.json`'s
+  work is (this Mac's sessions and commits, and Slack through the AI tool's own connector), and a first collection with
+  the projects it finds. It writes `TASKS=on` and ends on Todo. Pace is off meanwhile and after (`desktop.json`'s
   `pace: 'off'`): it never starts by itself, the status bar says "Pace: Off", Overview, Runs and Pace leave the sidebar,
   and nothing asks to set it up. Set up Pace (the first run, Settings > General, the tray) turns it on and opens Pace's
   setup; starting Pace any other way turns it on too. A Pacenote set up before keeps Pace as it was. The window opens
