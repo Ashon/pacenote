@@ -144,7 +144,12 @@ async function launch(
     settings?: string[]
     legacy?: boolean
     env?: Record<string, string>
-    firstRun?: boolean
+    /**
+     * A new install: true goes on from Todo's first run to Pace's setup
+     * (Set up Pace instead), as the tests of Pace's setup start; todo stays
+     * on the first run
+     */
+    firstRun?: boolean | 'todo'
   } = {}
 ): Promise<Page> {
   mkdirSync(world.home, { recursive: true })
@@ -186,6 +191,18 @@ async function launch(
   const page = await app.firstWindow()
   page.setDefaultTimeout(20_000)
   await page.waitForLoadState('domcontentloaded')
+  if (options.firstRun === true) {
+    // Todo's first run, unless Pace's setup was under way already
+    const paceInstead = page.getByRole('button', {
+      name: /^(Set up Pace instead|대신 Pace 설정)$/,
+    })
+    const wizard = page.getByText(/^(Step \d of 5|5단계 중 \d단계)/)
+    // The one not there times out later: nothing waits on it.
+    const either = (locator: typeof wizard) => locator.waitFor().catch(() => {})
+    await Promise.race([either(paceInstead), either(wizard)])
+    if (await paceInstead.isVisible()) await paceInstead.click()
+    await wizard.waitFor()
+  }
   return page
 }
 
@@ -679,6 +696,68 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.getByRole('heading', { name: 'Overview' }).waitFor()
     await page.getByText(/Pace: Connected/).waitFor()
     expect(await page.getByText('Finish setting up Pace').count()).toBe(0)
+  })
+
+  it("opens a new install on Todo's first run, with Pace off until it is set up from Settings", async () => {
+    world = await World.create([])
+    const prefs = () =>
+      JSON.parse(
+        readFileSync(path.join(world!.home, 'desktop.json'), 'utf8')
+      ) as Record<string, unknown>
+    let page = await launch(world, { firstRun: 'todo' })
+
+    // 1. Your AI: the fake claude, signed in
+    await page
+      .getByRole('heading', { name: 'Which AI service do you already use?' })
+      .waitFor()
+    await page.getByText('Step 1 of 3').waitFor()
+    await page
+      .getByRole('radiogroup', { name: 'AI service' })
+      .getByText('Signed in')
+      .waitFor()
+    await page.getByRole('button', { name: 'Use Claude' }).click()
+
+    // 2. Where your work is: Slack through Claude Code's connector, read only
+    await page.getByRole('heading', { name: 'Where your work is' }).waitFor()
+    await page
+      .getByText(/Connect Slack in claude\.ai's Settings > Connectors/)
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/first-run-sources.png'),
+    })
+    await page.getByRole('button', { name: 'Continue' }).click()
+
+    // 3. A first look, and Todo; Pace never asked to be set up
+    await page.getByRole('heading', { name: 'A first look' }).waitFor()
+    expect(saved(world).TASKS).toBe('on')
+    await page.getByRole('button', { name: 'Open Todo' }).click()
+    await page.getByRole('heading', { name: 'Todo' }).waitFor()
+    const nav = page.getByRole('navigation', { name: 'Sections' })
+    for (const name of ['Todo', 'Recap', 'You', 'Settings'])
+      await nav.getByRole('button', { name }).waitFor()
+    for (const name of ['Overview', 'Runs', 'Pace'])
+      expect(await nav.getByRole('button', { name }).count()).toBe(0)
+    await page.getByText('Pace: Off').waitFor()
+    expect(await page.getByText('Setup needed').count()).toBe(0)
+    expect(prefs().pace).toBe('off')
+    expect(
+      JSON.parse(readFileSync(path.join(world.home, 'setup.json'), 'utf8'))
+    ).toHaveProperty('finishedAt')
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/first-run-todo.png'),
+    })
+
+    // Opened again, it opens on Todo, with Pace still off.
+    await app!.close()
+    page = await launch(world, { settings: ['TASKS=on'] })
+    await page.getByRole('heading', { name: 'Todo' }).waitFor()
+    await page.getByText('Pace: Off').waitFor()
+
+    // Pace from Settings: on, and its own setup where it got to
+    await page.getByText('Pace: Off').click()
+    await page.getByRole('button', { name: 'Set up Pace' }).click()
+    await page.getByText(/^Step \d of 5/).waitFor()
+    expect(prefs()).not.toHaveProperty('pace')
   })
 
   it('pairs with the team hub in setup, picks up where it was after a restart, and starts once reviewed', async () => {

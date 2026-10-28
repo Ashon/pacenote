@@ -89,7 +89,7 @@ import { hubShareLink } from '@src/hub/share'
 import { codeWords, macsControl, useMacs } from '@/lib/macs'
 import type { AddingView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
-import { cn } from '@/lib/utils'
+import { cn, go as goTo } from '@/lib/utils'
 import { isLocale, LOCALE_NAMES, LOCALES, localized } from '@src/i18n/locale'
 import { CopyButton } from './code-block'
 import { McpConnections } from './mcp-connections'
@@ -773,13 +773,29 @@ export function SettingsPage() {
                 </div>
               </Row>
             )}
-            {supervisor && (
-              <Row label={t.autoStart} help={t.autoStartHelp}>
-                <Switch
-                  checked={supervisor.autoStart}
-                  onChange={(value) => void botControl()?.setAutoStart(value)}
-                />
+            {supervisor?.off ? (
+              <Row label={t.paceOff} help={t.paceOffHelp}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    void botControl()
+                      ?.setUp()
+                      .then(() => goTo('#/setup'))
+                  }
+                >
+                  {t.setUpPace}
+                </Button>
               </Row>
+            ) : (
+              supervisor && (
+                <Row label={t.autoStart} help={t.autoStartHelp}>
+                  <Switch
+                    checked={supervisor.autoStart}
+                    onChange={(value) => void botControl()?.setAutoStart(value)}
+                  />
+                </Row>
+              )
             )}
           </div>
         </section>

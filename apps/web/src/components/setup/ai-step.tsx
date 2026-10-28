@@ -54,10 +54,16 @@ const cliReady = (check: CliCheck | undefined) =>
 export function AiStep({
   detect,
   settings,
+  of,
+  lead,
   onDone,
 }: {
   detect: { detected?: Detected; checking: boolean; check: () => void }
   settings?: SettingsView
+  /** In the first run: where it is in its steps */
+  of?: [number, number]
+  /** In the first run: what the AI does there, rather than Pace's answers */
+  lead?: string
   onDone: () => void
 }) {
   const t = useText(text)
@@ -106,8 +112,9 @@ export function AiStep({
   return (
     <StepFrame
       step="ai"
+      of={of}
       title={t.title}
-      lead={t.lead}
+      lead={lead ?? t.lead}
       footer={
         <>
           <Button

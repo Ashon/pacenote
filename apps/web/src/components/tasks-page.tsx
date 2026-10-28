@@ -34,12 +34,14 @@ import {
   formatShortDay,
   formatTokens,
 } from '@/lib/format'
+import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import {
   stagesOf,
   taskHash,
   useCollect,
   useDecide,
+  useLanding,
   useStage,
   useTasks,
   useTasksLive,
@@ -339,6 +341,7 @@ export function TasksPage({
         live={live}
         titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
       />
+      <TodoFirst />
       <Today
         lines={todayLines(data.tasks, stages, data.working, live?.working)}
       />
@@ -666,6 +669,48 @@ function CollectButton({
       <RefreshCw />
       {t.collectNow}
     </Button>
+  )
+}
+
+/**
+ * Told once, to someone who used Pace before the window opened on Todo: Pace's
+ * screens are still there, and Overview can stay the first screen
+ */
+function TodoFirst() {
+  const t = useText(text)
+  const supervisor = useSupervisor()
+  const landing = useLanding()
+  // Pace in use: set up, not off (a Pacenote for Todo alone has nothing new)
+  const used = supervisor && !supervisor.off && supervisor.phase !== 'setup'
+  if (!used || !landing.data || landing.data.told) return null
+  return (
+    <section
+      aria-label={t.todoFirst}
+      className="mt-5 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-section">{t.todoFirst}</p>
+        <p className="text-meta text-muted-foreground">{t.todoFirstBody}</p>
+      </div>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() =>
+          void landing
+            .set({ landing: 'overview', told: true })
+            .then(() => go('#/'))
+        }
+      >
+        {t.openOnOverview}
+      </Button>
+      <Button
+        size="xs"
+        variant="outline"
+        onClick={() => void landing.set({ told: true })}
+      >
+        {t.gotIt}
+      </Button>
+    </section>
   )
 }
 

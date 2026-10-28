@@ -45,7 +45,10 @@ const DECISIVE = new Set(['building', 'stopping', 'setup', 'failed', 'crashed'])
 export const botKnown = (
   view: BotStatusView | undefined,
   supervisor: SupervisorState | undefined
-) => view !== undefined || DECISIVE.has(supervisor?.phase ?? '')
+) =>
+  view !== undefined ||
+  DECISIVE.has(supervisor?.phase ?? '') ||
+  Boolean(supervisor?.off)
 
 /**
  * Combines the status file (bot.json) and the desktop supervisor state into a
@@ -61,6 +64,8 @@ export function describeBot(
     label: t[name],
   })
   const phase = supervisor?.phase
+  // Off on purpose (Todo alone): said as such, not as stopped
+  if (supervisor?.off && phase === 'idle') return state('off', 'off')
   if (phase === 'building') return state('busy', 'building')
   if (phase === 'stopping') return state('busy', 'stopping')
   // Missing settings are something to do, not an error: amber, and named for

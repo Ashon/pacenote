@@ -16,6 +16,7 @@ interface GitBuild {
 
 const en = {
   setupTip: 'Open Settings to set up Pace',
+  offTip: 'Pace is off: set it up in Settings',
   statusTip: "Pace's status and logs",
   /** Before Pace's state: Pace: Connected */
   pace: 'Pace:',
@@ -56,6 +57,7 @@ const en = {
 
 const ko: typeof en = {
   setupTip: '설정을 열어 Pace를 설정하세요',
+  offTip: 'Pace가 꺼져 있어요. 설정에서 설정하세요',
   statusTip: 'Pace 상태와 로그',
   pace: 'Pace:',
   whereTip: 'Pace가 답변하는 곳: 지금 쓰는 Mac (설정 > 내 Mac)',

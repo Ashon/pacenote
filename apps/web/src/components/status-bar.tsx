@@ -107,11 +107,13 @@ export function StatusBarView({
       {/* When setup is needed, Pace's status goes straight to the settings
           that fix it. */}
       <Item
-        tip={setup ? t.setupTip : t.statusTip}
+        tip={setup ? t.setupTip : supervisor?.off ? t.offTip : t.statusTip}
         onClick={
           setup
             ? () => onOpenRoute(setupSettingsRoute(supervisor?.issues))
-            : openBot
+            : supervisor?.off
+              ? () => onOpenRoute('#/settings')
+              : openBot
         }
       >
         {/* The dot pings only while Pace starts, builds or stops; connected,

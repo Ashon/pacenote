@@ -39,6 +39,13 @@ const en = {
   showMore: (n: number) => `Show ${n} more`,
   newTasks: (n: number) => `${n} new ${n === 1 ? 'task' : 'tasks'}`,
 
+  // Told once, to someone who used Pace before: the window opens here now
+  todoFirst: 'Pacenote opens on Todo now',
+  todoFirstBody:
+    'Overview, Runs and Pace are below, as they were. Pace keeps answering in Slack.',
+  openOnOverview: 'Open on Overview instead',
+  gotIt: 'Got it',
+
   // New task (Cmd-N)
   newTask: 'New task',
   newTaskLabel: 'What to do',
@@ -174,6 +181,12 @@ const ko: typeof en = {
   noWaiting: '남을 기다리는 일이 없어요.',
   showMore: (n) => `${n}개 더 보기`,
   newTasks: (n) => `새 할 일 ${n}개`,
+
+  todoFirst: 'Pacenote가 이제 할 일로 열려요',
+  todoFirstBody:
+    '개요, 실행 기록, Pace는 아래에 그대로 있어요. Pace는 Slack에서 계속 답해요.',
+  openOnOverview: '개요로 열기',
+  gotIt: '알겠어요',
 
   newTask: '새 할 일',
   newTaskLabel: '할 일',

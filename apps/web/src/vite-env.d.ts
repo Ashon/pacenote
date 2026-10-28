@@ -107,8 +107,18 @@ declare global {
         stop(): Promise<void>
         restart(rebuild?: boolean): Promise<void>
         setAutoStart(value: boolean): Promise<void>
+        /** With Pace off: turns it on, its setup open where it got to */
+        setUp(): Promise<void>
         openLogs(): Promise<void>
         onChange(callback: (state: SupervisorState) => void): () => void
+      }
+      /** The screen the window opens on, and whether you were told */
+      landing: {
+        get(): Promise<{ landing: 'tasks' | 'overview'; told: boolean } | null>
+        set(patch: {
+          landing?: 'tasks' | 'overview'
+          told?: true
+        }): Promise<void>
       }
       settings: {
         get(): Promise<SettingsView | null>

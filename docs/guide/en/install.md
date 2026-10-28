@@ -1,6 +1,6 @@
 ---
 title: From install to Pace's first answer
-summary: Install Pacenote with Homebrew, go through setup's five steps, and get Pace's first answer in Slack.
+summary: Install Pacenote with Homebrew, gather your tasks in three steps, and set up Pace for its first answer in Slack.
 kind: start
 order: 1
 shot: setup-start
@@ -23,9 +23,21 @@ brew trust ashon/tap
 brew install --cask pacenote
 ```
 
-## Setup, step by step
+## First run
 
-Open Pacenote. On a first run it opens on setup, with its steps on the left. Each step checks what it needs where it is.
+Open Pacenote. A new install opens on three steps, with no Slack app to make:
+
+1. **Your AI.** Choose Claude Code or Codex. Pacenote checks that it is on this Mac and signed in.
+2. **Where your work is.** Slack, read only through your AI tool's own Slack connector, and the sessions and commits on
+   this Mac. Connect Slack in claude.ai's Settings > Connectors (or ChatGPT's Settings > Apps) if it is not yet.
+3. **A first look.** **Collect now** reads your last 7 days in Slack and finds your projects. Then Todo opens.
+
+Pace, which answers when you mention it in Slack, stays off until you set it up: **Set up Pace instead** on the first
+run, or **Set up Pace** in Settings > General.
+
+## Pace's setup, step by step
+
+Pace's setup has its steps on the left. Each step checks what it needs where it is.
 
 ![Setup's first step: which AI service you already use](shot:setup-start)
 

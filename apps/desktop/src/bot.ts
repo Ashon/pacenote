@@ -101,11 +101,13 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
   ) {
     super()
     this.prefsFile = path.join(options.dataDir, DESKTOP_PREFS_FILE)
-    const { autoStartBot } = readPrefs(this.prefsFile)
+    const { pace } = readPrefs(this.prefsFile)
+    const off = pace === 'off'
     this.state = {
       phase: 'idle',
       output: [],
-      autoStart: typeof autoStartBot === 'boolean' ? autoStartBot : true,
+      autoStart: !off && this.autoStartPref(),
+      ...(off ? { off } : {}),
       restarts: 0,
       canBuild: options.repoRoot !== undefined,
     }
@@ -125,11 +127,32 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
 
   setAutoStart(value: boolean): void {
     writePrefs(this.prefsFile, { autoStartBot: value })
-    this.set({ autoStart: value })
+    this.set({ autoStart: value && !this.state.off })
+  }
+
+  /** Start Pace when the app opens (Settings > General), on unless set off */
+  private autoStartPref(): boolean {
+    const { autoStartBot } = readPrefs(this.prefsFile)
+    return typeof autoStartBot === 'boolean' ? autoStartBot : true
+  }
+
+  /**
+   * Turns Pace off (Todo alone: it does not start or ask to be set up) or on
+   * again (desktop.json's pace; Pacenote before 0.6.12 does not read it)
+   */
+  setOff(value: boolean): void {
+    if (Boolean(this.state.off) === value) return
+    writePrefs(this.prefsFile, { pace: value ? 'off' : undefined })
+    this.set({
+      off: value || undefined,
+      autoStart: !value && this.autoStartPref(),
+    })
   }
 
   async start(options: { rebuild?: boolean } = {}): Promise<void> {
     if (this.disposed || this.child || this.state.phase === 'building') return
+    // Starting Pace is wanting it: it is on from here.
+    this.setOff(false)
     this.cancelRetry()
     this.refreshExternal()
     if (this.state.phase === 'external') return

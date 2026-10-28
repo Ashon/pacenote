@@ -16,6 +16,8 @@ const en = {
     external: 'Running in terminal',
   } satisfies Record<SupervisorState['phase'], string>,
   retrying: (label: string) => `${label}, starting again`,
+  /** Pace turned off: Pacenote for Todo alone */
+  off: 'Off',
   standingBy: 'Standing by (another of your Macs answers)',
   socket: (reconnecting: boolean) =>
     `Socket Mode ${reconnecting ? 'reconnecting' : 'disconnected'}`,
@@ -78,6 +80,7 @@ const ko: typeof en = {
     external: '터미널에서 실행 중',
   },
   retrying: (label) => `${label}, 곧 다시 시작`,
+  off: '꺼짐',
   standingBy: '대기 중 (내 다른 Mac이 답변 중)',
   socket: (reconnecting) =>
     `Socket Mode ${reconnecting ? '다시 연결 중' : '연결 끊김'}`,

@@ -58,8 +58,16 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:bot:restart', rebuild),
     setAutoStart: (value: boolean) =>
       ipcRenderer.invoke('pacenote:bot:auto-start', value),
+    // With Pace off: on again, its setup open where it got to
+    setUp: () => ipcRenderer.invoke('pacenote:pace:set-up'),
     openLogs: () => ipcRenderer.invoke('pacenote:bot:open-logs'),
     onChange: subscribe<unknown>('pacenote:bot:changed'),
+  },
+  // The screen the window opens on: Todo, or Overview as you chose
+  landing: {
+    get: () => ipcRenderer.invoke('pacenote:app:landing'),
+    set: (patch: unknown) =>
+      ipcRenderer.invoke('pacenote:app:set-landing', patch),
   },
   settings: {
     get: () => ipcRenderer.invoke('pacenote:settings:get'),

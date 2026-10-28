@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import { stagesOf, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -21,15 +22,17 @@ export type Section =
 
 type Item = { section: Section; icon: LucideIcon }
 
-/** The screens for watching Pace, at the top */
+/** Your work, at the top: what you have to do first */
 const ITEMS: Item[] = [
-  { section: 'overview', icon: LayoutDashboard },
-  // What you have to do, above the jobs Pacenote ran
   { section: 'tasks', icon: ListChecks },
   // What you did, by day, week and month: what is behind, after what is ahead
   { section: 'recap', icon: CalendarCheck },
   // Where you contribute, from those tasks and your sessions
   { section: 'you', icon: UserRound },
+]
+/** Pace's screens, below: gone while Pace is off (Todo alone) */
+const PACE_ITEMS: Item[] = [
+  { section: 'overview', icon: LayoutDashboard },
   { section: 'runs', icon: History },
   { section: 'bot', icon: Bot },
 ]
@@ -39,8 +42,8 @@ const SETTINGS: Item = { section: 'settings', icon: Settings }
 const DEBUG: Item = { section: 'debug', icon: Bug }
 
 /**
- * The app's sections as a labeled list: the screens for watching Pace at the
- * top, and Settings at the bottom. (Pace's status is in the status bar.) A
+ * The app's sections as a labeled list: your work at the top, then Pace's
+ * screens unless Pace is off, and Settings at the bottom. (Pace's status is in the status bar.) A
  * compact sidebar keeps only the icons, for narrow windows. Both use the same
  * padding and only hide the labels, so the icons and the mark stay put when it
  * switches: 12px of sidebar and 11px of item put an 18px icon on the compact
@@ -59,6 +62,7 @@ export function Sidebar({
   showDebug: boolean
 }) {
   const t = useText(text)
+  const paceOff = Boolean(useSupervisor()?.off)
   // Open tasks, beside Tasks: not those waiting on someone else
   const tasks = useTasks().data
   const stages = stagesOf(tasks)
@@ -104,6 +108,12 @@ export function Sidebar({
       </div>
 
       <div className="flex flex-col gap-1">{ITEMS.map(item)}</div>
+      {!paceOff && (
+        <>
+          <div aria-hidden="true" className="mx-3 my-2 h-px bg-border" />
+          <div className="flex flex-col gap-1">{PACE_ITEMS.map(item)}</div>
+        </>
+      )}
 
       <div className="mt-auto flex flex-col gap-1">
         {showDebug && item(DEBUG)}

@@ -78,6 +78,11 @@ const en = {
   openLoginItems: 'Open Login Items',
   autoStart: 'Start Pace when the app opens',
   autoStartHelp: 'When off, start Pace from its screen or the menu bar.',
+  // Pace off: Pacenote for Todo alone
+  paceOff: 'Pace in Slack',
+  paceOffHelp:
+    "Off. Pace answers when you mention it in Slack, with your own AI, in this Mac's sandbox. It needs a Slack app of your own or your team's hub.",
+  setUpPace: 'Set up Pace',
   files: 'Files',
   filesHelp:
     'Pace reads its settings from a file outside the repository. Runs from the app and the terminal share it.',
@@ -298,6 +303,10 @@ const ko: typeof en = {
   openLoginItems: '로그인 항목 열기',
   autoStart: '앱을 열 때 Pace 시작',
   autoStartHelp: '끄면 Pace 화면이나 메뉴 막대에서 Pace를 시작하세요.',
+  paceOff: 'Slack의 Pace',
+  paceOffHelp:
+    '꺼져 있어요. Slack에서 Pace를 멘션하면 내 AI로 이 Mac의 샌드박스에서 답해요. 내 Slack 앱이나 팀 허브가 필요해요.',
+  setUpPace: 'Pace 설정',
   files: '파일',
   filesHelp:
     'Pace는 저장소 밖의 파일에서 설정을 읽어요. 앱과 터미널에서 실행한 Pace가 이 파일을 함께 써요.',

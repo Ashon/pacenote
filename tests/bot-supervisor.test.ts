@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -154,6 +155,42 @@ describe('the bot supervisor while the app quits', () => {
     expect(forked[0]!.kill).toHaveBeenCalledTimes(1)
     expect(bot.managing).toBe(false)
     expect(bot.current.phase).toBe('idle')
+  })
+})
+
+describe('Pace off, for Todo alone', () => {
+  const prefs = () =>
+    JSON.parse(readFileSync(path.join(root, 'desktop.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >
+
+  it('does not start by itself while off, and is on again once started', async () => {
+    const bot = supervisor()
+    expect(bot.current.autoStart).toBe(true)
+    bot.setOff(true)
+    expect(bot.current).toMatchObject({ off: true, autoStart: false })
+    expect(prefs().pace).toBe('off')
+
+    // Read again as the app opens next time
+    const again = supervisor()
+    expect(again.current).toMatchObject({ off: true, autoStart: false })
+
+    // Starting it is wanting it: on, and starting by itself as before
+    await again.start()
+    expect(forked).toHaveLength(1)
+    expect(again.current.off).toBeUndefined()
+    expect(again.current.autoStart).toBe(true)
+    expect(prefs()).not.toHaveProperty('pace')
+  })
+
+  it('keeps Start Pace when the app opens as you set it, on again', () => {
+    const bot = supervisor()
+    bot.setAutoStart(false)
+    bot.setOff(true)
+    bot.setOff(false)
+    expect(bot.current.autoStart).toBe(false)
+    expect(prefs().autoStartBot).toBe(false)
   })
 })
 

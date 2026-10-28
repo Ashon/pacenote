@@ -16,6 +16,7 @@ import { text as partsText } from './parts.text'
  */
 export function StepFrame({
   step,
+  of,
   part,
   title,
   lead,
@@ -23,6 +24,8 @@ export function StepFrame({
   footer,
 }: {
   step: SetupStep
+  /** Where it is in another set of steps (the first run's): n of total */
+  of?: [number, number]
   /** The part of the step it is on: "Your own Slack app" */
   part?: string
   title: string
@@ -40,7 +43,9 @@ export function StepFrame({
             of a paragraph, and a title or lead in even lines. */}
         <div className="@container mx-auto max-w-3xl px-10 pt-9 pb-8 text-pretty">
           <p className="text-body font-semibold text-primary">
-            {t.stepOf(SETUP_STEPS.indexOf(step) + 1, SETUP_STEPS.length)}
+            {of
+              ? t.stepOf(...of)
+              : t.stepOf(SETUP_STEPS.indexOf(step) + 1, SETUP_STEPS.length)}
             {part && ` · ${part}`}
           </p>
           <h1

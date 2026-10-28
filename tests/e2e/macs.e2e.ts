@@ -394,12 +394,13 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
     await pro.page.getByText('Waiting for it on this network').waitFor()
 
-    // The Air's first run: its own AI and where it runs, then Slack from the
-    // Pro.
+    // The Air's first run: Pace's setup, from Todo's (a new install's), with
+    // its own AI and where it runs, then Slack from the Pro.
     const air = await openMac(world, 'MacBook Air', 1, {
       follow: false,
       firstRun: true,
     })
+    await air.page.getByRole('button', { name: 'Set up Pace instead' }).click()
     await air.page
       .getByRole('heading', { name: 'Which AI service do you already use?' })
       .waitFor()

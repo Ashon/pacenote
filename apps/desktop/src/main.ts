@@ -62,6 +62,7 @@ import { setAppMenu } from './app-menu.js'
 import { text } from './main.text.js'
 import {
   readLanguage,
+  readPrefs,
   resolveLanguage,
   writePrefs,
   type LanguageState,
@@ -504,6 +505,30 @@ const setup = new SetupStore(dataDir, () => ({
   configured: setupProblem(settings.effectiveEnv()) === undefined,
   answered: reader.list({ kind: 'mention', limit: 1 }).length > 0,
 }))
+/**
+ * A Pacenote nothing was set up in yet, Pace or Todo: it opens on Todo's
+ * first run (#/start), with Pace off until it is set up from Settings. One
+ * part way through Pace's setup (a Slack step saved) goes on with that.
+ */
+const firstRun = (): boolean => {
+  const { open, record } = setup.view()
+  return (
+    open &&
+    record.step === 'ai' &&
+    !record.slack &&
+    !record.me &&
+    !record.fromMac
+  )
+}
+/**
+ * The screen the window opens on: Todo when it is on, unless you chose
+ * Overview (desktop.json's landing), else Overview as before
+ */
+const landing = (): string =>
+  settings.effectiveEnv().TASKS === 'on' &&
+  readPrefs(prefsFile).landing !== 'overview'
+    ? '#/tasks'
+    : ''
 /** Setup listening for "@Pace it's me" on your own Slack app */
 let claim: ClaimListener | undefined
 /**
@@ -913,6 +938,7 @@ function botSummary(): {
   const status = view.alive ? view.status : undefined
   const phase = supervisor?.current.phase
   let label = t.phase[phase ?? (status ? 'running' : 'idle')]
+  if (supervisor?.current.off && phase === 'idle') label = t.off
   if (supervisor?.current.retryAt !== undefined) label = t.retrying(label)
   const running = status?.state === 'running'
   if (running && status.standby) label = t.standingBy
@@ -1043,24 +1069,29 @@ function updateTray(): void {
   // Start that would stop again.
   const controls: MenuItemConstructorOptions[] = supervisor
     ? [
-        live
-          ? { label: t.restart, click: () => void supervisor.restart() }
-          : phase === 'setup'
-            ? setup.view().open
-              ? { label: t.setUp, click: () => showMainWindow('#/setup') }
+        // Off: set it up from Settings, rather than a Start with nothing set
+        supervisor.current.off && phase === 'idle'
+          ? { label: t.setUp, click: () => showMainWindow('#/settings') }
+          : live
+            ? { label: t.restart, click: () => void supervisor.restart() }
+            : phase === 'setup'
+              ? setup.view().open
+                ? { label: t.setUp, click: () => showMainWindow('#/setup') }
+                : {
+                    label: t.openSettings,
+                    click: () =>
+                      showMainWindow(
+                        setupSettingsRoute(supervisor?.current.issues)
+                      ),
+                  }
               : {
-                  label: t.openSettings,
-                  click: () =>
-                    showMainWindow(
-                      setupSettingsRoute(supervisor?.current.issues)
-                    ),
-                }
-            : {
-                label: t.start,
-                enabled:
-                  phase === 'idle' || phase === 'failed' || phase === 'crashed',
-                click: () => void supervisor.start(),
-              },
+                  label: t.start,
+                  enabled:
+                    phase === 'idle' ||
+                    phase === 'failed' ||
+                    phase === 'crashed',
+                  click: () => void supervisor.start(),
+                },
       ]
     : []
   tray.setContextMenu(
@@ -1182,6 +1213,32 @@ function registerBotIpc(): void {
   )
   handle('pacenote:bot:auto-start', undefined, (value) => {
     if (typeof value === 'boolean') supervisor?.setAutoStart(value)
+  })
+  // Settings > General's Set up Pace, with Pace off: on again, and its setup
+  // open where it got to (the window goes to #/setup)
+  handle('pacenote:pace:set-up', undefined, () => {
+    supervisor?.setOff(false)
+    setup.save({ finished: false })
+    // As at a start: it says what it needs until its setup is done
+    if (supervisor?.current.autoStart && supervisor.current.phase === 'idle')
+      void supervisor.start()
+  })
+  // The screen the window opens on, and whether you were told it is Todo now
+  handle('pacenote:app:landing', null, () => {
+    const prefs = readPrefs(prefsFile)
+    return {
+      landing: prefs.landing === 'overview' ? 'overview' : 'tasks',
+      told: prefs.todoFirstTold === true,
+    }
+  })
+  handle('pacenote:app:set-landing', undefined, (patch) => {
+    const { landing: where, told } = (patch ?? {}) as Record<string, unknown>
+    writePrefs(prefsFile, {
+      ...(where === 'overview' || where === 'tasks'
+        ? { landing: where === 'overview' ? 'overview' : undefined }
+        : {}),
+      ...(told === true ? { todoFirstTold: true } : {}),
+    })
   })
   // The language, for the window's first paint (asked before it renders)
   ipcMain.on('pacenote:app:language', (event) => {
@@ -2613,6 +2670,8 @@ if (!app.requestSingleInstanceLock()) {
           )
         todoSync?.start()
       }
+      // A new install starts with Todo, and Pace off until it is set up.
+      if (firstRun()) supervisor?.setOff(true)
       // The bot starts independently of the window and does not wait for it.
       if (supervisor?.current.autoStart && supervisor.current.phase === 'idle')
         void supervisor.start()
@@ -2625,11 +2684,13 @@ if (!app.requestSingleInstanceLock()) {
       else
         await createWindow(
           setup.view().open
-            ? '#/setup'
+            ? firstRun()
+              ? '#/start'
+              : '#/setup'
             : // Opened by a link from the hub's installer
               linkedHub
               ? '#/settings/messengers'
-              : ''
+              : landing()
         )
       openOnActivate()
     })

@@ -9,6 +9,8 @@ const en = {
   crashed: 'Crashed',
   starting: 'Starting',
   stopped: 'Stopped',
+  /** Pace turned off: Pacenote for Todo alone */
+  off: 'Off',
   standingBy: 'Standing by',
   connected: 'Connected',
   reconnecting: 'Reconnecting',
@@ -23,6 +25,7 @@ const ko: typeof en = {
   crashed: '비정상 종료',
   starting: '시작 중',
   stopped: '중지됨',
+  off: '꺼짐',
   standingBy: '대기 중',
   connected: '연결됨',
   reconnecting: '다시 연결 중',

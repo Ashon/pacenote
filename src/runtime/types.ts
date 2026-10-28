@@ -96,6 +96,12 @@ export interface SupervisorState {
    */
   issues?: { key?: string; message: string }[]
   autoStart: boolean
+  /**
+   * Pace is off: Pacenote is used for Todo alone (a new install, until you set
+   * Pace up from Settings). It never starts by itself, and nothing asks to set
+   * it up; starting it turns it on.
+   */
+  off?: boolean
   /** Exits no one asked for in a row, since the bot last ran well */
   restarts: number
   /** When the app starts the bot again (epoch ms), while it waits to */

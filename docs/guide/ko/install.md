@@ -1,6 +1,6 @@
 ---
 title: 설치부터 Pace의 첫 답변까지
-summary: Homebrew로 Pacenote를 설치하고, 초기 설정 다섯 단계를 지나 Slack에서 Pace의 첫 답변을 받아요.
+summary: Homebrew로 Pacenote를 설치하고, 세 단계로 할 일을 모은 뒤, Pace를 설정해 Slack에서 첫 답변을 받아요.
 kind: start
 order: 1
 shot: setup-start
@@ -23,10 +23,21 @@ brew trust ashon/tap
 brew install --cask pacenote
 ```
 
-## 초기 설정, 한 단계씩
+## 처음 실행
 
-Pacenote를 열어요. 처음 실행하면 초기 설정이 열리고, 단계 목록이 왼쪽에 있어요. 단계마다 필요한 것을 그 자리에서
-확인해요.
+Pacenote를 열어요. 새로 설치하면 세 단계로 시작하고, Slack 앱은 만들지 않아요.
+
+1. **내 AI.** Claude Code나 Codex를 골라요. 이 Mac에 있고 로그인했는지 확인해요.
+2. **일이 있는 곳.** AI 도구의 Slack 커넥터로 읽기만 하는 Slack, 그리고 이 Mac의 세션과 커밋이에요. 아직이라면
+   claude.ai의 설정 > 커넥터(또는 ChatGPT의 설정 > 앱)에서 Slack을 연결하세요.
+3. **첫 모으기.** **지금 모으기**가 지난 7일의 Slack을 읽고 내 프로젝트를 찾아요. 그다음 할 일이 열려요.
+
+Slack에서 멘션하면 답하는 Pace는 설정하기 전까지 꺼져 있어요. 처음 실행에서 **대신 Pace 설정**을 누르거나,
+설정 > 일반에서 **Pace 설정**을 누르세요.
+
+## Pace 초기 설정, 한 단계씩
+
+Pace 초기 설정은 단계 목록이 왼쪽에 있어요. 단계마다 필요한 것을 그 자리에서 확인해요.
 
 ![초기 설정의 첫 단계: 이미 쓰고 있는 AI 서비스](shot:setup-start)
 

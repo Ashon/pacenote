@@ -135,6 +135,28 @@ export function useDecide() {
   }
 }
 
+/**
+ * The screen the window opens on (Todo, or Overview as you chose) and whether
+ * you were told it is Todo now; null outside the app
+ */
+export function useLanding() {
+  const bridge = window.pacenoteDesktop?.landing
+  const client = useQueryClient()
+  const query = useQuery({
+    queryKey: ['landing'],
+    queryFn: async () => (await bridge?.get()) ?? null,
+    enabled: Boolean(bridge),
+  })
+  const set = async (patch: {
+    landing?: 'tasks' | 'overview'
+    told?: true
+  }) => {
+    await bridge?.set(patch)
+    await client.invalidateQueries({ queryKey: ['landing'] })
+  }
+  return { ...query, set }
+}
+
 /** Sets a task's stage (or open again) and refreshes the list */
 export function useStage() {
   const client = useQueryClient()

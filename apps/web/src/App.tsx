@@ -30,6 +30,7 @@ import { TasksPage } from './components/tasks-page'
 import { YouPage } from './components/you-page'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
+import { FirstRun } from './components/setup/first-run'
 import { SetupWizard } from './components/setup/wizard'
 import { text } from './App.text'
 
@@ -74,6 +75,7 @@ type Route =
   | { page: 'settings' }
   | { page: 'debug' }
   | { page: 'setup' }
+  | { page: 'start' }
 
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
@@ -81,8 +83,9 @@ type Route =
  * the list), #/recap/<day|week|month>[/<key>]: what you did in a period,
  * #/you: where you contribute, #/you/<id>: one area open in its row, #/bot:
  * Pace's status and logs,
- * #/settings: Settings, #/setup: setting Pace up (the first run's wizard),
- * #/debug: Debug (development builds), otherwise: Overview
+ * #/settings: Settings, #/setup: setting Pace up (its wizard), #/start: a new
+ * install's first run (Todo's), #/debug: Debug (development builds),
+ * otherwise: Overview
  */
 function readRoute(): Route {
   const hash = window.location.hash
@@ -110,6 +113,7 @@ function readRoute(): Route {
   if (hash.startsWith('#/bot')) return { page: 'bot' }
   if (hash.startsWith('#/settings')) return { page: 'settings' }
   if (hash.startsWith('#/setup')) return { page: 'setup' }
+  if (hash.startsWith('#/start')) return { page: 'start' }
   if (hash.startsWith('#/debug') && showDebug) return { page: 'debug' }
   return { page: 'overview' }
 }
@@ -148,7 +152,8 @@ export default function App() {
     false
   )
   const compact = collapsed || windowWidth < SIDEBAR.below
-  const section: Section = route.page === 'setup' ? 'overview' : route.page
+  const section: Section =
+    route.page === 'setup' || route.page === 'start' ? 'overview' : route.page
 
   // Cmd+B shows or hides the sidebar's labels, as in most macOS apps.
   useEffect(() => {
@@ -175,12 +180,16 @@ export default function App() {
   const surfaceWidth =
     windowWidth - (compact ? SIDEBAR.compact : SIDEBAR.full) - SURFACE_MARGIN
 
-  // Setup takes the whole window; leaving it swaps the app back in.
+  // Setup and the first run take the whole window; leaving either swaps the
+  // app back in.
+  const whole = route.page === 'setup' || route.page === 'start'
   return (
     <TooltipProvider delayDuration={300}>
-      <Swap id={route.page === 'setup' ? 'setup' : 'app'} className="h-full">
+      <Swap id={whole ? route.page : 'app'} className="h-full">
         {route.page === 'setup' ? (
           <SetupWizard onLeave={go} />
+        ) : route.page === 'start' ? (
+          <FirstRun onLeave={go} />
         ) : (
           <div className="flex h-full flex-col bg-sidebar">
             {/* Three columns keep the search centered on the window; the
