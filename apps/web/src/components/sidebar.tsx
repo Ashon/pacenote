@@ -43,12 +43,13 @@ const DEBUG: Item = { section: 'debug', icon: Bug }
 
 /**
  * The app's sections as a labeled list: your work at the top, then Pace's
- * screens unless Pace is off, and Settings at the bottom. (Pace's status is in the status bar.) A
- * compact sidebar keeps only the icons, for narrow windows. Both use the same
- * padding and only hide the labels, so the icons and the mark stay put when it
- * switches: 12px of sidebar and 11px of item put an 18px icon on the compact
- * sidebar's center line. The width changes with motion (layout): the labels
- * fade before it narrows and after it widens, and are clipped meanwhile.
+ * screens unless Pace is off, and Settings at the bottom. (Pace's status is in
+ * the status bar.) A compact sidebar keeps only the icons, for narrow windows.
+ * Both use the same padding and only hide the labels, so the icons and the
+ * mark stay put when it switches: 12px of sidebar and 11px of item put an
+ * 18px icon on the compact sidebar's center line. The width changes with
+ * motion (layout): the labels fade before it narrows and after it widens, and
+ * are clipped meanwhile.
  */
 export function Sidebar({
   active,
