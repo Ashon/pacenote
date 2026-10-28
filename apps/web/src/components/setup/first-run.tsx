@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { botControl } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
+import { readStored, writeStored } from '@/lib/storage'
 import { useDetect, useSettingsView, useSetup } from '@/lib/setup'
 import { useCollect, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,17 @@ type Step = 'ai' | 'sources' | 'look'
 const STEPS: Step[] = ['ai', 'sources', 'look']
 
 /**
+ * The furthest step reached, kept in this window, so the first run picks up
+ * where it was when the window draws it again (a language change)
+ */
+const REACHED_KEY = 'pacenote.first-run.reached'
+
+function lastReached(): number {
+  const reached = Number(readStored(REACHED_KEY))
+  return reached > 0 && reached < STEPS.length ? reached : 0
+}
+
+/**
  * A new install's first run (the task-first canvas, T5): your AI, where your
  * work is, and a first look at what is asked of you, with your projects. It
  * turns Todo on and ends on it, with no Slack app to make: Pace stays off
@@ -35,17 +47,20 @@ export function FirstRun({ onLeave }: { onLeave: (hash: string) => void }) {
   const setup = useSetup()
   const detect = useDetect()
   const settings = useSettingsView()
-  const [step, setStep] = useState<Step>('ai')
-  const [reached, setReached] = useState(0)
+  const [reached, setReached] = useState(lastReached)
+  const [step, setStep] = useState<Step>(STEPS[reached]!)
   const isMac = window.pacenoteDesktop?.platform === 'darwin'
   const go = (next: Step) => {
+    const furthest = Math.max(reached, STEPS.indexOf(next))
     setStep(next)
-    setReached(Math.max(reached, STEPS.indexOf(next)))
+    setReached(furthest)
+    writeStored(REACHED_KEY, String(furthest))
     settings.refresh()
   }
   const chosen = settings.view?.values.TASKS_AI
   const cli = isOwnCli(chosen) ? chosen : 'claude'
   const finish = async () => {
+    writeStored(REACHED_KEY, '0')
     await setup.save({ finished: true })
     onLeave('#/tasks')
   }
