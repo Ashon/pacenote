@@ -8,7 +8,7 @@ cask "pacenote" do
 
   url "https://github.com/Ashon/pacenote/releases/download/v#{version}/Pacenote-v#{version}-macos-arm64.app.zip"
   name "Pacenote"
-  desc "Slack assistant that answers only you, with your local claude or codex CLI"
+  desc "Gathers what is asked of you into one list, with your own Claude Code or Codex"
   homepage "https://pacenote.dev/"
 
   # Apple silicon only; Electron 38 and later need macOS 12.
@@ -33,14 +33,15 @@ cask "pacenote" do
   ]
 
   caveats <<~EOS
-    Pace answers you in Slack when you mention it, with your local claude or codex CLI login.
-    Before the first mention:
+    Pacenote keeps what is asked of you in one list, with your local claude or codex CLI login.
+    Before you open it:
       - log in to claude or codex (codex 0.138 or later)
-      - open Pacenote: a first run opens on setup, from the AI service on this Mac to Pace's
-        first answer, with the built-in sandbox prepared in the background (macOS 15 or later),
-        your team's hub or your own Slack app, and "@Pace it's me" to say which account is yours
-    Pace answers only you; teammates each run their own Pace through your team's hub.
-    Setup can be left and picked up from Overview, or done in Settings instead.
+      - to gather asks from Slack, connect Slack in claude.ai's Settings > Connectors (or
+        ChatGPT's Settings > Apps); Pacenote reads it through that connector and holds no token
+    A first run asks which AI to use, reads your last 7 days, and opens Todo.
+    Pace, which answers when you mention it in Slack, is optional: set it up from the first run
+    or Settings > General, with your team's hub or your own Slack app. An install set up
+    before keeps Pace as it was.
     Config and run history are in ~/.pacenote and are kept when the app is removed.
   EOS
 end
