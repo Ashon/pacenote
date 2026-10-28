@@ -80,8 +80,8 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
   (`add_tasks`), each with the permalink of its message. A message is never a task twice, and messages from channels left
   out, or DMs while they do not count, are skipped whatever the tool sends.
 - The messages go to the tool's model, as anything the tool reads does. Pacenote keeps the tasks in
-  `PACENOTE_DATA_DIR/tasks.json` and your decisions in `tasks-decisions.json`. With Pacenote on another of your Macs,
-  both are the same there too ([Your Macs](macs.md)).
+  `PACENOTE_DATA_DIR/tasks.json`, your decisions in `tasks-decisions.json`, and the stages you set (in progress, waiting)
+  in `tasks-stages.json`. With Pacenote on another of your Macs, they are the same there too ([Your Macs](macs.md)).
 
 ## Who you are in Slack
 
@@ -107,6 +107,16 @@ A collection is told who you are, so it can tell what is asked of you from what 
   me" from the same channel, the screen offers to leave that channel out.
 - Closed tasks show under Done with why, and Reopen brings one back. Done lists the ten settled last, the latest first,
   and ten more on each **Show more**; a task opened from a link is listed however far down it is.
+- **In progress** and **Waiting** sit on top of open. A task is in progress when you mark it (More > Mark in progress)
+  or when a session worked on it in the last day, and comes first in Open. A task waiting on someone else (More >
+  Waiting on someone else) moves to the Waiting tab until a collection changes it after that (someone answered in its
+  thread) or you put it back. To AI tools, Pace, Recap and areas it is still open, so a collection keeps reading its
+  thread. The stages are kept apart, in `tasks-stages.json`, so a Pacenote before 0.6.12, here or on another Mac, shows
+  such a task as open and loses nothing.
+- **Today**, above the tabs, names the ask waiting on you (a due one first), the task in progress to pick up and the one
+  waiting longest on someone else, counted from the list with no model.
+- **New task** (⌘N) adds a task of your own on This Mac, in the project its words point to (or the one you pick, among
+  those with a repository); its row says "You added it".
 - Open tasks fade after 7 days and drop after 14; done, dismissed and closed ones are kept 14 days.
 - Above Done's list, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked
   too loosely.

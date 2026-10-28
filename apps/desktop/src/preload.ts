@@ -83,6 +83,10 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       subscribe('pacenote:tasks:changed')(() => callback()),
     decide: (id: string, decision: unknown) =>
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
+    stage: (id: string, stage: string) =>
+      ipcRenderer.invoke('pacenote:tasks:stage', id, stage),
+    add: (title: string, repo?: string) =>
+      ipcRenderer.invoke('pacenote:tasks:add', title, repo),
     leaveOut: (label: string) =>
       ipcRenderer.invoke('pacenote:tasks:leave-out', label),
     // Collect now: Claude Code reads Slack, read only, in the main process

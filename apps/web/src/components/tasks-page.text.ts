@@ -7,9 +7,12 @@ const it = (title?: string) => (title ? `“${title}”` : 'a task')
 const en = {
   title: 'Todo',
   noDesktop: 'Tasks are gathered by the desktop app.',
-  /** The header: open tasks, and when (and on which Mac) they were collected */
-  meta: (open: number, collected?: string, mac?: string) =>
-    `${open} open${
+  /**
+   * The header: open tasks, those waiting on someone else, and when (and on
+   * which Mac) they were collected
+   */
+  meta: (open: number, collected?: string, mac?: string, waiting = 0) =>
+    `${open} open${waiting ? ` · ${waiting} waiting` : ''}${
       collected ? ` · collected ${collected}${mac ? ` on ${mac}` : ''}` : ''
     }`,
   leaveOutOffer: (count: number, label: string) =>
@@ -26,11 +29,27 @@ const en = {
   dismissRate: (percent: number) =>
     `You dismissed ${percent}% of the tasks you settled. Above about 30%, Pace is picking too loosely.`,
   tabOpen: 'Open',
+  tabWaiting: 'Waiting',
   tabMaybe: 'Maybe',
   tabDone: 'Done',
   tabCollections: 'Collections',
+  waitingNote:
+    'Waiting on someone else, longest first. A task comes back to Open when a collection finds something new in its thread.',
+  noWaiting: 'Nothing waits on anyone else.',
   showMore: (n: number) => `Show ${n} more`,
   newTasks: (n: number) => `${n} new ${n === 1 ? 'task' : 'tasks'}`,
+
+  // New task (Cmd-N)
+  newTask: 'New task',
+  newTaskLabel: 'What to do',
+  newTaskPlaceholder: 'What to do',
+  add: 'Add',
+  project: 'Project',
+  noProject: 'No project',
+  keptHere: 'Kept on This Mac',
+  addHint: 'Enter adds it to Open · Esc closes',
+  guessedFrom: (word: string) => `the project was guessed from “${word}”`,
+  guessed: 'guessed',
 
   // Collect now
   collectingOn: (mac: string) => `Collecting on ${mac}`,
@@ -128,8 +147,8 @@ const sentence = (line: string) => line.replace(/[.。]\s*$/, '')
 const ko: typeof en = {
   title: '할 일',
   noDesktop: '할 일은 데스크톱 앱이 모아요.',
-  meta: (open, collected, mac) =>
-    `열린 할 일 ${open}개${
+  meta: (open, collected, mac, waiting = 0) =>
+    `열린 할 일 ${open}개${waiting ? ` · 기다림 ${waiting}개` : ''}${
       collected ? ` · ${mac ? `${mac}에서 ` : ''}${collected} 모음` : ''
     }`,
   leaveOutOffer: (count, label) =>
@@ -146,11 +165,26 @@ const ko: typeof en = {
   dismissRate: (percent) =>
     `끝내거나 제외한 할 일 중 ${percent}%를 제외했어요. 30%를 넘으면 Pace가 너무 느슨하게 고르고 있는 거예요.`,
   tabOpen: '열림',
+  tabWaiting: '기다림',
   tabMaybe: '후보',
   tabDone: '완료',
   tabCollections: '모으기 기록',
+  waitingNote:
+    '남을 기다리는 일이에요. 오래 기다린 것부터 보여요. 모으기가 스레드에서 새 소식을 찾으면 열림으로 돌아와요.',
+  noWaiting: '남을 기다리는 일이 없어요.',
   showMore: (n) => `${n}개 더 보기`,
   newTasks: (n) => `새 할 일 ${n}개`,
+
+  newTask: '새 할 일',
+  newTaskLabel: '할 일',
+  newTaskPlaceholder: '무엇을 할까요',
+  add: '추가',
+  project: '프로젝트',
+  noProject: '프로젝트 없음',
+  keptHere: '이 Mac에 둬요',
+  addHint: 'Enter로 열림에 추가 · Esc로 닫기',
+  guessedFrom: (word) => `“${word}”에서 프로젝트를 짐작했어요`,
+  guessed: '짐작',
 
   collectingOn: (mac) => `${mac}에서 모으는 중`,
   collecting: '모으는 중',

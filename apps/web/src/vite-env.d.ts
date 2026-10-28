@@ -26,6 +26,7 @@ import type {
   SetupView,
 } from '@src/settings/setup'
 import type { OwnAiNow, OwnAiView, OwnCli } from '@src/tasks/own-ai'
+import type { StageRecord, StageRecords } from '@src/tasks/stage'
 import type { FromMacState, MacsView } from '@src/macs/types'
 import type {
   CollectionRecord,
@@ -155,6 +156,8 @@ declare global {
               collections: CollectionRecord[]
               /** Each open task's latest session: its tool and last activity */
               working: Record<string, { tool: WorkTool; at: string }>
+              /** The stages you set for open tasks: started, waiting */
+              stages: StageRecords
               /** Open tasks whose quiet session says they look done */
               proposals: Record<string, Proposal>
               /** User groups that mean you (Settings), and ones you said not */
@@ -174,6 +177,13 @@ declare global {
           id: string,
           decision: Omit<TaskDecision, 'at'> | null
         ): Promise<void>
+        /** In progress, waiting on someone else, or back to open */
+        stage(id: string, stage: StageRecord['stage']): Promise<void>
+        /** Adds a task of your own, in a repository's project or none */
+        add(
+          title: string,
+          repo?: string
+        ): Promise<{ id?: string; error?: string } | undefined>
         leaveOut(label: string): Promise<SettingsIssue[]>
         /**
          * Runs a collection (the AI chosen, Slack read only) and waits for it

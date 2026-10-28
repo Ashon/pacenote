@@ -142,6 +142,9 @@ export type TaskOrigin = SourceId | 'local'
 /** A task from a session on this Mac, as a source is named */
 export const LOCAL = { id: 'local', label: 'This Mac' } as const
 
+/** Who added a local task you added yourself, in Todo (Task.addedBy) */
+export const ADDED_BY_YOU = 'you'
+
 /** A task's source; tasks from before there were sources are Slack's */
 export const sourceOf = (task: {
   source: { app?: TaskOrigin }

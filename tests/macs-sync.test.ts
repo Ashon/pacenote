@@ -17,8 +17,10 @@ import { readCollections } from '../src/tasks/collections.js'
 import {
   decide,
   readDecisions,
+  readStages,
   readTakenBack,
   readTasks,
+  setStage,
   writeTasks,
 } from '../src/tasks/store.js'
 import type {
@@ -351,6 +353,10 @@ describe('your Todo between two Macs', () => {
     decide(pro.dataDir, '1', undefined, new Date(Date.now() + 1_000))
     await poll(() => readDecisions(air.dataDir)['1']).toBeUndefined()
     expect(Object.keys(readTakenBack(air.dataDir))).toEqual(['1'])
+    // Waiting, set on the Air: a part of its own, which an earlier Pacenote
+    // leaves alone
+    setStage(air.dataDir, '2', 'waiting')
+    await poll(() => readStages(pro.dataDir)['2']?.stage).toBe('waiting')
     expect(readCollections(air.dataDir)).toEqual([])
     expect(
       JSON.parse(readFileSync(path.join(pro.dataDir, 'tasks.json'), 'utf8'))

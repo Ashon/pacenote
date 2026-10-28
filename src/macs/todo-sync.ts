@@ -6,14 +6,17 @@ import {
   DECISIONS_FILE,
   readDecisions,
   readJson,
+  readStages,
   readTakenBack,
   readTasks,
+  STAGES_FILE,
   TAKEN_BACK_FILE,
   TASKS_FILE,
   withTasksLock,
   writeJson,
   writeTasks,
 } from '../tasks/store.js'
+import { cleanStages, type StageRecords } from '../tasks/stage.js'
 import type {
   CollectionRecord,
   TaskDecisions,
@@ -50,6 +53,7 @@ const SYNCED = new Set([
   WORK_FILE,
   RECAPS_FILE,
   YOU_FILE,
+  STAGES_FILE,
 ])
 /** Looks again this often, for changes the folder's events missed */
 const RECHECK_MS = 15_000
@@ -63,6 +67,11 @@ interface Parts {
   you: YouFile
   /** This Mac's own collections, for "Collected 10:20 on MacBook Pro" */
   collections: CollectionRecord[]
+  /**
+   * The stages you set (started, waiting): a part Pacenote before 0.6.12
+   * does not know and leaves alone, as it does whatever part it does not know
+   */
+  stages: StageRecords
 }
 
 type Part = keyof Parts
@@ -144,6 +153,7 @@ export class TodoSync {
       written: readWritten(dataDir),
       you: readYou(dataDir),
       collections: this.options.collections().filter((row) => !row.mac),
+      stages: readStages(dataDir),
     }
   }
 
@@ -253,6 +263,13 @@ export class TodoSync {
             writeJson(path.join(dataDir, COLLECTIONS_FILE), {
               collections: merged,
             })
+        )
+      }
+      if (parts.stages) {
+        known.set('stages', hash(parts.stages))
+        const local = readStages(dataDir)
+        write(local, mergeLatest(local, cleanStages(parts.stages)), (merged) =>
+          writeJson(path.join(dataDir, STAGES_FILE), merged)
         )
       }
     } catch (err) {

@@ -2,6 +2,7 @@ import { closeSync, mkdirSync, openSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { readJson, writeJson } from '../json-file.js'
 import { sourceOf } from './sources.js'
+import { cleanStages, type StageRecord, type StageRecords } from './stage.js'
 import type {
   DismissReason,
   Task,
@@ -13,13 +14,15 @@ import type {
 } from './types.js'
 
 /**
- * The two files behind your tasks:
+ * The files behind your tasks:
  * - tasks.json: the tasks as AI tools add, change and close them through
  *   Pacenote's MCP server, with who you are in Slack; the desktop app writes
  *   it too (a task closed when it looks done, a group you say is not you),
  *   each change under its lock (withTasksLock)
  * - tasks-decisions.json: your clicks in the desktop app (done, dismissed,
  *   kept), written by it alone
+ * - tasks-stages.json: the stages you set for open tasks (started, waiting),
+ *   written by it alone too
  */
 export const TASKS_FILE = 'tasks.json'
 export const DECISIONS_FILE = 'tasks-decisions.json'
@@ -28,6 +31,11 @@ export const DECISIONS_FILE = 'tasks-decisions.json'
  * too rather than bring them back (src/macs/sync.ts)
  */
 export const TAKEN_BACK_FILE = 'tasks-taken-back.json'
+/**
+ * The stages you set (started, waiting, open again), by task, written by the
+ * desktop app alone (src/tasks/stage.ts)
+ */
+export const STAGES_FILE = 'tasks-stages.json'
 
 const DAY = 24 * 60 * 60_000
 /** An open task this old is shown faded */
@@ -127,6 +135,30 @@ export function readTakenBack(dataDir: string): Record<string, string> {
     {}
   )
   return value && typeof value === 'object' ? value : {}
+}
+
+export function readStages(dataDir: string): StageRecords {
+  return cleanStages(readJson<unknown>(path.join(dataDir, STAGES_FILE), {}))
+}
+
+/**
+ * Records the stage you set for a task, or open when you take one back; the
+ * records stay as long as the tasks they are about
+ */
+export function setStage(
+  dataDir: string,
+  id: string,
+  stage: StageRecord['stage'],
+  now = new Date()
+): void {
+  const kept = Object.entries(readStages(dataDir)).filter(
+    ([key, record]) =>
+      key !== id && now.getTime() - Date.parse(record.at) < HISTORY_MS
+  )
+  writeJson(
+    path.join(dataDir, STAGES_FILE),
+    Object.fromEntries([...kept, [id, { stage, at: now.toISOString() }]])
+  )
 }
 
 /** A task as the screen shows it: your decision over what was found */

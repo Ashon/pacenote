@@ -4,7 +4,7 @@ import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { collectPrompt, registerTaskTools } from '../src/tasks/mcp.js'
 import type { TasksSettings } from '../src/tasks/settings.js'
 import { decide, readTasks, tasksView } from '../src/tasks/store.js'
@@ -21,6 +21,13 @@ const dir = (name: string) => path.join(root, name)
 
 const NOW = Date.parse('2026-10-14T03:00:00Z')
 const HOUR = 3600_000
+// The list drops an open task 14 days after it was found: these are read on
+// the day they were found, whatever today is.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(NOW)
+})
+afterAll(() => vi.useRealTimers())
 const on: TasksSettings = { on: true, dms: false, exclude: [] }
 const link = (conversation: string, at: number) =>
   `https://acme.slack.com/archives/${conversation}/p${(at / 1000).toFixed(6).replace('.', '')}`

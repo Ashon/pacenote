@@ -45,6 +45,20 @@ const en = {
   // Who it is from
   leftAfter: (title: string) => `Left after “${title}”`,
   keptFromSession: 'Kept from a session',
+  addedByYou: 'You added it',
+  // Stages: in progress, waiting on someone else
+  inProgress: 'In progress',
+  /** Since when it waits, by calendar days */
+  waitingFor: (days: number) =>
+    days === 0
+      ? 'Waiting since today'
+      : days === 1
+        ? 'Waiting since yesterday'
+        : `Waiting ${days} days`,
+  markInProgress: 'Mark in progress',
+  notInProgress: 'Not in progress',
+  waitingOnSomeone: 'Waiting on someone else',
+  backToOpen: 'Back to open',
   promised: 'You said you would',
   askedBy: (person: string, group?: string) =>
     `${person} asked ${group ?? 'you'}`,
@@ -245,6 +259,18 @@ const ko: typeof en = {
 
   leftAfter: (title) => `“${title}” 이후 남은 일`,
   keptFromSession: '세션에서 남긴 일',
+  addedByYou: '직접 추가함',
+  inProgress: '진행 중',
+  waitingFor: (days) =>
+    days === 0
+      ? '오늘부터 기다림'
+      : days === 1
+        ? '어제부터 기다림'
+        : `${days}일째 기다림`,
+  markInProgress: '진행 중으로',
+  notInProgress: '진행 중 아님',
+  waitingOnSomeone: '남을 기다리는 중',
+  backToOpen: '열림으로',
   promised: '하겠다고 한 일',
   askedBy: (person, group) =>
     group ? `${person}님이 ${group}에 요청` : `${person}님의 요청`,

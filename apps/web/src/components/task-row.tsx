@@ -1,6 +1,7 @@
 import { localized } from '@src/i18n/locale'
 import { CLI_NAMES } from '@src/tasks/own-ai'
-import { LOCAL, sourceOf } from '@src/tasks/sources'
+import { ADDED_BY_YOU, LOCAL, sourceOf } from '@src/tasks/sources'
+import type { StageRecord, TaskStage } from '@src/tasks/stage'
 import type {
   DismissReason,
   FolderCheck,
@@ -20,6 +21,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
   CircleCheck,
+  CirclePause,
+  Clock,
   Copy,
   ExternalLink,
   FolderOpen,
@@ -27,6 +30,7 @@ import {
   MessageSquare,
   MessagesSquare,
   MoreHorizontal,
+  Play,
   RotateCw,
   SquareTerminal,
   Undo2,
@@ -51,6 +55,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { motionItem, useFlash, usePresence } from '@/components/ui/motion'
@@ -59,6 +64,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { macNamed, useMacs } from '@/lib/macs'
+import { daysSince } from '@/lib/today'
 import {
   taskDetailQuery,
   taskHash,
@@ -161,6 +167,7 @@ export function TaskRow({
   opensIn,
   working,
   live,
+  stage,
   follows,
   proposal,
   area,
@@ -170,6 +177,7 @@ export function TaskRow({
   logEntry,
   onToggle,
   onDecide,
+  onStage,
 }: {
   task: TaskView
   /** Its list's motion as it comes and goes (useListMotion) */
@@ -184,6 +192,8 @@ export function TaskRow({
   working?: { tool: WorkTool; at: string }
   /** An AI tool working on it now over MCP (tasks-activity.jsonl) */
   live?: { by?: string; at: string }
+  /** Open, it may be in progress or waiting on someone (src/tasks/stage.ts) */
+  stage?: TaskStage
   /** The title of the task it carries on from, for one a session left */
   follows?: string
   /** Its quiet session says it looks done (done-watch.ts) */
@@ -202,6 +212,8 @@ export function TaskRow({
   logEntry?: string
   onToggle: () => void
   onDecide: (decision: Omit<TaskDecision, 'at'> | null) => void
+  /** Sets its stage, or open again */
+  onStage?: (stage: StageRecord['stage']) => void
 }) {
   const t = useText(text)
   const client = useQueryClient()
@@ -278,9 +290,11 @@ export function TaskRow({
   // From a session on this Mac, it has no thread: no reply to draft.
   const local = task.source.app === 'local'
   const who = local
-    ? follows
-      ? t.leftAfter(follows)
-      : t.keptFromSession
+    ? task.addedBy === ADDED_BY_YOU
+      ? t.addedByYou
+      : follows
+        ? t.leftAfter(follows)
+        : t.keptFromSession
     : task.kind === 'promised'
       ? t.promised
       : task.askedBy
@@ -344,6 +358,31 @@ export function TaskRow({
           },
         ]),
   ]
+  // Where it stands: in progress, or waiting on someone else
+  const stageItems: typeof more = onStage
+    ? [
+        stage?.stage === 'started'
+          ? {
+              label: t.notInProgress,
+              icon: <CirclePause />,
+              run: () => onStage('open'),
+            }
+          : {
+              label: t.markInProgress,
+              icon: <Play />,
+              run: () => onStage('started'),
+            },
+        ...(stage?.stage === 'waiting'
+          ? []
+          : [
+              {
+                label: t.waitingOnSomeone,
+                icon: <Clock />,
+                run: () => onStage('waiting'),
+              },
+            ]),
+      ]
+    : []
 
   return (
     <li
@@ -403,6 +442,21 @@ export function TaskRow({
               {settledLabel && (
                 <span className="rounded-full bg-muted px-2 py-px font-medium">
                   {settledLabel}
+                </span>
+              )}
+              {stage?.stage === 'started' && !atWork.mounted && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/12 px-2 py-px font-medium text-primary">
+                  <span
+                    aria-hidden="true"
+                    className="size-1.5 rounded-full bg-primary"
+                  />
+                  {t.inProgress}
+                </span>
+              )}
+              {stage?.stage === 'waiting' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-px font-medium">
+                  <Clock aria-hidden="true" className="size-3" />
+                  {t.waitingFor(daysSince(stage.at))}
                 </span>
               )}
               {area && (
@@ -565,6 +619,16 @@ export function TaskRow({
                 </a>
               </Button>
             )}
+            {acting && stage?.stage === 'waiting' && onStage && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onStage('open')}
+              >
+                <Undo2 />
+                {t.backToOpen}
+              </Button>
+            )}
             {acting && (
               <>
                 <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
@@ -584,6 +648,15 @@ export function TaskRow({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     {more.map((item) => (
+                      <DropdownMenuItem key={item.label} onSelect={item.run}>
+                        {item.icon}
+                        {item.label}
+                      </DropdownMenuItem>
+                    ))}
+                    {more.length > 0 && stageItems.length > 0 && (
+                      <DropdownMenuSeparator />
+                    )}
+                    {stageItems.map((item) => (
                       <DropdownMenuItem key={item.label} onSelect={item.run}>
                         {item.icon}
                         {item.label}

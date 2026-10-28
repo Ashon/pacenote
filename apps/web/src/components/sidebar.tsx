@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useText } from '@/lib/i18n'
-import { useTasks } from '@/lib/tasks'
+import { stagesOf, useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
 import { text } from './sidebar.text'
@@ -59,10 +59,13 @@ export function Sidebar({
   showDebug: boolean
 }) {
   const t = useText(text)
-  // Open tasks, beside Tasks
+  // Open tasks, beside Tasks: not those waiting on someone else
   const tasks = useTasks().data
+  const stages = stagesOf(tasks)
   const openTasks = tasks?.settings.on
-    ? tasks.tasks.filter((task) => task.status === 'open').length
+    ? tasks.tasks.filter(
+        (task) => task.status === 'open' && stages[task.id]?.stage !== 'waiting'
+      ).length
     : 0
   const item = (props: Item) => (
     <NavItem

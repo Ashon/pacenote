@@ -93,7 +93,9 @@ import {
   buildView,
   decide,
   readDecisions,
+  readStages,
   readTasks,
+  setStage,
   tasksView,
 } from '../../../src/tasks/store.js'
 import { listOf } from '../../../src/tasks/settings.js'
@@ -133,6 +135,7 @@ import {
   workFor,
 } from '../../../src/tasks/work.js'
 import { addFollowUp, closeTask } from '../../../src/tasks/write.js'
+import { ADDED_BY_YOU } from '../../../src/tasks/sources.js'
 import {
   leaveArea,
   mergeAreas,
@@ -1330,6 +1333,8 @@ function registerBotIpc(): void {
       collections,
       ...view,
       working: working(open, work.entries),
+      // What you set for open tasks: started, waiting (src/tasks/stage.ts)
+      stages: readStages(dataDir),
       proposals: openProposals(work, new Set(open.map((task) => task.id))),
       // A Maybe from a group neither list has asks whether it means you.
       groups: { yours, notYours: notYourGroups(file, yours) },
@@ -1531,6 +1536,27 @@ function registerBotIpc(): void {
   handle('pacenote:tasks:decide', undefined, (id, decision) => {
     if (typeof id !== 'string') return
     decide(dataDir, id, taskDecision(decision))
+  })
+  // In progress, waiting on someone else, or back to open
+  handle('pacenote:tasks:stage', undefined, (id, stage) => {
+    if (typeof id !== 'string') return
+    if (stage === 'started' || stage === 'waiting' || stage === 'open')
+      setStage(dataDir, id, stage)
+  })
+  // A task you add yourself (Todo's New task), in a project's repository
+  handle('pacenote:tasks:add', undefined, (title, repo) => {
+    if (typeof title !== 'string' || !title.trim()) return undefined
+    const result = addFollowUp(
+      dataDir,
+      {
+        title,
+        why: 'Added by you',
+        repo: typeof repo === 'string' ? repo : undefined,
+      },
+      { addedBy: ADDED_BY_YOU }
+    )
+    if ('error' in result) return result
+    return { id: result.task.id }
   })
   handle('pacenote:tasks:leave-out', [], (label) => {
     if (typeof label !== 'string' || !label.trim()) return []

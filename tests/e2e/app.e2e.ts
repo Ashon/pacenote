@@ -2643,6 +2643,122 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await eventually('all 12', async () => (await collections.count()) === 12)
   })
 
+  it('says what waits on you today, keeps a task in progress or waiting on someone, and adds one of your own with Cmd-N', async () => {
+    world = await World.create([])
+    const { home } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    const on = { on: true, dms: false, exclude: [] }
+    let k = 0
+    const ask = (title: string, asked_by: string, extra: object = {}) => ({
+      title,
+      asked_by,
+      where: '#payments',
+      link: `https://acme.slack.com/archives/C0PAYMENTS/p${Math.floor((now - 3 * HOUR) / 1000) + ++k}000100`,
+      confidence: 'sure' as const,
+      repo: 'Ashon/payments',
+      ...extra,
+    })
+    const [review, wal, psp] = addTasks(
+      home,
+      [
+        ask('Review the payment retry PR', 'mina', { due: 'Friday' }),
+        ask('Look at the WAL growth on db-3', 'jin'),
+        ask('Confirm the webhook timeout with the PSP', 'hyun'),
+      ],
+      { settings: on, now: new Date(now - 2 * HOUR), finished: true }
+    ).added
+    const page = await launch(world, { settings: ['TASKS=on'] })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const row = (id: string) => page.locator(`[data-task-row="${id}"]`)
+    // A line of Today, by its label
+    const line = (label: string) =>
+      page
+        .locator('dl[aria-label="Today"] > div')
+        .filter({ has: page.getByRole('term').filter({ hasText: label }) })
+
+    // Today: the ask with a due date waits on you first.
+    await line('Waiting on you')
+      .getByText('Review the payment retry PR')
+      .waitFor()
+    await line('Waiting on you')
+      .getByText(/mina asked .* · due Friday · and 2 more/)
+      .waitFor()
+
+    // Waiting on someone else, from More: a tab of its own, out of Open
+    const more = (id: string) =>
+      row(id).getByRole('button', { name: 'More for this task' }).click()
+    await more(psp!.id)
+    await page
+      .getByRole('menuitem', { name: 'Waiting on someone else' })
+      .click()
+    await page.getByRole('tab', { name: 'Waiting 1' }).waitFor()
+    await page.getByRole('tab', { name: 'Open 2' }).waitFor()
+    await line('Waiting on others')
+      .getByText('Confirm the webhook timeout with the PSP')
+      .waitFor()
+    await page.getByRole('tab', { name: 'Waiting 1' }).click()
+    await page.getByRole('tab', { name: 'Waiting 1', selected: true }).waitFor()
+    await page.getByText(/^Waiting on someone else, longest first/).waitFor()
+    await row(psp!.id).getByText('Waiting since today').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-waiting.png'),
+    })
+    // An earlier Pacenote reads the task as open: the stage is apart.
+    const stages = () =>
+      JSON.parse(
+        readFileSync(path.join(home, 'tasks-stages.json'), 'utf8')
+      ) as Record<string, { stage: string }>
+    expect(stages()[psp!.id]?.stage).toBe('waiting')
+    expect(existsSync(path.join(home, 'tasks-decisions.json'))).toBe(false)
+    // Back to open: the tab stays while you are on it, and goes after
+    await row(psp!.id).getByRole('button', { name: 'Back to open' }).click()
+    await page.getByText('Nothing waits on anyone else.').waitFor()
+    await page.getByRole('tab', { name: 'Open 3' }).click()
+    await page
+      .getByRole('tab', { name: /^Waiting/ })
+      .waitFor({ state: 'detached' })
+
+    // In progress: first in Open, and the one to pick up today
+    await more(wal!.id)
+    await page.getByRole('menuitem', { name: 'Mark in progress' }).click()
+    await row(wal!.id).getByText('In progress').waitFor()
+    await line('Pick up').getByText('Look at the WAL growth on db-3').waitFor()
+    await eventually(
+      'the task in progress first',
+      async () =>
+        (await page
+          .locator('[data-task-row]')
+          .first()
+          .getAttribute('data-task-row')) === wal!.id
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-today.png'),
+    })
+
+    // Cmd-N: a task of your own, in the project its words point to
+    await page.keyboard.press('Meta+N')
+    const form = page.getByRole('form', { name: 'New task' })
+    await form
+      .getByLabel('What to do')
+      .fill('Write the rollout note for the payment retry')
+    await form.getByRole('button', { name: 'Project: Payments' }).waitFor()
+    await form.getByText(/the project was guessed from “payment”/).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-new-task.png'),
+    })
+    await form.getByLabel('What to do').press('Enter')
+    const added = page
+      .locator('[data-task-row]')
+      .filter({ hasText: 'Write the rollout note for the payment retry' })
+    await added.getByText(/^You added it · Ashon\/payments/).waitFor()
+    await added.getByRole('link', { name: 'Payments' }).waitFor()
+    await page.getByRole('tab', { name: 'Open 4' }).waitFor()
+    await form.getByLabel('What to do').press('Escape')
+    await form.waitFor({ state: 'detached' })
+    expect(review).toBeDefined()
+  })
+
   it("hands Pacenote's own work to Codex while Claude Code is at its usage limit, and says so in Todo and Settings", async () => {
     // Claude Code is at its limit for everything; Codex collects through
     // ChatGPT's Slack app and drafts.

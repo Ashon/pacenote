@@ -2,6 +2,7 @@ import { newTokens } from '@history/usage'
 import { localized } from '@src/i18n/locale'
 import type { MacsView } from '@src/macs/types'
 import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
+import type { TaskStage } from '@src/tasks/stage'
 import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
 import {
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   LoaderCircle,
+  Plus,
   RefreshCw,
   Settings,
   SquareTerminal,
@@ -34,21 +36,26 @@ import {
 } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import {
+  stagesOf,
   taskHash,
   useCollect,
   useDecide,
+  useStage,
   useTasks,
   useTasksLive,
 } from '@/lib/tasks'
+import { todayLines } from '@/lib/today'
 import { macNamed, useMacs } from '@/lib/macs'
 import { readStored, writeStored } from '@/lib/storage'
 import { cn, go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
+import { NewTask } from './new-task'
 import { closedBy, TaskRow } from './task-row'
 import { Page } from './page'
 import { text } from './tasks-page.text'
+import { lastToday, Today, TodaySkeleton } from './today'
 import {
   lastYourWork,
   rememberYourWork,
@@ -56,14 +63,23 @@ import {
   YourWorkSkeleton,
 } from './your-work'
 
-type Tab = 'open' | 'maybe' | 'done' | 'collections'
+type Tab = 'open' | 'waiting' | 'maybe' | 'done' | 'collections'
 
 /** How many rows a long list shows at first, and Show more adds each time */
 const ROWS_AT_ONCE = 10
 
-/** The tab a task is listed under */
-const tabOf = (task: TaskView): Tab =>
-  task.status === 'open' ? 'open' : task.status === 'maybe' ? 'maybe' : 'done'
+/** The tab a task is listed under: an open one waiting on someone, Waiting */
+const tabOf = (task: TaskView, stage?: TaskStage): Tab =>
+  task.status === 'open'
+    ? stage?.stage === 'waiting'
+      ? 'waiting'
+      : 'open'
+    : task.status === 'maybe'
+      ? 'maybe'
+      : 'done'
+
+/** Cmd-N here, Ctrl-N elsewhere: New task */
+const isMac = /Mac/.test(navigator.platform)
 
 /** The leave-out offers you turned down, per channel, in this browser */
 const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
@@ -116,7 +132,10 @@ export function TasksPage({
   // Your other Macs, by name, for what they did
   const macs = useMacs()
   const decide = useDecide()
+  const setStage = useStage()
   const [tab, setTab] = useState<Tab>('open')
+  // New task, open above the tabs (Cmd-N)
+  const [adding, setAdding] = useState(false)
   const [declined, setDeclined] = useState(declinedOffers)
   // The open task and the tab it was opened in: settled meanwhile (in its
   // session, say), it stays where it was until it is closed.
@@ -132,6 +151,9 @@ export function TasksPage({
   const ids = data?.tasks.map((task) => task.id) ?? []
   if (data && !seen) setSeen(new Set(ids))
   const showAll = () => setSeen(new Set(ids))
+  // Each open task's stage: started, waiting (src/tasks/stage.ts)
+  const stages = stagesOf(data, live?.working)
+  const tabIn = (task: TaskView) => tabOf(task, stages[task.id])
 
   // A task opened from a link shows under its own tab.
   useEffect(() => {
@@ -142,9 +164,25 @@ export function TasksPage({
     if (held?.id === openId) return
     const task = data?.tasks.find((each) => each.id === openId)
     if (!task) return
-    setTab(tabOf(task))
-    setHeld({ id: openId, tab: tabOf(task) })
+    const at = tabOf(task, stagesOf(data)[task.id])
+    setTab(at)
+    setHeld({ id: openId, tab: at })
   }, [openId, data, held])
+
+  // Cmd-N opens New task (on Todo, with Todo on)
+  const on = Boolean(data?.settings.on)
+  useEffect(() => {
+    if (!on) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'n' || event.shiftKey || event.altKey)
+        return
+      if (!(isMac ? event.metaKey : event.ctrlKey)) return
+      event.preventDefault()
+      setAdding(true)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [on])
 
   if (!bridge)
     return (
@@ -162,8 +200,14 @@ export function TasksPage({
       <Page
         title={t.title}
         meta={<SkeletonWord width="9rem" />}
-        action={<CollectButton running={false} />}
+        action={
+          <>
+            <NewTaskButton />
+            <CollectButton running={false} />
+          </>
+        }
       >
+        <TodaySkeleton lines={lastToday()} />
         {card && (
           <Placeholder
             key="your-work"
@@ -187,19 +231,26 @@ export function TasksPage({
       </Page>
     )
 
-  const open = data.tasks.filter((task) => task.status === 'open')
+  const open = data.tasks.filter((task) => tabIn(task) === 'open')
+  // Open, but waiting on someone else
+  const onOthers = data.tasks.filter((task) => tabIn(task) === 'waiting')
   writeStored(ROWS_KEY, String(open.length))
   rememberYourWork(data.collectedAt ? you : undefined)
   const maybe = data.tasks.filter((task) => task.status === 'maybe')
   const kept = (task: TaskView) =>
     task.id === openId && held?.id === openId && held.tab === tab
-  const listed = data.tasks.filter((task) => tabOf(task) === tab || kept(task))
-  if (tab === 'done')
+  const listed = data.tasks.filter((task) => tabIn(task) === tab || kept(task))
+  const at = (iso?: string) => Date.parse(iso ?? '') || 0
+  if (tab === 'done') listed.sort((a, b) => at(b.settledAt) - at(a.settledAt))
+  // In progress first; waiting, the longest first
+  if (tab === 'open')
     listed.sort(
       (a, b) =>
-        (Date.parse(b.settledAt ?? '') || 0) -
-        (Date.parse(a.settledAt ?? '') || 0)
+        Number(stages[b.id]?.stage === 'started') -
+        Number(stages[a.id]?.stage === 'started')
     )
+  if (tab === 'waiting')
+    listed.sort((a, b) => at(stages[a.id]?.at) - at(stages[b.id]?.at))
   // New tasks wait unless there is nothing in the list for them to move
   const isNew = (task: TaskView) =>
     seen !== undefined && !seen.has(task.id) && task.id !== openId
@@ -217,9 +268,11 @@ export function TasksPage({
   const note =
     tab === 'maybe'
       ? t.maybeNote
-      : tab === 'done' && data.dismissRate !== undefined
-        ? t.dismissRate(Math.round(data.dismissRate * 100))
-        : undefined
+      : tab === 'waiting'
+        ? t.waitingNote
+        : tab === 'done' && data.dismissRate !== undefined
+          ? t.dismissRate(Math.round(data.dismissRate * 100))
+          : undefined
 
   // Up and down step through the tasks (the open one follows); Esc closes it.
   const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
@@ -267,13 +320,17 @@ export function TasksPage({
       meta={t.meta(
         open.length,
         data.collectedAt && formatRelative(data.collectedAt),
-        data.collect.last?.mac && macNamed(macs, data.collect.last.mac)
+        data.collect.last?.mac && macNamed(macs, data.collect.last.mac),
+        onOthers.length
       )}
       action={
-        <CollectButton
-          running={Boolean(data.collect.running)}
-          elsewhere={data.collect.elsewhere?.name}
-        />
+        <>
+          <NewTaskButton pressed={adding} onClick={() => setAdding(!adding)} />
+          <CollectButton
+            running={Boolean(data.collect.running)}
+            elsewhere={data.collect.elsewhere?.name}
+          />
+        </>
       }
     >
       <StatusLine
@@ -281,6 +338,9 @@ export function TasksPage({
         macs={macs}
         live={live}
         titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
+      />
+      <Today
+        lines={todayLines(data.tasks, stages, data.working, live?.working)}
       />
       <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
@@ -301,6 +361,19 @@ export function TasksPage({
         </div>
       )}
 
+      {adding && (
+        <NewTask
+          areas={you?.areas}
+          onClose={() => setAdding(false)}
+          onAdded={(id) => {
+            // Yours, so shown at once rather than behind the notice
+            setSeen(new Set([...(seen ?? []), id]))
+            setRevealed(id)
+            setTab('open')
+          }}
+        />
+      )}
+
       <TaskTabs
         key="tabs"
         tab={tab}
@@ -309,7 +382,11 @@ export function TasksPage({
           setDoneRows(ROWS_AT_ONCE)
           showAll()
         }}
-        counts={{ open: open.length, maybe: maybe.length }}
+        counts={{
+          open: open.length,
+          waiting: onOthers.length,
+          maybe: maybe.length,
+        }}
       />
 
       {/* Another tab's list takes this one's place (swap) */}
@@ -350,6 +427,8 @@ export function TasksPage({
                     opensIn={data.settings.opensIn}
                     working={data.working?.[task.id]}
                     live={live?.working[task.id]}
+                    stage={stages[task.id]}
+                    onStage={(stage) => void setStage(task.id, stage)}
                     proposal={data.proposals?.[task.id]}
                     area={data.areas?.[task.id]}
                     askGroup={
@@ -367,7 +446,7 @@ export function TasksPage({
                         : undefined
                     }
                     open={task.id === openId}
-                    gone={tabOf(task) !== tab}
+                    gone={tabIn(task) !== tab}
                     logEntry={task.id === openId ? logEntry : undefined}
                     onToggle={() =>
                       go(task.id === openId ? '#/tasks' : taskHash(task.id))
@@ -386,9 +465,11 @@ export function TasksPage({
                     ? data.collectedAt
                       ? t.nothingOpen
                       : t.nothingYet
-                    : tab === 'maybe'
-                      ? t.noMaybes
-                      : t.nothingSettled}
+                    : tab === 'waiting'
+                      ? t.noWaiting
+                      : tab === 'maybe'
+                        ? t.noMaybes
+                        : t.nothingSettled}
                 </p>
               )}
             </>
@@ -400,8 +481,8 @@ export function TasksPage({
 }
 
 /**
- * Open, Maybe and Done, with their counts once the tasks are in, and the
- * collections that found them
+ * Open, Waiting (once a task waits on someone), Maybe and Done, with their
+ * counts once the tasks are in, and the collections that found them
  */
 function TaskTabs({
   tab,
@@ -410,7 +491,7 @@ function TaskTabs({
 }: {
   tab: Tab
   onTab: (tab: Tab) => void
-  counts?: { open: number; maybe: number }
+  counts?: { open: number; waiting: number; maybe: number }
 }) {
   const t = useText(text)
   return (
@@ -419,6 +500,11 @@ function TaskTabs({
         <TabsTrigger value="open">
           {t.tabOpen} {counts ? counts.open : <SkeletonWord />}
         </TabsTrigger>
+        {(counts?.waiting || tab === 'waiting') && (
+          <TabsTrigger value="waiting">
+            {t.tabWaiting} {counts?.waiting ?? 0}
+          </TabsTrigger>
+        )}
         <TabsTrigger value="maybe">
           {t.tabMaybe} {counts ? counts.maybe : <SkeletonWord />}
         </TabsTrigger>
@@ -579,6 +665,29 @@ function CollectButton({
     <Button size="sm" onClick={() => void collect()}>
       <RefreshCw />
       {t.collectNow}
+    </Button>
+  )
+}
+
+/** New task, beside Collect now: opens (and closes) the form, as Cmd-N does */
+function NewTaskButton({
+  pressed = false,
+  onClick,
+}: {
+  pressed?: boolean
+  onClick?: () => void
+}) {
+  const t = useText(text)
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      aria-pressed={pressed}
+      aria-keyshortcuts={isMac ? 'Meta+N' : 'Control+N'}
+      onClick={onClick}
+    >
+      <Plus />
+      {t.newTask}
     </Button>
   )
 }
