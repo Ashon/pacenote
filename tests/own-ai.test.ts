@@ -162,6 +162,25 @@ describe("which CLI does Pacenote's own work", () => {
     })
   })
 
+  it('says why the chosen one could not when the other is not on this Mac', async () => {
+    const ai = new OwnAi({ chosen: () => 'claude', fallback: () => true })
+    const calls: OwnCli[] = []
+    const ran = await ai.run(async (cli: OwnCli) => {
+      calls.push(cli)
+      return cli === 'claude'
+        ? { error: 'Claude Code has no Slack connector.', unable: 'connector' }
+        : { error: 'codex is not on this Mac.', unable: 'missing' }
+    }, refusalOf)
+    expect(calls).toEqual(['claude', 'codex'])
+    expect(ran).toEqual({
+      result: {
+        error: 'Claude Code has no Slack connector.',
+        unable: 'connector',
+      },
+      by: 'claude',
+    })
+  })
+
   it('runs opencode only when chosen, then Claude Code and Codex, resting ones last', () => {
     expect(cliOrder('opencode', true, {})).toEqual([
       'opencode',

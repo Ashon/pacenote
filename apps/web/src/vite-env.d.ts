@@ -27,7 +27,7 @@ import type {
 } from '@src/settings/setup'
 import type { OwnAiNow, OwnAiView, OwnCli } from '@src/tasks/own-ai'
 import type { StageRecord, StageRecords } from '@src/tasks/stage'
-import type { FromMacState, MacsView } from '@src/macs/types'
+import type { FromMacMode, FromMacState, MacsView } from '@src/macs/types'
 import type {
   CollectionRecord,
   CollectOutcome,
@@ -390,7 +390,8 @@ declare global {
         /** Connect to your other Mac, as far as it got */
         macState(): Promise<FromMacState | null>
         /** Looks for a Mac waiting in Add a Mac on this network */
-        macLook(): Promise<void>
+        /** mode: what it takes this time (FromMacMode), Pace's by default */
+        macLook(mode?: FromMacMode): Promise<void>
         macConnect(
           target: { instance: string } | { address: string }
         ): Promise<void>

@@ -23,6 +23,12 @@ const en = {
   thisMacHow:
     'Your Claude Code, Codex and opencode sessions and your commits, to find the projects you work on.',
   continue: 'Continue',
+  fromMac: 'From your other Mac',
+  fromMacLead:
+    'Pacenote on another of your Macs sends how Todo collects, and the two keep your Todo the same.',
+  cancel: 'Cancel',
+  fromMacTook:
+    'How Todo collects comes from there, and your Todo follows as the two Macs keep it the same. AI sign-in, sessions and folders stay with each Mac.',
   lookTitle: 'A first look',
   lookLead: (cli: string) =>
     `${cli} reads your last 7 days in Slack, read only, for what is asked of you. It takes a minute or two.`,
@@ -30,9 +36,13 @@ const en = {
   reading: (reads: number) =>
     `Reading Slack, read only: ${reads} ${reads === 1 ? 'lookup' : 'lookups'} so far.`,
   found: (added: number, maybe: number) =>
-    `Added ${added} ${added === 1 ? 'task' : 'tasks'}${
-      maybe ? ` and ${maybe} ${maybe === 1 ? 'Maybe' : 'Maybes'}` : ''
-    }.`,
+    added + maybe === 0
+      ? 'Nothing asked of you in the last 7 days. New asks come with each collection.'
+      : `Added ${added} ${added === 1 ? 'task' : 'tasks'}${
+          maybe ? ` and ${maybe} ${maybe === 1 ? 'Maybe' : 'Maybes'}` : ''
+        }.`,
+  noConnector: (cli: string, where: string) =>
+    `${cli} has no Slack connector yet, so this look is from this Mac alone. Connect Slack in ${where} when you like; Collect now on Todo reads it from then on.`,
   projects: 'Your projects',
   projectsHow:
     'What your work keeps together: repositories, channels and groups. Fix them later on You.',
@@ -65,13 +75,23 @@ const ko: typeof en = {
   thisMacHow:
     '내 Claude Code, Codex, opencode 세션과 커밋이에요. 내가 일하는 프로젝트를 찾는 데 써요.',
   continue: '계속',
+  fromMac: '다른 Mac에서 가져오기',
+  fromMacLead:
+    '다른 Mac의 Pacenote가 할 일 모으기 설정을 보내고, 두 Mac이 할 일을 같게 맞춰요.',
+  cancel: '취소',
+  fromMacTook:
+    '할 일 모으기 설정을 그 Mac에서 가져오고, 두 Mac이 할 일을 맞추면서 할 일이 따라와요. AI 로그인, 세션, 폴더는 Mac마다 따로 있어요.',
   lookTitle: '첫 모으기',
   lookLead: (cli) =>
     `${josa(cli, '이/가')} 지난 7일의 Slack을 읽기만 하며 나에게 온 일을 찾아요. 1~2분 걸려요.`,
   collect: '지금 모으기',
   reading: (reads) => `Slack을 읽기만 하는 중: 지금까지 ${reads}번 찾아봤어요.`,
   found: (added, maybe) =>
-    `할 일 ${added}개${maybe ? `와 후보 ${maybe}개` : ''}를 더했어요.`,
+    added + maybe === 0
+      ? '지난 7일 동안 나에게 온 일이 없어요. 새로 온 일은 모을 때마다 더해져요.'
+      : `할 일 ${added}개${maybe ? `와 후보 ${maybe}개` : ''}를 더했어요.`,
+  noConnector: (cli, where) =>
+    `${josa(cli, '은/는')} 아직 Slack 커넥터가 없어서 이번에는 이 Mac만 봤어요. 원할 때 ${where}에서 Slack을 연결하면, 그때부터 할 일 화면의 지금 모으기가 함께 읽어요.`,
   projects: '내 프로젝트',
   projectsHow:
     '일이 함께 묶이는 곳이에요. 저장소, 채널, 그룹이요. 나중에 나에서 고칠 수 있어요.',

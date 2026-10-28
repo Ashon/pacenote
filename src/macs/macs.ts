@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import path from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
@@ -37,18 +38,29 @@ import {
 } from './types.js'
 
 /**
- * Your Macs, from this one: finds the others with the same Slack app on your
- * network (Bonjour, or addresses you add), keeps a channel open to each
- * (channel.ts), tells them how this Mac is used, and decides whether Pace
- * answers here (lease.ts). The desktop app opens or closes Pace's Slack
- * connection on onAnswer; everything else Pace does is as before.
+ * Your Macs, from this one: finds the others with the same key on your network
+ * (Bonjour, or addresses you add), keeps a channel open to each (channel.ts),
+ * tells them how this Mac is used, and decides whether Pace answers here
+ * (lease.ts). The desktop app opens or closes Pace's Slack connection on
+ * onAnswer; everything else Pace does is as before.
  *
- * Without your own Slack app (the team hub), or until you turn on Settings >
- * Macs > Follow the Mac you're using on each Mac, it does nothing and Pace
- * answers here, as on a Mac of its own.
+ * The key is your Slack app's (macsKey of its app token), as before 0.6.13,
+ * or one Add a Mac made on a Mac with no Slack app of its own and handed to
+ * the next (GROUP_FILE), which then wins. Over the channel Todo stays the same
+ * on each Mac (todo-sync.ts); Pace follows you only between Macs answering
+ * through the same Slack app of your own, never with the team hub.
+ *
+ * Until you turn on Settings > Macs (Follow the Mac you're using, or Find your
+ * other Macs) or Add a Mac, it does nothing and Pace answers here, as on a Mac
+ * of its own.
  */
 
 export const MACS_FILE = 'macs.json'
+/**
+ * The key Add a Mac made or brought (base64), kept apart from macs.json and
+ * readable by you alone, as settings.json's secrets are
+ */
+export const GROUP_FILE = 'macs-key'
 
 interface MacsFile {
   version: 1
@@ -126,7 +138,10 @@ interface Target {
 
 interface MacsOptions {
   dataDir: string
-  /** Your Slack app's app-level token, which the Macs know each other by */
+  /**
+   * Your own Slack app's app-level token (none with the team hub): the Macs'
+   * key when Add a Mac made none, and the app Pace follows you with
+   */
   appToken: () => string | undefined
   name: string
   version: string
@@ -165,8 +180,10 @@ export class Macs extends EventEmitter<{
   private server?: Server
   private wss?: WebSocketServer
   private bonjour?: Bonjour
-  private key?: Buffer
-  private token?: string
+  /** The key the network side was opened with */
+  private netKey?: Buffer
+  /** The key Add a Mac made or brought (GROUP_FILE) */
+  private group?: Buffer
   private timer?: NodeJS.Timeout
   private startedAt = 0
   private stopped = false
@@ -207,6 +224,7 @@ export class Macs extends EventEmitter<{
     super()
     this.now = options.now ?? Date.now
     this.file = this.read()
+    this.group = this.readGroup()
   }
 
   /** This Mac's id */
@@ -295,13 +313,14 @@ export class Macs extends EventEmitter<{
       })
     }
     return {
-      available: Boolean(this.options.appToken()),
+      paceFollows: Boolean(this.options.appToken()),
+      paired: Boolean(this.key()),
       follow: this.file.follow,
       macs: [
         me,
         ...others.filter((mac) => !this.file.ignored.includes(mac.id)),
       ],
-      ...(this.enabled() && lease ? { holder: lease.holder } : {}),
+      ...(this.paceFollows() && lease ? { holder: lease.holder } : {}),
       addresses: this.file.addresses,
       blocked: this.blocked,
       moved: this.moved,
@@ -340,12 +359,15 @@ export class Macs extends EventEmitter<{
 
   /**
    * Add a Mac: shows this Mac on your network for a new one's setup, for 10
-   * minutes, with following turned on. false without your own Slack app.
+   * minutes, with following turned on. With no Slack app of your own and no
+   * key yet, it makes the key your Macs will know each other by.
    */
   async startAdding(): Promise<boolean> {
-    if (!this.options.appToken()) return false
+    if (!this.key()) this.setGroup(randomBytes(32))
     this.clearAdding()
     if (!this.file.follow) await this.setFollow(true)
+    // On already, with the key just made: the network side opens with it
+    else await this.tick()
     if (!this.server) return false
     const timer = setTimeout(() => this.endAdding('expired'), ADDING_MS)
     timer.unref?.()
@@ -374,13 +396,36 @@ export class Macs extends EventEmitter<{
     this.emitIfChanged()
   }
 
-  /** Allow: sends the new Mac what it takes from this one */
+  /**
+   * Allow: sends the new Mac what it takes from this one, with the key your
+   * Macs know each other by
+   */
   allowAdding(): void {
     const request = this.adding?.request
-    const payload = this.options.setupPayload?.()
-    if (!request || this.adding?.result || !payload) return
+    const key = this.key()
+    if (!request || this.adding?.result || !key) return
+    const payload: SetupPayload = {
+      ...(this.options.setupPayload?.() ?? { values: {} }),
+      group: key.toString('base64'),
+    }
     request.channel.send({ t: 'setup-settings', payload })
     this.options.log(`Macs: sending ${request.name} what it needs`)
+  }
+
+  /**
+   * Takes the key your other Mac sent (Add a Mac there), so this Mac pairs
+   * with it and its others, once the network side opened again with it. false
+   * for one that is not a key.
+   */
+  async joinGroup(group: string): Promise<boolean> {
+    const key = Buffer.from(group, 'base64')
+    if (key.length !== 32) return false
+    // Your Slack app's own key already: nothing to keep apart from it
+    const token = this.options.appToken()
+    if (!this.group && token && macsKey(token).equals(key)) return true
+    this.setGroup(key)
+    await this.tick()
+    return true
   }
 
   /** Not this one: the numbers differ, or it is not your Mac */
@@ -408,7 +453,7 @@ export class Macs extends EventEmitter<{
 
   /** Answer here: this Mac claims the lease now */
   answerHere(): void {
-    if (!this.enabled() || !this.options.pace().ready) return
+    if (!this.paceFollows() || !this.options.pace().ready) return
     this.take('asked')
     void this.tick()
   }
@@ -418,7 +463,7 @@ export class Macs extends EventEmitter<{
     this.save({ follow: on })
     this.options.log(
       on
-        ? 'Macs: following the Mac you use'
+        ? 'Macs: on; looking for your other Macs'
         : 'Macs: off; Pace answers on this Mac'
     )
     await this.network()
@@ -453,15 +498,50 @@ export class Macs extends EventEmitter<{
     void this.tick()
   }
 
-  /** The Macs Macs follows on, enabled: your own Slack app and the switch on */
-  private enabled(): boolean {
-    return this.file.follow && Boolean(this.options.appToken())
+  /**
+   * The key your Macs know each other by: the one Add a Mac made or brought,
+   * else your own Slack app's
+   */
+  private key(): Buffer | undefined {
+    if (this.group) return this.group
+    const token = this.options.appToken()
+    return token ? macsKey(token) : undefined
+  }
+
+  /** On: the switch, and a key to know the others by */
+  private linkable(): boolean {
+    return this.file.follow && Boolean(this.key())
+  }
+
+  /** Pace follows the Mac you use: on, with your own Slack app */
+  private paceFollows(): boolean {
+    return this.linkable() && Boolean(this.options.appToken())
+  }
+
+  /** The Slack app Pace answers through here, one way (MacState.app) */
+  private app(): string | undefined {
+    const token = this.options.appToken()
+    return token ? macsGroup(macsKey(token)) : undefined
+  }
+
+  /**
+   * Another Mac that answers through the same Slack app: the only kind Pace
+   * moves between. One before 0.6.13 does not say its app, and pairs only by
+   * its app's key, so it shares this Mac's app when that is the key in use.
+   */
+  private sameApp(state: MacState): boolean {
+    const mine = this.app()
+    if (!mine) return false
+    if (state.app !== undefined) return state.app === mine
+    const token = this.options.appToken()
+    return Boolean(token && this.key()?.equals(macsKey(token)))
   }
 
   /** This Mac's state, for the others */
   private state(): MacState {
     const pace = this.options.pace()
     const collecting = this.options.collecting?.()
+    const app = this.app()
     return {
       id: this.id,
       name: this.options.name,
@@ -472,22 +552,25 @@ export class Macs extends EventEmitter<{
       answering: pace.answering,
       ...(pace.reasoner ? { reasoner: pace.reasoner } : {}),
       ...(collecting ? { collecting } : {}),
+      ...(app ? { app } : {}),
     }
   }
 
   private myStatus(answering: boolean): MacStatus {
-    if (!this.enabled()) return 'answering'
+    if (!this.paceFollows()) return 'answering'
     const holder = this.file.lease?.holder
     if (holder === undefined || holder === this.id)
       return answering ? 'answering' : 'moving'
     return this.here ? 'moving' : 'standing-by'
   }
 
-  /** The others as the rules see them */
+  /** The others as the rules see them: those of the same Slack app */
   private peers(): PeerSeen[] {
     const now = this.now()
     return [...this.links.values()].flatMap((link) =>
-      link.state && !this.file.ignored.includes(link.state.id)
+      link.state &&
+      !this.file.ignored.includes(link.state.id) &&
+      this.sameApp(link.state)
         ? [
             {
               id: link.state.id,
@@ -512,7 +595,7 @@ export class Macs extends EventEmitter<{
    * answers here. take: whether this may claim (not while just starting).
    */
   private decide(take = true): boolean {
-    if (!this.enabled()) return true
+    if (!this.paceFollows()) return true
     const pace = this.options.pace()
     const peers = this.peers()
     const lease = this.file.lease
@@ -585,7 +668,7 @@ export class Macs extends EventEmitter<{
   private async tick(): Promise<void> {
     if (this.stopped) return
     if (this.networking) await this.networking
-    else if (this.tokenChanged()) {
+    else if (this.keyChanged()) {
       this.networking = this.network().finally(() => {
         this.networking = undefined
       })
@@ -594,7 +677,7 @@ export class Macs extends EventEmitter<{
     const now = this.now()
     for (const link of this.links.values())
       if (now - link.heardAt >= SILENT_MS) link.channel.close()
-    if (this.enabled()) {
+    if (this.linkable()) {
       const every =
         this.unreachableSince !== undefined &&
         now - this.unreachableSince < 60_000
@@ -608,7 +691,7 @@ export class Macs extends EventEmitter<{
     }
     if (
       this.claimSince !== undefined &&
-      this.enabled() &&
+      this.paceFollows() &&
       this.options.pace().ready &&
       (this.peers().some((peer) => peer.reachable) ||
         now - this.claimSince >= CLAIM_WAIT_MS)
@@ -664,27 +747,29 @@ export class Macs extends EventEmitter<{
     for (const link of this.links.values()) link.channel.send(message)
   }
 
-  private tokenChanged(): boolean {
-    return (this.options.appToken() ?? '') !== (this.token ?? '')
+  /** The key changed since the network side opened: a new token or group */
+  private keyChanged(): boolean {
+    const key = this.key()
+    return key && this.netKey ? !key.equals(this.netKey) : key !== this.netKey
   }
 
-  /** Opens or closes the network side to match the switch and the token */
+  /** Opens or closes the network side to match the switch and the key */
   private async network(): Promise<void> {
     await this.disconnect()
-    this.token = this.options.appToken()
-    if (!this.enabled() || !this.token) return
-    this.key = macsKey(this.token)
+    this.netKey = this.key()
+    if (!this.linkable() || !this.netKey) return
+    const group = macsGroup(this.netKey)
     await this.listen()
     if (this.options.bonjour !== false)
       this.bonjour = new Bonjour({
         advertise: {
           name: this.options.name,
           port: this.port,
-          txt: { g: macsGroup(this.key), id: this.id },
+          txt: { g: group, id: this.id },
         },
         look: {
           accept: (txt) =>
-            txt.g === macsGroup(this.key!) &&
+            txt.g === group &&
             txt.id !== this.id &&
             !this.file.ignored.includes(txt.id ?? ''),
           found: (mac) => {
@@ -724,7 +809,7 @@ export class Macs extends EventEmitter<{
   private targetsFromAddresses(): void {
     for (const key of [...this.targets.keys()])
       if (key.startsWith('address:')) this.targets.delete(key)
-    if (!this.enabled()) return
+    if (!this.linkable()) return
     for (const address of this.file.addresses) {
       const where = hostPort(address)
       if (where) this.targets.set(`address:${address}`, { ...where, address })
@@ -743,7 +828,7 @@ export class Macs extends EventEmitter<{
       if (!privateAddress(address)) return socket.destroy()
       // A new Mac setting up from this one, only while Add a Mac waits
       const setup = (req.url ?? '').startsWith('/setup')
-      const key = this.key
+      const key = this.netKey
       if (setup ? !this.adding || this.adding.result : !key)
         return socket.destroy()
       wss.handleUpgrade(req, socket, head, (ws) => {
@@ -832,7 +917,7 @@ export class Macs extends EventEmitter<{
   }
 
   private async dialTarget(key: string, target: Target): Promise<void> {
-    const signingKey = this.key
+    const signingKey = this.netKey
     if (!signingKey || this.dialing.has(key)) return
     if (target.id && (this.links.has(target.id) || target.id === this.id))
       return
@@ -869,7 +954,7 @@ export class Macs extends EventEmitter<{
   /** A channel the handshake opened: one per Mac, the lower id's dial kept */
   private linked(channel: MacChannel, address?: string, target?: string): void {
     const id = channel.peer.id
-    if (this.file.ignored.includes(id) || !this.enabled())
+    if (this.file.ignored.includes(id) || !this.linkable())
       return channel.close()
     const existing = this.links.get(id)
     if (existing) {
@@ -952,6 +1037,35 @@ export class Macs extends EventEmitter<{
     }
     if (value.id !== file.id) this.write(value)
     return value
+  }
+
+  private readGroup(): Buffer | undefined {
+    try {
+      const key = Buffer.from(
+        readFileSync(
+          path.join(this.options.dataDir, GROUP_FILE),
+          'utf8'
+        ).trim(),
+        'base64'
+      )
+      return key.length === 32 ? key : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Keeps the key your Macs know each other by, for you alone to read */
+  private setGroup(key: Buffer): void {
+    const file = path.join(this.options.dataDir, GROUP_FILE)
+    try {
+      writeFileSync(file, `${key.toString('base64')}\n`, { mode: 0o600 })
+      chmodSync(file, 0o600)
+    } catch (err) {
+      this.options.log(
+        `Macs: could not save ${GROUP_FILE}: ${(err as Error).message}`
+      )
+    }
+    this.group = key
   }
 
   private save(patch: Partial<MacsFile>): void {

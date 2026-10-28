@@ -1,10 +1,11 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { _electron, type ElectronApplication, type Page } from 'playwright-core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HistoryReader } from '../../src/history/reader.js'
+import { GROUP_FILE } from '../../src/macs/macs.js'
 import { readDecisions } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks } from '../../src/tasks/write.js'
@@ -86,6 +87,8 @@ async function openMac(
     follow?: boolean
     /** Not set up yet: it opens on setup, with no Slack app or owner */
     firstRun?: boolean
+    /** Set up for Todo alone: no Slack app, Pace off */
+    todoOnly?: boolean
     /** Who setup let in, on a Mac set up before */
     me?: { id: string; name: string }
   } = {}
@@ -116,7 +119,7 @@ async function openMac(
           'RENDER_DIAGRAMS=off',
           'TIMEZONE=UTC',
           `SLACK_API_URL=${world.slack.apiUrl}`,
-          ...(options.firstRun
+          ...(options.firstRun || options.todoOnly
             ? []
             : [
                 `SLACK_APP_TOKEN=${world.slack.appToken}`,
@@ -132,6 +135,11 @@ async function openMac(
       )
     )
   )
+  if (options.todoOnly)
+    writeFileSync(
+      path.join(home, 'desktop.json'),
+      JSON.stringify({ pace: 'off', todoFirstTold: true })
+    )
   const useFile = path.join(home, 'use.json')
   const use: Mac['use'] = (value) =>
     writeFileSync(
@@ -473,5 +481,212 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await world.answered(ops.id, hello)
     await air.page.getByRole('heading', { name: 'Pace is set up' }).waitFor()
     expect(air.answered().some((request) => /hello/.test(request))).toBe(true)
+  })
+
+  /** A screen of the run, kept under test-results to look at */
+  const shot = (mac: Mac, name: string) =>
+    mac.page.screenshot({
+      path: path.join(REPO, 'test-results', `macs-${name}.png`),
+    })
+
+  /** A task found on a Mac before the two meet */
+  function seedTask(world: World, name: string, title: string, by: string) {
+    const home = homeOf(world, name)
+    mkdirSync(home, { recursive: true })
+    const at = Date.now() - 3_600_000
+    return addTasks(
+      home,
+      [
+        {
+          title,
+          asked_by: by,
+          where: '#ops',
+          link: `https://acme.slack.com/archives/C0OPS/p${String(Math.floor(at / 1000))}000100`,
+          confidence: 'sure',
+        },
+      ],
+      { settings: { on: true, dms: false, exclude: [] }, now: new Date(at) }
+    ).added[0]!
+  }
+
+  /** A task's row shows on a Mac, as a new one comes in while you look */
+  async function shows(mac: Mac, id: string) {
+    await mac.page.evaluate("window.location.hash = '#/tasks'")
+    const row = mac.page.locator(`[data-task-row="${id}"]`)
+    const shown = mac.page.getByRole('button', { name: /new task/ })
+    await row.or(shown).first().waitFor()
+    if (await shown.isVisible()) await shown.click()
+    await row.waitFor()
+  }
+
+  it('pairs a new Mac with one that has no Slack app, and Todo is the same on both', async () => {
+    world = await World.create()
+    const review = seedTask(
+      world,
+      'MacBook Pro',
+      'Review the payment retry PR',
+      'mina'
+    )
+
+    // The Pro runs Todo alone: Settings > Macs pairs with no Slack app.
+    const pro = await openMac(world, 'MacBook Pro', 2, {
+      todoOnly: true,
+      follow: false,
+      settings: ['TASKS=on', 'TASKS_NAMES=Ash'],
+    })
+    await pro.page.evaluate("window.location.hash = '#/settings/macs'")
+    await pro.page
+      .getByText('Your Todo is the same on each Mac you pair with this one', {
+        exact: false,
+      })
+      .waitFor()
+    // Nothing to find yet: no key, so no switch
+    expect(await pro.page.getByRole('switch').count()).toBe(0)
+    await shot(pro, 'todo-settings')
+    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByText('Waiting for it on this network').waitFor()
+    await pro.page.getByText('in its first run', { exact: false }).waitFor()
+    await shot(pro, 'todo-adding')
+    // The key Add a Mac made, readable by you alone
+    const key = path.join(pro.home, GROUP_FILE)
+    expect(statSync(key).mode & 0o777).toBe(0o600)
+
+    // The Air's first run: its own AI, then your other Mac at step 2.
+    const air = await openMac(world, 'MacBook Air', 1, {
+      follow: false,
+      firstRun: true,
+    })
+    await air.page.getByRole('button', { name: 'Use Claude' }).click()
+    await air.page
+      .getByRole('heading', { name: 'Where your work is' })
+      .waitFor()
+    await air.page.getByRole('button', { name: 'From your other Mac' }).click()
+    await air.page
+      .getByRole('heading', { name: 'From your other Mac' })
+      .waitFor()
+    await air.page
+      .getByRole('button', { name: 'Not on this network? Enter its address' })
+      .click()
+    await air.page
+      .getByLabel('Address of your other Mac')
+      .fill(`127.0.0.1:${pro.port}`)
+    await air.page.getByRole('button', { name: 'Connect', exact: true }).click()
+
+    // Both show the same number; you Allow on the Pro.
+    const code = air.page.locator('[data-code]')
+    await code.waitFor()
+    await pro.page
+      .getByText('MacBook Air wants to pair with this Mac.')
+      .waitFor()
+    await pro.page
+      .getByText('Sends the key your Macs know each other by', { exact: false })
+      .waitFor()
+    expect(await pro.page.locator('[data-code]').textContent()).toBe(
+      await code.textContent()
+    )
+    await shot(air, 'todo-first-run-number')
+    await shot(pro, 'todo-request')
+    await pro.page.getByRole('button', { name: 'Allow', exact: true }).click()
+    await air.page.getByText('Connected to MacBook Pro').waitFor()
+    await shot(air, 'todo-first-run-paired')
+    await pro.page
+      .getByText('MacBook Air is paired. Your Todo is the same on both.')
+      .waitFor()
+    // How Todo collects came over; no Slack app, the same key
+    const airSettings = readSettingsValues(path.join(air.home, 'settings.json'))
+    expect(airSettings).toMatchObject({ TASKS: 'on', TASKS_NAMES: 'Ash' })
+    expect(airSettings).not.toHaveProperty('SLACK_APP_TOKEN')
+    expect(readFileSync(path.join(air.home, GROUP_FILE), 'utf8')).toBe(
+      readFileSync(key, 'utf8')
+    )
+
+    // Open Todo: the Pro's task is there, and Pace stays off.
+    await air.page.getByRole('button', { name: 'Open Todo' }).click()
+    await air.page.getByRole('heading', { name: 'Todo' }).waitFor()
+    await shows(air, review.id)
+    await air.page.getByText('Pace: Off').waitFor()
+    await shot(air, 'todo-air-todo')
+
+    // The Pro lists the Air, in sync.
+    await pro.page.getByRole('button', { name: 'Done', exact: true }).click()
+    const airRow = pro.page.locator('[data-mac="MacBook Air"]')
+    await airRow.getByText('In sync').waitFor()
+    await pro.page
+      .locator('[data-mac="here"]')
+      .getByText('Keeps your Todo')
+      .waitFor()
+    await pro.page.getByText('Find your other Macs').waitFor()
+    expect(await pro.page.getByText('Pair with your other Mac').count()).toBe(0)
+    await shot(pro, 'todo-paired')
+
+    // Done on the Air: done on the Pro too.
+    await air.page
+      .locator(`[data-task-row="${review.id}"]`)
+      .getByRole('button', { name: 'Done' })
+      .click()
+    await eventually(
+      'the decision on the Pro',
+      () => readDecisions(pro.home)[review.id]?.status === 'done'
+    )
+  })
+
+  it('pairs two Macs set up already from Settings, and each keeps its own settings', async () => {
+    world = await World.create()
+    const review = seedTask(
+      world,
+      'MacBook Pro',
+      'Review the payment retry PR',
+      'mina'
+    )
+    const answer = seedTask(
+      world,
+      'MacBook Air',
+      'Answer hyun about the webhook retry limit',
+      'hyun'
+    )
+    const pro = await openMac(world, 'MacBook Pro', 2, {
+      todoOnly: true,
+      follow: false,
+      settings: ['TASKS=on', 'TASKS_NAMES=Ash'],
+    })
+    const air = await openMac(world, 'MacBook Air', 1, {
+      todoOnly: true,
+      follow: false,
+      settings: ['TASKS=on', 'TASKS_NAMES=Ashon'],
+    })
+    await pro.page.evaluate("window.location.hash = '#/settings/macs'")
+    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByText('Waiting for it on this network').waitFor()
+
+    // On the Air, set up already: Pair, in Settings > Macs
+    await air.page.evaluate("window.location.hash = '#/settings/macs'")
+    await air.page.getByText('Pair with your other Mac').waitFor()
+    await air.page.getByRole('button', { name: 'Pair', exact: true }).click()
+    await air.page
+      .getByRole('button', { name: 'Not on this network? Enter its address' })
+      .click()
+    await air.page
+      .getByLabel('Address of your other Mac')
+      .fill(`127.0.0.1:${pro.port}`)
+    await air.page.getByRole('button', { name: 'Connect', exact: true }).click()
+    await air.page.locator('[data-code]').waitFor()
+    await shot(air, 'join-number')
+    await pro.page.getByRole('button', { name: 'Allow', exact: true }).click()
+    await air.page
+      .getByText('Your Todo is the same on both Macs now.', { exact: false })
+      .waitFor()
+    await shot(air, 'join-paired')
+    await air.page.getByRole('button', { name: 'Done', exact: true }).click()
+    await air.page
+      .locator('[data-mac="MacBook Pro"]')
+      .getByText('In sync')
+      .waitFor()
+
+    // Each keeps its own settings; each Todo has both tasks.
+    expect(
+      readSettingsValues(path.join(air.home, 'settings.json')).TASKS_NAMES
+    ).toBe('Ashon')
+    await shows(air, review.id)
+    await shows(pro, answer.id)
   })
 })

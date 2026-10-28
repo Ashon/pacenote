@@ -2,9 +2,6 @@ import type { Locale } from '@src/i18n/locale'
 import { josa } from '@src/i18n/korean'
 import type { ReactNode } from 'react'
 
-/** Sets a name in a sentence in bold: a menu path, a button */
-type Bold = (text: string) => ReactNode
-
 const en = {
   // Choosing how Pace reaches Slack
   codeExpired: 'The code expired before it came back. Get a new one.',
@@ -39,7 +36,6 @@ const en = {
   cancelledNotMe: 'Cancelled. If someone else sent your code, get a new one.',
 
   // Your other Mac
-  connectedTo: (name: string) => `Connected to ${name}`,
   yourSlackApp: 'Your Slack app',
   /** name: who Pace answers there */
   paceAnswers: (name: string) => `Pace answers ${name}`,
@@ -47,23 +43,8 @@ const en = {
   followMac: "Follow the Mac you're using: on",
   stayWithEachMac:
     'AI sign-in, the sandbox, tools and folders stay with each Mac.',
-  sameNumber: (name: string) =>
-    `Check that ${name} shows the same number, then click Allow there.`,
-  openAddMac: (b: Bold): ReactNode => (
-    <>
-      On your other Mac, open {b('Pacenote > Settings > Macs')} and click{' '}
-      {b('Add a Mac')}.
-    </>
-  ),
-  macRetrying: (name: string) =>
-    `Waiting for ${name}. Check that Add a Mac is open there.`,
-  macConnecting: (name: string) => `Connecting to ${name}…`,
   connect: 'Connect',
-  looking: 'Looking for it on this network…',
   tryAgain: 'Try again',
-  macAddressLabel: 'Address of your other Mac',
-  macAddressPlaceholder: '100.68.0.12 or macbook-pro.local',
-  enterAddress: 'Not on this network? Enter its address',
 
   // Pairing with the hub
   pairedHere: (name: string) => `This Mac is paired with this hub as @${name}.`,
@@ -190,29 +171,13 @@ const ko: typeof en = {
   cancelledNotMe:
     '취소했어요. 다른 사람이 내 코드를 보냈다면 새 코드를 받으세요.',
 
-  connectedTo: (name) => `${name}에 연결됨`,
   yourSlackApp: '내 Slack 앱',
   paceAnswers: (name) => `Pace가 답변할 사람: ${name}`,
   todoSettings: '할 일 설정: 내 이름, 그룹, 채널은 빼고',
   followMac: '지금 쓰는 Mac 따라가기: 켬',
   stayWithEachMac: 'AI 로그인, 샌드박스, 도구, 폴더는 Mac마다 따로 있어요.',
-  sameNumber: (name) =>
-    `${name}에 같은 숫자가 보이는지 확인한 뒤 그곳에서 허용을 클릭하세요.`,
-  openAddMac: (b) => (
-    <>
-      다른 Mac에서 {b('Pacenote > 설정 > 내 Mac')}을 열고 {b('Mac 추가')}를
-      클릭하세요.
-    </>
-  ),
-  macRetrying: (name) =>
-    `${name} 기다리는 중이에요. 그곳에서 Mac 추가가 열려 있는지 확인하세요.`,
-  macConnecting: (name) => `${name}에 연결하는 중…`,
   connect: '연결',
-  looking: '이 네트워크에서 찾는 중…',
   tryAgain: '다시 시도',
-  macAddressLabel: '다른 Mac의 주소',
-  macAddressPlaceholder: '100.68.0.12 또는 macbook-pro.local',
-  enterAddress: '이 네트워크에 없나요? 주소 입력',
 
   pairedHere: (name) =>
     `이 Mac은 ${josa(`@${name}`, '으로/로')} 이 허브와 페어링돼 있어요.`,

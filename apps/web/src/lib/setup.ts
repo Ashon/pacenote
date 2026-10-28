@@ -12,7 +12,7 @@ import {
 } from '@src/sandbox/vm-progress'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { desktopValue, useDesktopValue, useSandbox } from './desktop'
-import type { FromMacState } from '@src/macs/types'
+import type { FromMacMode, FromMacState } from '@src/macs/types'
 import { localized } from '@src/i18n/locale'
 import { text } from './setup.text'
 
@@ -124,15 +124,16 @@ const fromMac = desktopValue(() => {
 })
 
 /**
- * Connect to your other Mac (setup's Slack step): finding it, the number to
- * compare, and what came from it, as the desktop app tells
+ * Connect to your other Mac (Pace's setup, Todo's first run, Settings >
+ * Macs): finding it, the number to compare, and what came from it, as the
+ * desktop app tells. mode: what this Mac takes from it (FromMacMode).
  */
-export function useFromMac() {
+export function useFromMac(mode: FromMacMode = 'pace') {
   const bridge = window.pacenoteDesktop?.setup
   const state: FromMacState = useDesktopValue(fromMac) ?? { step: 'idle' }
   return {
     state,
-    look: () => void bridge?.macLook(),
+    look: () => void bridge?.macLook(mode),
     connect: (target: { instance: string } | { address: string }) =>
       void bridge?.macConnect(target),
     cancel: () => void bridge?.macCancel(),

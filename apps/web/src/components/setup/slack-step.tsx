@@ -2,13 +2,7 @@ import type { HubUser } from '@src/hub/protocol'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type { SettingsView } from '@src/settings/fields'
 import type { ClaimedUser } from '@src/settings/setup'
-import {
-  CircleCheck,
-  ExternalLink,
-  Laptop,
-  LoaderCircle,
-  TriangleAlert,
-} from 'lucide-react'
+import { ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -18,7 +12,6 @@ import { Swap } from '@/components/ui/motion'
 import { useText } from '@/lib/i18n'
 import { HubInstall } from '../hub-install'
 import { useHubPairing, type PairState } from '@/lib/hub'
-import { codeWords } from '@/lib/macs'
 import { allowedIds, useFromMac } from '@/lib/setup'
 import { cn } from '@/lib/utils'
 import { localized } from '@src/i18n/locale'
@@ -33,6 +26,7 @@ import {
   StepFrame,
   useWaited,
 } from './parts'
+import { FromMacBody } from './from-mac'
 import { text } from './slack-step.text'
 
 export type SlackPart = 'choose' | 'app' | 'me'
@@ -286,7 +280,26 @@ function ChooseConnection({
       </div>
       <Collapsible open={connection === 'mac'}>
         <CollapsibleContent>
-          <FromMacBody mac={mac} />
+          <FromMacBody
+            mac={mac}
+            took={
+              mac.state.step === 'copied' && (
+                <>
+                  <ul className="flex flex-col gap-1 text-body">
+                    <li>{t.yourSlackApp}</li>
+                    {mac.state.me && (
+                      <li>{t.paceAnswers(mac.state.me.name)}</li>
+                    )}
+                    <li>{t.todoSettings}</li>
+                    <li>{t.followMac}</li>
+                  </ul>
+                  <p className="text-meta text-muted-foreground">
+                    {t.stayWithEachMac}
+                  </p>
+                </>
+              )
+            }
+          />
         </CollapsibleContent>
       </Collapsible>
       <Collapsible open={connection === 'hub'}>
@@ -330,135 +343,6 @@ function ChooseConnection({
         </CollapsibleContent>
       </Collapsible>
     </StepFrame>
-  )
-}
-
-/**
- * 3c. Your other Mac: found waiting in Add a Mac, or by its address; the
- * number to compare; and what came from it
- */
-function FromMacBody({ mac }: { mac: ReturnType<typeof useFromMac> }) {
-  const t = useText(text)
-  const [typing, setTyping] = useState(false)
-  const [address, setAddress] = useState('')
-  const { state } = mac
-  return (
-    <div
-      className="flex flex-col gap-3 rounded-xl bg-well px-5 py-4"
-      data-from-mac={state.step}
-      aria-live="polite"
-    >
-      {state.step === 'copied' ? (
-        <>
-          <b className="flex items-center gap-2 text-section">
-            <CircleCheck className="size-4 text-status-succeeded" />
-            {t.connectedTo(state.name)}
-          </b>
-          <ul className="flex flex-col gap-1 text-body">
-            <li>{t.yourSlackApp}</li>
-            {state.me && <li>{t.paceAnswers(state.me.name)}</li>}
-            <li>{t.todoSettings}</li>
-            <li>{t.followMac}</li>
-          </ul>
-          <p className="text-meta text-muted-foreground">{t.stayWithEachMac}</p>
-        </>
-      ) : state.step === 'confirming' ? (
-        <>
-          <p
-            className="text-number tracking-[0.2em] tabular-nums select-text"
-            data-code
-          >
-            {codeWords(state.code)}
-          </p>
-          <p className="text-body">{t.sameNumber(state.name)}</p>
-        </>
-      ) : (
-        <>
-          <p className="text-body">
-            {t.openAddMac((name) => (
-              <span className="font-semibold whitespace-nowrap">{name}</span>
-            ))}
-          </p>
-          {state.step === 'error' ? (
-            <p className="flex items-start gap-2 text-body text-status-failed">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-              <span className="select-text">{state.message}</span>
-            </p>
-          ) : state.step === 'connecting' ? (
-            <p className="flex items-center gap-2 text-meta text-muted-foreground">
-              <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-              {state.retrying
-                ? t.macRetrying(state.name)
-                : t.macConnecting(state.name)}
-            </p>
-          ) : (
-            <>
-              {state.step === 'looking' &&
-                state.found.map((found) => (
-                  <div
-                    key={found.instance}
-                    className="flex items-center gap-3 rounded-lg bg-card px-3 py-2"
-                  >
-                    <Laptop className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-row">
-                      {found.name}
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => mac.connect({ instance: found.instance })}
-                    >
-                      {t.connect}
-                    </Button>
-                  </div>
-                ))}
-              <p className="flex items-center gap-2 text-meta text-muted-foreground">
-                <LoaderCircle className="size-3.5 shrink-0 animate-spin" />
-                {t.looking}
-              </p>
-            </>
-          )}
-          {state.step === 'error' && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              onClick={() => mac.look()}
-            >
-              {t.tryAgain}
-            </Button>
-          )}
-          {typing ? (
-            <form
-              className="flex items-center gap-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                if (address.trim()) mac.connect({ address })
-              }}
-            >
-              <Input
-                autoFocus
-                aria-label={t.macAddressLabel}
-                placeholder={t.macAddressPlaceholder}
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                className="h-8 flex-1"
-              />
-              <Button size="sm" type="submit" disabled={!address.trim()}>
-                {t.connect}
-              </Button>
-            </form>
-          ) : (
-            <button
-              type="button"
-              className="self-start text-meta text-muted-foreground hover:text-foreground hover:underline"
-              onClick={() => setTyping(true)}
-            >
-              {t.enterAddress}
-            </button>
-          )}
-        </>
-      )}
-    </div>
   )
 }
 

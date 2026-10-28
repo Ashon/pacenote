@@ -214,7 +214,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     claimStart: () => ipcRenderer.invoke('pacenote:setup:claim-start'),
     // Connect to your other Mac: setup takes your Slack app from it
     macState: () => ipcRenderer.invoke('pacenote:setup:mac-state'),
-    macLook: () => ipcRenderer.invoke('pacenote:setup:mac-look'),
+    macLook: (mode?: 'pace' | 'todo' | 'join') =>
+      ipcRenderer.invoke('pacenote:setup:mac-look', mode),
     macConnect: (target: { instance: string } | { address: string }) =>
       ipcRenderer.invoke('pacenote:setup:mac-connect', target),
     macCancel: () => ipcRenderer.invoke('pacenote:setup:mac-cancel'),

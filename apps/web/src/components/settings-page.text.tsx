@@ -15,7 +15,7 @@ const en = {
     },
     macs: {
       label: 'Macs',
-      help: 'Where Pace answers when you use more than one Mac.',
+      help: 'The same Todo on each Mac you use, and where Pace answers.',
     },
   },
   nav: { app: 'App', pace: 'Pace' },
@@ -152,8 +152,13 @@ const en = {
   yourMacs: 'Your Macs',
   yourMacsHelp:
     "Pace answers on the Mac you're using. Pacenote on your other Mac, set up with the same Slack app, joins in on this network by itself, and Todo is the same on both.",
-  macsUnavailable:
-    "Your Macs follow you only with your own Slack app (Settings > Messengers). With your team's hub, Pace answers on one Mac per person: pair a new Mac with the hub instead, and Pace moves there.",
+  yourMacsTodoHelp:
+    'Your Todo is the same on each Mac you pair with this one. They find each other on this network, with no Slack app.',
+  findMacs: 'Find your other Macs',
+  findOn:
+    'Your Todo goes to your paired Macs on this network as it changes. Off, this Mac keeps it to itself.',
+  findOff:
+    'Turn it on to keep your Todo the same on your paired Macs. macOS asks once whether Pacenote may look on your local network.',
   addressIssue: 'Enter a name or address, like 100.68.0.12.',
   follow: "Follow the Mac you're using",
   followOn:
@@ -163,6 +168,17 @@ const en = {
   addMac: 'Add a Mac',
   addMacHelp:
     'Set up Pacenote on a new Mac from this one: its Slack app and who you are come from here.',
+  addMacTodoHelp:
+    'Pair another Mac with this one: a new Mac takes how Todo collects from here, and your Todo follows.',
+  joinMac: 'Pair with your other Mac',
+  joinMacHelp:
+    'Set up on both already? Click Add a Mac on the other one, then pair here. Each keeps its own settings.',
+  pair: 'Pair',
+  joined:
+    'Your Todo is the same on both Macs now. Each keeps its own settings, AI sign-in and sessions.',
+  keepsTodo: 'Keeps your Todo',
+  inSync: 'In sync',
+  collectingThere: 'Collecting now',
   networkBlocked:
     "Pacenote can't look on this network. Turn on Local Network for Pacenote in System Settings > Privacy & Security.",
   openSystemSettings: 'Open System Settings',
@@ -176,22 +192,33 @@ const en = {
 
   macSetUp: (name: string | undefined) =>
     `${name ?? 'Your new Mac'} is set up. Pace follows the Mac you're using.`,
+  macPaired: (name: string | undefined) =>
+    `${name ?? 'Your other Mac'} is paired. Your Todo is the same on both.`,
   addDeclined: 'Cancelled. Nothing was sent.',
   addExpired: 'Stopped waiting. Nothing was sent.',
   done: 'Done',
   close: 'Close',
   wantsSetUp: (name: string) => `${name} wants to set up from this Mac.`,
+  wantsPair: (name: string) => `${name} wants to pair with this Mac.`,
   sameNumber: 'Do both Macs show this number?',
   allow: 'Allow',
   notThisOne: 'Not this one',
   whatIsSent:
     "Sends your Slack app, who Pace answers and Todo's collection settings. Not your AI sign-in, the sandbox, tools or folders.",
+  whatIsSentTodo:
+    "Sends the key your Macs know each other by and Todo's collection settings. Not your AI sign-in, sessions or folders.",
   stop: 'Stop',
   /** choice: the new Mac's option, set apart */
   openOnNewMac: (choice: (words: string) => ReactNode) => (
     <>
       Open Pacenote on the new Mac and choose{' '}
       {choice('Connect to your other Mac')} at the Slack step.
+    </>
+  ),
+  openOnOtherMac: (choice: (words: string) => ReactNode) => (
+    <>
+      On the other Mac, choose {choice('From your other Mac')} in its first run,
+      or {choice('Pair')} in Settings &gt; Macs.
     </>
   ),
   waitingOnNetwork: (clock: string) =>
@@ -211,6 +238,7 @@ const en = {
   answerHere: 'Answer here',
   moreFor: (name: string) => `More for ${name}`,
   stopFollowing: 'Stop following to this Mac',
+  stopSyncing: 'Stop pairing with this Mac',
 
   help: 'Help',
   diagnostics: 'Diagnostics',
@@ -240,7 +268,7 @@ const ko: typeof en = {
     },
     macs: {
       label: '내 Mac',
-      help: 'Mac을 여러 대 쓸 때 Pace가 답하는 곳이에요.',
+      help: '쓰는 Mac마다 같은 할 일, 그리고 Pace가 답하는 곳이에요.',
     },
   },
   nav: { app: '앱', pace: 'Pace' },
@@ -369,8 +397,13 @@ const ko: typeof en = {
   yourMacs: '내 Mac',
   yourMacsHelp:
     'Pace는 지금 쓰는 Mac에서 답해요. 같은 Slack 앱으로 설정한 다른 Mac의 Pacenote는 이 네트워크에서 알아서 합류하고, 할 일은 두 Mac에서 같아요.',
-  macsUnavailable:
-    'Mac 따라가기는 직접 만든 Slack 앱에서만 돼요(설정 > 메신저). 팀 허브에서는 Pace가 한 사람당 Mac 한 대에서 답해요. 대신 새 Mac을 허브와 페어링하면 Pace가 그곳으로 옮겨가요.',
+  yourMacsTodoHelp:
+    '이 Mac과 페어링한 Mac마다 할 일이 같아요. Slack 앱 없이 이 네트워크에서 서로 찾아요.',
+  findMacs: '다른 Mac 찾기',
+  findOn:
+    '할 일이 바뀌면 이 네트워크의 페어링한 Mac으로 바로 가요. 끄면 이 Mac에만 둬요.',
+  findOff:
+    '켜면 페어링한 Mac의 할 일이 같아져요. macOS가 Pacenote의 로컬 네트워크 접근을 허용할지 한 번 물어봐요.',
   addressIssue: '100.68.0.12처럼 이름이나 주소를 입력하세요.',
   follow: '쓰는 Mac 따라가기',
   followOn:
@@ -380,6 +413,17 @@ const ko: typeof en = {
   addMac: 'Mac 추가',
   addMacHelp:
     '이 Mac에서 새 Mac의 Pacenote를 설정해요. Slack 앱과 내 정보를 여기서 가져가요.',
+  addMacTodoHelp:
+    '다른 Mac을 이 Mac과 페어링해요. 새 Mac은 할 일 모으기 설정을 여기서 가져가고, 할 일이 따라가요.',
+  joinMac: '다른 Mac과 페어링',
+  joinMacHelp:
+    '두 Mac 모두 이미 설정했나요? 다른 Mac에서 Mac 추가를 누른 뒤 여기서 페어링하세요. 설정은 Mac마다 그대로예요.',
+  pair: '페어링',
+  joined:
+    '이제 두 Mac의 할 일이 같아요. 설정, AI 로그인, 세션은 Mac마다 따로 있어요.',
+  keepsTodo: '할 일을 보관해요',
+  inSync: '맞춰져 있음',
+  collectingThere: '지금 모으는 중',
   networkBlocked:
     'Pacenote가 이 네트워크를 살펴볼 수 없어요. 시스템 설정 > 개인정보 보호 및 보안에서 Pacenote의 로컬 네트워크를 켜세요.',
   openSystemSettings: '시스템 설정 열기',
@@ -393,22 +437,33 @@ const ko: typeof en = {
 
   macSetUp: (name) =>
     `${name ? josa(name, '이/가') : '새 Mac이'} 설정됐어요. Pace는 지금 쓰는 Mac을 따라가요.`,
+  macPaired: (name) =>
+    `${name ? josa(name, '과/와') : '다른 Mac과'} 페어링했어요. 두 Mac의 할 일이 같아요.`,
   addDeclined: '취소했어요. 아무것도 보내지 않았어요.',
   addExpired: '기다리기를 멈췄어요. 아무것도 보내지 않았어요.',
   done: '완료',
   close: '닫기',
   wantsSetUp: (name) =>
     `${josa(name, '이/가')} 이 Mac에서 설정을 가져가려고 해요.`,
+  wantsPair: (name) => `${josa(name, '이/가')} 이 Mac과 페어링하려고 해요.`,
   sameNumber: '두 Mac에 같은 숫자가 보이나요?',
   allow: '허용',
   notThisOne: '이 Mac 아님',
   whatIsSent:
     'Slack 앱, Pace가 답하는 사람, 할 일 모으기 설정을 보내요. AI 로그인, 샌드박스, 도구, 폴더는 보내지 않아요.',
+  whatIsSentTodo:
+    'Mac끼리 서로 알아보는 열쇠와 할 일 모으기 설정을 보내요. AI 로그인, 세션, 폴더는 보내지 않아요.',
   stop: '중지',
   openOnNewMac: (choice) => (
     <>
       새 Mac에서 Pacenote를 열고 Slack 단계에서 {choice('내 다른 Mac에 연결')}을
       선택하세요.
+    </>
+  ),
+  openOnOtherMac: (choice) => (
+    <>
+      다른 Mac의 첫 실행에서 {choice('다른 Mac에서 가져오기')}를, 또는 설정 &gt;
+      내 Mac에서 {choice('페어링')}을 선택하세요.
     </>
   ),
   waitingOnNetwork: (clock) => `이 네트워크에서 기다리는 중… ${clock} 남음`,
@@ -426,6 +481,7 @@ const ko: typeof en = {
   answerHere: '여기서 답변',
   moreFor: (name) => `${name} 더 보기`,
   stopFollowing: '이 Mac으로 따라가지 않기',
+  stopSyncing: '이 Mac과 페어링 끊기',
 
   help: '도움말',
   diagnostics: '진단 정보',

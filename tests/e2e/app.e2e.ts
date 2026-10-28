@@ -704,7 +704,11 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       JSON.parse(
         readFileSync(path.join(world!.home, 'desktop.json'), 'utf8')
       ) as Record<string, unknown>
-    let page = await launch(world, { firstRun: 'todo' })
+    // The fake Claude Code collects with no Slack connector (step 3)
+    let page = await launch(world, {
+      firstRun: 'todo',
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
 
     // 1. Your AI: the fake claude, signed in
     await page
@@ -728,9 +732,20 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await siteShot(page, 'first-run')
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // 3. A first look, and Todo; Pace never asked to be set up
+    // 3. A first look, and Todo; Pace never asked to be set up. The fake
+    // Claude Code has no Slack connector: the look is this Mac's alone, said
+    // as such and not as a failure, with its projects.
     await page.getByRole('heading', { name: 'A first look' }).waitFor()
     expect(saved(world).TASKS).toBe('on')
+    await page.getByRole('button', { name: 'Collect now' }).click()
+    await page
+      .getByText('Claude Code has no Slack connector yet', { exact: false })
+      .waitFor()
+    expect(await page.getByRole('alert').count()).toBe(0)
+    await page.getByRole('region', { name: 'Your projects' }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/first-run-no-connector.png'),
+    })
     await page.getByRole('button', { name: 'Open Todo' }).click()
     await page.getByRole('heading', { name: 'Todo' }).waitFor()
     const nav = page.getByRole('navigation', { name: 'Sections' })

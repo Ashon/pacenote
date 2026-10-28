@@ -192,7 +192,12 @@ import {
 import { KeepAwake } from './keep-awake.js'
 import { Macs } from '../../../src/macs/macs.js'
 import { SetupFromMac } from '../../../src/macs/setup.js'
-import { SETUP_KEYS } from '../../../src/macs/types.js'
+import { macsKey } from '../../../src/macs/channel.js'
+import {
+  SETUP_KEYS,
+  TODO_SETUP_KEYS,
+  type FromMacMode,
+} from '../../../src/macs/types.js'
 import { TodoSync } from '../../../src/macs/todo-sync.js'
 import { MacUseWatch, macName } from './macs.js'
 import { McpClients } from './mcp-clients.js'
@@ -685,6 +690,8 @@ let macUse: MacUseWatch | undefined
 let todoSync: TodoSync | undefined
 /** Setup's Connect to your other Mac: this Mac set up from another */
 let fromMac: SetupFromMac | undefined
+/** What Connect to your other Mac takes this time (FromMacMode) */
+let fromMacMode: FromMacMode = 'pace'
 
 const supervisor = manageBot
   ? new BotSupervisor({
@@ -756,9 +763,34 @@ if (supervisor) {
       id: thisMac.id,
       name: process.env.PACENOTE_MACS_NAME || macName(),
     }),
-    // What your other Mac sent: its Slack app, who Pace answers and how Todo
-    // collects. This Mac's own choices (steps 1 and 2) stay as they are.
+    // What your other Mac sent, as this Mac's setup takes it (FromMacMode):
+    // Pace's its Slack app, who Pace answers and how Todo collects; Todo's
+    // first run how Todo collects; a Mac set up already the key alone. This
+    // Mac's own choices stay as they are.
     apply: async (payload, from) => {
+      const mode = fromMacMode
+      if (mode !== 'pace') {
+        // The key your Macs know each other by; from Pacenote before 0.6.13,
+        // the one its Slack app's token makes
+        const token = payload.values.SLACK_APP_TOKEN
+        const group =
+          payload.group ?? (token ? macsKey(token).toString('base64') : '')
+        if (!(await thisMac.joinGroup(group)))
+          throw new Error(localized(text).noKeyToShare(from.name))
+        if (mode === 'todo') {
+          const values: Record<string, string> = {}
+          for (const key of TODO_SETUP_KEYS) {
+            const value = payload.values[key]
+            if (typeof value === 'string') values[key] = value
+          }
+          const issues = settings.save({ ...values, TASKS: 'on' })
+          if (issues.length > 0)
+            throw new Error(issues.map((issue) => issue.message).join(' '))
+        }
+        await thisMac.setFollow(true)
+        if (from.address) thisMac.addAddress(from.address)
+        return
+      }
       const values: Record<string, string> = {}
       for (const key of SETUP_KEYS) {
         const value = payload.values[key]
@@ -769,6 +801,10 @@ if (supervisor) {
       const issues = settings.save(values)
       if (issues.length > 0)
         throw new Error(issues.map((issue) => issue.message).join(' '))
+      // The key your Macs know each other by, kept only when it is not your
+      // Slack app's own (saved just now): Add a Mac made it on a Mac with no
+      // Slack app of its own
+      if (payload.group) await thisMac.joinGroup(payload.group)
       const owner = (values.MENTION_ALLOWED_USERS ?? '').split(/[\s,]+/)[0]
       const me = payload.me ?? (owner ? { id: owner, name: owner } : undefined)
       setup.save({
@@ -2220,7 +2256,11 @@ function registerBotIpc(): void {
   }
   // Connect to your other Mac: setup takes your Slack app from it
   handle('pacenote:setup:mac-state', null, () => fromMac?.current ?? null)
-  handle('pacenote:setup:mac-look', undefined, () => fromMac?.look())
+  handle('pacenote:setup:mac-look', undefined, (mode) => {
+    // What it takes this time: Pace's setup, Todo's first run, or Settings
+    fromMacMode = mode === 'todo' || mode === 'join' ? mode : 'pace'
+    fromMac?.look()
+  })
   handle('pacenote:setup:mac-connect', undefined, (raw) => {
     const target = (raw ?? {}) as { instance?: unknown; address?: unknown }
     if (typeof target.instance === 'string')

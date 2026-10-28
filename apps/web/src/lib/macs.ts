@@ -29,12 +29,12 @@ export const macNamed = (view: MacsView | undefined, id: string): string =>
 /**
  * Where Pace answers, when another of your Macs is in the picture: this Mac
  * or another, and whether it is on its way there. undefined for a Mac on its
- * own (nothing to say).
+ * own, or Macs that only keep Todo the same (nothing to say).
  */
 export function whereAnswers(
   view: MacsView | undefined
 ): { here: boolean; moving: boolean; other?: MacView } | undefined {
-  if (!view?.available || !view.follow) return undefined
+  if (!view?.paceFollows || !view.follow) return undefined
   const [me, ...others] = view.macs
   if (!me || others.length === 0) return undefined
   const holder = view.macs.find((mac) => mac.id === view.holder)

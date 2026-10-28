@@ -1,8 +1,9 @@
 /**
- * Your Macs: Pacenote on each Mac you use with the same Slack app finds the
- * others on your network by itself, and Pace answers on the one you're using
- * (docs/macs.md). What the desktop app (apps/desktop/src/macs.ts) and its
- * screens share. Has no Node APIs, so the UI imports it too.
+ * Your Macs: Pacenote on each Mac you pair (Add a Mac), or set up with the
+ * same Slack app, finds the others on your network by itself; Todo is the same
+ * on each, and Pace answers on the one you're using (docs/macs.md). What the
+ * desktop app (apps/desktop/src/macs.ts) and its screens share. Has no Node
+ * APIs, so the UI imports it too.
  */
 
 /**
@@ -41,6 +42,12 @@ export interface MacState {
   reasoner?: string
   /** Collect now runs there, since then */
   collecting?: string
+  /**
+   * The Slack app Pace answers through there, one way (macsGroup of its
+   * key): Pace follows you only between Macs of the same app. Pacenote before
+   * 0.6.13 does not say it.
+   */
+  app?: string
 }
 
 /**
@@ -109,11 +116,16 @@ export interface MacView {
 
 export interface MacsView {
   /**
-   * Macs follow only with your own Slack app (Socket Mode): a Mac on the team
-   * hub has no app token to recognize the others by
+   * Pace follows the Mac you're using: your own Slack app (Socket Mode). With
+   * the team hub, or with Pace not set up, your Macs only keep Todo the same.
    */
-  available: boolean
-  /** Settings > Macs > Follow the Mac you're using */
+  paceFollows: boolean
+  /**
+   * This Mac has a key to know your other Macs by: your Slack app's, or the
+   * one Add a Mac made or brought
+   */
+  paired: boolean
+  /** Settings > Macs: Follow the Mac you're using, or Find your other Macs */
   follow: boolean
   /** This Mac first, then the others it knows */
   macs: MacView[]
@@ -161,13 +173,35 @@ export const SETUP_KEYS = [
   'TASKS_GROUPS',
 ] as const
 
+/** What a Mac with no Slack app of its own takes: how Todo collects */
+export const TODO_SETUP_KEYS = [
+  'TASKS',
+  'TASKS_DMS',
+  'TASKS_EXCLUDE_CHANNELS',
+  'TASKS_NAMES',
+  'TASKS_GROUPS',
+] as const satisfies readonly (typeof SETUP_KEYS)[number][]
+
 /** What the Mac already set up sends the new one, once you Allow */
 export interface SetupPayload {
   /** SETUP_KEYS, as that Mac has them */
   values: Partial<Record<(typeof SETUP_KEYS)[number], string>>
   /** Who Pace answers, as that Mac's setup knew you */
   me?: { id: string; name: string }
+  /**
+   * The key your Macs know each other by (base64), so the new one pairs with
+   * no Slack app of its own. Pacenote before 0.6.13 sends none.
+   */
+  group?: string
 }
+
+/**
+ * Where a Mac takes another's settings from (setup.ts):
+ * - pace: Pace's setup, which takes your Slack app and who Pace answers
+ * - todo: Todo's first run, which takes how Todo collects
+ * - join: Settings > Macs on a Mac set up already, which takes the key alone
+ */
+export type FromMacMode = 'pace' | 'todo' | 'join'
 
 /** A new Mac's setup taking it from your other Mac, step by step */
 export type FromMacState =

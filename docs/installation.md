@@ -20,7 +20,8 @@ brew install --cask pacenote
 - The app carries the bot, the sandbox jobs and its own Node, so it needs no repository, Node or pnpm. It needs a `claude` or
   `codex` CLI login (codex 0.138 or later), and `gh` and `git` for the GitHub connection. The built-in sandbox, which also renders
   diagrams, needs nothing installed, on Apple silicon with macOS 15 or later.
-- Open Pacenote. A new install opens on Todo's first run: your AI, where your work is, and a first collection. Pace
+- Open Pacenote. A new install opens on Todo's first run: your AI, where your work is (or **From your other Mac**, to
+  pair with Pacenote on another of your Macs), and a first collection. Pace
   stays off until you set it up (Set up Pace on the first run, or in Settings > General), which opens Pace's setup: the AI service (the CLIs found on this Mac, signed in or not), where
   answers run (the built-in sandbox where this Mac runs it, prepared in the background from the start, or this Mac),
   Slack (the team hub, or your own app from Pacenote's manifest with its two tokens, then "@Pace it's me" to say who you

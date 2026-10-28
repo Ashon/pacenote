@@ -24,7 +24,8 @@ chosen in Settings > Todo > Pacenote's own work: Claude Code, Codex or opencode.
 - **Switch when it can't** (on by default): at a usage limit, unavailable (overloaded, or its server out of reach),
   signed out, not on this Mac or without a Slack connector, Claude Code or Codex does the work in the same run, and the run, the Todo line, the draft and the recap say
   so. One at its usage limit rests until the limit resets (the time its error gives, or an hour), so work goes to the
-  other one first; overloaded rests ten minutes. Looks done waits while both rest.
+  other one first; overloaded rests ten minutes. Looks done waits while both rest. When the other one is not on this
+  Mac, it was never one to switch to: the work says why the first could not.
 - Settings shows each one: whether it is on this Mac and signed in, and until when it rests (`own-ai.json` in the data
   folder keeps what each last did).
 

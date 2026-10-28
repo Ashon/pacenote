@@ -77,7 +77,7 @@ import {
   useUpdate,
 } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
-import { useSettingsView } from '@/lib/setup'
+import { useFromMac, useSettingsView } from '@/lib/setup'
 import {
   useLanguage,
   useLocale,
@@ -96,6 +96,7 @@ import { McpConnections } from './mcp-connections'
 import { OwnAiStatus } from './own-ai-status'
 import { isOwnCli } from '@src/tasks/own-ai'
 import { RepoFolders } from './repo-folders'
+import { FromMacBody } from './setup/from-mac'
 import { SandboxSignIn } from './sandbox-sign-in'
 import { SlackYou } from './slack-you'
 import { PaceSpinner } from './pace-spinner'
@@ -1989,19 +1990,20 @@ function MacsSection() {
   const view = useMacs()
   const control = macsControl()
   const [adding, setAdding] = useState(false)
+  // Pairing here is under way: it stays until you close what it says
+  const [joining, setJoining] = useState(false)
   const [address, setAddress] = useState('')
   const [addIssue, setAddIssue] = useState<string>()
   if (!view) return <SectionSkeleton />
-  const header = <CardHeader title={t.yourMacs} help={t.yourMacsHelp} />
-  if (!view.available)
-    return (
-      <section className="surface-group" data-macs="unavailable">
-        {header}
-        <p className="px-4 py-3 text-meta text-muted-foreground">
-          {t.macsUnavailable}
-        </p>
-      </section>
-    )
+  // With your own Slack app Pace follows the Mac you're using; otherwise
+  // (Pace off, or the team hub) your Macs keep the same Todo
+  const pace = view.paceFollows
+  const header = (
+    <CardHeader
+      title={t.yourMacs}
+      help={pace ? t.yourMacsHelp : t.yourMacsTodoHelp}
+    />
+  )
   const others = view.macs.filter((mac) => !mac.here)
   const add = () =>
     void control?.addAddress(address).then((ok) => {
@@ -2014,16 +2016,29 @@ function MacsSection() {
     <section className="surface-group" data-macs={view.follow ? 'on' : 'off'}>
       {header}
       <div className="divide-y divide-border">
-        <Row label={t.follow} help={view.follow ? t.followOn : t.followOff}>
-          <Switch
-            checked={view.follow}
-            onChange={(on) => void control?.follow(on)}
-          />
-        </Row>
+        {(pace || view.paired) && (
+          <Row
+            label={pace ? t.follow : t.findMacs}
+            help={
+              pace
+                ? view.follow
+                  ? t.followOn
+                  : t.followOff
+                : view.follow
+                  ? t.findOn
+                  : t.findOff
+            }
+          >
+            <Switch
+              checked={view.follow}
+              onChange={(on) => void control?.follow(on)}
+            />
+          </Row>
+        )}
         {view.adding ? (
-          <AddingPanel adding={view.adding} />
+          <AddingPanel adding={view.adding} pace={pace} />
         ) : (
-          <Row label={t.addMac} help={t.addMacHelp}>
+          <Row label={t.addMac} help={pace ? t.addMacHelp : t.addMacTodoHelp}>
             <Button
               size="xs"
               variant="outline"
@@ -2034,10 +2049,14 @@ function MacsSection() {
             </Button>
           </Row>
         )}
-        {view.follow && (
+        {/* Paired already, joining another Mac's would leave these */}
+        {!pace && (joining || (!view.paired && !view.adding)) && (
+          <JoinMac open={joining} onOpen={setJoining} />
+        )}
+        {view.follow && view.paired && (
           <>
             {view.macs.map((mac) => (
-              <MacRow key={mac.id} mac={mac} />
+              <MacRow key={mac.id} mac={mac} pace={pace} />
             ))}
             {view.blocked ? (
               <div className="flex items-center gap-3 px-4 py-3">
@@ -2143,7 +2162,14 @@ function MacsSection() {
  * Add a Mac, while it waits for the new Mac, when the new Mac asks (compare
  * the number, then Allow), and how it ended
  */
-function AddingPanel({ adding }: { adding: AddingView }) {
+function AddingPanel({
+  adding,
+  pace,
+}: {
+  adding: AddingView
+  /** Pace follows between your Macs: your own Slack app goes too */
+  pace: boolean
+}) {
   const t = useText(text)
   const control = macsControl()
   const [now, setNow] = useState(Date.now)
@@ -2163,7 +2189,9 @@ function AddingPanel({ adding }: { adding: AddingView }) {
         )}
         <p className="min-w-0 flex-1 text-body">
           {kind === 'sent'
-            ? t.macSetUp(name)
+            ? pace
+              ? t.macSetUp(name)
+              : t.macPaired(name)
             : kind === 'declined'
               ? t.addDeclined
               : t.addExpired}
@@ -2187,7 +2215,9 @@ function AddingPanel({ adding }: { adding: AddingView }) {
     const { name, code } = adding.request
     return (
       <div className="flex flex-col gap-3 px-4 py-4" data-adding="request">
-        <b className="text-section">{t.wantsSetUp(name)}</b>
+        <b className="text-section">
+          {pace ? t.wantsSetUp(name) : t.wantsPair(name)}
+        </b>
         <p
           className="text-number tracking-[0.2em] tabular-nums select-text"
           data-code
@@ -2207,7 +2237,9 @@ function AddingPanel({ adding }: { adding: AddingView }) {
             {t.notThisOne}
           </Button>
         </div>
-        <p className="text-meta text-muted-foreground">{t.whatIsSent}</p>
+        <p className="text-meta text-muted-foreground">
+          {pace ? t.whatIsSent : t.whatIsSentTodo}
+        </p>
       </div>
     )
   }
@@ -2228,7 +2260,7 @@ function AddingPanel({ adding }: { adding: AddingView }) {
         </Button>
       </div>
       <p className="text-body text-pretty">
-        {t.openOnNewMac((words) => (
+        {(pace ? t.openOnNewMac : t.openOnOtherMac)((words) => (
           <span className="font-semibold whitespace-nowrap">{words}</span>
         ))}
       </p>
@@ -2248,9 +2280,21 @@ const MAC_DOT: Record<MacView['status'], string> = {
   'out-of-reach': 'bg-border',
 }
 
-/** What a Mac is doing, in a few words */
-function macWords(mac: MacView): string {
+/**
+ * What a Mac is doing, in a few words: Pace's state there, or with Macs that
+ * only keep Todo the same (pace false), whether it is in reach
+ */
+function macWords(mac: MacView, pace: boolean): string {
   const t = localized(text)
+  if (!pace) {
+    if (mac.here) return t.keepsTodo
+    if (mac.status === 'out-of-reach')
+      return mac.lastSeen
+        ? t.outOfReachSeen(formatRelative(mac.lastSeen))
+        : t.outOfReach
+    if (mac.asleep) return t.asleep
+    return mac.collecting ? t.collectingThere : t.inSync
+  }
   if (mac.notReady) return t.paceNotRunning
   switch (mac.status) {
     case 'answering':
@@ -2266,7 +2310,15 @@ function macWords(mac: MacView): string {
   }
 }
 
-function MacRow({ mac }: { mac: MacView }) {
+/** A Mac's dot with Macs that only keep Todo the same: in reach or not */
+const todoDot = (mac: MacView): string =>
+  mac.status === 'out-of-reach'
+    ? 'bg-border'
+    : !mac.here && mac.asleep
+      ? 'bg-muted-foreground/50'
+      : 'bg-status-succeeded'
+
+function MacRow({ mac, pace }: { mac: MacView; pace: boolean }) {
   const t = useText(text)
   return (
     <div
@@ -2289,16 +2341,16 @@ function MacRow({ mac }: { mac: MacView }) {
             aria-hidden="true"
             className={cn(
               'size-1.5 shrink-0 rounded-full',
-              MAC_DOT[mac.status]
+              pace ? MAC_DOT[mac.status] : todoDot(mac)
             )}
           />
           <span className="truncate">
-            {macWords(mac)}
-            {mac.reasoner ? ` · ${mac.reasoner}` : ''}
+            {macWords(mac, pace)}
+            {pace && mac.reasoner ? ` · ${mac.reasoner}` : ''}
           </span>
         </p>
       </div>
-      {mac.here && mac.status === 'standing-by' && !mac.notReady && (
+      {pace && mac.here && mac.status === 'standing-by' && !mac.notReady && (
         <Button
           size="xs"
           variant="outline"
@@ -2322,11 +2374,69 @@ function MacRow({ mac }: { mac: MacView }) {
             <DropdownMenuItem
               onSelect={() => void macsControl()?.ignore(mac.id)}
             >
-              {t.stopFollowing}
+              {pace ? t.stopFollowing : t.stopSyncing}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+    </div>
+  )
+}
+
+/**
+ * Pair with your other Mac, on a Mac set up already: Add a Mac there, then
+ * the number to compare; this Mac takes the key alone and keeps its settings
+ */
+function JoinMac({
+  open,
+  onOpen,
+}: {
+  open: boolean
+  onOpen: (open: boolean) => void
+}) {
+  const t = useText(text)
+  const mac = useFromMac('join')
+  const close = () => {
+    mac.cancel()
+    onOpen(false)
+  }
+  // Leaving Settings lets your other Mac go
+  useEffect(
+    () => () => {
+      if (open) window.pacenoteDesktop?.setup?.macCancel()
+    },
+    [open]
+  )
+  if (!open)
+    return (
+      <Row label={t.joinMac} help={t.joinMacHelp}>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => {
+            onOpen(true)
+            mac.look()
+          }}
+        >
+          <Laptop />
+          {t.pair}
+        </Button>
+      </Row>
+    )
+  const joined = mac.state.step === 'copied'
+  return (
+    <div className="flex flex-col gap-3 px-4 py-4" data-join={mac.state.step}>
+      <div className="flex items-center gap-3">
+        <b className="min-w-0 flex-1 text-section">{t.joinMac}</b>
+        <Button
+          size="xs"
+          variant={joined ? 'default' : 'ghost'}
+          onClick={close}
+        >
+          {joined ? t.done : t.cancel}
+        </Button>
+      </div>
+      <FromMacBody mac={mac} took={<p className="text-body">{t.joined}</p>} />
     </div>
   )
 }

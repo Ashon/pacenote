@@ -128,9 +128,12 @@ export class OwnAi {
     let ran: Ran<R> | undefined
     for (const cli of order) {
       const result = await attempt(cli, switched)
-      ran = { result, by: cli, ...(switched ? { switched } : {}) }
       const refused = refusal(result)
       const until = this.keep(cli, refused)
+      // The other one is not on this Mac: it was never one to switch to, so
+      // why the first could not stands
+      if (ran && refused?.unable === 'missing') return ran
+      ran = { result, by: cli, ...(switched ? { switched } : {}) }
       if (!refused) return ran
       switched = { from: cli, unable: refused.unable, until }
     }

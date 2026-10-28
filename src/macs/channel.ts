@@ -18,10 +18,12 @@ import { text } from './channel.text.js'
 /**
  * The channel between two of your Macs, over a WebSocket on your network.
  *
- * Both Macs hold the same Slack app token, and that is what they know each
- * other by: a key derived from it (macsKey) proves each side to the other, and
- * nothing else gets in. A Mac set up with another Slack app (another
- * workspace, your company's Pace) has another key, and the two never pair.
+ * Both Macs hold the same key, and that is what they know each other by: the
+ * one derived from your Slack app's token (macsKey), or one a Mac with no
+ * Slack app of its own made and handed over when you added the next (Add a
+ * Mac, macs.ts). It proves each side to the other, and nothing else gets in. A
+ * Mac with another key (another workspace's Slack app, your company's Pace)
+ * never pairs with them.
  *
  * 1. The dialing Mac says hello: its group, id, name and a fresh nonce.
  * 2. The other answers with its own and a proof: an HMAC under the key of
@@ -29,7 +31,8 @@ import { text } from './channel.text.js'
  * 3. The dialing Mac checks it and sends its own proof.
  * Then each direction has a key of its own, derived from the key and both
  * nonces, and every message is sealed with AES-256-GCM under it, numbered so
- * that none can be played again. The app token never crosses the network.
+ * that none can be played again. The key never crosses the network on this
+ * channel: only Add a Mac's setup channel (below) hands it to a new Mac.
  */
 
 const PROTOCOL = 1
@@ -372,8 +375,8 @@ export async function accept(
 
 /**
  * Setting up a new Mac from one already set up (Settings > Macs > Add a Mac,
- * and Connect to your other Mac in the new Mac's setup). The new Mac has no
- * Slack app token yet, so the two cannot know each other by it: this once,
+ * and Connect to your other Mac in the new Mac's setup or Settings). The new
+ * Mac has no key yet, so the two cannot know each other by it: this once,
  * they agree on a key with X25519, and both show a 6-digit number made from
  * it. Someone in between on the network would agree on a key with each, and
  * the numbers would differ, so you compare them before you Allow. What follows

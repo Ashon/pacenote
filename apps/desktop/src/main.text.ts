@@ -38,7 +38,9 @@ const en = {
   notAllowed: 'Not allowed.',
   denied: 'Denied',
   noSlackAppToShare: (mac: string) =>
-    `${mac} has no Slack app of its own to share.`,
+    `${mac} has no Slack app of its own to share. Set one up here, or join your team's hub.`,
+  noKeyToShare: (mac: string) =>
+    `${mac} sent nothing to pair with. Update Pacenote there, then add this Mac again.`,
   notAGroup: (group: string) => `${group} is not a user group.`,
   notARecap: 'Not a recap.',
   nothingToWriteUp: 'There is nothing to write up yet.',
@@ -98,7 +100,10 @@ const ko: typeof en = {
   quit: (app) => `${app} 종료`,
   notAllowed: '허용되지 않아요.',
   denied: '거부됨',
-  noSlackAppToShare: (mac) => `${mac}에는 공유할 자체 Slack 앱이 없어요.`,
+  noSlackAppToShare: (mac) =>
+    `${mac}에는 공유할 자체 Slack 앱이 없어요. 여기서 새로 만들거나 팀 허브에 연결하세요.`,
+  noKeyToShare: (mac) =>
+    `${josa(mac, '이/가')} 페어링할 정보를 보내지 않았어요. 그 Mac의 Pacenote를 업데이트한 뒤 이 Mac을 다시 추가하세요.`,
   notAGroup: (group) => `${josa(group, '은/는')} 사용자 그룹이 아니에요.`,
   notARecap: '회고가 아니에요.',
   nothingToWriteUp: '아직 정리할 내용이 없어요.',

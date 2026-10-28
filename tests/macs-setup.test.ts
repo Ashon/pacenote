@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket, WebSocketServer } from 'ws'
-import { setupAccept, setupDial } from '../src/macs/channel.js'
-import { Macs } from '../src/macs/macs.js'
+import { macsKey, setupAccept, setupDial } from '../src/macs/channel.js'
+import { GROUP_FILE, Macs } from '../src/macs/macs.js'
 import { SetupFromMac } from '../src/macs/setup.js'
 import type { FromMacState, SetupPayload } from '../src/macs/types.js'
 
@@ -117,7 +117,11 @@ describe('setting up a new Mac from one already set up', () => {
     await poll(() => setup.current.step).toBe('copied')
     expect(took).toEqual([
       {
-        payload,
+        // With the key your Macs know each other by: your Slack app's
+        payload: {
+          ...payload,
+          group: macsKey('xapp-1-HOME').toString('base64'),
+        },
         from: { name: 'MacBook Pro', address: `127.0.0.1:${macs.listening}` },
       },
     ])
@@ -176,24 +180,38 @@ describe('setting up a new Mac from one already set up', () => {
     expect(states.some((s) => s.step === 'error')).toBe(false)
   })
 
-  it('offers nothing without your own Slack app', async () => {
+  it('sends a key it makes, and how Todo collects, without a Slack app of your own', async () => {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'pacenote-setup-'))
     dirs.push(dataDir)
+    const values = { TASKS: 'on', TASKS_NAMES: 'Ash' }
     const macs = new Macs({
       dataDir,
       appToken: () => undefined,
       name: 'MacBook Pro',
-      version: '0.5.31',
+      version: '0.6.13',
       use: () => ({ idle: 1, locked: false, asleep: false }),
-      pace: () => ({ ready: true, answering: true }),
+      pace: () => ({ ready: false, answering: false }),
       onAnswer: () => undefined,
+      setupPayload: () => ({ values }),
       log: () => undefined,
       port: 0,
       bonjour: false,
+      tickMs: 50,
     })
     await macs.start()
     stops.push(() => macs.stop())
-    expect(await macs.startAdding()).toBe(false)
-    expect(macs.view().adding).toBeUndefined()
+    expect(await macs.startAdding()).toBe(true)
+    const file = path.join(dataDir, GROUP_FILE)
+    expect(statSync(file).mode & 0o777).toBe(0o600)
+    const { setup, took } = air()
+    setup.look()
+    await setup.connect({ address: `127.0.0.1:${macs.listening}` })
+    await poll(() => macs.view().adding?.request?.name).toBe('MacBook Air')
+    macs.allowAdding()
+    await poll(() => setup.current.step).toBe('copied')
+    expect(took[0]?.payload).toEqual({
+      values,
+      group: readFileSync(file, 'utf8').trim(),
+    })
   })
 })
