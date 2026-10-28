@@ -56,6 +56,7 @@ const SITE = build('site', {
   'v0.6.9': '2026-10-26T06:00:00Z',
   'v0.6.10': '2026-10-27T03:00:00Z',
   'v0.6.11': '2026-10-28T03:00:00Z',
+  'v0.6.12': '2026-10-28T15:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -370,21 +371,24 @@ describe('the news', () => {
       expect(read(`${dir}news/`)).toContain(
         '<a class="news-featured" href="share-your-hub/" data-kind="post">'
       )
-    expect(rows('news/').slice(0, 2)).toEqual([
+    expect(rows('news/').slice(0, 3)).toEqual([
+      'release v0.6.12/',
       'release v0.6.11/',
       'release v0.6.10/',
     ])
     expect(rows('news/')).not.toContain('post share-your-hub/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 2)).toEqual([
+    expect(rows('ko/news/').slice(0, 3)).toEqual([
+      'release v0.6.12/',
       'release v0.6.11/',
       'release ../../news/v0.6.10/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
+    expect(EVERY).toContain('ko/news/v0.6.12/')
     expect(read('ko/news/')).toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.12/')
+    expect(EVERY).not.toContain('news/v0.6.13/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -395,12 +399,13 @@ describe('the news', () => {
         ),
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
     expect(recent('news/v0.6.11/').slice(0, 3)).toEqual([
+      '../v0.6.12/',
       '../share-your-hub/',
       './ *',
-      '../v0.6.10/',
     ])
     // The Korean rail has the English notes too, as the Korean list has
-    expect(recent('ko/news/share-your-hub/').slice(0, 3)).toEqual([
+    expect(recent('ko/news/share-your-hub/').slice(0, 4)).toEqual([
+      '../v0.6.12/',
       './ *',
       '../v0.6.11/',
       '../../../news/v0.6.10/',
@@ -414,14 +419,9 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    expect(link('')).toEqual([
-      'news/share-your-hub/',
-      'New: Share your team hub with a link',
-    ])
-    expect(link('ko/')).toEqual([
-      'news/share-your-hub/',
-      '새 소식: 팀 허브를 링크로 공유해요',
-    ])
+    // The latest release, after the feature post before it
+    expect(link('')).toEqual(['news/v0.6.12/', "What's new in v0.6.12"])
+    expect(link('ko/')).toEqual(['news/v0.6.12/', 'v0.6.12에서 달라진 점'])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
