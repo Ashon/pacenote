@@ -8,16 +8,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pacenote: 내 Mac에서 돌아가는 나만의 Slack AI 어시스턴트</title>
-  <meta name="description" content="무료 Mac 앱이에요. Slack에서 Pace를 멘션하면 내 Claude Code나 Codex 로그인으로 답하고, 사람들이 내게 부탁한 일을 목록으로 정리해요. 오픈 소스이고, 텔레메트리는 없어요.">
+  <title>Pacenote: 나에게 온 일을 한 목록에, 내 Mac에서</title>
+  <meta name="description" content="사람들이 Slack에서 내게 부탁한 일과 AI 세션이 남긴 일을 모아, 할 일마다 Claude Code, Codex, opencode로 넘기는 무료 Mac 앱이에요. 오픈 소스이고, 텔레메트리는 없어요.">
   <link rel="canonical" href="https://pacenote.dev/ko/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/">
   <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/">
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
-  <meta property="og:title" content="Pacenote: Slack 속 나만의 AI 어시스턴트">
-  <meta property="og:description" content="Pace는 내 Mac에서, 내 Claude나 ChatGPT 요금제로, 나에게만 답해요. 무료 오픈 소스예요.">
+  <meta property="og:title" content="Pacenote: 나에게 온 일을 한 목록에">
+  <meta property="og:description" content="사람들이 내게 부탁한 일과 AI 세션이 남긴 일을 내 Mac에 모아, Claude Code, Codex, opencode로 이어가요. 무료 오픈 소스예요.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/ko/">
   <meta property="og:site_name" content="Pacenote">
@@ -54,9 +54,10 @@
   <main id="main">
     <section class="hero">
       <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">달라진 점</a>
-      <h1>Slack에서 묻고,<br>터미널에서 이어가세요.</h1>
-      <p class="lede">Pacenote는 무료 Mac 앱이에요. Slack에서 어시스턴트 Pace를 멘션하면 내 Claude Code나 Codex 로그인으로
-        답하고, 할 일마다 그간의 기록을 챙겨 실제로 작업할 터미널 세션에 넘겨줘요.</p>
+      <h1>나에게 온 일을 한 목록에,<br>내 Mac에서.</h1>
+      <p class="lede">Pacenote는 무료 Mac 앱이에요. 사람들이 Slack에서 내게 부탁한 일과 AI 세션이 나중으로 남긴 일을
+        모으고, 할 일마다 그간의 기록을 챙겨 Claude Code, Codex, opencode에 넘겨줘요. Slack 어시스턴트 Pace는 원할 때
+        켜요.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Homebrew로 설치">
           <code id="install-command"><span>brew tap ashon/tap</span>
@@ -67,16 +68,16 @@
         </div>
         <a class="button secondary" href="how-it-works/">작동 방식</a>
       </div>
-      <p class="next">무료 오픈 소스예요. Apple silicon Mac, 내 Claude나 ChatGPT 요금제, 그리고
-        <a href="install/#before">앱을 만들 수 있는</a> Slack 워크스페이스가 필요해요. 텔레메트리는 없어요.</p>
+      <p class="next">무료 오픈 소스예요. Apple silicon Mac과 내 Claude나 ChatGPT 요금제가 필요해요. Slack은 내 AI의
+        <a href="install/#needs">커넥터</a>로 읽어요. 텔레메트리는 없어요.</p>
       <figure class="window">
         <div class="av av-window" role="img"
           aria-label="Pacenote의 할 일 화면: 사람들이 Slack에서 부탁한 할 일 세 개가 있어요. 펼친 할 일은 목요일 마감인 PR 리뷰로, 지난주 Codex에서 관련 리뷰가 어떻게 끝났는지와 같은 스레드에서 Pace가 한 답변을 보여 주고, Claude Code에서 이어서 하는 버튼이 있어요.">
           <div class="av-bar"><span class="av-toggle"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#panel-left"/></svg></span><span class="av-search"><svg class="av-i s14" aria-hidden="true"><use href="../icons.svg#search"/></svg><span>요청, 채널, 답변으로 실행 기록 검색</span><kbd>⌘K</kbd></span></div>
-          <div class="av-side"><span class="av-brand"><img src="../media/pacenote-mark.svg" width="24" height="24" alt="">Pacenote</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#layout-dashboard"/></svg>개요</span><span class="av-nav current"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#list-checks"/></svg>할 일<span class="av-count">3</span></span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#calendar-check"/></svg>회고</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#user-round"/></svg>나</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#history"/></svg>실행 기록</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#bot"/></svg>Pace</span><span class="av-nav last"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#settings"/></svg>설정</span></div>
+          <div class="av-side"><span class="av-brand"><img src="../media/pacenote-mark.svg" width="24" height="24" alt="">Pacenote</span><span class="av-nav current"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#list-checks"/></svg>할 일<span class="av-count">3</span></span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#calendar-check"/></svg>회고</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#user-round"/></svg>나</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#layout-dashboard"/></svg>개요</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#history"/></svg>실행 기록</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#bot"/></svg>Pace</span><span class="av-nav last"><svg class="av-i s18" aria-hidden="true"><use href="../icons.svg#settings"/></svg>설정</span></div>
           <div class="av-main">
             <div class="av-surface">
-              <div class="av-head"><span class="av-title">할 일<span>열린 할 일 3개</span></span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#refresh-cw"/></svg>지금 모으기</span></div>
+              <div class="av-head"><span class="av-title">할 일<span>열린 할 일 3개</span></span><span class="av-head-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#plus"/></svg>새 할 일</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#refresh-cw"/></svg>지금 모으기</span></span></div>
               <div class="av-tabs"><span class="on">열림 3</span><span>후보 0</span><span>완료</span></div>
               <div class="av-rows"><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev open" aria-hidden="true"><use href="../icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">결제 재시도 PR 리뷰</span><span class="av-meta"><span>mina님의 요청 · #payments · 2시간 전</span><span class="av-badge due">목요일</span><span class="av-badge area">결제</span></span><span class="av-mono">acme/payments</span></div></div><div class="av-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#square-terminal"/></svg>Claude Code에서 계속</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#circle-check"/></svg>완료</span><span class="av-btn secondary">제외</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#external-link"/></svg></span></div></div><div class="av-context"><div>mina님이 목요일 전까지 PR #482 리뷰를 부탁했어요.</div><div class="av-kv"><span class="av-k">지난번</span><span class="av-v"><b>재시도 설정 변경 리뷰</b><span class="av-muted">Codex에서 완료 · 코멘트 2개 남기고 승인 · 금요일</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#square-terminal"/></svg></span><span class="av-k">이 스레드</span><span class="av-v"><b>PR #482에서 어떤 재시도가 바뀌었나요?</b><span class="av-muted">Pace · 오늘</span></span><span></span></div><div class="av-show">접기</div></div></div><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev" aria-hidden="true"><use href="../icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">webhook 재시도 한도 관련해 hyun님에게 답하기</span><span class="av-meta"><span>hyun님의 요청 · #ops · 5시간 전</span></span></div></div><div class="av-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#message-square"/></svg>답장 초안 쓰기</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#circle-check"/></svg>완료</span><span class="av-btn secondary">제외</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#external-link"/></svg></span></div></div></div><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev" aria-hidden="true"><use href="../icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">월요일 장애 타임라인 공유</span><span class="av-meta"><span>jun님의 요청 · #incidents · 1일 전</span><span class="av-badge due">금요일</span></span></div></div><div class="av-actions"><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#circle-check"/></svg>완료</span><span class="av-btn secondary">제외</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="../icons.svg#external-link"/></svg></span></div></div></div></div>
             </div>
@@ -111,7 +112,7 @@
         <div class="row">
           <div class="copy">
             <h2>Pace는 스레드에서 답해요</h2>
-            <p>Slack 스레드에서 <code>@Pace</code>를 멘션하세요. 스레드와 파일을 읽고, 로그인해 둔 <code>claude</code>나
+            <p>원할 때 Pace를 켜고, Slack 스레드에서 <code>@Pace</code>를 멘션하세요. 스레드와 파일을 읽고, 로그인해 둔 <code>claude</code>나
               <code>codex</code> CLI로 답을 찾아 바로 그 자리에서 답해요. 거친 단계는 모두 남겨 둬요.</p>
             <a class="more" href="how-it-works/#answer">답변이 만들어지는 과정</a>
           </div>
@@ -130,9 +131,9 @@
         <div class="row">
           <div class="copy">
             <h2>멈춘 곳에서 이어가세요</h2>
-            <p><b>지금 모으기</b>를 누르면 사람들이 Slack에서 내게 부탁한 일이 목록으로 정리돼요. <b>Claude Code에서 계속</b>이나
-              Codex, opencode에서 계속을 누르면, 스레드와 Pace가 찾은 내용, 지난번 관련 작업이 어떻게 끝났는지를 이미 담은 세션이
-              열려요.</p>
+            <p><b>지금 모으기</b>를 누르면 사람들이 Slack에서 내게 부탁한 일이 목록으로 정리되고, <b>새 할 일</b>로 내 일을
+              더해요. <b>Claude Code에서 계속</b>이나 Codex, opencode에서 계속을 누르면, 스레드와 그간의 기록, 지난번 관련
+              작업이 어떻게 끝났는지를 이미 담은 세션이 열려요.</p>
             <a class="more" href="how-it-works/#todo">할 일과 넘겨주기</a>
           </div>
           <figure class="shot">
@@ -145,9 +146,11 @@
         <div class="row">
           <div class="copy">
             <h2>다른 Mac에서 이어가세요</h2>
-            <p>두 Mac에 Pacenote가 있으면 할 일과 각 할 일의 진행 상황이 두 Mac에서 같고, Pace는 지금 쓰는 Mac에서 답해요.
-              그 Mac을 잠그거나, 뚜껑을 닫거나, 자리를 비우면 Pace가 다른 Mac으로 옮겨가요. 두 Mac은 중간에 서버 없이 내
-              네트워크에서 서로를 찾아요.</p>
+            <p>일은 내 Mac에 남아요. 두 Mac에 Pacenote가 있으면 할 일과 각 할 일의 진행 상황이 두 Mac에서 같고, Pace는 지금
+              쓰는 Mac에서 답해요. 그 Mac을 잠그거나, 뚜껑을 닫거나, 자리를 비우면 Pace가 다른 Mac으로 옮겨가요. 두 Mac은
+              중간에 서버 없이 내 네트워크에서 봉주르로 서로를 찾아요.</p>
+            <p><span class="badge">곧 나와요</span> Slack 앱 없이도 페어링하는 Mac, 그리고 같은 방식으로 내 네트워크에서
+              페어링하는 iPhone과 iPad로 책상을 떠나서도 할 일을 챙겨요.</p>
             <a class="more" href="how-it-works/#macs">Mac 사이에서 넘겨받는 방식</a>
           </div>
           <figure class="shot">
@@ -219,8 +222,8 @@
           </div>
           <a class="button primary" href="install/">초기 설정 단계</a>
         </div>
-        <p>macOS 12 이상의 Apple silicon Mac, 내 요금제로 로그인한 Claude Code나 Codex, 그리고 앱을 만들 수 있는 Slack
-          워크스페이스가 필요해요.</p>
+        <p>macOS 12 이상의 Apple silicon Mac과 내 요금제로 로그인한 Claude Code나 Codex가 필요해요. 선택인 Slack
+          어시스턴트 Pace에는 앱을 만들 수 있는 Slack 워크스페이스나 팀 허브도 필요해요.</p>
         <p>함께 다듬어 보고 싶다면 <a href="https://github.com/Ashon/pacenote/issues/new?template=design-partner.yml">디자인
           파트너로 참여해 주세요</a>. 한 달 동안 써 보시고, 2주마다 무엇이 좋고 불편했는지 들려주시면 돼요.</p>
       </section>

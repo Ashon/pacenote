@@ -369,17 +369,19 @@ describe('the news', () => {
     // The latest post leads in a card of its own, and the list has the rest
     for (const dir of ['', 'ko/'])
       expect(read(`${dir}news/`)).toContain(
-        '<a class="news-featured" href="share-your-hub/" data-kind="post">'
+        '<a class="news-featured" href="todo-comes-first/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 3)).toEqual([
       'release v0.6.12/',
+      'post share-your-hub/',
       'release v0.6.11/',
-      'release v0.6.10/',
     ])
-    expect(rows('news/')).not.toContain('post share-your-hub/')
+    expect(rows('news/')).not.toContain('post todo-comes-first/')
+    expect(rows('news/')).toContain('post share-your-hub/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 3)).toEqual([
+    expect(rows('ko/news/').slice(0, 4)).toEqual([
       'release v0.6.12/',
+      'post share-your-hub/',
       'release v0.6.11/',
       'release ../../news/v0.6.10/',
     ])
@@ -398,13 +400,15 @@ describe('the news', () => {
           /<a href="([^"]+)"( aria-current="page")?[^>]*>[^<]*<span class="news-nav-date">/g
         ),
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
-    expect(recent('news/v0.6.11/').slice(0, 3)).toEqual([
+    expect(recent('news/v0.6.11/').slice(0, 4)).toEqual([
+      '../todo-comes-first/',
       '../v0.6.12/',
       '../share-your-hub/',
       './ *',
     ])
     // The Korean rail has the English notes too, as the Korean list has
-    expect(recent('ko/news/share-your-hub/').slice(0, 4)).toEqual([
+    expect(recent('ko/news/share-your-hub/').slice(0, 5)).toEqual([
+      '../todo-comes-first/',
       '../v0.6.12/',
       './ *',
       '../v0.6.11/',
@@ -419,9 +423,15 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest release, after the feature post before it
-    expect(link('')).toEqual(['news/v0.6.12/', "What's new in v0.6.12"])
-    expect(link('ko/')).toEqual(['news/v0.6.12/', 'v0.6.12에서 달라진 점'])
+    // The latest feature post, as it leads the news
+    expect(link('')).toEqual([
+      'news/todo-comes-first/',
+      'New: Todo comes first',
+    ])
+    expect(link('ko/')).toEqual([
+      'news/todo-comes-first/',
+      '새 소식: 이제 할 일이 먼저예요',
+    ])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {

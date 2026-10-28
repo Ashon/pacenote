@@ -22,16 +22,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pacenote: your own AI assistant in Slack, on your Mac</title>
-  <meta name="description" content="A free Mac app. Pace answers you in Slack when you mention it, with your own Claude Code or Codex login, and lists what people asked of you. Open source, no telemetry.">
+  <title>Pacenote: everything asked of you, in one list on your Mac</title>
+  <meta name="description" content="A free Mac app that gathers what people ask of you in Slack and what your AI sessions leave for later, and hands each task to Claude Code, Codex or opencode. Open source, no telemetry.">
   <link rel="canonical" href="https://pacenote.dev/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/">
   <link rel="alternate" hreflang="x-default" href="https://pacenote.dev/">
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
-  <meta property="og:title" content="Pacenote: your own AI assistant in Slack">
-  <meta property="og:description" content="Pace answers only you, on your own Claude or ChatGPT plan, from your Mac. Free and open source.">
+  <meta property="og:title" content="Pacenote: everything asked of you, in one list">
+  <meta property="og:description" content="What people ask of you and what your AI sessions leave for later, kept on your Mac for Claude Code, Codex or opencode. Free and open source.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/">
   <meta property="og:site_name" content="Pacenote">
@@ -68,9 +68,10 @@
   <main id="main">
     <section class="hero">
       <a class="release" id="release-link" href="https://github.com/Ashon/pacenote/releases/latest">What's new</a>
-      <h1>Ask in Slack.<br>Pick it up in your terminal.</h1>
-      <p class="lede">Pacenote is a free Mac app. Its assistant, Pace, answers you in Slack when you mention it, with your
-        own Claude Code or Codex login, and hands each task, with its history, to the terminal session that does the work.</p>
+      <h1>Everything asked of you,<br>in one list on your Mac.</h1>
+      <p class="lede">Pacenote is a free Mac app. It gathers what people ask of you in Slack and what your AI sessions
+        leave for later, keeps each task with its history, and hands it to Claude Code, Codex or opencode. Pace, its Slack
+        assistant, is there when you want it.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
           <code id="install-command"><span>brew tap ashon/tap</span>
@@ -81,16 +82,16 @@
         </div>
         <a class="button secondary" href="how-it-works/">How it works</a>
       </div>
-      <p class="next">Free and open source. Needs an Apple silicon Mac, your Claude or ChatGPT plan and a Slack
-        workspace where you can <a href="install/#before">create an app</a>. No telemetry.</p>
+      <p class="next">Free and open source. Needs an Apple silicon Mac and your Claude or ChatGPT plan; Slack is read
+        through your AI's own <a href="install/#needs">connector</a>. No telemetry.</p>
       <figure class="window">
         <div class="av av-window" role="img"
           aria-label="Pacenote's Todo screen: three tasks people asked of you in Slack. The open one, a PR review due Thursday, shows how a related review ended last week in Codex and what Pace answered in the same thread, with a button to continue it in Claude Code.">
           <div class="av-bar"><span class="av-toggle"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#panel-left"/></svg></span><span class="av-search"><svg class="av-i s14" aria-hidden="true"><use href="icons.svg#search"/></svg><span>Search runs by request, channel or reply</span><kbd>⌘K</kbd></span></div>
-          <div class="av-side"><span class="av-brand"><img src="media/pacenote-mark.svg" width="24" height="24" alt="">Pacenote</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#layout-dashboard"/></svg>Overview</span><span class="av-nav current"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#list-checks"/></svg>Todo<span class="av-count">3</span></span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#calendar-check"/></svg>Recap</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#user-round"/></svg>You</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#history"/></svg>Runs</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#bot"/></svg>Pace</span><span class="av-nav last"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#settings"/></svg>Settings</span></div>
+          <div class="av-side"><span class="av-brand"><img src="media/pacenote-mark.svg" width="24" height="24" alt="">Pacenote</span><span class="av-nav current"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#list-checks"/></svg>Todo<span class="av-count">3</span></span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#calendar-check"/></svg>Recap</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#user-round"/></svg>You</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#layout-dashboard"/></svg>Overview</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#history"/></svg>Runs</span><span class="av-nav"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#bot"/></svg>Pace</span><span class="av-nav last"><svg class="av-i s18" aria-hidden="true"><use href="icons.svg#settings"/></svg>Settings</span></div>
           <div class="av-main">
             <div class="av-surface">
-              <div class="av-head"><span class="av-title">Todo<span>3 open</span></span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#refresh-cw"/></svg>Collect now</span></div>
+              <div class="av-head"><span class="av-title">Todo<span>3 open</span></span><span class="av-head-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#plus"/></svg>New task</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#refresh-cw"/></svg>Collect now</span></span></div>
               <div class="av-tabs"><span class="on">Open 3</span><span>Maybe 0</span><span>Done</span></div>
               <div class="av-rows"><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev open" aria-hidden="true"><use href="icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">Review the payment retry PR</span><span class="av-meta"><span>mina asked you · #payments · 2h ago</span><span class="av-badge due">Thursday</span><span class="av-badge area">Payments</span></span><span class="av-mono">acme/payments</span></div></div><div class="av-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#square-terminal"/></svg>Continue in Claude Code</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Done</span><span class="av-btn secondary">Dismiss</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg></span></div></div><div class="av-context"><div>mina wants a review of PR #482 before Thursday.</div><div class="av-kv"><span class="av-k">Last time</span><span class="av-v"><b>Review the retry config change</b><span class="av-muted">Done in Codex · Approved with 2 comments · Fri</span></span><span class="av-btn outline square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#square-terminal"/></svg></span><span class="av-k">In this thread</span><span class="av-v"><b>which retries changed in PR #482?</b><span class="av-muted">Pace · Today</span></span><span></span></div><div class="av-show">Show less</div></div></div><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev" aria-hidden="true"><use href="icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">Answer hyun about the webhook retry limit</span><span class="av-meta"><span>hyun asked you · #ops · 5h ago</span></span></div></div><div class="av-actions"><span class="av-btn outline"><svg class="av-i" aria-hidden="true"><use href="icons.svg#message-square"/></svg>Draft a reply</span><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Done</span><span class="av-btn secondary">Dismiss</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg></span></div></div></div><div class="av-task"><div class="av-task-head"><div class="av-task-main"><svg class="av-i av-chev" aria-hidden="true"><use href="icons.svg#chevron-right"/></svg><div class="av-task-text"><span class="av-task-title">Share the incident timeline from Monday</span><span class="av-meta"><span>jun asked you · #incidents · 1d ago</span><span class="av-badge due">Friday</span></span></div></div><div class="av-actions"><span class="av-btn primary"><svg class="av-i" aria-hidden="true"><use href="icons.svg#circle-check"/></svg>Done</span><span class="av-btn secondary">Dismiss</span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#ellipsis"/></svg></span><span class="av-btn ghost square"><svg class="av-i" aria-hidden="true"><use href="icons.svg#external-link"/></svg></span></div></div></div></div>
             </div>
@@ -125,7 +126,8 @@
         <div class="row">
           <div class="copy">
             <h2>Pace answers in the thread</h2>
-            <p>Mention <code>@Pace</code> in a Slack thread. It reads the thread and its files, works the question out
+            <p>Turn Pace on when you want it, and mention <code>@Pace</code> in a Slack thread. It reads the thread and
+              its files, works the question out
               with the <code>claude</code> or <code>codex</code> CLI you are signed in to, and answers right there.
               Every step it took is kept.</p>
             <a class="more" href="how-it-works/#answer">How an answer happens</a>
@@ -145,8 +147,9 @@
         <div class="row">
           <div class="copy">
             <h2>Pick up where you left off</h2>
-            <p><b>Collect now</b> lists what people asked of you in Slack. <b>Continue in Claude Code</b>, Codex or opencode opens a
-              session that already has the thread, what Pace found and how related work ended last time.</p>
+            <p><b>Collect now</b> lists what people asked of you in Slack, and <b>New task</b> adds your own. <b>Continue
+              in Claude Code</b>, Codex or opencode opens a session that already has the thread, what came before and how
+              related work ended last time.</p>
             <a class="more" href="how-it-works/#todo">Your Todo and the handoff</a>
           </div>
           <figure class="shot">
@@ -159,9 +162,11 @@
         <div class="row">
           <div class="copy">
             <h2>Pick up on your other Mac</h2>
-            <p>With Pacenote on two Macs, your Todo and how each task went are the same on both, and Pace answers on the
-              one you're using. Lock it, close the lid or step away, and Pace moves to the other one. Your Macs find each
-              other on your network, with no server in between.</p>
+            <p>Your Mac keeps your work. With Pacenote on two Macs, your Todo and how each task went are the same on
+              both, and Pace answers on the one you're using. Lock it, close the lid or step away, and Pace moves to the
+              other one. Your Macs find each other on your network with Bonjour, with no server in between.</p>
+            <p><span class="badge">Coming soon</span> Macs that pair with no Slack app, and iPhone and iPad paired over
+              your network the same way, for your Todo away from your desk.</p>
             <a class="more" href="how-it-works/#macs">How your Macs hand over</a>
           </div>
           <figure class="shot">
@@ -234,8 +239,8 @@
           </div>
           <a class="button primary" href="install/">Setup steps</a>
         </div>
-        <p>Needs an Apple silicon Mac on macOS 12 or later, Claude Code or Codex signed in with your plan, and a Slack
-          workspace where you can create an app.</p>
+        <p>Needs an Apple silicon Mac on macOS 12 or later and Claude Code or Codex signed in with your plan. Pace, the
+          optional Slack assistant, also needs a Slack workspace where you can create an app, or your team's hub.</p>
         <p>Want to shape it? <a href="https://github.com/Ashon/pacenote/issues/new?template=design-partner.yml">Become a
           design partner</a>: use it for a month and say what works and what doesn't, every two weeks.</p>
       </section>

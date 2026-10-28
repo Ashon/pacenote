@@ -964,6 +964,12 @@ code {
   justify-content: space-between;
   gap: 12px;
 }
+/* The header's buttons, together at its right */
+.av-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .av-title {
   font-size: 18px;
   line-height: 28px;

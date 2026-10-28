@@ -5,8 +5,8 @@
 <h1 align="center">Pacenote</h1>
 
 <p align="center">
-  <b>Ask in Slack. Pick it up in your terminal.</b><br>
-  A free Mac app for developers whose work arrives in Slack and gets done in Claude Code or Codex.
+  <b>Everything asked of you, in one list on your Mac.</b><br>
+  A free Mac app for developers whose work arrives in Slack and gets done in Claude Code, Codex or opencode.
 </p>
 
 <p align="center">
@@ -28,37 +28,29 @@
 </picture>
 </p>
 
-Mention **Pace** in a Slack thread and it answers there, from your Mac, with the Claude Code or Codex you are signed in
-to, on the subscription you already have. It keeps a list of what people ask of you, and when you pick a task up, it
-opens Claude Code, Codex or opencode with the thread, what Pace found and how related work ended last time, even when
-that work was done in another tool.
+Pacenote gathers what people ask of you in Slack, read through your AI tool's own Slack connector, and what your Claude
+Code, Codex or opencode sessions leave for later. Each task keeps its history, and when you pick one up, Pacenote opens
+the session with the thread and how related work ended last time, even when that work was done in another tool.
 
-Pace answers only you, keeps its history in `~/.pacenote` on your Mac, and sends no telemetry. In rallying, the
-co-driver reads the pace notes so the driver can keep their eyes on the road. You drive; Pace reads the notes.
+**Pace**, the assistant you mention in Slack, is optional: turn it on and it answers you there, from your Mac, with the
+Claude Code or Codex you are signed in to, on the subscription you already have.
+
+Everything stays in `~/.pacenote` on your Mac, and Pacenote sends no telemetry. In rallying, the co-driver reads the
+pace notes so the driver can keep their eyes on the road. You drive; Pace reads the notes.
 
 ## What you can do
-
-### Ask Pace in Slack
-
-Mention `@Pace` in a thread. Pace reads the thread and its files (text, images, PDFs), works the question out with the
-`claude` or `codex` CLI you are signed in to, and answers in the thread. The app keeps every run with each step Pace
-took, so you can see how it got there. In the built-in sandbox, diagrams and charts in an answer come back as images,
-and Pace can use your Todo: ask it to keep what a thread needs from you, list or close your tasks, or recap your week.
-
-<p align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/run-dark.webp">
-  <img alt="A run in Pacenote: the question asked in #ops, the two tool steps Pace took, and its answer naming the likely cause." src="docs/images/run-light.webp">
-</picture>
-</p>
 
 ### Keep track of what is asked of you
 
 **Collect now** has Claude Code (through your claude.ai Slack connector) or Codex (through ChatGPT's Slack app) read
-Slack, read only, and lists what people asked of you and what you said you would do: by your @mention, the other names people call you, or a user group that
-means you. Anything it is not sure about waits under Maybe instead of cluttering the list, a Maybe from a group asks once
-whether that group means you, and a message never becomes a task twice. Collecting is off until you turn it on. With
+Slack, read only, and lists what people asked of you and what you said you would do: by your @mention, the other names
+people call you, or a user group that means you. Anything it is not sure about waits under Maybe instead of cluttering
+the list, a Maybe from a group asks once whether that group means you, and a message never becomes a task twice. With
 both on your Mac, the other one takes over when the one you chose is at its usage limit.
+
+**New task** (⌘N) adds one of your own, in the project its words point to. A task can be in progress (you mark it, or a
+session worked on it in the last day) or waiting on someone else until something new comes in its thread, and Today,
+above the list, names the ask waiting on you, the task to pick up and the one waiting longest on someone else.
 
 ### Pick up where you left off, in either tool
 
@@ -72,6 +64,21 @@ shows the work as it happens.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/trajectory-dark.svg">
   <img alt="A task's trajectory in six stages on a track: asked, collected, picked up, worked on, settled and wrapped up; four ways through them (continued from Todo in Claude Code, a session you start yourself that is told the repository's open tasks, settled in Slack with a drafted reply, and your own promise done in Codex); and what a trajectory leaves: the next one remembers how it ended, whoever does the work, live on Todo, links rather than messages" src="docs/diagrams/trajectory-light.svg">
+</picture>
+</p>
+
+### Ask Pace in Slack, if you want it
+
+Turn Pace on from the first run or Settings > General, then mention `@Pace` in a thread. Pace reads the thread and its
+files (text, images, PDFs), works the question out with the `claude` or `codex` CLI you are signed in to, and answers in
+the thread. The app keeps every run with each step Pace took, so you can see how it got there. In the built-in sandbox,
+diagrams and charts in an answer come back as images, and Pace can use your Todo: ask it to keep what a thread needs
+from you, list or close your tasks, or recap your week.
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/run-dark.webp">
+  <img alt="A run in Pacenote: the question asked in #ops, the two tool steps Pace took, and its answer naming the likely cause." src="docs/images/run-light.webp">
 </picture>
 </p>
 
@@ -93,7 +100,8 @@ to post.
 With Pacenote on two Macs, Pace answers on the one you're using and moves with you when you leave it for the other, and
 Todo is the same on both. Turn it on in Settings > Macs on each: Macs with the same Slack app find each other on your
 network, with nothing to pair and no server in between. A new Mac's setup can take your Slack app from the other one
-(Add a Mac). See [Your Macs](docs/macs.md).
+(Add a Mac). See [Your Macs](docs/macs.md). Coming soon: Macs that pair with no Slack app, and iPhone and iPad paired
+over your network the same way.
 
 ### Share the history with your AI tools
 
@@ -128,9 +136,9 @@ How each of these is enforced is in [Reasoner sandbox](docs/sandbox.md), [Tools]
 - A Mac with Apple silicon and macOS 12 or later. The built-in sandbox needs macOS 15 or later.
 - Claude Code with a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later with ChatGPT Plus, Pro or
   Business, signed in on that Mac.
-- A Slack workspace where you can create an app, or your team's Pacenote hub.
-- To gather your tasks: Claude Code, with the Slack connector of your claude.ai account, or Codex, with ChatGPT's
+- To gather asks from Slack: Claude Code, with the Slack connector of your claude.ai account, or Codex, with ChatGPT's
   Slack app.
+- For Pace, the optional Slack assistant: a Slack workspace where you can create an app, or your team's Pacenote hub.
 
 ## Install
 
@@ -143,9 +151,10 @@ brew install --cask pacenote
 Homebrew loads casks only from taps you trust, so without `brew trust` the install is refused and upgrades skip
 Pacenote.
 
-Open Pacenote, and setup takes you through five steps: the AI service on your Mac, where answers run, Slack, a review,
-and Pace's first answer. It ends when Pace answers you in Slack for the first time. You can leave at any step and pick
-it up again from Overview.
+Open Pacenote. A first run asks for your AI, shows where your work is read from (this Mac, then Slack through your AI
+tool's connector) and collects your last 7 days, then opens Todo. There is no Slack app to make. For Pace, choose **Set
+up Pace** on the first run or in Settings > General: its setup takes you through where answers run, Slack and a review,
+and ends when Pace answers you in Slack for the first time.
 
 `brew upgrade --cask pacenote` updates the app. Settings and run history live in `~/.pacenote` and are kept across
 upgrades and uninstalls. To run from source instead, see [Installation](docs/installation.md).

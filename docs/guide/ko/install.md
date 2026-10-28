@@ -1,9 +1,9 @@
 ---
-title: 설치부터 Pace의 첫 답변까지
-summary: Homebrew로 Pacenote를 설치하고, 세 단계로 할 일을 모은 뒤, Pace를 설정해 Slack에서 첫 답변을 받아요.
+title: 설치하고 처음 실행하기
+summary: Homebrew로 Pacenote를 설치하고, 세 단계로 나에게 온 일을 모으고, 원할 때 Pace를 설정해요.
 kind: start
 order: 1
-shot: setup-start
+shot: first-run
 ---
 
 ## 필요한 것
@@ -26,6 +26,8 @@ brew install --cask pacenote
 ## 처음 실행
 
 Pacenote를 열어요. 새로 설치하면 세 단계로 시작하고, Slack 앱은 만들지 않아요.
+
+![처음 실행의 두 번째 단계: 이 Mac, 그리고 AI 도구의 커넥터로 읽는 Slack](shot:first-run)
 
 1. **내 AI.** Claude Code나 Codex를 골라요. 이 Mac에 있고 로그인했는지 확인해요.
 2. **일이 있는 곳.** 이 Mac의 세션과 커밋, 그리고 AI 도구의 Slack 커넥터로 읽기만 하는 Slack이에요. 아직이라면

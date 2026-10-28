@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>설치 - Pacenote</title>
-  <meta name="description" content="Homebrew로 Pacenote를 설치하세요. 필요한 것, Slack에서 Pace의 첫 답변으로 끝나는 초기 설정, 업데이트와 삭제 방법을 안내해요.">
+  <meta name="description" content="Homebrew로 Pacenote를 설치하세요. 필요한 것, 할 일로 끝나는 처음 실행, 원할 때 하는 Pace 설정, 업데이트와 삭제 방법을 안내해요.">
   <link rel="canonical" href="https://pacenote.dev/ko/install/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/install/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/install/">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Pacenote 설치하기">
-  <meta property="og:description" content="Homebrew 명령 세 줄, 그리고 Slack에서 Pace가 답하면 끝나는 초기 설정.">
+  <meta property="og:description" content="Homebrew 명령 세 줄, 그리고 할 일로 끝나는 처음 실행.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/ko/install/">
   <meta property="og:site_name" content="Pacenote">
@@ -45,7 +45,8 @@
   <main id="main">
     <div class="page-head">
       <h1>Pacenote 설치하기</h1>
-      <p class="lede">Homebrew 명령 세 줄이면 되고, 앱 안의 초기 설정은 Slack에서 Pace가 답하면 끝나요.</p>
+      <p class="lede">Homebrew 명령 세 줄이면 되고, 앱의 처음 실행은 할 일 화면에서 끝나요. Slack 어시스턴트 Pace는
+        원할 때 켜요.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Homebrew로 설치">
           <code id="install-command"><span>brew tap ashon/tap</span>
@@ -64,22 +65,23 @@
           <li>macOS 12 이상의 Apple silicon Mac. 내장 샌드박스에는 macOS 15가 필요해요.</li>
           <li>Claude Pro, Max, Team, Enterprise 요금제의 Claude Code, 또는 ChatGPT Plus, Pro, Business의 Codex 0.138 이상.
             그 Mac에서 로그인되어 있어야 해요.</li>
-          <li>앱을 만들 수 있는 Slack 워크스페이스, 또는 팀의
+          <li>Slack에서 할 일을 모으려면: claude.ai 계정의 Slack 커넥터를 연결한 Claude Code, 또는 ChatGPT의 Slack 앱을
+            연결한 Codex. Pacenote는 그걸로 Slack을 읽고, Slack 토큰을 갖지 않아요.</li>
+          <li>선택인 Slack 어시스턴트 Pace에는: 앱을 만들 수 있는 Slack 워크스페이스, 또는 팀의
             <a href="https://github.com/Ashon/pacenote/blob/main/docs/team-hub.md">Pacenote 허브</a>.</li>
-          <li>할 일 모으기에는: claude.ai 계정의 Slack 커넥터를 연결한 Claude Code, 또는 ChatGPT의 Slack 앱을 연결한
-            Codex.</li>
         </ul>
       </section>
 
       <section class="block" id="setup" aria-labelledby="setup-title">
-        <h2 id="setup-title">초기 설정은 Pace의 첫 답변으로 끝나요</h2>
+        <h2 id="setup-title">처음 실행은 할 일 화면에서 끝나요</h2>
         <ol class="steps down">
           <li>Homebrew로 설치하세요: <code>brew tap ashon/tap</code>으로 tap을 추가하고, <code>brew trust ashon/tap</code>으로
             신뢰한 다음 <code>brew install --cask pacenote</code>를 실행해요. Homebrew는 신뢰한 tap의 cask만 불러오기 때문에,
             신뢰하지 않으면 설치를 거부해요.</li>
-          <li>Pacenote를 여세요. 초기 설정이 AI 서비스, 답변을 실행할 곳, Slack, 마지막 확인까지 차례로 안내해요. 어느
-            단계에서든 멈췄다가 나중에 개요에서 이어서 할 수 있어요.</li>
-          <li>스레드에서 <code>@Pace</code>를 멘션하세요. Pace가 거기서 답하면 초기 설정이 끝나요.</li>
+          <li>Pacenote를 여세요. 처음 실행이 내 AI를 묻고, 일을 어디서 읽는지 보여 주고, 지난 7일을 모아요. 그다음 할 일이
+            열려요.</li>
+          <li>Slack에서 Pace를 쓰려면 설정 &gt; 일반이나 처음 실행에서 <b>Pace 설정</b>을 누르세요. 답변을 실행할 곳, Slack,
+            마지막 확인까지 안내하고, 스레드에서 <code>@Pace</code>가 답하면 끝나요.</li>
         </ol>
       </section>
 

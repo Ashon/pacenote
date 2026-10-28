@@ -725,6 +725,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.screenshot({
       path: path.join(REPO, 'test-results/first-run-sources.png'),
     })
+    await siteShot(page, 'first-run')
     await page.getByRole('button', { name: 'Continue' }).click()
 
     // 3. A first look, and Todo; Pace never asked to be set up

@@ -1,9 +1,9 @@
 ---
-title: From install to Pace's first answer
-summary: Install Pacenote with Homebrew, gather your tasks in three steps, and set up Pace for its first answer in Slack.
+title: Install and first run
+summary: Install Pacenote with Homebrew, gather what is asked of you in three steps, and set up Pace when you want it.
 kind: start
 order: 1
-shot: setup-start
+shot: first-run
 ---
 
 ## What you need
@@ -26,6 +26,8 @@ brew install --cask pacenote
 ## First run
 
 Open Pacenote. A new install opens on three steps, with no Slack app to make:
+
+![The first run's second step: this Mac, then Slack through your AI tool's connector](shot:first-run)
 
 1. **Your AI.** Choose Claude Code or Codex. Pacenote checks that it is on this Mac and signed in.
 2. **Where your work is.** The sessions and commits on this Mac, and Slack, read only through your AI tool's own Slack
