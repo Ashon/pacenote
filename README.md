@@ -97,11 +97,11 @@ to post.
 
 ### Move between your Macs
 
-With Pacenote on two Macs, Pace answers on the one you're using and moves with you when you leave it for the other, and
-Todo is the same on both. Turn it on in Settings > Macs on each: Macs with the same Slack app find each other on your
-network, with nothing to pair and no server in between. A new Mac's setup can take your Slack app from the other one
-(Add a Mac). See [Your Macs](docs/macs.md). Coming soon: Macs that pair with no Slack app, and iPhone and iPad paired
-over your network the same way.
+With Pacenote on two Macs, Todo is the same on both, merged directly over your network with no server in between. Pair
+them once with no Slack app: Add a Mac on one, then From your other Mac in the other's first run (or Pair in its
+Settings > Macs). With your own Slack app, Pace answers on the one you're using and moves with you when you leave it for
+the other; Macs with the same Slack app find each other with nothing to pair. See [Your Macs](docs/macs.md). Coming
+soon: iPhone and iPad, paired over your network the same way.
 
 ### Share the history with your AI tools
 
@@ -122,7 +122,8 @@ and where you contribute. You add it to each tool with one click, and only if yo
   Tools, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only
   lookups and, only where you turn on Write, draft PRs and Jira issues or comments.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
-  only your other Macs reach it, on your own network: ones with the same Slack app, or a new one while Add a Mac waits.
+  only your other Macs reach it, on your own network: ones you paired or set up with the same Slack app, or a new one
+  while Add a Mac waits.
   Besides Slack (or your hub), your AI
   service and the services you connect in Settings > Tools, it talks only to GitHub to check for updates, and downloads the
   sandbox's images when you set it up. There is no telemetry.

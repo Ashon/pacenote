@@ -483,6 +483,33 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     expect(air.answered().some((request) => /hello/.test(request))).toBe(true)
   })
 
+  /**
+   * A screen for pacenote.dev, in English and Korean (E2E_SITE_SHOTS=1), as
+   * app.e2e.ts takes its own
+   */
+  async function siteShot(mac: Mac, name: string) {
+    if (!process.env.E2E_SITE_SHOTS) return
+    // No button shown as hovered
+    await mac.page.mouse.move(0, 0)
+    const language = async (preference: string, lang: string) => {
+      await mac.page.evaluate(
+        `window.pacenoteDesktop.language.set(${JSON.stringify(preference)})`
+      )
+      await mac.page.waitForFunction(
+        `document.documentElement.lang === '${lang}'`
+      )
+    }
+    for (const lang of ['en', 'ko']) {
+      await language(lang, lang)
+      // The screen in its new words, settled
+      await mac.page.waitForTimeout(600)
+      const file = path.join(REPO, 'site/shots', lang, `${name}.png`)
+      mkdirSync(path.dirname(file), { recursive: true })
+      await mac.page.screenshot({ path: file })
+    }
+    await language('system', 'en')
+  }
+
   /** A screen of the run, kept under test-results to look at */
   const shot = (mac: Mac, name: string) =>
     mac.page.screenshot({
@@ -618,6 +645,7 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await pro.page.getByText('Find your other Macs').waitFor()
     expect(await pro.page.getByText('Pair with your other Mac').count()).toBe(0)
     await shot(pro, 'todo-paired')
+    await siteShot(pro, 'macs-paired')
 
     // Done on the Air: done on the Pro too.
     await air.page
