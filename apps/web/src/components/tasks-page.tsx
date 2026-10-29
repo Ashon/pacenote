@@ -541,6 +541,11 @@ function TaskRowsSkeleton({ count }: { count: number }) {
               className="mt-1 text-meta leading-[1.1875rem]"
               width={META_WIDTHS[i % META_WIDTHS.length]}
             />
+            {/* a narrow window's buttons, under the title (task-row.tsx) */}
+            <div
+              aria-hidden="true"
+              className="mt-2.5 hidden h-7 @max-[44rem]:block"
+            />
           </div>
         </li>
       ))}

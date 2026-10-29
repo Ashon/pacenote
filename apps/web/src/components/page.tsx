@@ -19,7 +19,9 @@ export function Page({
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
-        <header className="flex items-center gap-3">
+        {/* In a narrow window what it counts, then the action, go to a line
+            of their own rather than squeeze beside the title */}
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-title">{title}</h1>
           {meta && (
             <span className="text-copy text-muted-foreground">{meta}</span>
@@ -27,7 +29,7 @@ export function Page({
           {action && (
             <>
               <span className="flex-1" />
-              {action}
+              <div className="flex items-center gap-3">{action}</div>
             </>
           )}
         </header>

@@ -1648,6 +1648,104 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await kept.getByText('Ashon/payments').first().waitFor()
   }, 180_000)
 
+  it("keeps a task's title wide in a narrow window, with its buttons under it", async () => {
+    world = await World.create([])
+    const { home } = world
+    const HOUR = 3_600_000
+    const now = Date.now()
+    const link = (at: number) =>
+      `https://acme.slack.com/archives/C0OPS/p${String(Math.floor(at / 1000))}000100`
+    addTasks(
+      home,
+      [
+        {
+          title: 'Send dave the list of who needs Okta turned on',
+          asked_by: 'dave',
+          where: '#icp-cloud',
+          link: link(now - 2 * HOUR),
+          confidence: 'sure',
+          action: 'reply',
+          summary: 'dave needs the list to turn Okta on.',
+          due: 'by Friday, so Okta can be turned on for all of them',
+        },
+        {
+          title: 'Document where the CMDB domain view stops',
+          where: '#cloud-infra',
+          link: link(now - HOUR),
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/cmdb-visualizer',
+          summary: 'Left from a session in the CMDB repository.',
+        },
+      ],
+      { settings: { on: true, dms: false, exclude: [] } }
+    )
+    const page = await launch(world, { settings: ['TASKS=on'] })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const rows = page.locator('[data-task-row]')
+    await rows.nth(1).waitFor()
+    const size = (width: number) =>
+      app!.evaluate(
+        ({ BrowserWindow }, width) =>
+          BrowserWindow.getAllWindows()[0]!.setSize(width, 900),
+        width
+      )
+    /** Where each row's buttons are: under its title, or beside it */
+    const places = () =>
+      rows.evaluateAll((all) =>
+        all.map((row) => {
+          const title = row.querySelector('[data-task-title]')!
+          const actions = row.querySelector('[data-task-actions]')!
+          // The task's own buttons (Done, Dismiss, more), kept on one line
+          const own = [...actions.lastElementChild!.children].map(
+            (button) => button.getBoundingClientRect().top
+          )
+          return {
+            under:
+              actions.getBoundingClientRect().top >=
+              title.getBoundingClientRect().bottom,
+            // how much of the row the title's column has
+            share:
+              title.parentElement!.getBoundingClientRect().width /
+              row.getBoundingClientRect().width,
+            together: new Set(own).size === 1,
+          }
+        })
+      )
+
+    // As narrow as the window goes: the title keeps the row, the buttons go
+    // under it
+    await size(600)
+    await eventually('the buttons under the titles', async () =>
+      (await places()).every((place) => place.under)
+    )
+    for (const place of await places()) {
+      expect(place.share).toBeGreaterThan(0.9)
+      expect(place.together).toBe(true)
+    }
+    // Settled, in English and in Korean, to look at
+    for (const lang of ['en', 'ko']) {
+      await page.evaluate(
+        `window.pacenoteDesktop.language.set(${JSON.stringify(lang)})`
+      )
+      await page.waitForFunction(`document.documentElement.lang === '${lang}'`)
+      await page.waitForTimeout(800)
+      await page.screenshot({
+        path: path.join(REPO, 'test-results', `todo-narrow-${lang}.png`),
+      })
+    }
+
+    // Wide: the buttons beside the title, as before
+    await size(1280)
+    await eventually('the buttons beside the titles', async () =>
+      (await places()).every((place) => !place.under)
+    )
+    await page.waitForTimeout(800)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results', 'todo-wide.png'),
+    })
+  }, 120_000)
+
   it('opens code tasks in the Claude app or the Codex app with the task written in, finds each session once sent, and opens the terminal when the app is not here', async () => {
     world = await World.create([])
     const { home, root } = world
@@ -1841,10 +1939,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/task-app-found.png'),
     })
 
-    // Codex, from the row's menu: the Codex app, the same way
+    // Codex, from its own button in the row: the Codex app, the same way
     const other = page.locator(`[data-task-row="${flaky.id}"]`)
-    await other.getByRole('button', { name: 'More for this task' }).click()
-    await page.getByRole('menuitem', { name: 'Continue in Codex' }).click()
+    await other.getByRole('button', { name: 'Continue in Codex' }).click()
     const codexLink = await eventually('the Codex app opened', () =>
       openedNow().find((line) => line.startsWith('codex://new?'))
     )

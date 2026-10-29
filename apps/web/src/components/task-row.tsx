@@ -331,10 +331,12 @@ export function TaskRow({
     icon: <SquareTerminal />,
     run: () => void continueIn(tool),
   })
-  // The steps the row's own button does not take
+  // The steps the row's own buttons do not take: a code task has a button
+  // for each tool
   const more: { label: string; icon: React.ReactNode; run: () => void }[] = [
-    ...(task.action === 'code' ? [] : [continueItem(cli)]),
-    ...tools.filter((tool) => tool !== cli).map(continueItem),
+    ...(task.action === 'code'
+      ? []
+      : [cli, ...tools.filter((tool) => tool !== cli)].map(continueItem)),
     ...(folder
       ? [
           {
@@ -395,8 +397,10 @@ export function TaskRow({
       )}
     >
       <Collapsible open={open} onOpenChange={() => onToggle()}>
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1 pl-6">
+        {/* A narrow window: the buttons go under the title, which keeps the
+            row's width (the page's @container, as the skeleton's) */}
+        <div className="flex items-start gap-4 @max-[44rem]:flex-col @max-[44rem]:gap-2.5">
+          <div className="min-w-0 flex-1 pl-6 @max-[44rem]:w-full">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
@@ -434,7 +438,7 @@ export function TaskRow({
               {task.due && !settled && (
                 <span
                   {...flash('due')}
-                  className="motion-flash rounded-full bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted"
+                  className="motion-flash rounded-xl bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted"
                 >
                   {task.due}
                 </span>
@@ -463,7 +467,7 @@ export function TaskRow({
                 <a
                   href={areaHash(area.id)}
                   title={t.inArea(area.name)}
-                  className="rounded-full bg-muted px-2 py-px font-medium hover:text-foreground"
+                  className="rounded-xl bg-muted px-2 py-px font-medium hover:text-foreground"
                 >
                   {area.name}
                 </a>
@@ -578,114 +582,146 @@ export function TaskRow({
               </div>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {acting && task.action === 'code' && (
-              <OpensIn
-                folder={folder}
-                app={opensIn?.[cli] === 'app' ? cli : undefined}
-              >
+          {/* Two groups, which wrap whole in a narrow window: the next step
+              (and its link), then the task's own buttons */}
+          <div
+            data-task-actions
+            className="flex shrink-0 items-center gap-1.5 @max-[44rem]:flex-wrap @max-[44rem]:pl-6"
+          >
+            <span className="flex items-center gap-1.5 empty:hidden">
+              {acting && task.action === 'code' && (
+                // Each tool it can continue in, by its name, the one set in
+                // Settings first: one control, as an outline button is drawn
+                <span
+                  role="group"
+                  aria-label={t.continueWith}
+                  className="flex h-7 items-center rounded-md border bg-background shadow-xs dark:border-input dark:bg-input/30"
+                >
+                  {[cli, ...tools.filter((tool) => tool !== cli)].map(
+                    (tool, i) => (
+                      <OpensIn
+                        key={tool}
+                        folder={folder}
+                        app={opensIn?.[tool] === 'app' ? tool : undefined}
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t.continueIn(CLI_NAMES[tool])}
+                          className="h-full rounded-none border-l first:rounded-l-[5px] first:border-l-0 last:rounded-r-[5px] dark:border-input"
+                          onClick={() => void continueIn(tool)}
+                        >
+                          {i === 0 && <SquareTerminal />}
+                          {CLI_NAMES[tool]}
+                        </Button>
+                      </OpensIn>
+                    )
+                  )}
+                </span>
+              )}
+              {acting && task.action === 'reply' && !local && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void continueIn(cli)}
+                  disabled={drafting}
+                  onClick={() => void draft()}
                 >
-                  <SquareTerminal />
-                  {t.continueIn(CLI_NAMES[cli])}
+                  <MessageSquare />
+                  {t.draftReply}
                 </Button>
-              </OpensIn>
-            )}
-            {acting && task.action === 'reply' && !local && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={drafting}
-                onClick={() => void draft()}
-              >
-                <MessageSquare />
-                {t.draftReply}
-              </Button>
-            )}
-            {/* Before the task's own buttons, so they keep their place in
+              )}
+              {/* Before the task's own buttons, so they keep their place in
                 rows with no link */}
-            {task.source.permalink && (
-              <Button size="icon-sm" variant="outline" asChild>
-                <a
-                  href={task.source.permalink}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={t.openIn(sourceLabel)}
+              {task.source.permalink && (
+                <Button size="icon-sm" variant="outline" asChild>
+                  <a
+                    href={task.source.permalink}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={t.openIn(sourceLabel)}
+                  >
+                    <ExternalLink />
+                  </a>
+                </Button>
+              )}
+              {acting && stage?.stage === 'waiting' && onStage && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onStage('open')}
                 >
-                  <ExternalLink />
-                </a>
-              </Button>
-            )}
-            {acting && stage?.stage === 'waiting' && onStage && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onStage('open')}
-              >
-                <Undo2 />
-                {t.backToOpen}
-              </Button>
-            )}
-            {acting && (
-              <>
-                <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
-                  <CircleCheck />
-                  {t.done}
+                  <Undo2 />
+                  {t.backToOpen}
                 </Button>
-                {dismiss}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={t.moreForTask}
-                    >
-                      <MoreHorizontal />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {more.map((item) => (
-                      <DropdownMenuItem key={item.label} onSelect={item.run}>
-                        {item.icon}
-                        {item.label}
-                      </DropdownMenuItem>
-                    ))}
-                    {more.length > 0 && stageItems.length > 0 && (
-                      <DropdownMenuSeparator />
-                    )}
-                    {stageItems.map((item) => (
-                      <DropdownMenuItem key={item.label} onSelect={item.run}>
-                        {item.icon}
-                        {item.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-            {task.status === 'maybe' && !dismissing && (
-              <>
-                <Button size="sm" onClick={() => onDecide({ status: 'kept' })}>
-                  {t.keepAsTask}
+              )}
+            </span>
+            <span className="flex items-center gap-1.5 empty:hidden">
+              {acting && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => onDecide({ status: 'done' })}
+                  >
+                    <CircleCheck />
+                    {t.done}
+                  </Button>
+                  {dismiss}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={t.moreForTask}
+                      >
+                        <MoreHorizontal />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {more.map((item) => (
+                        <DropdownMenuItem key={item.label} onSelect={item.run}>
+                          {item.icon}
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                      {more.length > 0 && stageItems.length > 0 && (
+                        <DropdownMenuSeparator />
+                      )}
+                      {stageItems.map((item) => (
+                        <DropdownMenuItem key={item.label} onSelect={item.run}>
+                          {item.icon}
+                          {item.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+              {task.status === 'maybe' && !dismissing && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => onDecide({ status: 'kept' })}
+                  >
+                    {t.keepAsTask}
+                  </Button>
+                  {dismiss}
+                </>
+              )}
+              {settled && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    onDecide(
+                      task.status === 'closed' ? { status: 'kept' } : null
+                    )
+                  }
+                >
+                  <Undo2 />
+                  {t.reopen}
                 </Button>
-                {dismiss}
-              </>
-            )}
-            {settled && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  onDecide(task.status === 'closed' ? { status: 'kept' } : null)
-                }
-              >
-                <Undo2 />
-                {t.reopen}
-              </Button>
-            )}
+              )}
+            </span>
           </div>
         </div>
         {error && (

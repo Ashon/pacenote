@@ -66,6 +66,8 @@ const en = {
 
   // The row
   continueIn: (tool: string) => `Continue in ${tool}`,
+  /** The tools a code task continues in, as a group */
+  continueWith: 'Continue in',
   continueElsewhere: 'Continue in another folder',
   draftReply: 'Draft a reply',
   inArea: (area: string) => `In ${area}, an area of your work`,
@@ -277,6 +279,7 @@ const ko: typeof en = {
   askedOf: (group) => `${group}에 온 요청`,
 
   continueIn: (tool) => `${tool}에서 계속`,
+  continueWith: '이어서 하기',
   continueElsewhere: '다른 폴더에서 계속',
   draftReply: '답장 초안 쓰기',
   inArea: (area) => `내 업무 영역: ${area}`,
