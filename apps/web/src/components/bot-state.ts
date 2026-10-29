@@ -81,7 +81,7 @@ export function describeBot(
   }
   if (status.state === 'starting') return state('busy', 'starting')
   if (status.state === 'stopping') return state('busy', 'stopping')
-  // Another of your Macs answers (Settings > Macs)
+  // Another of your Macs answers (Settings > Devices)
   if (status.standby) return state('off', 'standingBy')
   switch (status.socket.state) {
     case 'connected':

@@ -132,7 +132,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     sessionLog: (entryId: string) =>
       ipcRenderer.invoke('pacenote:tasks:session-log', entryId),
   },
-  // Settings > Macs: your other Macs, and where Pace answers
+  // Settings > Devices: your other Macs, and where Pace answers
   macs: {
     view: () => ipcRenderer.invoke('pacenote:macs:view'),
     answerHere: () => ipcRenderer.invoke('pacenote:macs:answer-here'),
@@ -144,7 +144,7 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     ignore: (id: string) => ipcRenderer.invoke('pacenote:macs:ignore', id),
     removeDevice: (id: string) =>
       ipcRenderer.invoke('pacenote:macs:remove-device', id),
-    // Add a Mac: a new Mac's setup takes your Slack app from this one
+    // Add a device: a new Mac's setup takes your Slack app from this one
     addStart: () => ipcRenderer.invoke('pacenote:macs:add-start'),
     addStop: () => ipcRenderer.invoke('pacenote:macs:add-stop'),
     addAllow: () => ipcRenderer.invoke('pacenote:macs:add-allow'),

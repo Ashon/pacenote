@@ -9,7 +9,7 @@ const en = {
   thisMac: 'That is this Mac.',
   removed: 'This device was removed from your Macs. Pair it again.',
   notWaiting:
-    'The other Mac is not waiting for a new Mac. Click Add a Mac there.',
+    'The other Mac is not waiting for a new Mac. Click Add a device there.',
 }
 
 const ko: typeof en = {
@@ -20,7 +20,7 @@ const ko: typeof en = {
   thisMac: '이 Mac이에요.',
   removed: '이 기기는 Mac에서 제거됐어요. 다시 페어링하세요.',
   notWaiting:
-    '다른 Mac이 새 Mac을 기다리고 있지 않아요. 그 Mac에서 Mac 추가를 클릭하세요.',
+    '다른 Mac이 새 Mac을 기다리고 있지 않아요. 그 Mac에서 기기 추가를 클릭하세요.',
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

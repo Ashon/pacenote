@@ -20,7 +20,7 @@ const en = {
   statusTip: "Pace's status and logs",
   /** Before Pace's state: Pace: Connected */
   pace: 'Pace:',
-  whereTip: "Where Pace answers: the Mac you're using (Settings > Macs)",
+  whereTip: "Where Pace answers: the Mac you're using (Settings > Devices)",
   movedHere: (from: string) => `Pace moved here from ${from}`,
   movingHere: 'Moving here…',
   /** Pace moving to another of your Macs, by its name if known */
@@ -60,7 +60,7 @@ const ko: typeof en = {
   offTip: 'Pace가 꺼져 있어요. 설정에서 설정하세요',
   statusTip: 'Pace 상태와 로그',
   pace: 'Pace:',
-  whereTip: 'Pace가 답변하는 곳: 지금 쓰는 Mac (설정 > 내 Mac)',
+  whereTip: 'Pace가 답변하는 곳: 지금 쓰는 Mac (설정 > 내 기기)',
   movedHere: (from) => `Pace가 ${from}에서 이 Mac으로 왔어요`,
   movingHere: '이 Mac으로 옮기는 중…',
   movingTo: (name) => `${josa(name ?? '다른 Mac', '으로/로')} 옮기는 중…`,

@@ -33,7 +33,7 @@ import type { DeviceKind } from './types.js'
  * Then each direction has a key of its own, derived from the key and both
  * nonces, and every message is sealed with AES-256-GCM under it, numbered so
  * that none can be played again. The key never crosses the network on this
- * channel: only Add a Mac's setup channel (below) hands it to a new Mac.
+ * channel: only Add a device's setup channel (below) hands it to a new Mac.
  */
 
 const PROTOCOL = 1
@@ -129,7 +129,7 @@ const helloOf = (group: string, me: MacHello, nonce: string, signed?: string) =>
 
 /**
  * A handshake that did not go through, and why, in the app's language (as
- * Settings > Macs and the setup show it)
+ * Settings > Devices and the setup show it)
  */
 class HandshakeError extends Error {}
 
@@ -425,13 +425,13 @@ export async function accept(
 }
 
 /**
- * Setting up a new Mac from one already set up (Settings > Macs > Add a Mac,
- * and Connect to your other Mac in the new Mac's setup or Settings). The new
- * Mac has no key yet, so the two cannot know each other by it: this once,
- * they agree on a key with X25519, and both show a 6-digit number made from
- * it. Someone in between on the network would agree on a key with each, and
- * the numbers would differ, so you compare them before you Allow. What follows
- * is sealed as on any channel.
+ * Setting up a new Mac from one already set up (Settings > Devices > Add a
+ * device, and Connect to your other Mac in the new Mac's setup or Settings).
+ * The new Mac has no key yet, so the two cannot know each other by it: this
+ * once, they agree on a key with X25519, and both show a 6-digit number made
+ * from it. Someone in between on the network would agree on a key with each,
+ * and the numbers would differ, so you compare them before you Allow. What
+ * follows is sealed as on any channel.
  */
 
 const SETUP_PROTOCOL = 1
@@ -546,7 +546,7 @@ export async function setupDial(
   }
 }
 
-/** The Mac already set up, while Add a Mac waits: answers the new one */
+/** The Mac already set up, while Add a device waits: answers the new one */
 export async function setupAccept(
   ws: WebSocket,
   options: { me: MacHello; timeoutMs?: number }

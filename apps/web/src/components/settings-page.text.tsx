@@ -14,8 +14,8 @@ const en = {
       help: 'Preferences for this app, and where Pacenote keeps its settings and run history.',
     },
     macs: {
-      label: 'Macs',
-      help: 'The same Todo on each Mac you use, and where Pace answers.',
+      label: 'Devices',
+      help: 'Your Macs and the devices paired with them: the same Todo on each, and where Pace answers.',
     },
   },
   nav: { app: 'App', pace: 'Pace' },
@@ -165,14 +165,14 @@ const en = {
     'Pace moves to the Mac you use when you lock, sleep or leave the other one for 5 minutes. Off, Pace answers on this Mac as on a Mac of its own.',
   followOff:
     'Turn it on here and on your other Mac. macOS asks once whether Pacenote may look on your local network.',
-  addMac: 'Add a Mac',
+  addMac: 'Add a device',
   addMacHelp:
-    'Set up Pacenote on a new Mac from this one: its Slack app and who you are come from here.',
+    'A new Mac sets up Pacenote from this one: its Slack app and who you are come from here.',
   addMacTodoHelp:
     'Pair another Mac with this one: a new Mac takes how Todo collects from here, and your Todo follows.',
   joinMac: 'Pair with your other Mac',
   joinMacHelp:
-    'Set up on both already? Click Add a Mac on the other one, then pair here. Each keeps its own settings.',
+    'Set up on both already? Click Add a device on the other one, then pair here. Each keeps its own settings.',
   pair: 'Pair',
   joined:
     'Your Todo is the same on both Macs now. Each keeps its own settings, AI sign-in and sessions.',
@@ -213,7 +213,7 @@ const en = {
     'Gives it a key of its own and sends your Todo. Not your Slack app, AI sign-in, sessions or folders.',
   devicePaired: (name: string | undefined) =>
     `${name ?? 'Your device'} is paired. Your Todo goes to it.`,
-  yourDevices: 'Your devices',
+  yourDevices: 'Phones and tablets',
   yourDevicesHelp:
     'Your iPhone, iPad and Android phone show your Todo. Each holds a key of its own, never your Slack app or AI sign-in. Remove one you lost: none of your Macs lets it in again.',
   deviceNow: 'Connected now',
@@ -239,7 +239,7 @@ const en = {
   openOnOtherMac: (choice: (words: string) => ReactNode) => (
     <>
       On the other Mac, choose {choice('From your other Mac')} in its first run,
-      or {choice('Pair')} in Settings &gt; Macs.
+      or {choice('Pair')} in Settings &gt; Devices.
     </>
   ),
   waitingOnNetwork: (clock: string) =>
@@ -288,8 +288,8 @@ const ko: typeof en = {
       help: '이 앱의 환경설정, 그리고 Pacenote가 설정과 실행 기록을 보관하는 곳이에요.',
     },
     macs: {
-      label: '내 Mac',
-      help: '쓰는 Mac마다 같은 할 일, 그리고 Pace가 답하는 곳이에요.',
+      label: '내 기기',
+      help: '내 Mac과 거기 페어링한 기기예요. 어디서나 같은 할 일, 그리고 Pace가 답하는 곳이에요.',
     },
   },
   nav: { app: '앱', pace: 'Pace' },
@@ -431,14 +431,14 @@ const ko: typeof en = {
     '다른 Mac을 잠그거나 잠자기 상태로 두거나 5분 동안 쓰지 않으면 Pace가 지금 쓰는 Mac으로 옮겨가요. 끄면 Pace는 Mac이 한 대일 때처럼 이 Mac에서 답해요.',
   followOff:
     '여기와 다른 Mac에서 모두 켜세요. macOS가 Pacenote의 로컬 네트워크 접근을 허용할지 한 번 물어봐요.',
-  addMac: 'Mac 추가',
+  addMac: '기기 추가',
   addMacHelp:
-    '이 Mac에서 새 Mac의 Pacenote를 설정해요. Slack 앱과 내 정보를 여기서 가져가요.',
+    '새 Mac은 이 Mac에서 Pacenote를 설정해요. Slack 앱과 내 정보를 여기서 가져가요.',
   addMacTodoHelp:
     '다른 Mac을 이 Mac과 페어링해요. 새 Mac은 할 일 모으기 설정을 여기서 가져가고, 할 일이 따라가요.',
   joinMac: '다른 Mac과 페어링',
   joinMacHelp:
-    '두 Mac 모두 이미 설정했나요? 다른 Mac에서 Mac 추가를 누른 뒤 여기서 페어링하세요. 설정은 Mac마다 그대로예요.',
+    '두 Mac 모두 이미 설정했나요? 다른 Mac에서 기기 추가를 누른 뒤 여기서 페어링하세요. 설정은 Mac마다 그대로예요.',
   pair: '페어링',
   joined:
     '이제 두 Mac의 할 일이 같아요. 설정, AI 로그인, 세션은 Mac마다 따로 있어요.',
@@ -476,7 +476,7 @@ const ko: typeof en = {
     '이 기기만의 열쇠를 주고 할 일을 보내요. Slack 앱, AI 로그인, 세션, 폴더는 보내지 않아요.',
   devicePaired: (name) =>
     `${josa(name ?? '기기', '과/와')} 페어링했어요. 할 일이 그 기기로 가요.`,
-  yourDevices: '내 기기',
+  yourDevices: '폰과 태블릿',
   yourDevicesHelp:
     '내 iPhone, iPad, Android 폰이 할 일을 보여 줘요. 기기마다 자기 열쇠가 있고, Slack 앱이나 AI 로그인은 가지 않아요. 잃어버린 기기는 제거하세요. 어느 Mac도 다시 들이지 않아요.',
   deviceNow: '지금 연결됨',
@@ -486,7 +486,7 @@ const ko: typeof en = {
   removeDevice: '제거',
   removeDeviceSure: (name) => `${josa(name, '을/를')} 모든 Mac에서 제거할까요?`,
   allow: '허용',
-  notThisOne: '이 Mac 아님',
+  notThisOne: '이 기기 아님',
   whatIsSent:
     'Slack 앱, Pace가 답하는 사람, 할 일 모으기 설정을 보내요. AI 로그인, 샌드박스, 도구, 폴더는 보내지 않아요.',
   whatIsSentTodo:
@@ -501,7 +501,7 @@ const ko: typeof en = {
   openOnOtherMac: (choice) => (
     <>
       다른 Mac의 첫 실행에서 {choice('다른 Mac에서 가져오기')}를, 또는 설정 &gt;
-      내 Mac에서 {choice('페어링')}을 선택하세요.
+      내 기기에서 {choice('페어링')}을 선택하세요.
     </>
   ),
   waitingOnNetwork: (clock) => `이 네트워크에서 기다리는 중… ${clock} 남음`,

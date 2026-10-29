@@ -260,7 +260,7 @@ export type CollectOutcome = (
   /** The CLI chosen could not, so the other one did */
   switched?: Switch
   /**
-   * Another of your Macs ran it, by id (Settings > Macs): its run is in that
+   * Another of your Macs ran it, by id (Settings > Devices): its run is in that
    * Mac's history
    */
   mac?: string
@@ -340,7 +340,7 @@ export type WorkEntry =
       /** The git branch it worked on, when it was found by it */
       branch?: string
       /**
-       * Another of your Macs it runs on, by id (Settings > Macs): it
+       * Another of your Macs it runs on, by id (Settings > Devices): it
        * continues there, not here
        */
       mac?: string

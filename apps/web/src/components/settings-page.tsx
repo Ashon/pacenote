@@ -37,10 +37,12 @@ import {
   LoaderCircle,
   MessagesSquare,
   Monitor,
+  MonitorSmartphone,
   Moon,
   MoreHorizontal,
   Plug,
   PlugZap,
+  Plus,
   RotateCcw,
   Save,
   SlidersHorizontal,
@@ -130,7 +132,7 @@ const SECTION_ICON: Record<Section, LucideIcon> = {
   tasks: ListChecks,
   logs: History,
   general: SlidersHorizontal,
-  macs: Laptop,
+  macs: MonitorSmartphone,
 }
 
 /** A section's name and help, in the app's language */
@@ -2061,7 +2063,7 @@ function Segmented({
 }
 
 /**
- * Settings > Macs: Pace answers on the Mac you're using. Pacenote on your
+ * Settings > Devices: Pace answers on the Mac you're using. Pacenote on your
  * other Macs with the same Slack app joins in on this network by itself
  * (src/macs), and you can add one on another network by its address.
  */
@@ -2124,7 +2126,7 @@ function MacsSection() {
               variant="outline"
               onClick={() => void control?.addStart()}
             >
-              <Laptop />
+              <Plus />
               {t.addMac}
             </Button>
           </Row>
@@ -2239,7 +2241,7 @@ function MacsSection() {
 }
 
 /**
- * Add a Mac, while it waits for the new Mac, when the new Mac asks (compare
+ * Add a device, while it waits for the new Mac, when the new Mac asks (compare
  * the number, then Allow), and how it ended
  */
 function AddingPanel({
@@ -2546,7 +2548,7 @@ function MacRow({ mac, pace }: { mac: MacView; pace: boolean }) {
 }
 
 /**
- * Pair with your other Mac, on a Mac set up already: Add a Mac there, then
+ * Pair with your other Mac, on a Mac set up already: Add a device there, then
  * the number to compare; this Mac takes the key alone and keeps its settings
  */
 function JoinMac({

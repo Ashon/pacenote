@@ -276,7 +276,9 @@ declare global {
         ): Promise<{ items?: SessionItem[]; error?: string } | undefined>
       }
       /** Pacenote's own work: the CLIs that do it (Settings > Todo) */
-      /** Settings > Macs (src/macs): your other Macs, and where Pace answers */
+      /**
+       * Settings > Devices (src/macs): your other Macs, and where Pace answers
+       */
       macs: {
         view(): Promise<MacsView | null>
         /** Pace answers on this Mac from now */
@@ -289,7 +291,7 @@ declare global {
         ignore(id: string): Promise<void>
         /** A device of yours: none of your Macs lets it in again */
         removeDevice(id: string): Promise<void>
-        /** Add a Mac: waits 10 minutes; false without your own Slack app */
+        /** Add a device: waits 10 minutes; false without your own Slack app */
         addStart(): Promise<boolean>
         addStop(): Promise<void>
         /**
@@ -299,7 +301,7 @@ declare global {
         addAllow(): Promise<void>
         /** Not this one */
         addDecline(): Promise<void>
-        /** Done with what Add a Mac says */
+        /** Done with what Add a device says */
         addClose(): Promise<void>
         /** System Settings > Privacy & Security > Local Network */
         openPrivacy(): Promise<void>
@@ -403,7 +405,7 @@ declare global {
         claimStart(): Promise<{ ok: true } | { error: string }>
         /** Connect to your other Mac, as far as it got */
         macState(): Promise<FromMacState | null>
-        /** Looks for a Mac waiting in Add a Mac on this network */
+        /** Looks for a Mac waiting in Add a device on this network */
         /** mode: what it takes this time (FromMacMode), Pace's by default */
         macLook(mode?: FromMacMode): Promise<void>
         macConnect(

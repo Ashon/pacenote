@@ -185,7 +185,8 @@ plistSet(infoPlist, {
   CFBundleVersion: version,
   CFBundleShortVersionString: version,
   LSApplicationCategoryType: 'public.app-category.developer-tools',
-  // Settings > Macs: macOS asks once before Pacenote looks for your other Macs
+  // Settings > Devices: macOS asks once before Pacenote looks for your other
+  // Macs
   NSLocalNetworkUsageDescription:
     'Pacenote finds your other Macs on this network, so Pace answers on the one you are using.',
   CFBundleDevelopmentRegion: 'en',
@@ -251,7 +252,7 @@ run('/usr/libexec/PlistBuddy', [
   'Add :NSBonjourServices:0 string _pacenote._tcp',
   infoPlist,
 ])
-// Add a Mac: a new Mac's setup finds the one waiting for it
+// Add a device: a new Mac's setup finds the one waiting for it
 run('/usr/libexec/PlistBuddy', [
   '-c',
   'Add :NSBonjourServices:1 string _pacenote-setup._tcp',

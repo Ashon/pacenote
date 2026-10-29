@@ -8,9 +8,10 @@ import type { useFromMac } from '@/lib/setup'
 import { text } from './from-mac.text'
 
 /**
- * Your other Mac, waiting in Add a Mac there: found on this network or by its
- * address, the number to compare, and once you Allow there, what came from it
- * (took). Pace's setup (3c), Todo's first run and Settings > Macs share it.
+ * Your other Mac, waiting in Add a device there: found on this network or by
+ * its address, the number to compare, and once you Allow there, what came from
+ * it (took). Pace's setup (3c), Todo's first run and Settings > Devices share
+ * it.
  */
 export function FromMacBody({
   mac,

@@ -35,9 +35,10 @@ Open Pacenote. A new install opens on three steps, with no Slack app to make:
 3. **A first look.** **Collect now** reads your last 7 days in Slack and finds your projects. Then Todo opens. With no
    Slack connector yet, it looks at this Mac alone, and Collect now on Todo reads Slack once you connect it.
 
-Pacenote on another of your Macs already? At step 2, choose **From your other Mac**, click **Add a Mac** in Settings >
-Macs on that Mac, and Allow there once both show the same 6 digits. This Mac takes how Todo collects from it and opens
-on Todo, which stays the same on both. A Mac set up already pairs from its own Settings > Macs, with **Pair**.
+Pacenote on another of your Macs already? At step 2, choose **From your other Mac**, click **Add a device** in
+Settings > Devices on that Mac, and Allow there once both show the same 6 digits. This Mac takes how Todo collects from
+it and opens on Todo, which stays the same on both. A Mac set up already pairs from its own Settings > Devices, with
+**Pair**.
 
 Pace, which answers when you mention it in Slack, stays off until you set it up: **Set up Pace instead** on the first
 run, or **Set up Pace** in Settings > General.

@@ -778,7 +778,7 @@ if (supervisor) {
     onAnswer: (here) => supervisor.answer(here),
     // When Collect now started here, while it runs
     collecting: () => taskCollector.state.running?.startedAt,
-    // Add a Mac: your Slack app, who Pace answers and how Todo collects
+    // Add a device: your Slack app, who Pace answers and how Todo collects
     setupPayload: () => {
       const env = settings.effectiveEnv()
       const values: Record<string, string> = {}
@@ -845,7 +845,7 @@ if (supervisor) {
       if (issues.length > 0)
         throw new Error(issues.map((issue) => issue.message).join(' '))
       // The key your Macs know each other by, kept only when it is not your
-      // Slack app's own (saved just now): Add a Mac made it on a Mac with no
+      // Slack app's own (saved just now): Add a device made it on a Mac with no
       // Slack app of its own
       if (payload.group) await thisMac.joinGroup(payload.group)
       const owner = (values.MENTION_ALLOWED_USERS ?? '').split(/[\s,]+/)[0]
@@ -1350,7 +1350,7 @@ function registerBotIpc(): void {
     mainWindow?.webContents.send('pacenote:app:language-changed', language)
     return language
   })
-  // Settings > Macs: your Macs, and where Pace answers
+  // Settings > Devices: your Macs, and where Pace answers
   handle('pacenote:macs:view', null, () => macs?.view() ?? null)
   handle('pacenote:macs:answer-here', undefined, () => macs?.answerHere())
   ipcMain.handle('pacenote:macs:follow', async (event, on: unknown) => {
@@ -1370,7 +1370,7 @@ function registerBotIpc(): void {
   handle('pacenote:macs:remove-device', undefined, (id) => {
     if (typeof id === 'string') macs?.removeDevice(id)
   })
-  // Add a Mac: a new Mac's setup takes your Slack app from this one
+  // Add a device: a new Mac's setup takes your Slack app from this one
   handle('pacenote:macs:add-start', false, () => macs?.startAdding() ?? false)
   handle('pacenote:macs:add-stop', undefined, () => macs?.stopAdding())
   handle('pacenote:macs:add-allow', undefined, () => macs?.allowAdding())

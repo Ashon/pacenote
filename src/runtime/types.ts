@@ -21,7 +21,7 @@ export interface BotStatus {
   socket: { state: SocketState; since: string; reconnects: number }
   /**
    * Another of your Macs answers: the Slack connection is closed on purpose
-   * (Settings > Macs), not lost
+   * (Settings > Devices), not lost
    */
   standby?: boolean
   bot?: { user: string; userId: string; team: string }

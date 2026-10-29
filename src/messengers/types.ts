@@ -210,7 +210,7 @@ export interface MessengerConnection {
   limits(): string[]
   /**
    * Starts receiving mentions. standby: wait with the connection closed until
-   * standby(false), as another of your Macs answers (Settings > Macs)
+   * standby(false), as another of your Macs answers (Settings > Devices)
    */
   start(
     onMention: (mention: Mention) => Promise<void>,

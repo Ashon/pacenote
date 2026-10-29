@@ -9,8 +9,8 @@ import type { FromMacState, SetupPayload } from './types.js'
 
 /**
  * A new Mac's setup, taken from your other Mac (the Slack step's "Connect to
- * your other Mac"): it finds the Mac waiting in Add a Mac on this network, or
- * reaches it by address; both show a 6-digit number (channel.ts setupDial);
+ * your other Mac"): it finds the Mac waiting in Add a device on this network,
+ * or reaches it by address; both show a 6-digit number (channel.ts setupDial);
  * once you Allow there, that Mac's Slack app, who Pace answers and Todo's
  * collection settings come over, and apply takes them in here.
  */
@@ -54,7 +54,7 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     return this.state
   }
 
-  /** Looks for a Mac waiting in Add a Mac on this network */
+  /** Looks for a Mac waiting in Add a device on this network */
   look(): void {
     this.cancel()
     if (this.options.bonjour !== false) {

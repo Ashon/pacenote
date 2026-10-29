@@ -122,7 +122,8 @@ function appEnv(
     PACENOTE_DESKTOP_THEME: 'light',
     // In English whatever this Mac's language (docs/i18n.md)
     PACENOTE_DESKTOP_LANGUAGE: 'en',
-    // Settings > Macs looks on the network only in its own test (macs.e2e.ts)
+    // Settings > Devices looks on the network only in its own test
+    // (macs.e2e.ts)
     PACENOTE_MACS_BONJOUR: 'off',
     PACENOTE_MACS_PORT: '0',
     ...extra,

@@ -322,7 +322,7 @@ describe('your Macs', () => {
   ) {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'pacenote-macs-'))
     dirs.push(dataDir)
-    // Turned on in Settings > Macs
+    // Turned on in Settings > Devices
     writeFileSync(
       path.join(dataDir, MACS_FILE),
       JSON.stringify({ follow: true })
@@ -507,7 +507,7 @@ describe('your Macs', () => {
   const groupOf = (dataDir: string) =>
     readFileSync(path.join(dataDir, GROUP_FILE), 'utf8').trim()
 
-  it('pairs Macs with no Slack app by the key Add a Mac made, and keeps it for you alone', async () => {
+  it('pairs Macs with no Slack app by the key Add a device made, and keeps it for you alone', async () => {
     // Todo alone on both: no Slack app, Pace not running
     const pro = mac('MacBook Pro', '')
     const air = mac('MacBook Air', '')
@@ -517,7 +517,7 @@ describe('your Macs', () => {
     await air.start()
     expect(pro.macs.view()).toMatchObject({ paired: false })
 
-    // Add a Mac on the Pro makes the key; the Air takes it
+    // Add a device on the Pro makes the key; the Air takes it
     expect(await pro.macs.startAdding()).toBe(true)
     expect(pro.macs.view()).toMatchObject({ paired: true, follow: true })
     const file = path.join(pro.dataDir, GROUP_FILE)
@@ -567,7 +567,7 @@ describe('your Macs', () => {
     await pro.start()
     await poll(() => leaseOf(pro.dataDir)?.holder).toBe(pro.macs.id)
     await air.start()
-    // Add a Mac on the Pro sends its Slack app's key
+    // Add a device on the Pro sends its Slack app's key
     expect(
       await air.macs.joinGroup(macsKey('xapp-1-HOME').toString('base64'))
     ).toBe(true)
@@ -589,7 +589,7 @@ describe('your Macs', () => {
     const work = mac('Work Mac', 'xapp-1-WORK')
     await home.start()
     await work.start()
-    // Paired by Add a Mac before either had a Slack app of its own
+    // Paired by Add a device before either had a Slack app of its own
     const key = Buffer.alloc(32, 7).toString('base64')
     await home.macs.joinGroup(key)
     await work.macs.joinGroup(key)

@@ -1246,7 +1246,7 @@ code {
   border-top: 0;
 }
 
-/* Your Macs: Settings > Macs as the app draws it, and the status bar under it */
+/* Your Macs: Settings > Devices as the app draws it, and the status bar under it */
 .av-macs {
   display: flex;
   flex-direction: column;

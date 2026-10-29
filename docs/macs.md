@@ -1,12 +1,12 @@
 # Your Macs
 
 With Pacenote on more than one Mac, Todo is the same on each, and with your own Slack app Pace answers on the Mac
-you're using. Settings > Macs shows them.
+you're using. Settings > Devices shows them.
 
-- **With your own Slack app**, turn on **Follow the Mac you're using** in Settings > Macs on each Mac. There is nothing
-  to pair: Pacenote on your other Mac, set up with the same Slack app, finds this one on your network by itself.
+- **With your own Slack app**, turn on **Follow the Mac you're using** in Settings > Devices on each Mac. There is
+  nothing to pair: Pacenote on your other Mac, set up with the same Slack app, finds this one on your network by itself.
 - **With no Slack app** (Todo alone, Pace off) or with the [team hub](team-hub.md), pair the Macs once:
-  [Add a Mac](#pair-macs-with-no-slack-app) on one, and the number compared on both. Todo is then the same on each;
+  [Add a device](#pair-macs-with-no-slack-app) on one, and the number compared on both. Todo is then the same on each;
   with the team hub, Pace answers on the one Mac you connected, as before.
 
 macOS asks once, when a Mac first looks, whether Pacenote may look on your local network.
@@ -17,8 +17,8 @@ One Mac at a time holds Pace's Slack connection: the one you used last.
 
 - **You leave a Mac for the other.** You lock it, put it to sleep, close its lid, or leave it for 5 minutes, and use the
   other one: Pace moves there. The status bar says "Pace moved here from MacBook Pro".
-- **You use both.** Pace stays where it is, and doesn't flip back and forth. **Answer here** in Settings > Macs moves it
-  at once.
+- **You use both.** Pace stays where it is, and doesn't flip back and forth. **Answer here** in Settings > Devices moves
+  it at once.
 - **One can't reach the other.** It is asleep, off the network or quit: the Mac that is awake answers, used or not. A
   Mac that wakes asks the others before it connects again.
 - **Both are asleep.** Pace rests, as it does on a Mac of its own.
@@ -64,8 +64,8 @@ While one Mac collects, the other's Collect now waits and says "Collecting on Ma
 
 A new Mac can take what it needs from the one already set up, instead of a Slack app of its own and "@Pace it's me":
 
-1. On the Mac already set up, click **Add a Mac** in Settings > Macs. It turns following on and shows the Mac on your
-   network for 10 minutes, only while it waits.
+1. On the Mac already set up, click **Add a device** in Settings > Devices. It turns following on and shows the Mac on
+   your network for 10 minutes, only while it waits.
 2. In the new Mac's setup, choose your AI and where Pace runs as usual. At the Slack step, choose **Connect to your
    other Mac**: it finds the waiting Mac on your network, or takes its address (Tailscale).
 3. Both Macs show the same 6-digit number. If they match, click **Allow** on the Mac already set up.
@@ -89,11 +89,11 @@ Everything after is encrypted, and from then on the Macs know each other by the 
 
 Pacenote that runs Todo alone, with Pace off, pairs the same way, with nothing of Slack:
 
-1. On one Mac, click **Add a Mac** in Settings > Macs. The first time, it makes the key your Macs will know each other
-   by, and it waits for 10 minutes, as above.
+1. On one Mac, click **Add a device** in Settings > Devices. The first time, it makes the key your Macs will know each
+   other by, and it waits for 10 minutes, as above.
 2. On the other Mac:
    - **A new install**: at the first run's second step, choose **From your other Mac**.
-   - **Set up already**: click **Pair** under **Pair with your other Mac** in Settings > Macs.
+   - **Set up already**: click **Pair** under **Pair with your other Mac** in Settings > Devices.
 
    Either finds the waiting Mac on your network, or takes its address (Tailscale).
 3. Both Macs show the same 6-digit number. If they match, click **Allow** on the first Mac.
@@ -116,14 +116,14 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   addresses (its `utun` addresses in Tailscale's ranges, 100.64/10 and fd7a:115c:a1e0::/48), for a device of yours to
   reach it away from your network.
 - **Knowing.** Both Macs hold the same key, and that is what they know each other by. It is either derived (HKDF) from
-  the Slack app-level token both hold, or one Add a Mac made on a Mac with no Slack app and handed to the next. Each
+  the Slack app-level token both hold, or one Add a device made on a Mac with no Slack app and handed to the next. Each
   proves it holds the key, over fresh nonces, before anything else is said, and every message after that is sealed with
   AES-256-GCM under keys of that connection and numbered, so none can be read, altered or played again. Neither the
-  token nor the key crosses the network, but once: Add a Mac's setup channel hands the key to the new Mac. A Mac with
-  another key, such as your company's Pace, never sees the others. The key Add a Mac made is kept in
+  token nor the key crosses the network, but once: Add a device's setup channel hands the key to the new Mac. A Mac with
+  another key, such as your company's Pace, never sees the others. The key Add a device made is kept in
   `PACENOTE_DATA_DIR/macs-key`, readable by you alone.
 - **Devices hold a key of their own.** A device of yours (an iPhone, iPad and Android app, in development and not
-  released) never gets your Macs' key or your Slack app: Add a Mac gives it one made from that key and its id, which
+  released) never gets your Macs' key or your Slack app: Add a device gives it one made from that key and its id, which
   each of your Macs works out again as it says hello, and none does once you remove it. It asks the Mac it reaches for
   what the Mac's own screens show, and the Mac answers only what a device may ask, never a secret
   ([src/macs/asks.ts](../src/macs/asks.ts)).
@@ -136,7 +136,7 @@ A Mac set up with the same Slack app still finds the others by that app, includi
 
 Regenerate the app-level token and both Macs need the new one before they know each other again.
 
-## Settings > Macs
+## Settings > Devices
 
 - **Follow the Mac you're using** (your own Slack app), or **Find your other Macs** (paired, no Slack app): off until
   you turn it on or add a Mac, so a Mac of its own never looks on the network. Off, this Mac leaves the others and Pace
@@ -144,10 +144,10 @@ Regenerate the app-level token and both Macs need the new one before they know e
 - **Your Macs**: this one and the others, with what each is doing. With your own Slack app: answering, standing by,
   moving, or out of reach since when. With no Slack app: in sync, asleep, or out of reach since when.
 - **Stop following to this Mac** or **Stop pairing with this Mac** (⋯): leaves one Mac out.
-- **Add a Mac**: sets up a new Mac from this one, or pairs one set up already.
-- **Pair with your other Mac** (no Slack app, not paired yet): pairs this Mac with one waiting in Add a Mac.
+- **Add a device**: sets up a new Mac from this one, or pairs one set up already.
+- **Pair with your other Mac** (no Slack app, not paired yet): pairs this Mac with one waiting in Add a device.
 - **Add by address**: a Mac on another network.
-- **Your devices**, once one has paired: your devices, paired here or with your other Macs, connected now or when last
-  seen. **Remove** one you lost: every Mac turns it away from then on.
+- **Phones and tablets**, once one has paired: your devices, paired here or with your other Macs, connected now or when
+  last seen. **Remove** one you lost: every Mac turns it away from then on.
 
 What a Mac knows of the others, and of your devices, is kept in `PACENOTE_DATA_DIR/macs.json`.

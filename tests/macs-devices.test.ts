@@ -55,7 +55,7 @@ const next = <T>(channel: MacChannel, t: string) =>
   })
 
 // A device of yours (the iPhone, iPad and Android app) as your Macs see it:
-// it pairs through Add a Mac, and dials as a device with a key of its own
+// it pairs through Add a device, and dials as a device with a key of its own
 describe('your devices and your Macs', () => {
   const dirs: string[] = []
   const stops: (() => unknown)[] = []
@@ -66,8 +66,8 @@ describe('your devices and your Macs', () => {
   })
 
   /**
-   * A Mac with your Slack app's token in what Add a Mac sends a new Mac; with
-   * a key already, it looks for your other Macs at addresses
+   * A Mac with your Slack app's token in what Add a device sends a new Mac;
+   * with a key already, it looks for your other Macs at addresses
    */
   async function mac(
     options: { name?: string; group?: Buffer; addresses?: string[] } = {}
@@ -107,9 +107,9 @@ describe('your devices and your Macs', () => {
     return { dataDir, macs, address: () => `127.0.0.1:${macs.listening}` }
   }
 
-  /** Pairs the iPad through Add a Mac: what the Mac sends it once allowed */
+  /** Pairs the iPad through Add a device: what the Mac sends it once allowed */
   async function pairDevice(macs: Macs) {
-    // Add a Mac opens the Mac on your network, if it was not yet
+    // Add a device opens the Mac on your network, if it was not yet
     await macs.startAdding()
     const address = `127.0.0.1:${macs.listening}`
     const { channel } = await setupDial(await socket(`${address}/setup`), {

@@ -5,7 +5,7 @@ import type { PowerMonitor } from 'electron'
 import type { MacUse } from '../../../src/macs/types.js'
 
 /**
- * What the desktop app gives Settings > Macs (src/macs/macs.ts): this Mac's
+ * What the desktop app gives Settings > Devices (src/macs/macs.ts): this Mac's
  * name and how it is used now.
  */
 

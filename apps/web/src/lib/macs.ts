@@ -9,7 +9,7 @@ const macs = desktopValue(() => {
 })
 
 /**
- * Your Macs and where Pace answers (Settings > Macs, the status bar), from
+ * Your Macs and where Pace answers (Settings > Devices, the status bar), from
  * the desktop app as it changes. undefined outside the app.
  */
 export function useMacs(): MacsView | undefined {

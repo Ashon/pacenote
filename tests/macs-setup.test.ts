@@ -101,7 +101,7 @@ describe('setting up a new Mac from one already set up', () => {
   it('sends your Slack app, who Pace answers and Todo settings once you Allow', async () => {
     const { macs, payload } = await pro()
     expect(await macs.startAdding()).toBe(true)
-    // Add a Mac turns following on.
+    // Add a device turns following on.
     expect(macs.view()).toMatchObject({ follow: true, adding: {} })
     const { setup, took } = air()
     setup.look()
@@ -136,7 +136,7 @@ describe('setting up a new Mac from one already set up', () => {
   it('sends nothing when you say Not this one, and takes no one when not waiting', async () => {
     const { macs } = await pro()
     const { setup, took } = air()
-    // Not waiting in Add a Mac: the new Mac is turned away.
+    // Not waiting in Add a device: the new Mac is turned away.
     await macs.setFollow(true)
     await setup.connect({ address: `127.0.0.1:${macs.listening}` })
     expect(setup.current).toMatchObject({
@@ -163,7 +163,7 @@ describe('setting up a new Mac from one already set up', () => {
     const { macs } = await pro()
     await macs.setFollow(true)
     const { setup, states } = air(10_000)
-    // Asked before Add a Mac: no error, it waits and tries again
+    // Asked before Add a device: no error, it waits and tries again
     const connecting = setup.connect({
       address: `127.0.0.1:${macs.listening}`,
     })

@@ -83,7 +83,7 @@ async function openMac(
     settings?: string[]
     /** Addresses of your other Macs, as added before */
     addresses?: string[]
-    /** Settings > Macs > Follow the Mac you're using, as turned on before */
+    /** Settings > Devices > Follow the Mac you're using, as turned on before */
     follow?: boolean
     /** Not set up yet: it opens on setup, with no Slack app or owner */
     firstRun?: boolean
@@ -194,7 +194,7 @@ async function openMac(
 const homeOf = (world: World, name: string) =>
   path.join(world.root, name.replace(/\W+/g, '-'))
 
-/** The Mac rows on Settings > Macs, as name and status */
+/** The Mac rows on Settings > Devices, as name and status */
 async function macRows(page: Page): Promise<string[][]> {
   return page
     .locator('[data-mac]')
@@ -392,14 +392,14 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     world = await World.create([{ match: 'hello', answer: 'Hi alice.' }])
     const { slack, ops, alice } = world
 
-    // The Pro is set up, with following off until Add a Mac.
+    // The Pro is set up, with following off until Add a device.
     const pro = await openMac(world, 'MacBook Pro', 2, {
       follow: false,
       me: { id: alice.id, name: 'alice' },
     })
     await pro.page.getByText(/Pace: Connected/).waitFor()
     await pro.page.evaluate("window.location.hash = '#/settings/macs'")
-    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByRole('button', { name: 'Add a device' }).click()
     await pro.page.getByText('Waiting for it on this network').waitFor()
 
     // The Air's first run: Pace's setup, from Todo's (a new install's), with
@@ -555,7 +555,7 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
       'mina'
     )
 
-    // The Pro runs Todo alone: Settings > Macs pairs with no Slack app.
+    // The Pro runs Todo alone: Settings > Devices pairs with no Slack app.
     const pro = await openMac(world, 'MacBook Pro', 2, {
       todoOnly: true,
       follow: false,
@@ -570,11 +570,11 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     // Nothing to find yet: no key, so no switch
     expect(await pro.page.getByRole('switch').count()).toBe(0)
     await shot(pro, 'todo-settings')
-    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByRole('button', { name: 'Add a device' }).click()
     await pro.page.getByText('Waiting for it on this network').waitFor()
     await pro.page.getByText('in its first run', { exact: false }).waitFor()
     await shot(pro, 'todo-adding')
-    // The key Add a Mac made, readable by you alone
+    // The key Add a device made, readable by you alone
     const key = path.join(pro.home, GROUP_FILE)
     expect(statSync(key).mode & 0o777).toBe(0o600)
 
@@ -683,10 +683,10 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
       settings: ['TASKS=on', 'TASKS_NAMES=Ashon'],
     })
     await pro.page.evaluate("window.location.hash = '#/settings/macs'")
-    await pro.page.getByRole('button', { name: 'Add a Mac' }).click()
+    await pro.page.getByRole('button', { name: 'Add a device' }).click()
     await pro.page.getByText('Waiting for it on this network').waitFor()
 
-    // On the Air, set up already: Pair, in Settings > Macs
+    // On the Air, set up already: Pair, in Settings > Devices
     await air.page.evaluate("window.location.hash = '#/settings/macs'")
     await air.page.getByText('Pair with your other Mac').waitFor()
     await air.page.getByRole('button', { name: 'Pair', exact: true }).click()

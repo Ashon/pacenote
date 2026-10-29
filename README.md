@@ -98,9 +98,9 @@ to post.
 ### Move between your Macs
 
 With Pacenote on two Macs, Todo is the same on both, merged directly over your network with no server in between. Pair
-them once with no Slack app: Add a Mac on one, then From your other Mac in the other's first run (or Pair in its
-Settings > Macs). With your own Slack app, Pace answers on the one you're using and moves with you when you leave it for
-the other; Macs with the same Slack app find each other with nothing to pair. See [Your Macs](docs/macs.md). Coming
+them once with no Slack app: Add a device on one, then From your other Mac in the other's first run (or Pair in its
+Settings > Devices). With your own Slack app, Pace answers on the one you're using and moves with you when you leave it
+for the other; Macs with the same Slack app find each other with nothing to pair. See [Your Macs](docs/macs.md). Coming
 soon: iPhone and iPad, paired over your network the same way.
 
 ### Share the history with your AI tools
@@ -123,7 +123,7 @@ and where you contribute. You add it to each tool with one click, and only if yo
   lookups and, only where you turn on Write, draft PRs and Jira issues or comments.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
   only your other Macs reach it, on your own network: ones you paired or set up with the same Slack app, or a new one
-  while Add a Mac waits.
+  while Add a device waits.
   Besides Slack (or your hub), your AI
   service and the services you connect in Settings > Tools, it talks only to GitHub to check for updates, and downloads the
   sandbox's images when you set it up. There is no telemetry.

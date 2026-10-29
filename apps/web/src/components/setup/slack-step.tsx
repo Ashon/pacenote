@@ -42,7 +42,7 @@ const SLACK_APPS_URL = 'https://api.slack.com/apps'
  * 3. How Pace reaches Slack: your team's hub, paired here; your own Slack
  * app, made from the manifest (3a), and then told who you are with one
  * mention (3b); or your own Slack app and who you are, taken from your other
- * Mac (3c, Add a Mac there)
+ * Mac (3c, Add a device there)
  */
 export function SlackStep({
   part,

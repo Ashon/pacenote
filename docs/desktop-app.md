@@ -122,7 +122,7 @@ Bot management:
 - A new install opens on Todo's first run (`#/start`, `apps/web/src/components/setup/first-run.tsx`): your AI, where your
   work is (this Mac's sessions and commits, and Slack through the AI tool's own connector), and a first collection with
   the projects it finds. With no Slack connector yet, the first look is this Mac's alone, said as such rather than as
-  a failure. Instead of step 2, **From your other Mac** pairs it with one waiting in Add a Mac and takes how Todo
+  a failure. Instead of step 2, **From your other Mac** pairs it with one waiting in Add a device and takes how Todo
   collects from there ([Your Macs](macs.md#pair-macs-with-no-slack-app)), then opens Todo. It writes `TASKS=on` and
   ends on Todo. Pace is off meanwhile and after (`desktop.json`'s
   `pace: 'off'`): it never starts by itself, the status bar says "Pace: Off", Overview, Runs and Pace leave the sidebar,

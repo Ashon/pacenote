@@ -56,7 +56,7 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
 
   /**
    * Opens (here) or closes Pace's Slack connection, as another of your Macs
-   * answers or this one should (Settings > Macs)
+   * answers or this one should (Settings > Devices)
    */
   answer(here: boolean): void {
     this.child?.postMessage({ type: ANSWER_HERE, here })

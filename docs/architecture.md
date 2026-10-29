@@ -83,7 +83,7 @@ More: [Team hub](team-hub.md).
 ## Your Macs
 
 With Pacenote on more than one Mac, the Macs find each other (Bonjour, or an address you add) and talk over a channel
-only they can open (`src/macs/channel.ts`). Its key comes from the Slack app token they share, or from Add a Mac,
+only they can open (`src/macs/channel.ts`). Its key comes from the Slack app token they share, or from Add a device,
 which makes one on a Mac with no Slack app and hands it to the next (`macs-key`). Your Todo files are merged between
 them as they change (`sync.ts`, `todo-sync.ts`); sessions and run history stay on their Mac. Between Macs of the same
 Slack app of your own, one holds Pace's Slack connection: each claims a lease when the rules say so, the one you're

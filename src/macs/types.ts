@@ -1,5 +1,5 @@
 /**
- * Your Macs: Pacenote on each Mac you pair (Add a Mac), or set up with the
+ * Your Macs: Pacenote on each Mac you pair (Add a device), or set up with the
  * same Slack app, finds the others on your network by itself; Todo is the same
  * on each, and Pace answers on the one you're using (docs/macs.md). What the
  * desktop app (apps/desktop/src/macs.ts) and its screens share. Has no Node
@@ -128,10 +128,12 @@ export interface MacsView {
   paceFollows: boolean
   /**
    * This Mac has a key to know your other Macs by: your Slack app's, or the
-   * one Add a Mac made or brought
+   * one Add a device made or brought
    */
   paired: boolean
-  /** Settings > Macs: Follow the Mac you're using, or Find your other Macs */
+  /**
+   * Settings > Devices: Follow the Mac you're using, or Find your other Macs
+   */
   follow: boolean
   /** This Mac first, then the others it knows */
   macs: MacView[]
@@ -143,7 +145,7 @@ export interface MacsView {
   blocked: boolean
   /** The last time Pace moved to this Mac, and from which */
   moved?: { from: string; at: string }
-  /** Add a Mac: this Mac waits for a new one to set up from it */
+  /** Add a device: this Mac waits for a new one to set up from it */
   adding?: AddingView
   /**
    * Your iPhone, iPad and Android devices, each with a key of its own: paired
@@ -186,8 +188,8 @@ export interface DeviceRecord {
 }
 
 /**
- * Settings > Macs > Add a Mac: this Mac shows itself on your network for 10
- * minutes, for a new Mac's setup to connect to it, and sends what that one
+ * Settings > Devices > Add a device: this Mac shows itself on your network for
+ * 10 minutes, for a new Mac's setup to connect to it, and sends what that one
  * needs once you Allow
  */
 export interface AddingView {
@@ -247,7 +249,7 @@ export interface SetupPayload {
  * Where a Mac takes another's settings from (setup.ts):
  * - pace: Pace's setup, which takes your Slack app and who Pace answers
  * - todo: Todo's first run, which takes how Todo collects
- * - join: Settings > Macs on a Mac set up already, which takes the key alone
+ * - join: Settings > Devices on a Mac set up already, which takes the key alone
  */
 export type FromMacMode = 'pace' | 'todo' | 'join'
 
@@ -256,7 +258,7 @@ export type FromMacState =
   | { step: 'idle' }
   | {
       step: 'looking'
-      /** Macs waiting in Add a Mac on this network */
+      /** Macs waiting in Add a device on this network */
       found: { instance: string; name: string }[]
     }
   /** retrying: the first try did not get through, and it tries again */

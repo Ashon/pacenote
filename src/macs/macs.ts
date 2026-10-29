@@ -54,19 +54,19 @@ import {
  * onAnswer; everything else Pace does is as before.
  *
  * The key is your Slack app's (macsKey of its app token), as before 0.6.13,
- * or one Add a Mac made on a Mac with no Slack app of its own and handed to
+ * or one Add a device made on a Mac with no Slack app of its own and handed to
  * the next (GROUP_FILE), which then wins. Over the channel Todo stays the same
  * on each Mac (todo-sync.ts); Pace follows you only between Macs answering
  * through the same Slack app of your own, never with the team hub.
  *
- * Until you turn on Settings > Macs (Follow the Mac you're using, or Find your
- * other Macs) or Add a Mac, it does nothing and Pace answers here, as on a Mac
- * of its own.
+ * Until you turn on Settings > Devices (Follow the Mac you're using, or Find
+ * your other Macs) or Add a device, it does nothing and Pace answers here, as
+ * on a Mac of its own.
  */
 
 export const MACS_FILE = 'macs.json'
 /**
- * The key Add a Mac made or brought (base64), kept apart from macs.json and
+ * The key Add a device made or brought (base64), kept apart from macs.json and
  * readable by you alone, as settings.json's secrets are
  */
 export const GROUP_FILE = 'macs-key'
@@ -107,7 +107,7 @@ const STALLED_MS = 60_000
 const CLAIM_COOLDOWN_MS = 15_000
 /**
  * Unreachable this long, as macOS answers while Local Network access is off,
- * before Settings > Macs says so: the first time, macOS is still asking
+ * before Settings > Devices says so: the first time, macOS is still asking
  */
 const BLOCKED_MS = 30_000
 /** How often to dial again while the network turns this Mac away */
@@ -118,7 +118,7 @@ const REDIAL_MS = 2_000
  */
 const STARTUP_MS = 15_000
 const MAX_MESSAGE = 16 * 1024 * 1024
-/** How long Add a Mac waits for the new Mac */
+/** How long Add a device waits for the new Mac */
 const ADDING_MS = 10 * 60_000
 /** Setup just finished: how long the new Mac waits to hear the others */
 const CLAIM_WAIT_MS = 30_000
@@ -163,7 +163,7 @@ interface MacsOptions {
   dataDir: string
   /**
    * Your own Slack app's app-level token (none with the team hub): the Macs'
-   * key when Add a Mac made none, and the app Pace follows you with
+   * key when Add a device made none, and the app Pace follows you with
    */
   appToken: () => string | undefined
   name: string
@@ -175,7 +175,7 @@ interface MacsOptions {
   onAnswer: (here: boolean) => void
   /** Collect now runs here, since then */
   collecting?: () => string | undefined
-  /** What Add a Mac sends a new Mac once you Allow */
+  /** What Add a device sends a new Mac once you Allow */
   setupPayload?: () => SetupPayload
   log: (message: string) => void
   /** 0 takes any free port (tests); MACS_PORT otherwise */
@@ -205,7 +205,7 @@ export class Macs extends EventEmitter<{
   private bonjour?: Bonjour
   /** The key the network side was opened with */
   private netKey?: Buffer
-  /** The key Add a Mac made or brought (GROUP_FILE) */
+  /** The key Add a device made or brought (GROUP_FILE) */
   private group?: Buffer
   private timer?: NodeJS.Timeout
   private startedAt = 0
@@ -231,7 +231,7 @@ export class Macs extends EventEmitter<{
   private readonly seenAt = new Map<string, number>()
   /** The Macs heard from since this one started */
   private readonly heardSinceStart = new Set<string>()
-  /** Add a Mac, while it waits or until you close what it says */
+  /** Add a device, while it waits or until you close what it says */
   private adding?: {
     until: number
     timer?: NodeJS.Timeout
@@ -438,7 +438,7 @@ export class Macs extends EventEmitter<{
   }
 
   /**
-   * Add a Mac: shows this Mac on your network for a new one's setup, for 10
+   * Add a device: shows this Mac on your network for a new one's setup, for 10
    * minutes, with following turned on. With no Slack app of your own and no
    * key yet, it makes the key your Macs will know each other by.
    */
@@ -517,7 +517,7 @@ export class Macs extends EventEmitter<{
   }
 
   /**
-   * Takes the key your other Mac sent (Add a Mac there), so this Mac pairs
+   * Takes the key your other Mac sent (Add a device there), so this Mac pairs
    * with it and its others, once the network side opened again with it. false
    * for one that is not a key.
    */
@@ -540,7 +540,7 @@ export class Macs extends EventEmitter<{
     this.endAdding('declined', request.name)
   }
 
-  /** What Add a Mac said is read: it goes away */
+  /** What Add a device said is read: it goes away */
   closeAdding(): void {
     if (this.adding?.result) this.clearAdding()
     this.emitIfChanged()
@@ -603,7 +603,7 @@ export class Macs extends EventEmitter<{
   }
 
   /**
-   * The key your Macs know each other by: the one Add a Mac made or brought,
+   * The key your Macs know each other by: the one Add a device made or brought,
    * else your own Slack app's
    */
   private key(): Buffer | undefined {
@@ -932,7 +932,7 @@ export class Macs extends EventEmitter<{
       const address = req.socket.remoteAddress
       // Only your own networks, never the internet
       if (!privateAddress(address)) return socket.destroy()
-      // A new Mac setting up from this one, only while Add a Mac waits
+      // A new Mac setting up from this one, only while Add a device waits
       const setup = (req.url ?? '').startsWith('/setup')
       const key = this.netKey
       if (setup ? !this.adding || this.adding.result : !key)
@@ -967,7 +967,7 @@ export class Macs extends EventEmitter<{
     this.wss = wss
   }
 
-  /** A new Mac asking to set up from this one, while Add a Mac waits */
+  /** A new Mac asking to set up from this one, while Add a device waits */
   private setupConnection(ws: WebSocket): void {
     const adding = this.adding
     if (!adding || adding.result || adding.request) return ws.close()
@@ -998,7 +998,7 @@ export class Macs extends EventEmitter<{
       .catch(() => undefined)
   }
 
-  /** Add a Mac ended: it stops showing itself, and says how it ended */
+  /** Add a device ended: it stops showing itself, and says how it ended */
   private endAdding(
     kind: NonNullable<AddingView['result']>['kind'],
     name?: string,
