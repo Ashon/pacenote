@@ -59,6 +59,7 @@ const SITE = build('site', {
   'v0.6.12': '2026-10-28T15:00:00Z',
   'v0.6.13': '2026-10-29T03:00:00Z',
   'v0.6.14': '2026-10-29T04:00:00Z',
+  'v0.6.15': '2026-10-29T07:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -374,14 +375,15 @@ describe('the news', () => {
         '<a class="news-featured" href="macs-without-slack/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 4)).toEqual([
+      'release v0.6.15/',
       'release v0.6.14/',
       'release v0.6.13/',
       'post todo-comes-first/',
-      'release v0.6.12/',
     ])
     expect(rows('news/')).not.toContain('post macs-without-slack/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 7)).toEqual([
+    expect(rows('ko/news/').slice(0, 8)).toEqual([
+      'release v0.6.15/',
       'release v0.6.14/',
       'release v0.6.13/',
       'post todo-comes-first/',
@@ -391,11 +393,11 @@ describe('the news', () => {
       'release ../../news/v0.6.10/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
-    expect(EVERY).toContain('ko/news/v0.6.14/')
+    expect(EVERY).toContain('ko/news/v0.6.15/')
     expect(read('ko/news/')).toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.15/')
+    expect(EVERY).not.toContain('news/v0.6.16/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -405,15 +407,18 @@ describe('the news', () => {
           /<a href="([^"]+)"( aria-current="page")?[^>]*>[^<]*<span class="news-nav-date">/g
         ),
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
-    expect(recent('news/v0.6.12/').slice(0, 5)).toEqual([
+    expect(recent('news/v0.6.12/').slice(0, 6)).toEqual([
+      '../v0.6.15/',
       '../v0.6.14/',
       '../macs-without-slack/',
       '../v0.6.13/',
       '../todo-comes-first/',
       './ *',
     ])
-    // The Korean rail has the English notes too, as the Korean list has
-    expect(recent('ko/news/v0.6.11/').slice(0, 8)).toEqual([
+    // The Korean rail, its latest eight as the English one (the Korean list
+    // above has the English notes too)
+    expect(recent('ko/news/v0.6.11/')).toEqual([
+      '../v0.6.15/',
       '../v0.6.14/',
       '../macs-without-slack/',
       '../v0.6.13/',
@@ -421,7 +426,6 @@ describe('the news', () => {
       '../v0.6.12/',
       '../share-your-hub/',
       './ *',
-      '../../../news/v0.6.10/',
     ])
   })
 
@@ -432,9 +436,9 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest news: v0.6.14's notes, newer than the last feature post
-    expect(link('')).toEqual(['news/v0.6.14/', "What's new in v0.6.14"])
-    expect(link('ko/')).toEqual(['news/v0.6.14/', 'v0.6.14에서 달라진 점'])
+    // The latest news: v0.6.15's notes, newer than the last feature post
+    expect(link('')).toEqual(['news/v0.6.15/', "What's new in v0.6.15"])
+    expect(link('ko/')).toEqual(['news/v0.6.15/', 'v0.6.15에서 달라진 점'])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
