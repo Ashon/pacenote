@@ -8,6 +8,7 @@ import { readJson, writeJson } from '../tasks/store.js'
 import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import {
   accept,
+  deviceKey,
   dial,
   macsGroup,
   macsKey,
@@ -22,13 +23,21 @@ import {
   type ClaimReason,
   type PeerSeen,
 } from './lease.js'
-import { hostPort, MACS_PORT, privateAddress } from './network.js'
+import {
+  hostPort,
+  MACS_PORT,
+  privateAddress,
+  tailnetAddresses,
+} from './network.js'
 import {
   away,
   inUse,
   laterLease,
   type Lease,
   type AddingView,
+  type DeviceKind,
+  type DeviceRecord,
+  type DeviceView,
   type MacState,
   type MacStatus,
   type MacsView,
@@ -75,6 +84,10 @@ interface MacsFile {
   lease?: Lease
   /** The other Macs, as last heard from */
   known: Record<string, { name: string; lastSeen: string; address?: string }>
+  /** Your devices (DeviceRecord), paired here or with your other Macs */
+  devices: Record<string, DeviceRecord>
+  /** Devices you removed, and when: no Mac of yours lets them in again */
+  removed: Record<string, string>
 }
 
 const HEARTBEAT_MS = 5_000
@@ -112,6 +125,16 @@ const CLAIM_WAIT_MS = 30_000
 
 /** What Macs say to each other over their channel */
 type MacMessage = { t: 'state'; state: MacState }
+
+/**
+ * Your devices, as one Mac tells the others when it links to them and when
+ * one is paired or removed. Pacenote before 0.6.14 leaves it alone.
+ */
+interface DevicesMessage {
+  t: 'devices'
+  devices: Record<string, DeviceRecord>
+  removed: Record<string, string>
+}
 
 interface Link {
   channel: MacChannel
@@ -213,7 +236,12 @@ export class Macs extends EventEmitter<{
     until: number
     timer?: NodeJS.Timeout
     advert?: Bonjour
-    request?: { name: string; code: string; channel: MacChannel }
+    request?: {
+      name: string
+      code: string
+      channel: MacChannel
+      device?: DeviceKind
+    }
     result?: AddingView['result']
   }
   /** Set up just now from another Mac: this one takes over once it can */
@@ -279,7 +307,7 @@ export class Macs extends EventEmitter<{
     const ids = new Set([
       ...Object.keys(this.file.known),
       ...[...this.links.values()].flatMap((link) =>
-        link.state ? [link.state.id] : []
+        link.state && !link.channel.peer.device ? [link.state.id] : []
       ),
     ])
     for (const id of ids) {
@@ -328,12 +356,59 @@ export class Macs extends EventEmitter<{
         adding: {
           until: new Date(adding.until).toISOString(),
           ...(adding.request && {
-            request: { name: adding.request.name, code: adding.request.code },
+            request: {
+              name: adding.request.name,
+              code: adding.request.code,
+              ...(adding.request.device && { device: adding.request.device }),
+            },
           }),
           ...(adding.result && { result: adding.result }),
         },
       }),
+      devices: this.devices(now),
     }
+  }
+
+  /** Your devices, those linked to this Mac first */
+  private devices(now: number): DeviceView[] {
+    return Object.entries(this.file.devices)
+      .map(([id, record]) => {
+        const link = this.links.get(id)
+        const connected = Boolean(
+          link?.channel.peer.device && now - link.heardAt < SILENT_MS
+        )
+        return {
+          id,
+          ...record,
+          connected,
+          ...(link && { address: link.address }),
+        }
+      })
+      .sort(
+        (a, b) =>
+          Number(b.connected) - Number(a.connected) ||
+          (b.lastSeen ?? b.pairedAt).localeCompare(a.lastSeen ?? a.pairedAt)
+      )
+  }
+
+  /**
+   * Removes a device: it is let in by none of your Macs again (they hear of
+   * it now, or as they link), and its channel here closes
+   */
+  removeDevice(id: string): void {
+    if (this.file.removed[id]) return
+    const { [id]: gone, ...devices } = this.file.devices
+    this.save({
+      devices,
+      removed: {
+        ...this.file.removed,
+        [id]: new Date(this.now()).toISOString(),
+      },
+    })
+    this.options.log(`Macs: removed ${gone?.name ?? id}`)
+    this.links.get(id)?.channel.close()
+    this.tellDevices()
+    this.emitIfChanged()
   }
 
   /**
@@ -347,6 +422,11 @@ export class Macs extends EventEmitter<{
   /** The other Macs a channel is open to now, by id */
   connected(): string[] {
     return [...this.links.keys()]
+  }
+
+  /** Whether a peer is a device of yours (iPhone, iPad, Android), not a Mac */
+  isDevice(peer: string): boolean {
+    return Boolean(this.links.get(peer)?.channel.peer.device)
   }
 
   /** Says something to another Mac, if a channel is open to it */
@@ -404,6 +484,30 @@ export class Macs extends EventEmitter<{
     const request = this.adding?.request
     const key = this.key()
     if (!request || this.adding?.result || !key) return
+    // A device: a key of its own and your Macs' group, nothing else
+    if (request.device) {
+      const id = request.channel.peer.id
+      request.channel.send({
+        t: 'setup-device',
+        key: deviceKey(key, id).toString('base64'),
+        group: macsGroup(key),
+      })
+      // A device pairs with a new id each time: one you removed stays out
+      this.save({
+        devices: {
+          ...this.file.devices,
+          [id]: {
+            name: request.name,
+            device: request.device,
+            pairedAt: new Date(this.now()).toISOString(),
+            by: this.options.name,
+          },
+        },
+      })
+      this.options.log(`Macs: giving ${request.name} a key of its own`)
+      this.tellDevices()
+      return
+    }
     const payload: SetupPayload = {
       ...(this.options.setupPayload?.() ?? { values: {} }),
       group: key.toString('base64'),
@@ -542,6 +646,7 @@ export class Macs extends EventEmitter<{
     const pace = this.options.pace()
     const collecting = this.options.collecting?.()
     const app = this.app()
+    const reach = this.server ? tailnetAddresses(this.port) : []
     return {
       id: this.id,
       name: this.options.name,
@@ -553,6 +658,7 @@ export class Macs extends EventEmitter<{
       ...(pace.reasoner ? { reasoner: pace.reasoner } : {}),
       ...(collecting ? { collecting } : {}),
       ...(app ? { app } : {}),
+      ...(reach.length ? { reach } : {}),
     }
   }
 
@@ -833,7 +939,12 @@ export class Macs extends EventEmitter<{
         return socket.destroy()
       wss.handleUpgrade(req, socket, head, (ws) => {
         if (setup) return this.setupConnection(ws)
-        accept(ws, { key: key!, me: this.hello() })
+        accept(ws, {
+          key: key!,
+          me: this.hello(),
+          deviceKey: (id) =>
+            this.file.removed[id] ? undefined : deviceKey(key!, id),
+        })
           .then((channel) => this.linked(channel, address))
           .catch(() => undefined)
       })
@@ -864,13 +975,13 @@ export class Macs extends EventEmitter<{
       .then(({ channel, code }) => {
         if (this.adding !== adding || adding.request || adding.result)
           return channel.close()
-        const name = channel.peer.name
-        adding.request = { name, code, channel }
+        const { name, device } = channel.peer
+        adding.request = { name, code, channel, ...(device && { device }) }
         channel.on('message', (message) => {
           const { t, error } = (message ?? {}) as { t?: string; error?: string }
           if (t === 'setup-done') {
             this.options.log(`Macs: ${name} is set up from this Mac`)
-            this.endAdding('sent', name)
+            this.endAdding('sent', name, device)
           } else if (t === 'setup-failed')
             this.options.log(
               `Macs: ${name} could not take the settings: ${error}`
@@ -890,7 +1001,8 @@ export class Macs extends EventEmitter<{
   /** Add a Mac ended: it stops showing itself, and says how it ended */
   private endAdding(
     kind: NonNullable<AddingView['result']>['kind'],
-    name?: string
+    name?: string,
+    device?: DeviceKind
   ): void {
     const adding = this.adding
     if (!adding || adding.result) return
@@ -898,7 +1010,7 @@ export class Macs extends EventEmitter<{
     this.clearAdding()
     this.adding = {
       until: adding.until,
-      result: { kind, ...(name ? { name } : {}) },
+      result: { kind, ...(name ? { name } : {}), ...(device && { device }) },
     }
     this.emitIfChanged()
   }
@@ -954,10 +1066,17 @@ export class Macs extends EventEmitter<{
   /** A channel the handshake opened: one per Mac, the lower id's dial kept */
   private linked(channel: MacChannel, address?: string, target?: string): void {
     const id = channel.peer.id
-    if (this.file.ignored.includes(id) || !this.linkable())
+    const device = channel.peer.device
+    if (
+      this.file.ignored.includes(id) ||
+      (device && this.file.removed[id]) ||
+      !this.linkable()
+    )
       return channel.close()
     const existing = this.links.get(id)
-    if (existing) {
+    // A device always dials: the newer channel is the one it uses now
+    if (existing && device) existing.channel.close()
+    else if (existing) {
       const dialer = (link: MacChannel) => (link.dialed ? this.id : id)
       if (dialer(existing.channel) <= dialer(channel)) return channel.close()
       existing.channel.close()
@@ -975,14 +1094,92 @@ export class Macs extends EventEmitter<{
       `Macs: connected to ${channel.peer.name} (${address ?? '?'})`
     )
     channel.send({ t: 'state', state: this.state() } satisfies MacMessage)
+    if (device) this.seenDevice(id)
+    else channel.send(this.devicesMessage())
     this.emit('linked', id)
   }
 
+  private devicesMessage(): DevicesMessage {
+    return {
+      t: 'devices',
+      devices: this.file.devices,
+      removed: this.file.removed,
+    }
+  }
+
+  /** Tells your other Macs of your devices: one paired, seen or removed */
+  private tellDevices(): void {
+    const message = this.devicesMessage()
+    for (const link of this.links.values())
+      if (!link.channel.peer.device) link.channel.send(message)
+  }
+
+  /**
+   * What another Mac knows of your devices, kept with this one's: a device
+   * removed on any Mac is removed on all, and its channel here closes
+   */
+  private heardDevices(message: Partial<DevicesMessage>): void {
+    const removed = { ...this.file.removed }
+    for (const [id, at] of Object.entries(message.removed ?? {}))
+      if (typeof at === 'string' && (!removed[id] || at < removed[id]!))
+        removed[id] = at
+    const devices: Record<string, DeviceRecord> = {}
+    for (const [id, record] of Object.entries({
+      ...(message.devices ?? {}),
+      ...this.file.devices,
+    })) {
+      if (removed[id]) continue
+      const theirs = message.devices?.[id]
+      const mine = this.file.devices[id]
+      // The later sighting wins: the Mac it is linked to says it last
+      const seen = (r?: DeviceRecord) => r?.lastSeen ?? r?.pairedAt ?? ''
+      devices[id] =
+        theirs && mine ? (seen(theirs) > seen(mine) ? theirs : mine) : record
+    }
+    if (
+      JSON.stringify(devices) === JSON.stringify(this.file.devices) &&
+      JSON.stringify(removed) === JSON.stringify(this.file.removed)
+    )
+      return
+    this.save({ devices, removed })
+    for (const id of Object.keys(removed))
+      if (this.links.get(id)?.channel.peer.device)
+        this.links.get(id)?.channel.close()
+    this.emitIfChanged()
+  }
+
+  /** A device was heard from here: written now and then, as Macs are */
+  private seenDevice(id: string): void {
+    const record = this.file.devices[id]
+    const savedAt = this.seenAt.get(id) ?? 0
+    if (!record || this.now() - savedAt < 60_000) return
+    this.seenAt.set(id, this.now())
+    this.save({
+      devices: {
+        ...this.file.devices,
+        [id]: { ...record, lastSeen: new Date(this.now()).toISOString() },
+      },
+    })
+  }
+
   private heard(link: Link, message: unknown): void {
-    const { t, state } = (message ?? {}) as Partial<MacMessage>
+    const { t, state } = (message ?? {}) as { t?: string; state?: MacState }
+    const device = Boolean(link.channel.peer.device)
+    if (t === 'devices') {
+      link.heardAt = this.now()
+      // Only your Macs say who your devices are
+      if (!device) this.heardDevices(message as Partial<DevicesMessage>)
+      return
+    }
     if (t !== 'state') {
       link.heardAt = this.now()
       this.emit('message', link.channel.peer.id, message)
+      return
+    }
+    // A device's state says only that it is there: never a Mac, no lease
+    if (device) {
+      link.heardAt = this.now()
+      this.seenDevice(link.channel.peer.id)
       return
     }
     if (!state || state.id !== link.channel.peer.id) return
@@ -1034,6 +1231,8 @@ export class Macs extends EventEmitter<{
       ignored: Array.isArray(file.ignored) ? file.ignored : [],
       ...(file.lease ? { lease: file.lease } : {}),
       known: file.known ?? {},
+      devices: file.devices ?? {},
+      removed: file.removed ?? {},
     }
     if (value.id !== file.id) this.write(value)
     return value

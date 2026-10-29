@@ -67,8 +67,17 @@ declare global {
     readonly VITE_PACENOTE_DEBUG?: string
   }
   interface Window {
-    /** Present only in the desktop app (preload). */
+    /**
+     * Present in the desktop app (preload), and on a device of yours
+     * (the iPhone, iPad and Android app), which asks its Mac for what these
+     * screens get
+     */
     pacenoteDesktop?: {
+      /**
+       * On a device of yours: the Mac whose screens these are. What stays on
+       * that Mac (its secrets, folders, Finder) is left to it.
+       */
+      remote?: { mac: string }
       platform: string
       /**
        * Runs from the repository (Pacenote Dev) rather than the installed app
@@ -278,10 +287,15 @@ declare global {
         removeAddress(address: string): Promise<void>
         /** Stop following to that Mac */
         ignore(id: string): Promise<void>
+        /** A device of yours: none of your Macs lets it in again */
+        removeDevice(id: string): Promise<void>
         /** Add a Mac: waits 10 minutes; false without your own Slack app */
         addStart(): Promise<boolean>
         addStop(): Promise<void>
-        /** Sends the new Mac your Slack app, who Pace answers, Todo settings */
+        /**
+         * Sends the new Mac your Slack app, who Pace answers, Todo settings;
+         * a device, a key of its own
+         */
         addAllow(): Promise<void>
         /** Not this one */
         addDecline(): Promise<void>

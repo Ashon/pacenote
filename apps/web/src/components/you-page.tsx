@@ -322,9 +322,15 @@ function AreaRow({
                 <span>{t.askYouMost(area.people)}</span>
               )}
             </p>
+            {/* A phone's narrow row: its 8 weeks under what it says */}
+            <div className="mt-2 hidden @max-[30rem]:flex">
+              <Bars weeks={area.weeks} faded={resting} />
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <Bars weeks={area.weeks} faded={resting} />
+            <span className="flex @max-[30rem]:hidden">
+              <Bars weeks={area.weeks} faded={resting} />
+            </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

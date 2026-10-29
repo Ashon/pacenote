@@ -25,7 +25,7 @@ import {
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
-import { handleLocalApi } from '../../../src/local-api.js'
+import { apiForDevice, handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import {
   DESKTOP_LOG_FILE,
@@ -190,6 +190,14 @@ import {
   type Session,
 } from './handoff.js'
 import { KeepAwake } from './keep-awake.js'
+import {
+  API_ASK,
+  argsFromDevice,
+  DEVICE_ASKS,
+  DeviceAsks,
+  valueForDevice,
+  type DeviceAsk,
+} from '../../../src/macs/asks.js'
 import { Macs } from '../../../src/macs/macs.js'
 import { SetupFromMac } from '../../../src/macs/setup.js'
 import { macsKey } from '../../../src/macs/channel.js'
@@ -688,6 +696,41 @@ let macs: Macs | undefined
 let macUse: MacUseWatch | undefined
 /** Your Todo, the same on your other Macs */
 let todoSync: TodoSync | undefined
+/** What your devices ask this Mac: its screens' own answers (asks.ts) */
+let deviceAsks: DeviceAsks | undefined
+/**
+ * The screens' bridge, by channel: what each answers the window, which a
+ * device of yours is answered by too (DEVICE_ASKS)
+ */
+const bridged = new Map<string, (...args: unknown[]) => unknown>()
+
+/**
+ * A device's ask, answered as this Mac's own screen is: the read-only API as
+ * the screens fetch it, else the channel's own handler (asks.ts says what
+ * goes either way)
+ */
+async function answerDevice(
+  what: DeviceAsk,
+  args: unknown[],
+  peer: string
+): Promise<unknown> {
+  if (what === API_ASK) return apiForDevice(reader, args[0])
+  const run = bridged.get(DEVICE_ASKS[what])
+  if (!run) throw new Error(`${what} is not answered on this Mac`)
+  const taken = argsFromDevice(what, args)
+  if (what === 'settings.save')
+    log.info(
+      `Settings changed from ${deviceName(peer)}: ${Object.keys(
+        (taken[0] ?? {}) as object
+      ).join(', ')}`
+    )
+  else if (!/\.(get|state|now|status|validate)$/.test(what))
+    log.info(`${deviceName(peer)} asked: ${what}`)
+  return valueForDevice(what, await run(...taken))
+}
+
+const deviceName = (peer: string) =>
+  macs?.view().devices.find((device) => device.id === peer)?.name ?? peer
 /** Setup's Connect to your other Mac: this Mac set up from another */
 let fromMac: SetupFromMac | undefined
 /** What Connect to your other Mac takes this time (FromMacMode) */
@@ -832,6 +875,11 @@ if (supervisor) {
       collectionRuns(7).flatMap((run) => collectionRow(run) ?? []),
     log: (message) => log.info(message),
     changed: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
+  })
+  deviceAsks = new DeviceAsks({
+    macs,
+    answer: answerDevice,
+    log: (message) => log.info(message),
   })
   // Pace started or stopped here: the others hear of it at once.
   let phase = supervisor.current.phase
@@ -1219,10 +1267,12 @@ function registerBotIpc(): void {
     channel: string,
     denied: unknown,
     run: (...args: unknown[]) => unknown
-  ) =>
+  ) => {
+    bridged.set(channel, run)
     ipcMain.handle(channel, (event, ...args: unknown[]) =>
       fromMainWindow(event) ? run(...args) : denied
     )
+  }
   /** run's answer, or { error }: a thrown error loses its message over IPC */
   const orError = async <T>(run: () => T | Promise<T>) => {
     try {
@@ -1235,12 +1285,14 @@ function registerBotIpc(): void {
   const handleOrError = (
     channel: string,
     run: (...args: unknown[]) => Promise<unknown>
-  ) =>
+  ) => {
+    bridged.set(channel, (...args) => orError(() => run(...args)))
     ipcMain.handle(channel, (event, ...args: unknown[]) =>
       fromMainWindow(event)
         ? orError(() => run(...args))
         : { error: localized(text).notAllowed }
     )
+  }
   handle('pacenote:bot:state', null, () => supervisor?.current ?? null)
   handle('pacenote:bot:start', undefined, () => supervisor?.start())
   handle('pacenote:bot:stop', undefined, () => supervisor?.stop())
@@ -1314,6 +1366,9 @@ function registerBotIpc(): void {
   })
   handle('pacenote:macs:ignore', undefined, (id) => {
     if (typeof id === 'string') macs?.ignore(id)
+  })
+  handle('pacenote:macs:remove-device', undefined, (id) => {
+    if (typeof id === 'string') macs?.removeDevice(id)
   })
   // Add a Mac: a new Mac's setup takes your Slack app from this one
   handle('pacenote:macs:add-start', false, () => macs?.startAdding() ?? false)
@@ -1559,46 +1614,49 @@ function registerBotIpc(): void {
     if (kept && Date.now() - kept.at < RECAP_EVERY_MS) return kept.view
     return (await countRecapNow(which, at))?.view ?? null
   })
-  ipcMain.handle(
-    'pacenote:recap:write',
-    async (event, period: unknown, key: unknown) => {
-      const t = localized(text)
-      const which = periodOf(period)
-      if (!fromMainWindow(event) || !which || typeof key !== 'string')
-        return { error: t.notARecap }
-      const counted = await countRecapNow(which, key)
-      if (!counted) return { error: t.notARecap }
-      const { view, commits } = counted
-      if (view.areas.length === 0) return { error: t.nothingToWriteUp }
-      const prompt = recapPrompt(view, periodWords(view), commits)
-      const ran = await ownAi.run(async (cli) => {
-        const result = await writeRecap({
-          ...ownWork(cli),
-          opencode: opencodeRun(),
-          prompt,
-        })
-        // Spent whether it wrote or not, for the Overview's tokens
-        if (result.usage)
-          keepRecapSpend(dataDir, {
-            at: new Date().toISOString(),
-            usage: result.usage,
-          })
-        return result
-      }, refusalOf)
-      if ('resting' in ran) return { error: localized(text).bothResting }
-      const { result } = ran
-      if ('error' in result) {
-        log.warn(`Could not write up the recap of ${key}: ${result.error}`)
-        return { error: result.error }
-      }
-      keepWritten(dataDir, which, key, {
-        text: result.text,
-        at: new Date().toISOString(),
-        by: ran.by,
-        ...(ran.switched ? { switched: ran.switched } : {}),
+  const writeRecapNow = async (period: unknown, key: unknown) => {
+    const t = localized(text)
+    const which = periodOf(period)
+    if (!which || typeof key !== 'string') return { error: t.notARecap }
+    const counted = await countRecapNow(which, key)
+    if (!counted) return { error: t.notARecap }
+    const { view, commits } = counted
+    if (view.areas.length === 0) return { error: t.nothingToWriteUp }
+    const prompt = recapPrompt(view, periodWords(view), commits)
+    const ran = await ownAi.run(async (cli) => {
+      const result = await writeRecap({
+        ...ownWork(cli),
+        opencode: opencodeRun(),
+        prompt,
       })
-      return { view: (await countRecapNow(which, key))?.view }
+      // Spent whether it wrote or not, for the Overview's tokens
+      if (result.usage)
+        keepRecapSpend(dataDir, {
+          at: new Date().toISOString(),
+          usage: result.usage,
+        })
+      return result
+    }, refusalOf)
+    if ('resting' in ran) return { error: localized(text).bothResting }
+    const { result } = ran
+    if ('error' in result) {
+      log.warn(`Could not write up the recap of ${key}: ${result.error}`)
+      return { error: result.error }
     }
+    keepWritten(dataDir, which, key, {
+      text: result.text,
+      at: new Date().toISOString(),
+      by: ran.by,
+      ...(ran.switched ? { switched: ran.switched } : {}),
+    })
+    return { view: (await countRecapNow(which, key))?.view }
+  }
+  // Write it up: here, or asked by a device of yours (DeviceAsks)
+  bridged.set('pacenote:recap:write', writeRecapNow)
+  ipcMain.handle('pacenote:recap:write', (event, period, key) =>
+    fromMainWindow(event)
+      ? writeRecapNow(period, key)
+      : { error: localized(text).notARecap }
   )
   // The Overview's tasks: what you handled over the last 14 days
   handle('pacenote:tasks:trend', null, () => {
@@ -2709,6 +2767,7 @@ if (!app.requestSingleInstanceLock()) {
             log.warn(`Macs could not start: ${(err as Error).message}`)
           )
         todoSync?.start()
+        deviceAsks?.start()
       }
       // A new install starts with Todo, and Pace off until it is set up.
       if (firstRun()) supervisor?.setOff(true)
@@ -2758,6 +2817,7 @@ app.on('before-quit', (event) => {
   taskCollector.cancel()
   void stopClaim()
   todoSync?.stop()
+  deviceAsks?.stop()
   fromMac?.cancel()
   void macs?.stop()
   supervisor?.dispose()

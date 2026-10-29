@@ -112,3 +112,24 @@ export async function handleLocalApi(
   }
   return notFound()
 }
+
+/**
+ * The read-only API for a device of yours (macs/asks.ts), GET only, as JSON:
+ * a run's prompt stays on the Mac (the thread's messages and the system
+ * prompt), and so do its files
+ */
+export async function apiForDevice(
+  reader: HistoryReader,
+  path: unknown
+): Promise<{ status: number; body: unknown }> {
+  if (typeof path !== 'string' || !path.startsWith('/api/'))
+    throw new Error('not one of the API paths')
+  const url = new URL(path, 'pacenote://app')
+  if (/^\/api\/runs\/[^/]+\/artifacts\//.test(url.pathname))
+    return { status: 404, body: null }
+  const response = await handleLocalApi(reader, 'GET', url)
+  const body = (await response.json().catch(() => null)) as unknown
+  if (body && typeof body === 'object' && 'prompt' in body)
+    delete (body as { prompt?: unknown }).prompt
+  return { status: response.status, body }
+}

@@ -27,7 +27,7 @@ import {
   SkeletonWord,
 } from '@/components/ui/skeleton'
 import { useBotLogs, useBotStatus } from '@/lib/api'
-import { botControl, useSupervisor } from '@/lib/desktop'
+import { botControl, remoteMac, useSupervisor } from '@/lib/desktop'
 import { formatDateTime, formatDuration, formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { readStored, writeStored } from '@/lib/storage'
@@ -45,12 +45,15 @@ export function BotPage() {
   const status = view?.alive ? view.status : undefined
   const { tone, label } = describeBot(view, supervisor)
   const known = botKnown(view, supervisor)
+  // On a device of yours: the Mac Pace runs on
+  const remote = remoteMac()
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 border-b px-10 pt-8 pb-6">
         <div className="@container mx-auto max-w-5xl">
-          <div className="flex items-start gap-4">
+          {/* Narrow (a phone), the controls go under the title */}
+          <div className="flex flex-wrap items-start gap-4">
             {/* Until Pace's state can be told, its mark's place, not a stop
                 sign */}
             {known ? (
@@ -131,11 +134,13 @@ export function BotPage() {
               </Sub>
             </Info>
             <Info icon={<Square />} label={t.process} known={Boolean(view)}>
-              {status
-                ? `pid ${status.pid}`
-                : supervisor?.pid
-                  ? `pid ${supervisor.pid}`
-                  : '-'}
+              {remote
+                ? remote
+                : status
+                  ? `pid ${status.pid}`
+                  : supervisor?.pid
+                    ? `pid ${supervisor.pid}`
+                    : '-'}
               <Sub>
                 {status
                   ? t.processLine(
@@ -360,7 +365,7 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
   /** Waiting to start again after an exit; Stop ends the wait */
   const waiting = supervisor.retryAt !== undefined
   return (
-    <div className="flex shrink-0 flex-col items-end gap-2">
+    <div className="flex shrink-0 flex-col items-end gap-2 @max-[32rem]:basis-full @max-[32rem]:items-start">
       <div className="flex items-center gap-1.5">
         {!live && (
           <Button
@@ -560,7 +565,7 @@ const LogPanel = memo(function LogPanel() {
             <ArrowDownToLine />
             {t.follow}
           </Button>
-          {botControl() && (
+          {botControl() && !remoteMac() && (
             <Button
               variant="ghost"
               size="icon-sm"
@@ -579,7 +584,7 @@ const LogPanel = memo(function LogPanel() {
         }}
         className="min-h-0 flex-1"
       >
-        <div className="px-10 py-2 font-mono text-caption leading-[1.6] select-text">
+        <div className="@container/logs px-10 py-2 font-mono text-caption leading-[1.6] select-text">
           <div className="mx-auto max-w-5xl">
             {data === undefined && !isError && (
               <div className="motion-skeleton">
@@ -623,7 +628,8 @@ function LogRow({ line }: { line: LogLine }) {
   return (
     <div
       className={cn(
-        'flex gap-3 rounded-sm px-1.5 hover:bg-accent/50',
+        // Narrow (a phone), the message goes under its time and level
+        'flex flex-wrap gap-x-3 rounded-sm px-1.5 hover:bg-accent/50',
         line.level === 'ERROR' && 'bg-status-failed/5'
       )}
     >
@@ -646,7 +652,7 @@ function LogRow({ line }: { line: LogLine }) {
       >
         {scope}
       </span>
-      <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
+      <span className="min-w-0 flex-1 break-words whitespace-pre-wrap @max-[30rem]/logs:basis-full @max-[30rem]/logs:pb-1">
         {line.message}
       </span>
     </div>

@@ -44,8 +44,10 @@ import {
   RotateCcw,
   Save,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   Sun,
+  Tablet,
   TriangleAlert,
   Wrench,
   X,
@@ -73,6 +75,7 @@ import {
   botControl,
   useLoginItem,
   useSandbox,
+  remoteMac,
   useSupervisor,
   useUpdate,
 } from '@/lib/desktop'
@@ -87,7 +90,8 @@ import {
 import { useHubPairing } from '@/lib/hub'
 import { hubShareLink } from '@src/hub/share'
 import { codeWords, macsControl, useMacs } from '@/lib/macs'
-import type { AddingView, MacView } from '@src/macs/types'
+import { MAC_ONLY_SETTINGS } from '@src/macs/asks'
+import type { AddingView, DeviceView, MacView } from '@src/macs/types'
 import { useTheme, type ThemeMode } from '@/lib/theme'
 import { cn, go as goTo } from '@/lib/utils'
 import { isLocale, LOCALE_NAMES, LOCALES, localized } from '@src/i18n/locale'
@@ -195,6 +199,8 @@ interface Hint {
 export function SettingsPage() {
   const t = useText(text)
   const settings = window.pacenoteDesktop?.settings
+  // On a device of yours: the Mac whose settings these are
+  const remote = remoteMac()
   const supervisor = useSupervisor()
   const loginItem = useLoginItem()
   const update = useUpdate()
@@ -576,7 +582,7 @@ export function SettingsPage() {
     slack: () => (
       <>
         {card('slack', {
-          action: (
+          action: !remote && (
             <Button
               size="sm"
               variant="outline"
@@ -593,7 +599,9 @@ export function SettingsPage() {
           ),
           children:
             check && check !== 'running' ? <CheckResult items={check} /> : null,
-          after: hubMode ? (
+          after: remote ? (
+            <OnTheMacNote mac={remote} />
+          ) : hubMode ? (
             <HubPairing
               hubUrl={valueOf('HUB_URL')}
               allow={valueOf('MENTION_ALLOWED_USERS')}
@@ -639,14 +647,16 @@ export function SettingsPage() {
       <>
         {card('environment', {
           // Settings Pace picks up on its restart, such as the limits here
-          children: pending.length > 0 && (
+          children: !remote && pending.length > 0 && (
             <PendingList pending={pending} sandbox={sandbox} />
           ),
         })}
         {builtIn &&
           card('credentials', {
             help: t.credentialsHelp(valueOf('REASONER')),
-            after: (
+            after: remote ? (
+              <OnTheMacNote mac={remote} />
+            ) : (
               <>
                 <LoginChecks sandbox={sandbox} />
                 <SandboxSignIn
@@ -691,7 +701,9 @@ export function SettingsPage() {
     tasks: () => (
       <>
         {card('ownWork', {
-          after: (
+          after: remote ? (
+            <OnTheMacNote mac={remote} />
+          ) : (
             <OwnAiStatus
               chosen={
                 isOwnCli(view.values.TASKS_AI) ? view.values.TASKS_AI : 'claude'
@@ -701,7 +713,7 @@ export function SettingsPage() {
           ),
         })}
         {card('tasks', {
-          after: valueOf('TASKS') === 'on' && (
+          after: valueOf('TASKS') === 'on' && !remote && (
             <>
               <SlackYou
                 owners={
@@ -717,20 +729,27 @@ export function SettingsPage() {
             </>
           ),
         })}
-        {card('work', { after: valueOf('TASKS') === 'on' && <RepoFolders /> })}
+        {card('work', {
+          after: valueOf('TASKS') === 'on' && !remote && <RepoFolders />,
+        })}
       </>
     ),
     logs: () => (
       <>
         {card('history', {
-          after: valueOf('HISTORY_SHARE') === 'on' && (
+          after: valueOf('HISTORY_SHARE') === 'on' && !remote && (
             <McpConnections about={t.mcpHistory} />
           ),
         })}
         {card('logs')}
       </>
     ),
-    macs: () => <MacsSection />,
+    macs: () => (
+      <>
+        <MacsSection />
+        <DevicesSection />
+      </>
+    ),
     general: () => (
       <>
         <section className="surface-group">
@@ -966,6 +985,8 @@ function SettingsNav({
   hints?: Partial<Record<Section, Hint>>
 }) {
   const t = useText(text)
+  // A device of yours lists the sections itself, its own first
+  if (remoteMac()) return null
   return (
     <nav
       aria-label={t.navLabel}
@@ -1550,6 +1571,13 @@ function FieldRow({
 }: ControlProps & { extras?: ChoiceExtras; changed: boolean; issue?: string }) {
   const t = useText(text)
   const { field, value, onChange } = control
+  const mac = remoteMac()
+  if (mac && MAC_ONLY_SETTINGS.has(field.key))
+    return (
+      <Row label={field.label} setting={field.key} help={field.help}>
+        <OnTheMac field={field} view={control.view} mac={mac} />
+      </Row>
+    )
   const overridden = control.view.overridden.includes(field.key)
   const label = (
     <span className="flex items-center gap-1.5">
@@ -1590,6 +1618,58 @@ function FieldRow({
     >
       <Control {...control} />
     </Row>
+  )
+}
+
+/** On a device of yours, in place of what only happens at the Mac */
+function OnTheMacNote({ mac }: { mac: string }) {
+  const t = useText(text)
+  return (
+    <p className="border-t border-border px-4 py-3 text-meta text-muted-foreground">
+      {t.onTheMac(mac)}
+    </p>
+  )
+}
+
+/**
+ * A setting a device of yours leaves to the Mac (MAC_ONLY_SETTINGS): what it
+ * is there, and where to change it. A secret, only whether it is set.
+ */
+function OnTheMac({
+  field,
+  view,
+  mac,
+}: {
+  field: SettingField
+  view: SettingsView
+  mac: string
+}) {
+  const t = useText(text)
+  const value = view.values[field.key] ?? ''
+  const shown =
+    field.type === 'secret'
+      ? view.secrets[field.key]?.set
+        ? t.setOn(mac)
+        : t.notSet
+      : (field.options?.find((option) => option.value === value)?.label ??
+        value)
+  return (
+    <div className="flex max-w-72 flex-col items-end gap-0.5 text-right @max-[36rem]/content:items-start @max-[36rem]/content:text-left">
+      <span
+        className={cn(
+          'text-meta break-all',
+          field.type === 'text' && value && !field.options && 'font-mono',
+          !value && field.type !== 'secret' && 'text-muted-foreground'
+        )}
+      >
+        {shown || t.notSet}
+      </span>
+      {field.type !== 'secret' && (
+        <span className="text-caption text-muted-foreground">
+          {t.changeOn(mac)}
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -2179,7 +2259,7 @@ function AddingPanel({
     return () => clearInterval(timer)
   }, [adding.result, adding.request])
   if (adding.result) {
-    const { kind, name } = adding.result
+    const { kind, name, device } = adding.result
     return (
       <div className="flex items-center gap-3 px-4 py-3" data-adding={kind}>
         {kind === 'sent' ? (
@@ -2189,9 +2269,11 @@ function AddingPanel({
         )}
         <p className="min-w-0 flex-1 text-body">
           {kind === 'sent'
-            ? pace
-              ? t.macSetUp(name)
-              : t.macPaired(name)
+            ? device
+              ? t.devicePaired(name)
+              : pace
+                ? t.macSetUp(name)
+                : t.macPaired(name)
             : kind === 'declined'
               ? t.addDeclined
               : t.addExpired}
@@ -2212,11 +2294,11 @@ function AddingPanel({
     )
   }
   if (adding.request) {
-    const { name, code } = adding.request
+    const { name, code, device } = adding.request
     return (
       <div className="flex flex-col gap-3 px-4 py-4" data-adding="request">
         <b className="text-section">
-          {pace ? t.wantsSetUp(name) : t.wantsPair(name)}
+          {pace && !device ? t.wantsSetUp(name) : t.wantsPair(name)}
         </b>
         <p
           className="text-number tracking-[0.2em] tabular-nums select-text"
@@ -2224,7 +2306,9 @@ function AddingPanel({
         >
           {codeWords(code)}
         </p>
-        <p className="text-body text-muted-foreground">{t.sameNumber}</p>
+        <p className="text-body text-muted-foreground">
+          {device ? t.sameNumberDevice(name) : t.sameNumber}
+        </p>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => void control?.addAllow()}>
             {t.allow}
@@ -2238,7 +2322,7 @@ function AddingPanel({
           </Button>
         </div>
         <p className="text-meta text-muted-foreground">
-          {pace ? t.whatIsSent : t.whatIsSentTodo}
+          {device ? t.whatIsSentDevice : pace ? t.whatIsSent : t.whatIsSentTodo}
         </p>
       </div>
     )
@@ -2308,6 +2392,84 @@ function macWords(mac: MacView, pace: boolean): string {
         ? t.outOfReachSeen(formatRelative(mac.lastSeen))
         : t.outOfReach
   }
+}
+
+/**
+ * Your iPhone, iPad and Android devices (their app is in development): each
+ * with a key of its own, paired here or with another of your Macs, and Remove
+ * for one you lost
+ */
+function DevicesSection() {
+  const t = useText(text)
+  const view = useMacs()
+  // Once a device has paired: the app for them is not out yet
+  if (!view?.devices.length) return null
+  return (
+    <section className="surface-group" data-devices={view.devices.length}>
+      <CardHeader title={t.yourDevices} help={t.yourDevicesHelp} />
+      <div className="divide-y divide-border">
+        {view.devices.map((device) => (
+          <DeviceRow key={device.id} device={device} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function DeviceRow({ device }: { device: DeviceView }) {
+  const t = useText(text)
+  const [removing, setRemoving] = useState(false)
+  const Icon = device.device === 'tablet' ? Tablet : Smartphone
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3"
+      data-device={device.name}
+      data-connected={device.connected}
+    >
+      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-row">{device.name}</div>
+        <p className="flex items-center gap-1.5 text-meta text-muted-foreground">
+          <span
+            aria-hidden="true"
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              device.connected ? 'bg-status-succeeded' : 'bg-border'
+            )}
+          />
+          <span className="truncate">
+            {device.connected
+              ? t.deviceNow
+              : device.lastSeen
+                ? t.deviceSeen(formatRelative(device.lastSeen))
+                : t.devicePairedBy(device.by, formatRelative(device.pairedAt))}
+          </span>
+        </p>
+      </div>
+      {removing ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="text-meta text-muted-foreground">
+            {t.removeDeviceSure(device.name)}
+          </span>
+          <Button
+            size="xs"
+            variant="outline"
+            className="text-status-failed"
+            onClick={() => void macsControl()?.removeDevice(device.id)}
+          >
+            {t.removeDevice}
+          </Button>
+          <Button size="xs" variant="ghost" onClick={() => setRemoving(false)}>
+            {t.cancel}
+          </Button>
+        </div>
+      ) : (
+        <Button size="xs" variant="outline" onClick={() => setRemoving(true)}>
+          {t.removeDevice}
+        </Button>
+      )}
+    </div>
+  )
 }
 
 /** A Mac's dot with Macs that only keep Todo the same: in reach or not */

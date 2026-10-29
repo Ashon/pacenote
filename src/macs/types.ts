@@ -48,6 +48,12 @@ export interface MacState {
    * 0.6.13 does not say it.
    */
   app?: string
+  /**
+   * Where it can be reached away from your network: its Tailscale addresses,
+   * as host:port (network.ts tailnetAddresses). A device paired with it keeps
+   * them and dials them too; Pacenote before 0.6.14 does not say them.
+   */
+  reach?: string[]
 }
 
 /**
@@ -139,6 +145,44 @@ export interface MacsView {
   moved?: { from: string; at: string }
   /** Add a Mac: this Mac waits for a new one to set up from it */
   adding?: AddingView
+  /**
+   * Your iPhone, iPad and Android devices, each with a key of its own: paired
+   * here or with any of your Macs. Pacenote before 0.6.14 keeps none.
+   */
+  devices: DeviceView[]
+}
+
+/**
+ * An iPhone, iPad or Android device of yours (its app is in development). It
+ * holds a key of its own, not your Macs' (channel.ts deviceKey).
+ */
+export type DeviceKind = 'phone' | 'tablet'
+
+/** A device of yours paired with your Macs */
+export interface DeviceView {
+  id: string
+  name: string
+  device: DeviceKind
+  pairedAt: string
+  /** The Mac it paired with */
+  by?: string
+  /** Linked to this Mac now */
+  connected: boolean
+  lastSeen?: string
+  /** Where it reached this Mac from */
+  address?: string
+}
+
+/**
+ * A device as your Macs keep it (macs.json) and tell each other: one you
+ * removed is kept apart, in removed, so none of them lets it in again
+ */
+export interface DeviceRecord {
+  name: string
+  device: DeviceKind
+  pairedAt: string
+  by?: string
+  lastSeen?: string
 }
 
 /**
@@ -149,10 +193,14 @@ export interface MacsView {
 export interface AddingView {
   /** It waits until then */
   until: string
-  /** A new Mac asks, and the number both Macs show */
-  request?: { name: string; code: string }
+  /** A new Mac or a device asks, and the number both show */
+  request?: { name: string; code: string; device?: DeviceKind }
   /** How it ended: sent, you said Not this one, or it stopped waiting */
-  result?: { kind: 'sent' | 'declined' | 'expired'; name?: string }
+  result?: {
+    kind: 'sent' | 'declined' | 'expired'
+    name?: string
+    device?: DeviceKind
+  }
 }
 
 /**

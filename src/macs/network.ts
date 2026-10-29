@@ -1,4 +1,5 @@
 import { isIPv4, isIPv6 } from 'node:net'
+import { networkInterfaces } from 'node:os'
 
 /**
  * Whether an address is on a network of your own: this Mac, a home or office
@@ -53,4 +54,30 @@ export function hostPort(
   const port = Number(text.slice(colon + 1))
   if (!Number.isInteger(port) || port <= 0 || port > 65535) return undefined
   return { host: text.slice(0, colon), port }
+}
+
+/**
+ * This Mac's addresses on your Tailscale network, as host:port for the port
+ * it listens on (MacState.reach): what a device paired with it dials when it
+ * is away from your network. Tailscale's tunnel (utun on macOS) holds them,
+ * in its ranges: 100.64.0.0/10 and fd7a:115c:a1e0::/48. None without
+ * Tailscale.
+ */
+export function tailnetAddresses(
+  port: number,
+  interfaces: ReturnType<typeof networkInterfaces> = networkInterfaces()
+): string[] {
+  const found: string[] = []
+  for (const [name, entries] of Object.entries(interfaces)) {
+    if (!/^(utun|tailscale)/.test(name)) continue
+    for (const { address, family, internal } of entries ?? []) {
+      if (internal) continue
+      const [a, b] = address.split('.').map(Number) as [number, number]
+      if (family === 'IPv4' && a === 100 && b >= 64 && b <= 127)
+        found.push(`${address}:${port}`)
+      else if (family === 'IPv6' && /^fd7a:115c:a1e0:/i.test(address))
+        found.push(`[${address}]:${port}`)
+    }
+  }
+  return found
 }

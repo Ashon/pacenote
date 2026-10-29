@@ -14,6 +14,7 @@ import { EventEmitter } from 'node:events'
 import type { RawData, WebSocket } from 'ws'
 import { localized } from '../i18n/locale.js'
 import { text } from './channel.text.js'
+import type { DeviceKind } from './types.js'
 
 /**
  * The channel between two of your Macs, over a WebSocket on your network.
@@ -40,6 +41,27 @@ const ALGORITHM = 'aes-256-gcm'
 /** How long a Mac has to finish the handshake */
 const HANDSHAKE_MS = 5_000
 
+/**
+ * A device of yours (types.ts DeviceKind) holds a key of its own, not your
+ * Macs': deviceKey of theirs and its id, which any of your Macs works out
+ * again as it says hello, and none does once you remove it.
+ */
+export const isDeviceKind = (value: unknown): value is DeviceKind =>
+  value === 'phone' || value === 'tablet'
+
+/** The key a device of yours holds, from your Macs' key and its id */
+export function deviceKey(key: Buffer, id: string): Buffer {
+  return Buffer.from(
+    hkdfSync(
+      'sha256',
+      key,
+      Buffer.from(id, 'utf8'),
+      'pacenote-device key v1',
+      32
+    )
+  )
+}
+
 /** The key two Macs with this Slack app token share */
 export function macsKey(appToken: string): Buffer {
   return Buffer.from(
@@ -55,10 +77,11 @@ export function macsGroup(key: Buffer): string {
   return createHmac('sha256', key).update('group').digest('hex').slice(0, 16)
 }
 
-/** Who a Mac is, as it says hello */
+/** Who a Mac is, as it says hello: a device of yours says which kind */
 export interface MacHello {
   id: string
   name: string
+  device?: DeviceKind
 }
 
 interface HelloMessage {
@@ -69,6 +92,8 @@ interface HelloMessage {
   name: string
   nonce: string
   proof?: string
+  /** A device of yours, with a key of its own (deviceKey) */
+  device?: DeviceKind
 }
 
 const proof = (
@@ -89,16 +114,17 @@ const same = (a: string, b: string) => {
   return left.length === right.length && timingSafeEqual(left, right)
 }
 
-/** This Mac's hello, with its proof once it has one */
-const helloOf = (key: Buffer, me: MacHello, nonce: string, signed?: string) =>
+/** This Mac's hello in your Macs' group, with its proof once it has one */
+const helloOf = (group: string, me: MacHello, nonce: string, signed?: string) =>
   JSON.stringify({
     t: 'hello',
     v: PROTOCOL,
-    group: macsGroup(key),
+    group,
     id: me.id,
     name: me.name,
     nonce,
     proof: signed,
+    ...(me.device && { device: me.device }),
   } satisfies HelloMessage)
 
 /**
@@ -298,17 +324,21 @@ class Incoming {
   }
 }
 
-/** The Mac that dialed: says hello first, checks the answer, proves itself */
+/**
+ * The Mac that dialed: says hello first, checks the answer, proves itself.
+ * A device dials as one, with its own key and your Macs' group.
+ */
 export async function dial(
   ws: WebSocket,
-  options: { key: Buffer; me: MacHello; timeoutMs?: number }
+  options: { key: Buffer; me: MacHello; group?: string; timeoutMs?: number }
 ): Promise<MacChannel> {
   const { key, me } = options
   const t = localized(text)
   const incoming = new Incoming(ws)
   const nonce = randomBytes(16).toString('base64')
   const answer = incoming.next(options.timeoutMs ?? HANDSHAKE_MS)
-  ws.send(helloOf(key, me, nonce))
+  const group = options.group ?? macsGroup(key)
+  ws.send(helloOf(group, me, nonce))
   const hello = await closing(ws, answer)
   const dialer = { id: me.id, nonce }
   if (
@@ -321,7 +351,7 @@ export async function dial(
   )
     throw refuse(ws, t.otherApp)
   if (hello.id === me.id) throw refuse(ws, t.thisMac)
-  ws.send(helloOf(key, me, nonce, proof(key, 'dialer', dialer, hello)))
+  ws.send(helloOf(group, me, nonce, proof(key, 'dialer', dialer, hello)))
   const keys = sessionKeys(key, nonce, hello.nonce)
   return new MacChannel(
     ws,
@@ -332,12 +362,21 @@ export async function dial(
   )
 }
 
-/** The Mac that listened: answers with its proof, then checks the dialer's */
+/**
+ * The Mac that listened: answers with its proof, then checks the dialer's.
+ * A device proves itself with its own key (deviceKey): none for one you
+ * removed.
+ */
 export async function accept(
   ws: WebSocket,
-  options: { key: Buffer; me: MacHello; timeoutMs?: number }
+  options: {
+    key: Buffer
+    me: MacHello
+    deviceKey?: (id: string) => Buffer | undefined
+    timeoutMs?: number
+  }
 ): Promise<MacChannel> {
-  const { key, me } = options
+  const { me } = options
   const timeoutMs = options.timeoutMs ?? HANDSHAKE_MS
   const t = localized(text)
   const incoming = new Incoming(ws)
@@ -349,12 +388,16 @@ export async function accept(
     typeof hello.nonce !== 'string'
   )
     throw refuse(ws, t.unexpected)
-  if (hello.group !== macsGroup(key)) throw refuse(ws, t.otherApp)
+  const group = macsGroup(options.key)
+  if (hello.group !== group) throw refuse(ws, t.otherApp)
   if (hello.id === me.id) throw refuse(ws, t.thisMac)
+  const device = isDeviceKind(hello.device) ? hello.device : undefined
+  const key = device ? options.deviceKey?.(hello.id) : options.key
+  if (!key) throw refuse(ws, t.removed)
   const nonce = randomBytes(16).toString('base64')
   const listener = { id: me.id, nonce }
   const confirmed = incoming.next(timeoutMs)
-  ws.send(helloOf(key, me, nonce, proof(key, 'listener', hello, listener)))
+  ws.send(helloOf(group, me, nonce, proof(key, 'listener', hello, listener)))
   const second = await closing(ws, confirmed)
   if (
     second.id !== hello.id ||
@@ -368,7 +411,11 @@ export async function accept(
     ws,
     incoming,
     { send: keys.listener, receive: keys.dialer },
-    { id: hello.id, name: String(hello.name ?? hello.id) },
+    {
+      id: hello.id,
+      name: String(hello.name ?? hello.id),
+      ...(device && { device }),
+    },
     false
   )
 }
@@ -393,6 +440,13 @@ interface SetupHello {
   /** X25519 public key, DER (SPKI), base64 */
   key: string
   nonce: string
+  /** A device of yours asking, not a Mac */
+  device?: DeviceKind
+  /**
+   * The Mac waiting gives a device a key of its own (Pacenote 0.6.14 and
+   * later), not your Macs' key
+   */
+  devices?: 1
 }
 
 /** A setup channel, with the number both Macs show */
@@ -416,6 +470,7 @@ function setupHello(me: MacHello): {
       name: me.name,
       key: publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
       nonce: randomBytes(16).toString('base64'),
+      ...(me.device ? { device: me.device } : { devices: 1 }),
     },
   }
 }
@@ -501,13 +556,18 @@ export async function setupAccept(
   const { privateKey, hello } = setupHello(options.me)
   ws.send(JSON.stringify(hello))
   const secrets = setupSecrets(privateKey, peer, hello, peer.key)
+  const device = isDeviceKind(peer.device) ? peer.device : undefined
   return {
     code: secrets.code,
     channel: new MacChannel(
       ws,
       incoming,
       { send: secrets.listener, receive: secrets.dialer },
-      { id: peer.id, name: String(peer.name ?? peer.id) },
+      {
+        id: peer.id,
+        name: String(peer.name ?? peer.id),
+        ...(device && { device }),
+      },
       false
     ),
   }

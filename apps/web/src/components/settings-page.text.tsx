@@ -201,6 +201,27 @@ const en = {
   wantsSetUp: (name: string) => `${name} wants to set up from this Mac.`,
   wantsPair: (name: string) => `${name} wants to pair with this Mac.`,
   sameNumber: 'Do both Macs show this number?',
+  sameNumberDevice: (name: string) => `Does ${name} show this number?`,
+  /** On a device of yours: a secret set on the Mac, shown nothing of */
+  setOn: (mac: string) => `Set on ${mac}`,
+  /** On a device of yours: a setting that is changed on the Mac */
+  changeOn: (mac: string) => `Change it on ${mac}`,
+  /** On a device of yours: what only happens at the Mac */
+  onTheMac: (mac: string) =>
+    `Checking the connection, signing in and choosing folders happen on ${mac}.`,
+  whatIsSentDevice:
+    'Gives it a key of its own and sends your Todo. Not your Slack app, AI sign-in, sessions or folders.',
+  devicePaired: (name: string | undefined) =>
+    `${name ?? 'Your device'} is paired. Your Todo goes to it.`,
+  yourDevices: 'Your devices',
+  yourDevicesHelp:
+    'Your iPhone, iPad and Android phone show your Todo. Each holds a key of its own, never your Slack app or AI sign-in. Remove one you lost: none of your Macs lets it in again.',
+  deviceNow: 'Connected now',
+  deviceSeen: (when: string) => `Last seen ${when}`,
+  devicePairedBy: (mac: string | undefined, when: string) =>
+    mac ? `Paired with ${mac} ${when}` : `Paired ${when}`,
+  removeDevice: 'Remove',
+  removeDeviceSure: (name: string) => `Remove ${name} from all your Macs?`,
   allow: 'Allow',
   notThisOne: 'Not this one',
   whatIsSent:
@@ -447,6 +468,23 @@ const ko: typeof en = {
     `${josa(name, '이/가')} 이 Mac에서 설정을 가져가려고 해요.`,
   wantsPair: (name) => `${josa(name, '이/가')} 이 Mac과 페어링하려고 해요.`,
   sameNumber: '두 Mac에 같은 숫자가 보이나요?',
+  sameNumberDevice: (name) => `${name}에도 이 숫자가 보이나요?`,
+  setOn: (mac) => `${mac}에 설정됨`,
+  changeOn: (mac) => `${mac}에서 바꿔요`,
+  onTheMac: (mac) => `연결 확인, 로그인, 폴더 고르기는 ${mac}에서 해요.`,
+  whatIsSentDevice:
+    '이 기기만의 열쇠를 주고 할 일을 보내요. Slack 앱, AI 로그인, 세션, 폴더는 보내지 않아요.',
+  devicePaired: (name) =>
+    `${josa(name ?? '기기', '과/와')} 페어링했어요. 할 일이 그 기기로 가요.`,
+  yourDevices: '내 기기',
+  yourDevicesHelp:
+    '내 iPhone, iPad, Android 폰이 할 일을 보여 줘요. 기기마다 자기 열쇠가 있고, Slack 앱이나 AI 로그인은 가지 않아요. 잃어버린 기기는 제거하세요. 어느 Mac도 다시 들이지 않아요.',
+  deviceNow: '지금 연결됨',
+  deviceSeen: (when) => `마지막 연결 ${when}`,
+  devicePairedBy: (mac, when) =>
+    mac ? `${when} ${josa(mac, '과/와')} 페어링` : `${when} 페어링`,
+  removeDevice: '제거',
+  removeDeviceSure: (name) => `${josa(name, '을/를')} 모든 Mac에서 제거할까요?`,
   allow: '허용',
   notThisOne: '이 Mac 아님',
   whatIsSent:

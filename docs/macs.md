@@ -112,7 +112,9 @@ A Mac set up with the same Slack app still finds the others by that app, includi
 
 - **Finding.** Each Mac advertises Pacenote on your local network with Bonjour (`_pacenote._tcp`, through macOS's own
   `dns-sd`). macOS asks once whether Pacenote may look on the local network. For a Mac on another network, such as over
-  Tailscale, **Add by address** takes its name or address.
+  Tailscale, **Add by address** takes its name or address. Each Mac also tells those it links to its own Tailscale
+  addresses (its `utun` addresses in Tailscale's ranges, 100.64/10 and fd7a:115c:a1e0::/48), for a device of yours to
+  reach it away from your network.
 - **Knowing.** Both Macs hold the same key, and that is what they know each other by. It is either derived (HKDF) from
   the Slack app-level token both hold, or one Add a Mac made on a Mac with no Slack app and handed to the next. Each
   proves it holds the key, over fresh nonces, before anything else is said, and every message after that is sealed with
@@ -120,6 +122,11 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   token nor the key crosses the network, but once: Add a Mac's setup channel hands the key to the new Mac. A Mac with
   another key, such as your company's Pace, never sees the others. The key Add a Mac made is kept in
   `PACENOTE_DATA_DIR/macs-key`, readable by you alone.
+- **Devices hold a key of their own.** A device of yours (an iPhone, iPad and Android app, in development and not
+  released) never gets your Macs' key or your Slack app: Add a Mac gives it one made from that key and its id, which
+  each of your Macs works out again as it says hello, and none does once you remove it. It asks the Mac it reaches for
+  what the Mac's own screens show, and the Mac answers only what a device may ask, never a secret
+  ([src/macs/asks.ts](../src/macs/asks.ts)).
 - **Pace follows only within one Slack app.** Each Mac says which Slack app Pace answers through there, one way (a hash
   of its key), and Pace moves only between Macs of the same app of your own. Macs that only share Todo never stand by
   for one another.
@@ -140,5 +147,7 @@ Regenerate the app-level token and both Macs need the new one before they know e
 - **Add a Mac**: sets up a new Mac from this one, or pairs one set up already.
 - **Pair with your other Mac** (no Slack app, not paired yet): pairs this Mac with one waiting in Add a Mac.
 - **Add by address**: a Mac on another network.
+- **Your devices**, once one has paired: your devices, paired here or with your other Macs, connected now or when last
+  seen. **Remove** one you lost: every Mac turns it away from then on.
 
-What a Mac knows of the others is kept in `PACENOTE_DATA_DIR/macs.json`.
+What a Mac knows of the others, and of your devices, is kept in `PACENOTE_DATA_DIR/macs.json`.

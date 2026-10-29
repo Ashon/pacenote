@@ -57,7 +57,9 @@ export function Briefing({ open }: { open: number | undefined }) {
           {lines.map((line) => (
             <div key={line.label} className="contents">
               <dt className="text-muted-foreground">{line.label}</dt>
-              <dd className="truncate">
+              {/* One line on the Mac; a phone's lines wrap (Overview's
+                  @container) */}
+              <dd className="truncate @max-[30rem]:whitespace-normal">
                 <a href={hrefOf(line)} className="hover:underline">
                   {line.text}
                 </a>

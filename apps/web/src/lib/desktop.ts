@@ -80,6 +80,15 @@ export function useSupervisor(): SupervisorState | undefined {
 
 export const botControl = () => window.pacenoteDesktop?.bot
 
+/**
+ * On a device of yours (the iPhone, iPad and Android app), the Mac these
+ * screens are that Mac's for: what stays on it (secrets, sign-ins, its
+ * folders, Finder, a run's prompt) these screens leave out, or show as being
+ * there. undefined in the desktop app.
+ */
+export const remoteMac = (): string | undefined =>
+  window.pacenoteDesktop?.remote?.mac
+
 const update = desktopValue(() => {
   const bridge = window.pacenoteDesktop?.updates
   return bridge && { read: () => bridge.state(), onChange: bridge.onChange }

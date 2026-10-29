@@ -15,6 +15,7 @@ import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { remoteMac } from '@/lib/desktop'
 import { artifactUrl, useRun } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
@@ -50,6 +51,7 @@ export function RunDetail({ id }: { id: string }) {
 
 function MentionDetail({ run }: { run: RunRecord }) {
   const t = useText(text)
+  const remote = remoteMac()
   return (
     <Tabs defaultValue="timeline" className="flex h-full min-h-0 flex-col">
       <RunHeader run={run} />
@@ -62,27 +64,32 @@ function MentionDetail({ run }: { run: RunRecord }) {
           <TabsContent value="attachments" className="select-text">
             <Attachments run={run} />
           </TabsContent>
-          <TabsContent value="prompt" className="space-y-3 select-text">
-            {run.prompt ? (
-              <>
-                <CodeBlock
-                  label={t.instructions}
-                  code={run.prompt.system}
-                  maxHeight="max-h-96"
-                />
-                <CodeBlock
-                  label={t.input}
-                  code={run.prompt.user}
-                  maxHeight="max-h-[60vh]"
-                />
-              </>
-            ) : (
-              <Empty>{t.noPrompt}</Empty>
-            )}
-          </TabsContent>
-          <TabsContent value="raw" className="select-text">
-            <RawJson run={run} />
-          </TabsContent>
+          {/* A run's prompt and record stay on the Mac (a device: remote) */}
+          {!remote && (
+            <>
+              <TabsContent value="prompt" className="space-y-3 select-text">
+                {run.prompt ? (
+                  <>
+                    <CodeBlock
+                      label={t.instructions}
+                      code={run.prompt.system}
+                      maxHeight="max-h-96"
+                    />
+                    <CodeBlock
+                      label={t.input}
+                      code={run.prompt.user}
+                      maxHeight="max-h-[60vh]"
+                    />
+                  </>
+                ) : (
+                  <Empty>{t.noPrompt}</Empty>
+                )}
+              </TabsContent>
+              <TabsContent value="raw" className="select-text">
+                <RawJson run={run} />
+              </TabsContent>
+            </>
+          )}
         </div>
       </ScrollArea>
     </Tabs>
@@ -221,8 +228,12 @@ function RunHeader({ run }: { run: RunRecord }) {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="prompt">{t.tabs.prompt}</TabsTrigger>
-          <TabsTrigger value="raw">{t.tabs.raw}</TabsTrigger>
+          {!remoteMac() && (
+            <>
+              <TabsTrigger value="prompt">{t.tabs.prompt}</TabsTrigger>
+              <TabsTrigger value="raw">{t.tabs.raw}</TabsTrigger>
+            </>
+          )}
         </TabsList>
       </div>
     </header>

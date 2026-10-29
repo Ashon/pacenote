@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Placeholder } from '@/components/ui/motion'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useStats } from '@/lib/api'
-import { useSupervisor } from '@/lib/desktop'
+import { remoteMac, useSupervisor } from '@/lib/desktop'
 import { useSetup } from '@/lib/setup'
 import { readStored, writeStored } from '@/lib/storage'
 import {
@@ -88,6 +88,7 @@ export function Overview() {
   const supervisor = useSupervisor()
   const setup = useSetup()
   const trend = useTaskTrend()
+  const remote = remoteMac()
   const setupOpen = setup.view?.open === true
   const data = stats.data
   const finished = data
@@ -144,7 +145,8 @@ export function Overview() {
           }}
           className="flow-root"
         >
-          {setupOpen && setup.view ? (
+          {/* Setup's steps are taken on the Mac, not on a device of yours */}
+          {setupOpen && setup.view && !remote ? (
             <ResumeSetup
               view={setup.view}
               onFinish={() =>
@@ -159,7 +161,7 @@ export function Overview() {
                 message={supervisor.message}
                 issues={supervisor.issues}
                 onGuide={
-                  setup.view
+                  setup.view && !remote
                     ? () =>
                         void setup
                           .save({ finished: false })
@@ -871,7 +873,10 @@ function CardHeader({
   return (
     <div className="flex items-center gap-2">
       <span className="flex shrink-0 [&_svg]:size-4">{icon}</span>
-      <h2 className="truncate text-section">{label}</h2>
+      {/* One line, but for a phone's narrow columns */}
+      <h2 className="truncate text-section @max-[30rem]:whitespace-normal">
+        {label}
+      </h2>
       {meta && (
         <span className="ml-auto shrink-0 text-meta text-muted-foreground">
           {meta}
@@ -924,7 +929,7 @@ function Metric({
   accent?: boolean
 }) {
   return (
-    <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0">
+    <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0 @max-[30rem]:px-4">
       <CardHeader icon={icon} label={label} />
       <div className="mt-3">
         <Value
@@ -934,7 +939,9 @@ function Metric({
         />
       </div>
       {hint && (
-        <p className="mt-1 truncate text-meta text-muted-foreground">{hint}</p>
+        <p className="mt-1 truncate text-meta text-muted-foreground @max-[30rem]:whitespace-normal">
+          {hint}
+        </p>
       )}
     </div>
   )

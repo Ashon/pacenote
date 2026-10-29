@@ -142,6 +142,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     removeAddress: (address: string) =>
       ipcRenderer.invoke('pacenote:macs:remove-address', address),
     ignore: (id: string) => ipcRenderer.invoke('pacenote:macs:ignore', id),
+    removeDevice: (id: string) =>
+      ipcRenderer.invoke('pacenote:macs:remove-device', id),
     // Add a Mac: a new Mac's setup takes your Slack app from this one
     addStart: () => ipcRenderer.invoke('pacenote:macs:add-start'),
     addStop: () => ipcRenderer.invoke('pacenote:macs:add-stop'),
