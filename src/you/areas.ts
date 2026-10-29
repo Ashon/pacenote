@@ -3,13 +3,13 @@ import { getLocale, localized, type Locale } from '../i18n/locale.js'
 import { outcomeOf, outcomeWords } from '../tasks/context.js'
 import type { TaskView, WorkEntry } from '../tasks/types.js'
 import { text } from './areas.text.js'
+import { partKey, taskArea, taskParts } from './task-area.js'
 import type { SessionMark } from './sessions.js'
 import type {
   AreaPart,
   AreaRecord,
   AreaRole,
   AreaView,
-  TaskArea,
   YouFile,
 } from './types.js'
 
@@ -45,9 +45,6 @@ const GROUP_MIN = 2
 const LATELY = 3
 const NOW = 5
 const PEOPLE = 3
-
-export const partKey = (part: Pick<AreaPart, 'kind' | 'id'>) =>
-  `${part.kind}:${part.id.toLowerCase()}`
 
 /**
  * What one audience may hear of your work. Pace answers in a channel that
@@ -92,25 +89,6 @@ export interface Signal {
 const yourTask = (task: TaskView) =>
   task.status !== 'maybe' &&
   (task.status !== 'dismissed' || task.dismissReason === 'done-already')
-
-function taskParts(task: TaskView): AreaPart[] {
-  const parts: AreaPart[] = []
-  if (task.repo && /^[^/\s]+\/[^/\s]+$/.test(task.repo))
-    parts.push({ kind: 'repo', id: task.repo.toLowerCase(), label: task.repo })
-  if (task.source.app !== 'local' && task.source.label.startsWith('#'))
-    parts.push({
-      kind: 'channel',
-      id: task.source.conversation,
-      label: task.source.label,
-    })
-  if (task.group)
-    parts.push({
-      kind: 'group',
-      id: task.group.toLowerCase(),
-      label: task.group,
-    })
-  return parts
-}
 
 /** Your work of the last 8 weeks, from your tasks and sessions */
 export function signalsOf(
@@ -417,21 +395,6 @@ export function leaveArea(
   }
 }
 
-/** The area a task is in: by its repository, else its channel, else group */
-export function taskArea(
-  records: readonly AreaRecord[],
-  task: Pick<TaskView, 'repo' | 'source' | 'group'>
-): TaskArea | undefined {
-  const keys = taskParts(task as TaskView).map(partKey)
-  for (const key of keys) {
-    const area = records.find(
-      (record) => !record.left && record.parts.some((p) => partKey(p) === key)
-    )
-    if (area) return { id: area.id, name: area.name }
-  }
-  return undefined
-}
-
 const ROLE_ORDER: AreaRole[] = ['build', 'review', 'answer', 'on-call']
 
 /**
@@ -564,3 +527,6 @@ function unique(tasks: TaskView[]): TaskView[] {
   const seen = new Set<string>()
   return tasks.filter((task) => !seen.has(task.id) && seen.add(task.id))
 }
+
+// Re-exported for the modules that import them from here
+export { partKey, taskArea }
