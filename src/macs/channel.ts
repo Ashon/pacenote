@@ -167,14 +167,18 @@ export class MacChannel extends EventEmitter<{
     super()
     ws.on('close', () => this.ended())
     ws.on('error', () => this.close())
-    // Frames that came with the handshake's last one are handed over first.
-    incoming.hand((frame) => {
-      if (this.closed) return
-      if (!frame.binary) return this.close()
-      const message = this.open(frame.data)
-      if (message === undefined) return this.close()
-      this.emit('message', message)
-    })
+    // Frames that came with the handshake's last one are handed over first,
+    // once whoever opened the channel listens: a device asks at once, and a
+    // message said before then would be lost (Incoming keeps them till then)
+    setImmediate(() =>
+      incoming.hand((frame) => {
+        if (this.closed) return
+        if (!frame.binary) return this.close()
+        const message = this.open(frame.data)
+        if (message === undefined) return this.close()
+        this.emit('message', message)
+      })
+    )
   }
 
   send(message: unknown): void {
