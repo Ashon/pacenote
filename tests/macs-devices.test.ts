@@ -28,6 +28,8 @@ import { tailnetAddresses } from '../src/macs/network.js'
 /** Waits for the Macs to get there, with room for a busy run */
 const poll = <T>(check: () => T) =>
   expect.poll(check, { timeout: 15_000, interval: 50 })
+/** A test that pairs over the network: a busy runner takes past 5 seconds */
+const NETWORK_MS = 30_000
 
 const ipad: MacHello = { id: 'ipad-1', name: 'iPad', device: 'tablet' }
 
@@ -142,162 +144,174 @@ describe('your devices and your Macs', () => {
     return channel
   }
 
-  it("gives a device a key of its own, never your Macs' key or Slack app", async () => {
-    const { dataDir, macs, address } = await mac()
-    const given = await pairDevice(macs)
-    const group = Buffer.from(
-      readFileSync(path.join(dataDir, GROUP_FILE), 'utf8').trim(),
-      'base64'
-    )
-    expect(given).toEqual({
-      t: 'setup-device',
-      key: deviceKey(group, 'ipad-1').toString('base64'),
-      group: macsGroup(group),
-    })
-    expect(JSON.stringify(given)).not.toContain(group.toString('base64'))
-    expect(JSON.stringify(given)).not.toContain('xapp-')
-    expect(macs.view().adding?.result).toEqual({
-      kind: 'sent',
-      name: 'iPad',
-      device: 'tablet',
-    })
-
-    await linkDevice(given, address())
-    // One of your devices, not one of your Macs: no lease for Pace there
-    await poll(() =>
-      macs.view().devices.map(({ name, device, connected, by }) => ({
-        name,
-        device,
-        connected,
-        by,
-      }))
-    ).toEqual([
-      { name: 'iPad', device: 'tablet', connected: true, by: 'MacBook Pro' },
-    ])
-    expect(macs.isDevice('ipad-1')).toBe(true)
-    expect(macs.view().macs.map((m) => m.name)).toEqual(['MacBook Pro'])
-  })
-
-  it('is let in by none of your Macs once you remove it on one', async () => {
-    const first = await mac()
-    const given = await pairDevice(first.macs)
-    // Your other Mac, with the same key, linked to the first
-    const group = readFileSync(path.join(first.dataDir, GROUP_FILE), 'utf8')
-    const second = await mac({
-      name: 'Mac mini',
-      group: Buffer.from(group.trim(), 'base64'),
-      addresses: [first.address()],
-    })
-    await poll(() => second.macs.view().devices.map((d) => d.name)).toEqual([
-      'iPad',
-    ])
-    // It reaches your other Mac as well, by the same key
-    const there = await linkDevice(given, second.address())
-    await poll(() => second.macs.isDevice('ipad-1')).toBe(true)
-    there.close()
-    const linked = await linkDevice(given, first.address())
-    let closed = false
-    linked.on('close', () => (closed = true))
-    await poll(() => first.macs.view().devices[0]?.connected).toBe(true)
-
-    // Removed on the Mac mini: the MacBook Pro hears of it and lets go
-    second.macs.removeDevice('ipad-1')
-    await poll(() => first.macs.view().devices).toEqual([])
-    await poll(() => closed).toBe(true)
-    await expect(linkDevice(given, first.address())).rejects.toThrow()
-    expect(first.macs.connected()).not.toContain('ipad-1')
-  })
-
-  it("answers a device's asks with what the Mac's screens get, and no more", async () => {
-    const { dataDir, macs, address } = await mac()
-    // A run of Pace's, with its prompt (the thread, the system prompt)
-    const run = new HistoryStore(dataDir).start({
-      origin: {
-        messenger: 'slack',
-        conversation: 'C1',
-        conversationLabel: '#ops',
-        thread: '1',
-        message: '1',
-        userId: 'U1',
-      },
-      request: 'Is db-3 still growing?',
-      backend: { reasoner: 'claude', sandbox: 'none' },
-    })
-    run.setPrompt('the system prompt', 'mina: the thread so far')
-    run.patch({ status: 'succeeded', answer: 'Yes, 41 GB.' })
-    run.flush()
-    // The Mac's own screens' channels, as the desktop app answers them
-    const saved: unknown[] = []
-    const bridged: Record<string, (...args: unknown[]) => unknown> = {
-      'pacenote:settings:get': () => ({
-        file: '/x/settings.json',
-        exists: true,
-        dataDir,
-        values: { REASONER: 'claude' },
-        secrets: { SLACK_BOT_TOKEN: { set: true, hint: '…a1b2' } },
-        overridden: [],
-      }),
-      'pacenote:settings:save': (changes) => {
-        saved.push(changes)
-        return { issues: [], restarted: false }
-      },
-    }
-    const reader = new HistoryReader(dataDir)
-    const asks = new DeviceAsks({
-      macs,
-      answer: async (what, args) => {
-        if (what === API_ASK) return apiForDevice(reader, args[0])
-        return valueForDevice(
-          what,
-          await bridged[DEVICE_ASKS[what]]?.(...argsFromDevice(what, args))
-        )
-      },
-      log: () => undefined,
-    })
-    asks.start()
-    stops.push(() => asks.stop())
-    const device = await linkDevice(await pairDevice(macs), address())
-    let asked = 0
-    const ask = (what: string, args: unknown[] = []) => {
-      const id = ++asked
-      const answer = new Promise<AnswerMessage>((resolve) => {
-        const heard = (message: unknown) => {
-          const answer = message as AnswerMessage
-          if (answer.t !== 'answer' || answer.id !== id) return
-          device.off('message', heard)
-          resolve(answer)
-        }
-        device.on('message', heard)
+  it(
+    "gives a device a key of its own, never your Macs' key or Slack app",
+    async () => {
+      const { dataDir, macs, address } = await mac()
+      const given = await pairDevice(macs)
+      const group = Buffer.from(
+        readFileSync(path.join(dataDir, GROUP_FILE), 'utf8').trim(),
+        'base64'
+      )
+      expect(given).toEqual({
+        t: 'setup-device',
+        key: deviceKey(group, 'ipad-1').toString('base64'),
+        group: macsGroup(group),
       })
-      device.send({ t: 'ask', id, what, args })
-      return answer
-    }
+      expect(JSON.stringify(given)).not.toContain(group.toString('base64'))
+      expect(JSON.stringify(given)).not.toContain('xapp-')
+      expect(macs.view().adding?.result).toEqual({
+        kind: 'sent',
+        name: 'iPad',
+        device: 'tablet',
+      })
 
-    const got = (await ask(API_ASK, [`/api/runs/${run.id}`])).value as {
-      status: number
-      body: Record<string, unknown>
-    }
-    expect(got.status).toBe(200)
-    expect(got.body).toMatchObject({
-      request: 'Is db-3 still growing?',
-      answer: 'Yes, 41 GB.',
-    })
-    // The thread and the system prompt stay on the Mac
-    expect(got.body.prompt).toBeUndefined()
-    // A secret: set or not, nothing of its value
-    const settings = await ask('settings.get')
-    expect(settings.value).toMatchObject({
-      secrets: { SLACK_BOT_TOKEN: { set: true } },
-    })
-    expect(JSON.stringify(settings)).not.toContain('a1b2')
-    // A change from the device: what stays on the Mac does not go
-    await ask('settings.save', [
-      { REASONER: 'codex', SLACK_BOT_TOKEN: 'xoxb-new', OPS_FS_ROOT: '/' },
-    ])
-    expect(saved).toEqual([{ REASONER: 'codex' }])
-    // Anything else, it does not answer
-    expect(await ask('tasks.list')).toMatchObject({ error: 'not-allowed' })
-  })
+      await linkDevice(given, address())
+      // One of your devices, not one of your Macs: no lease for Pace there
+      await poll(() =>
+        macs.view().devices.map(({ name, device, connected, by }) => ({
+          name,
+          device,
+          connected,
+          by,
+        }))
+      ).toEqual([
+        { name: 'iPad', device: 'tablet', connected: true, by: 'MacBook Pro' },
+      ])
+      expect(macs.isDevice('ipad-1')).toBe(true)
+      expect(macs.view().macs.map((m) => m.name)).toEqual(['MacBook Pro'])
+    },
+    NETWORK_MS
+  )
+
+  it(
+    'is let in by none of your Macs once you remove it on one',
+    async () => {
+      const first = await mac()
+      const given = await pairDevice(first.macs)
+      // Your other Mac, with the same key, linked to the first
+      const group = readFileSync(path.join(first.dataDir, GROUP_FILE), 'utf8')
+      const second = await mac({
+        name: 'Mac mini',
+        group: Buffer.from(group.trim(), 'base64'),
+        addresses: [first.address()],
+      })
+      await poll(() => second.macs.view().devices.map((d) => d.name)).toEqual([
+        'iPad',
+      ])
+      // It reaches your other Mac as well, by the same key
+      const there = await linkDevice(given, second.address())
+      await poll(() => second.macs.isDevice('ipad-1')).toBe(true)
+      there.close()
+      const linked = await linkDevice(given, first.address())
+      let closed = false
+      linked.on('close', () => (closed = true))
+      await poll(() => first.macs.view().devices[0]?.connected).toBe(true)
+
+      // Removed on the Mac mini: the MacBook Pro hears of it and lets go
+      second.macs.removeDevice('ipad-1')
+      await poll(() => first.macs.view().devices).toEqual([])
+      await poll(() => closed).toBe(true)
+      await expect(linkDevice(given, first.address())).rejects.toThrow()
+      expect(first.macs.connected()).not.toContain('ipad-1')
+    },
+    NETWORK_MS
+  )
+
+  it(
+    "answers a device's asks with what the Mac's screens get, and no more",
+    async () => {
+      const { dataDir, macs, address } = await mac()
+      // A run of Pace's, with its prompt (the thread, the system prompt)
+      const run = new HistoryStore(dataDir).start({
+        origin: {
+          messenger: 'slack',
+          conversation: 'C1',
+          conversationLabel: '#ops',
+          thread: '1',
+          message: '1',
+          userId: 'U1',
+        },
+        request: 'Is db-3 still growing?',
+        backend: { reasoner: 'claude', sandbox: 'none' },
+      })
+      run.setPrompt('the system prompt', 'mina: the thread so far')
+      run.patch({ status: 'succeeded', answer: 'Yes, 41 GB.' })
+      run.flush()
+      // The Mac's own screens' channels, as the desktop app answers them
+      const saved: unknown[] = []
+      const bridged: Record<string, (...args: unknown[]) => unknown> = {
+        'pacenote:settings:get': () => ({
+          file: '/x/settings.json',
+          exists: true,
+          dataDir,
+          values: { REASONER: 'claude' },
+          secrets: { SLACK_BOT_TOKEN: { set: true, hint: '…a1b2' } },
+          overridden: [],
+        }),
+        'pacenote:settings:save': (changes) => {
+          saved.push(changes)
+          return { issues: [], restarted: false }
+        },
+      }
+      const reader = new HistoryReader(dataDir)
+      const asks = new DeviceAsks({
+        macs,
+        answer: async (what, args) => {
+          if (what === API_ASK) return apiForDevice(reader, args[0])
+          return valueForDevice(
+            what,
+            await bridged[DEVICE_ASKS[what]]?.(...argsFromDevice(what, args))
+          )
+        },
+        log: () => undefined,
+      })
+      asks.start()
+      stops.push(() => asks.stop())
+      const device = await linkDevice(await pairDevice(macs), address())
+      let asked = 0
+      const ask = (what: string, args: unknown[] = []) => {
+        const id = ++asked
+        const answer = new Promise<AnswerMessage>((resolve) => {
+          const heard = (message: unknown) => {
+            const answer = message as AnswerMessage
+            if (answer.t !== 'answer' || answer.id !== id) return
+            device.off('message', heard)
+            resolve(answer)
+          }
+          device.on('message', heard)
+        })
+        device.send({ t: 'ask', id, what, args })
+        return answer
+      }
+
+      const got = (await ask(API_ASK, [`/api/runs/${run.id}`])).value as {
+        status: number
+        body: Record<string, unknown>
+      }
+      expect(got.status).toBe(200)
+      expect(got.body).toMatchObject({
+        request: 'Is db-3 still growing?',
+        answer: 'Yes, 41 GB.',
+      })
+      // The thread and the system prompt stay on the Mac
+      expect(got.body.prompt).toBeUndefined()
+      // A secret: set or not, nothing of its value
+      const settings = await ask('settings.get')
+      expect(settings.value).toMatchObject({
+        secrets: { SLACK_BOT_TOKEN: { set: true } },
+      })
+      expect(JSON.stringify(settings)).not.toContain('a1b2')
+      // A change from the device: what stays on the Mac does not go
+      await ask('settings.save', [
+        { REASONER: 'codex', SLACK_BOT_TOKEN: 'xoxb-new', OPS_FS_ROOT: '/' },
+      ])
+      expect(saved).toEqual([{ REASONER: 'codex' }])
+      // Anything else, it does not answer
+      expect(await ask('tasks.list')).toMatchObject({ error: 'not-allowed' })
+    },
+    NETWORK_MS
+  )
 
   it("says a Mac's Tailscale addresses, and leaves out the rest", () => {
     const entry = (address: string, family: 'IPv4' | 'IPv6') => ({
