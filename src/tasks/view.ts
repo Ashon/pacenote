@@ -11,7 +11,7 @@ import type {
 /**
  * Your tasks as the screens show them, from tasks.json and your decisions,
  * with nothing read from disk: the desktop app's (store.ts reads the files)
- * and the iPad and Android app's, from what your Mac sends it (apps/mobile).
+ * and the phone and iPad app's, from what your Mac sends it.
  */
 
 const DAY = 24 * 60 * 60_000

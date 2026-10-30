@@ -118,7 +118,9 @@ export function RecapPage({
       <div className="@container mx-auto max-w-4xl px-10 py-9">
         {/* As tall as its buttons before they come */}
         <header className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-title">{t.title}</h1>
+          <h1 data-page-title className="text-title">
+            {t.title}
+          </h1>
           <span className="text-copy text-muted-foreground">{t.subtitle}</span>
           <span className="flex-1" />
           {view && view.areas.length > 0 && (

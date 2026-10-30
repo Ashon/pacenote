@@ -293,6 +293,24 @@
     transition-timing-function: var(--ease-standard);
   }
 
+  /*
+   * theme: light to dark and back (lib/theme.ts). The window crossfades as one
+   * picture, where it has View Transitions, and no part eases its own colors
+   * meanwhile (a button's hover, a row's), so nothing changes ahead of the
+   * rest or after it. Without View Transitions it changes at once, all of it.
+   */
+  .motion-theme-switching,
+  .motion-theme-switching *,
+  .motion-theme-switching *::before,
+  .motion-theme-switching *::after {
+    transition: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: var(--motion-moderate);
+    animation-timing-function: var(--ease-standard);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .motion-reveal[data-state='open'],
     .motion-swap[data-motion='in'],
@@ -350,6 +368,16 @@
     .motion-layout-label,
     .motion-layout-label[data-hidden] {
       transition: opacity calc(120ms * var(--motion-scale)) ease;
+    }
+    /* The theme: still at once, and a short fade */
+    .motion-theme-switching,
+    .motion-theme-switching * {
+      transition: none !important;
+    }
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: calc(120ms * var(--motion-scale));
+      animation-timing-function: ease;
     }
   }
 }

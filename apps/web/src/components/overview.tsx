@@ -122,7 +122,9 @@ export function Overview() {
     <div className="@container mx-auto max-w-4xl px-10 py-9">
       {/* A page title like the other screens'; the brand is the sidebar's. */}
       <header>
-        <h1 className="text-title">{t.title}</h1>
+        <h1 data-page-title className="text-title">
+          {t.title}
+        </h1>
         <p className="mt-1 text-copy text-muted-foreground">{t.intro}</p>
       </header>
 

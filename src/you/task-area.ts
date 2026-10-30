@@ -3,8 +3,8 @@ import type { AreaPart, AreaRecord, TaskArea } from './types.js'
 
 /**
  * Which of your areas a task is in, with nothing read from disk: the desktop
- * app's (areas.ts finds the areas) and the iPad and Android app's, from what
- * your Mac sends it (apps/mobile).
+ * app's (areas.ts finds the areas) and the phone and iPad app's, from what
+ * your Mac sends it.
  */
 
 export const partKey = (part: Pick<AreaPart, 'kind' | 'id'>) =>

@@ -68,7 +68,10 @@ export function BotPage() {
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="flex items-center gap-2 text-title">
+              <h1
+                data-page-title
+                className="flex items-center gap-2 text-title"
+              >
                 Pace
                 <span className={cn('text-row', TONE_CLASS[tone].text)}>
                   {known ? label : <SkeletonWord width="5rem" />}

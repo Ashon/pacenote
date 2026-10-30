@@ -22,7 +22,9 @@ export function Page({
         {/* In a narrow window what it counts, then the action, go to a line
             of their own rather than squeeze beside the title */}
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-title">{title}</h1>
+          <h1 data-page-title className="text-title">
+            {title}
+          </h1>
           {meta && (
             <span className="text-copy text-muted-foreground">{meta}</span>
           )}
