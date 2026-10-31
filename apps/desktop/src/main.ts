@@ -11,8 +11,6 @@ import {
   clipboard,
   dialog,
   ipcMain,
-  Menu,
-  type MenuItemConstructorOptions,
   nativeImage,
   nativeTheme,
   net,
@@ -21,7 +19,6 @@ import {
   powerSaveBlocker,
   protocol,
   shell,
-  Tray,
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
@@ -32,10 +29,7 @@ import {
   readBotStatus,
 } from '../../../src/runtime/status.js'
 import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
-import {
-  secretValues,
-  setupSettingsRoute,
-} from '../../../src/settings/fields.js'
+import { secretValues } from '../../../src/settings/fields.js'
 import {
   defaultHome,
   securePrivateDir,
@@ -222,6 +216,7 @@ import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
 import { markQuit, QUIT_MARK_FILE, quitWithin } from './quit-mark.js'
 import { ScreenLoader, unavailablePage, createScreenFiles } from './screen.js'
+import { TrayMenu, truncateLabel } from './tray.js'
 import { setupProblem } from './bot-readiness.js'
 import {
   listenForClaim,
@@ -420,7 +415,7 @@ let stopTasksWatch: (() => void) | undefined
 let mainWindow: BrowserWindow | undefined
 /** Loads the window's screen, and again while it fails (screen.ts) */
 let mainScreen: ScreenLoader | undefined
-let tray: Tray | undefined
+let trayMenu: TrayMenu | undefined
 let toolPathCache: string | undefined
 
 /**
@@ -958,11 +953,6 @@ function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
   }
 }
 
-/** A menu item's text, short enough for the menu bar's menu */
-function truncateLabel(text: string, max = 72): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
 /**
  * Looks for a newer release: the installed app only, or a dev run pointed at a
  * test server with PACENOTE_DESKTOP_UPDATE_URL.
@@ -985,7 +975,6 @@ const updates =
 /** Holds off system sleep while Pace has requests in progress */
 const keepAwake = new KeepAwake(powerSaveBlocker)
 
-let lastTrayKey = ''
 /** Every 2 seconds: the menu bar item, and keeping the Mac awake */
 function updateTray(): void {
   const summary = botSummary()
@@ -1002,105 +991,35 @@ function updateTray(): void {
     ? currentTroubles(supervisor.current, summary.status)
     : []
   tellTroubles(troubles, summary.status !== undefined)
-  if (!tray) return
-  const phase = supervisor?.current.phase
+  if (!trayMenu) return
   // What the status line does not say already
   const notes = troubles
     .filter((trouble) => trouble.key !== 'exit' && trouble.key !== 'setup')
     .map((trouble) =>
       trouble.key === 'socket' ? trouble.title : truncateLabel(trouble.body)
     )
-  const update = updates?.current.available
-    ? updates.current.latest?.version
-    : undefined
-  const key = JSON.stringify([
-    summary.label,
-    summary.active,
-    phase,
-    troubles.length,
-    notes,
-    update,
-  ])
-  if (key === lastTrayKey) return
-  lastTrayKey = key
-  const t = localized(text)
-  tray.setToolTip(t.tooltip(appName, summary.label))
-  // Shows the number of active requests next to the menu bar icon. (macOS)
-  // Dev runs say so next to the tray icon, since the installed Pacenote may sit
-  // beside it.
-  // A warning sign while there is trouble, so it shows with the window
-  // closed.
-  tray.setTitle(
-    [
-      app.isPackaged ? '' : 'Dev',
-      troubles.length > 0 ? '\u26a0\ufe0e' : '',
-      summary.active > 0 ? String(summary.active) : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-  )
-  // The tray opens the app first, then the status and quick actions. Bot
-  // control is on the Bot screen; app settings (start automatically, run
-  // history folder) are on the Settings screen.
-  const live = phase === 'running' || phase === 'starting'
-  // When setup is needed, the quick action is opening Settings rather than a
-  // Start that would stop again.
-  const controls: MenuItemConstructorOptions[] = supervisor
-    ? [
-        // Off: set it up from Settings, rather than a Start with nothing set
-        supervisor.current.off && phase === 'idle'
-          ? { label: t.setUp, click: () => showMainWindow('#/settings') }
-          : live
-            ? { label: t.restart, click: () => void supervisor.restart() }
-            : phase === 'setup'
-              ? setup.view().open
-                ? { label: t.setUp, click: () => showMainWindow('#/setup') }
-                : {
-                    label: t.openSettings,
-                    click: () =>
-                      showMainWindow(
-                        setupSettingsRoute(supervisor?.current.issues)
-                      ),
-                  }
-              : {
-                  label: t.start,
-                  enabled:
-                    phase === 'idle' ||
-                    phase === 'failed' ||
-                    phase === 'crashed',
-                  click: () => void supervisor.start(),
-                },
-      ]
-    : []
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: t.open(appName), click: () => showMainWindow() },
-      { type: 'separator' },
-      { label: t.status(summary.label), enabled: false },
-      ...notes.map((note) => ({ label: note, enabled: false })),
-      ...(summary.active > 0
-        ? [{ label: t.activeRequests(summary.active), enabled: false }]
-        : []),
-      ...controls,
-      { type: 'separator' },
-      ...(update
-        ? [
-            {
-              label: t.updateOut(update),
-              click: () => showMainWindow('#/settings/general'),
-            },
-          ]
-        : []),
-      { label: t.quit(appName), click: () => app.quit() },
-    ])
-  )
+  trayMenu.refresh(summary, notes, troubles.length)
 }
 
 function createTray(): void {
   // If tray@2x.png is in the same directory, Retina displays use it
   // automatically.
-  tray = new Tray(nativeImage.createFromPath(path.join(distDir, 'tray.png')))
-  tray.on('click', () => tray?.popUpContextMenu())
+  trayMenu = new TrayMenu({
+    appName,
+    iconPath: path.join(distDir, 'tray.png'),
+    dev: !app.isPackaged,
+    words: () => localized(text),
+    bot: () => supervisor?.current,
+    setupOpen: () => setup.view().open,
+    update: () =>
+      updates?.current.available ? updates.current.latest?.version : undefined,
+    openWindow: (route) => showMainWindow(route),
+    startBot: () => void supervisor?.start(),
+    restartBot: () => void supervisor?.restart(),
+    openSettings: (route) => showMainWindow(route),
+    quit: () => app.quit(),
+  })
+  trayMenu.create()
   updateTray()
   setInterval(updateTray, 2_000).unref()
 }
@@ -1238,7 +1157,7 @@ function registerBotIpc(): void {
     })
     setLocale(language.locale)
     setAppMenu(appName)
-    lastTrayKey = ''
+    trayMenu?.reset()
     updateTray()
     // The window takes it wherever it was set, as the end-to-end tests do
     mainWindow?.webContents.send('pacenote:app:language-changed', language)
@@ -2722,7 +2641,7 @@ app.on('before-quit', (event) => {
   if (supervisor?.managing && !botStopped) {
     event.preventDefault()
     const t = localized(text)
-    tray?.setToolTip(t.tooltip(appName, t.phase.stopping))
+    trayMenu?.setToolTip(t.tooltip(appName, t.phase.stopping))
     botStopping ??= supervisor
       .stop()
       .then(reopenIfReplaced)
