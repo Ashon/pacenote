@@ -37,6 +37,25 @@ const COMMAND_TIMEOUT_MS = 60_000
 const PROBE_TIMEOUT_MS = 15_000
 
 /**
+ * How AI tools launch Pacenote's MCP server: this app's own binary as Node,
+ * with the bundled server. ready: the bundle exists (dev runs need pnpm bundle)
+ */
+export function mcpLaunch(historyMcp: string): McpLaunch & { ready: boolean } {
+  return {
+    command: process.execPath,
+    args: [historyMcp],
+    env: { ELECTRON_RUN_AS_NODE: '1' },
+    ready: existsSync(historyMcp),
+  }
+}
+
+/** The MCP server as the app's own collections and drafts launch it */
+export function appMcpLaunch(historyMcp: string): McpLaunch {
+  const { command, args, env } = mcpLaunch(historyMcp)
+  return { command, args, env: { ...env, PACENOTE_MCP_FROM_APP: '1' } }
+}
+
+/**
  * Adds Pacenote's MCP server to Claude Code, Codex and opencode with their own
  * CLIs (user scope, so every project has it), and checks that each one reaches
  * it, so nobody has to type the commands. Changes run only from a button in the

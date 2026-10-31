@@ -202,7 +202,7 @@ import {
 } from '../../../src/macs/types.js'
 import { TodoSync } from '../../../src/macs/todo-sync.js'
 import { MacUseWatch, macName } from './macs.js'
-import { McpClients } from './mcp-clients.js'
+import { appMcpLaunch, McpClients, mcpLaunch } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
 import { OwnAi, refusalOf } from './own-ai.js'
@@ -568,21 +568,11 @@ const sandboxSignIn = new SandboxSignIn({
     mainWindow?.webContents.send('pacenote:sandbox:login-prompt', prompt),
 })
 
-/**
- * How AI tools launch Pacenote's MCP server: this app's own binary as Node,
- * with the bundled server. ready: the bundle exists (dev runs need pnpm bundle)
- */
-function mcpLaunch() {
-  return {
-    command: process.execPath,
-    args: [paths.historyMcp],
-    env: { ELECTRON_RUN_AS_NODE: '1' },
-    ready: existsSync(paths.historyMcp),
-  }
-}
-
 /** Adds the MCP server to Claude Code and Codex, and checks they reach it */
-const mcpClients = new McpClients({ launch: mcpLaunch, toolPath })
+const mcpClients = new McpClients({
+  launch: () => mcpLaunch(paths.historyMcp),
+  toolPath,
+})
 
 /**
  * Pacenote's own work (Collect now, Looks done, Write it up, reply drafts):
@@ -633,15 +623,9 @@ const ownWork = (cli: OwnCli) => ({
   cwd: dataDir,
 })
 
-/** The MCP server as the app's own collections and drafts launch it */
-function appMcpLaunch() {
-  const { command, args, env } = mcpLaunch()
-  return { command, args, env: { ...env, PACENOTE_MCP_FROM_APP: '1' } }
-}
-
 /** Collect now on the Todo screen: the AI reads Slack, read only */
 const taskCollector = new TaskCollector({
-  launch: appMcpLaunch,
+  launch: () => appMcpLaunch(paths.historyMcp),
   toolPath,
   cwd: dataDir,
   ai: ownAi,
@@ -2127,7 +2111,7 @@ function registerBotIpc(): void {
     if (drafting.has(id)) return { error: t.drafting }
     drafting.add(id)
     try {
-      const launch = appMcpLaunch()
+      const launch = appMcpLaunch(paths.historyMcp)
       const ran = await ownAi.run(
         (cli) =>
           draftReply({
@@ -2409,7 +2393,9 @@ function registerBotIpc(): void {
     shell.showItemInFolder(settingsFile)
   })
   // The settings screen turns the launch into commands to add it by hand.
-  handle('pacenote:settings:history-mcp', undefined, () => mcpLaunch())
+  handle('pacenote:settings:history-mcp', undefined, () =>
+    mcpLaunch(paths.historyMcp)
+  )
   handle('pacenote:mcp:status', [], () => mcpClients.status())
   handle('pacenote:mcp:connect', undefined, (id) =>
     isMcpClientId(id) ? mcpClients.connect(id) : undefined
