@@ -28,6 +28,8 @@ export { PacenoteMark } from './components/logo'
 // the same things; `localized` and `useText` below take them as they are
 export { text as firstRunText } from './components/setup/first-run.text'
 export { text as partsText } from './components/setup/parts.text'
+export { text as recapPageText } from './components/recap-page.text'
+export { text as runListText } from './components/run-list.text'
 export { text as settingsPageText } from './components/settings-page.text'
 export { text as sidebarText } from './components/sidebar.text'
 export { text as taskRowText } from './components/task-row.text'
@@ -75,6 +77,7 @@ export {
 } from './lib/format'
 export { daysSince, todayLines } from './lib/today'
 export type { TodayLine } from './lib/today'
+export { recapText, type CopyFormat } from './lib/recap'
 export { ThemeProvider, useTheme } from './lib/theme'
 export type { ThemeMode } from './lib/theme'
 export { useSupervisor } from './lib/desktop'
@@ -115,6 +118,8 @@ export type {
   WorkTool,
 } from '@src/tasks/types'
 export { taskArea } from '@src/you/task-area'
+// The run history's kinds and states, which the phone filters its run list by
+export type { RunKind, RunStatus } from '@history/types'
 export type {
   AreaView,
   RecapPeriod,
