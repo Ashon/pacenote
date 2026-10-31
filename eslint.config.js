@@ -17,6 +17,8 @@ export default tseslint.config(
       'data/',
       // pacenote.dev as built (pnpm site:build)
       '_site/',
+      // The design harness's own code and working copy (local, gitignored)
+      '.design-system/',
     ],
   },
   eslint.configs.recommended,
