@@ -78,10 +78,13 @@ export function lastPeriod(): RecapPeriod {
 export function RecapPage({
   period,
   periodKey,
+  copySlot,
 }: {
   period: RecapPeriod
   /** The period's key; the current one when none */
   periodKey?: string
+  /** A finger's screen supplies its own Copy: a sheet, not a desktop menu */
+  copySlot?: (view: RecapView) => React.ReactNode
 }) {
   const t = useText(text)
   const bridge = window.pacenoteDesktop?.recap
@@ -136,7 +139,7 @@ export function RecapPage({
                   {writing ? t.writingItUp : t.writeItUp}
                 </Button>
               )}
-              <CopyButton view={view} />
+              {copySlot ? copySlot(view) : <CopyButton view={view} />}
             </span>
           )}
         </header>
@@ -169,7 +172,7 @@ export function RecapPage({
                 >
                   <ChevronLeft />
                 </Button>
-                <span className="px-1.5 text-section">
+                <span className="px-1.5 text-section whitespace-nowrap">
                   {view ? recapTitle(view) : <SkeletonWord width="8rem" />}
                 </span>
                 {view && recapWhen(view) && (

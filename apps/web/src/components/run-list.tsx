@@ -51,62 +51,87 @@ function groupByDay(runs: RunSummary[]) {
  * Run list column: every job Pacenote ran, answers to mentions and task
  * collections, each saying what it was. The search query comes from the top
  * bar (SearchField).
+ *
+ * `filters` is for the phone (mac-screens.tsx): a finger's screen keeps the
+ * kind on its own bar and the state in a sheet, as a faceted search does
+ * (Nielsen Norman Group), so it owns the filtering and this list shows no
+ * controls. Without it, the list keeps its filters itself, as on the Mac.
  */
 export function RunList({
   q,
   selectedId,
   onSelect,
+  filters,
 }: {
   q: string
   selectedId?: string
   onSelect: (id: string) => void
+  filters?: {
+    kind?: RunKind
+    status?: RunStatus
+    onChange: (kind?: RunKind, status?: RunStatus) => void
+  }
 }) {
   const t = useText(text)
-  const [kind, setKind] = useState<RunKind>()
-  const [status, setStatus] = useState<RunStatus>()
+  const [ownKind, setOwnKind] = useState<RunKind>()
+  const [ownStatus, setOwnStatus] = useState<RunStatus>()
+  const kind = filters ? filters.kind : ownKind
+  const status = filters ? filters.status : ownStatus
+  const pick = (kind?: RunKind, status?: RunStatus) => {
+    if (filters) filters.onChange(kind, status)
+    else {
+      setOwnKind(kind)
+      setOwnStatus(status)
+    }
+  }
   const query = useDeferredValue(q)
   const runs = useRuns({ kind, status, q: query })
 
   return (
     <aside className="flex h-full w-full flex-col">
       {/* What kind of job on top, the state as a select under it */}
-      <div className="space-y-2 px-3 pt-4 pb-2">
-        <div role="radiogroup" className="flex rounded-lg bg-muted p-0.5">
-          {KINDS.map((filter) => (
-            <button
-              key={filter ?? 'all'}
-              type="button"
-              role="radio"
-              aria-checked={kind === filter}
-              onClick={() => setKind(filter)}
-              className={cn(
-                'h-6 flex-auto rounded-md px-1.5 text-meta font-medium whitespace-nowrap transition-colors',
-                kind === filter
-                  ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {t.kinds[filter ?? 'all']}
-            </button>
-          ))}
-        </div>
-        <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-meta text-muted-foreground">
-          {t.status}
-          <select
-            value={status ?? ''}
-            onChange={(e) =>
-              setStatus((e.target.value || undefined) as RunStatus | undefined)
-            }
-            className="bg-transparent font-medium text-foreground outline-none"
-          >
-            {FILTERS.map((filter) => (
-              <option key={filter ?? 'all'} value={filter ?? ''}>
-                {t.statuses[filter ?? 'all']}
-              </option>
+      {!filters && (
+        <div className="space-y-2 px-3 pt-4 pb-2">
+          <div role="radiogroup" className="flex rounded-lg bg-muted p-0.5">
+            {KINDS.map((filter) => (
+              <button
+                key={filter ?? 'all'}
+                type="button"
+                role="radio"
+                aria-checked={kind === filter}
+                onClick={() => pick(filter, status)}
+                className={cn(
+                  'h-6 flex-auto rounded-md px-1.5 text-meta font-medium whitespace-nowrap transition-colors',
+                  kind === filter
+                    ? 'bg-card text-foreground shadow-xs dark:bg-selected'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t.kinds[filter ?? 'all']}
+              </button>
             ))}
-          </select>
-        </label>
-      </div>
+          </div>
+          <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-meta text-muted-foreground">
+            {t.status}
+            <select
+              value={status ?? ''}
+              onChange={(e) =>
+                pick(
+                  kind,
+                  (e.target.value || undefined) as RunStatus | undefined
+                )
+              }
+              className="bg-transparent font-medium text-foreground outline-none"
+            >
+              {FILTERS.map((filter) => (
+                <option key={filter ?? 'all'} value={filter ?? ''}>
+                  {t.statuses[filter ?? 'all']}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2 pb-3">
           <Placeholder

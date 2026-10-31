@@ -538,6 +538,7 @@ const LogPanel = memo(function LogPanel() {
               <button
                 key={item}
                 type="button"
+                data-size="chip"
                 onClick={() => setView(item)}
                 className={cn(
                   'h-6 rounded-full px-2.5 text-meta font-medium transition-colors',
