@@ -25,7 +25,7 @@ import {
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
-import { apiForDevice, handleLocalApi } from '../../../src/local-api.js'
+import { handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import {
   DESKTOP_LOG_FILE,
@@ -190,14 +190,8 @@ import {
   type Session,
 } from './handoff.js'
 import { KeepAwake } from './keep-awake.js'
-import {
-  API_ASK,
-  argsFromDevice,
-  DEVICE_ASKS,
-  DeviceAsks,
-  valueForDevice,
-  type DeviceAsk,
-} from '../../../src/macs/asks.js'
+import { DeviceAnswers } from './device-answers.js'
+import { DeviceAsks } from '../../../src/macs/asks.js'
 import { Macs } from '../../../src/macs/macs.js'
 import { SetupFromMac } from '../../../src/macs/setup.js'
 import { macsKey } from '../../../src/macs/channel.js'
@@ -700,37 +694,14 @@ let todoSync: TodoSync | undefined
 let deviceAsks: DeviceAsks | undefined
 /**
  * The screens' bridge, by channel: what each answers the window, which a
- * device of yours is answered by too (DEVICE_ASKS)
+ * device of yours is answered by too (device-answers.ts, DEVICE_ASKS)
  */
-const bridged = new Map<string, (...args: unknown[]) => unknown>()
-
-/**
- * A device's ask, answered as this Mac's own screen is: the read-only API as
- * the screens fetch it, else the channel's own handler (asks.ts says what
- * goes either way)
- */
-async function answerDevice(
-  what: DeviceAsk,
-  args: unknown[],
-  peer: string
-): Promise<unknown> {
-  if (what === API_ASK) return apiForDevice(reader, args[0])
-  const run = bridged.get(DEVICE_ASKS[what])
-  if (!run) throw new Error(`${what} is not answered on this Mac`)
-  const taken = argsFromDevice(what, args)
-  if (what === 'settings.save')
-    log.info(
-      `Settings changed from ${deviceName(peer)}: ${Object.keys(
-        (taken[0] ?? {}) as object
-      ).join(', ')}`
-    )
-  else if (!/\.(get|state|now|status|validate)$/.test(what))
-    log.info(`${deviceName(peer)} asked: ${what}`)
-  return valueForDevice(what, await run(...taken))
-}
-
-const deviceName = (peer: string) =>
-  macs?.view().devices.find((device) => device.id === peer)?.name ?? peer
+const deviceAnswers = new DeviceAnswers({
+  reader,
+  peerName: (peer) =>
+    macs?.view().devices.find((device) => device.id === peer)?.name ?? peer,
+  log: (message) => log.info(message),
+})
 /** Setup's Connect to your other Mac: this Mac set up from another */
 let fromMac: SetupFromMac | undefined
 /** What Connect to your other Mac takes this time (FromMacMode) */
@@ -878,7 +849,7 @@ if (supervisor) {
   })
   deviceAsks = new DeviceAsks({
     macs,
-    answer: answerDevice,
+    answer: (what, args, peer) => deviceAnswers.answer(what, args, peer),
     log: (message) => log.info(message),
   })
   // Pace started or stopped here: the others hear of it at once.
@@ -1268,7 +1239,7 @@ function registerBotIpc(): void {
     denied: unknown,
     run: (...args: unknown[]) => unknown
   ) => {
-    bridged.set(channel, run)
+    deviceAnswers.bridge(channel, run)
     ipcMain.handle(channel, (event, ...args: unknown[]) =>
       fromMainWindow(event) ? run(...args) : denied
     )
@@ -1286,7 +1257,7 @@ function registerBotIpc(): void {
     channel: string,
     run: (...args: unknown[]) => Promise<unknown>
   ) => {
-    bridged.set(channel, (...args) => orError(() => run(...args)))
+    deviceAnswers.bridge(channel, (...args) => orError(() => run(...args)))
     ipcMain.handle(channel, (event, ...args: unknown[]) =>
       fromMainWindow(event)
         ? orError(() => run(...args))
@@ -1652,7 +1623,7 @@ function registerBotIpc(): void {
     return { view: (await countRecapNow(which, key))?.view }
   }
   // Write it up: here, or asked by a device of yours (DeviceAsks)
-  bridged.set('pacenote:recap:write', writeRecapNow)
+  deviceAnswers.bridge('pacenote:recap:write', writeRecapNow)
   ipcMain.handle('pacenote:recap:write', (event, period, key) =>
     fromMainWindow(event)
       ? writeRecapNow(period, key)
