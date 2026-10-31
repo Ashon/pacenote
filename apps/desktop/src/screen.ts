@@ -1,6 +1,95 @@
+import { net, protocol } from 'electron'
+import { existsSync, statSync } from 'node:fs'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import type { HistoryReader } from '../../../src/history/reader.js'
+import { handleLocalApi } from '../../../src/local-api.js'
 import { getLocale, localized } from '../../../src/i18n/locale.js'
 import type { Logger } from '../../../src/logger.js'
 import { text } from './screen.text.js'
+
+/** The screen's own content security policy, on every html it answers with */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+].join('; ')
+
+/**
+ * How the screen reaches the window: pacenote://app serves the built screen
+ * from its folder, with the read-only /api beside it (src/local-api.ts). A
+ * dev run instead loads from webDevUrl, which the probe follows.
+ */
+export function createScreenFiles(options: {
+  webDistDir: string
+  webDevUrl?: string
+  /** What the screen's /api reads: runs, tasks, the app's state */
+  reader: HistoryReader
+  log: Pick<Logger, 'warn'>
+}) {
+  const { webDistDir, webDevUrl, reader, log } = options
+
+  /**
+   * A file of the screen, by its path under pacenote://app. The page itself
+   * fails when it cannot be read, rather than reading "Not found", so the
+   * window tries again (ScreenLoader): an upgrade may be swapping it.
+   */
+  async function screenFile(pathname: string): Promise<Response> {
+    const page = pathname === '/'
+    const filePath = path.resolve(
+      webDistDir,
+      page ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '')
+    )
+    const relative = path.relative(webDistDir, filePath)
+    if (relative.startsWith('..') || path.isAbsolute(relative))
+      return new Response('Not found', { status: 404 })
+    if (!page && (!existsSync(filePath) || !statSync(filePath).isFile()))
+      return new Response('Not found', { status: 404 })
+    const response = await net.fetch(pathToFileURL(filePath).toString())
+    if (!filePath.endsWith('.html')) return response
+    const headers = new Headers(response.headers)
+    headers.set('content-security-policy', CSP)
+    return new Response(response.body, { status: response.status, headers })
+  }
+
+  return {
+    /** Answers pacenote://app: the screen's files, and the /api beside them */
+    registerAppProtocol(): void {
+      protocol.handle('pacenote', async (request) => {
+        const url = new URL(request.url)
+        if (url.hostname !== 'app')
+          return new Response('Not found', { status: 404 })
+        if (url.pathname.startsWith('/api/'))
+          return handleLocalApi(reader, request.method, url)
+        try {
+          return await screenFile(url.pathname)
+        } catch (error) {
+          if (url.pathname === '/')
+            log.warn(
+              `The screen's page could not be read: ${error instanceof Error ? error.message : String(error)}`
+            )
+          throw error
+        }
+      })
+    },
+
+    /** Rejects with why the screen would not load now (ScreenLoader's probe) */
+    async probe(): Promise<void> {
+      const response = webDevUrl
+        ? await fetch(webDevUrl, { signal: AbortSignal.timeout(5_000) })
+        : await screenFile('/')
+      if (!response.ok)
+        throw new Error(
+          `The screen answered ${response.status} ${response.statusText}`
+        )
+      await response.arrayBuffer()
+    },
+  }
+}
 
 /** The waits between tries, the last one repeating */
 const DELAYS_MS = [250, 500, 1_000, 2_000, 5_000, 10_000, 30_000]

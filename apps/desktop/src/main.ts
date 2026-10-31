@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import {
   app,
   BrowserWindow,
@@ -25,7 +25,6 @@ import {
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
-import { handleLocalApi } from '../../../src/local-api.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import {
   DESKTOP_LOG_FILE,
@@ -222,7 +221,7 @@ import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
 import { markQuit, QUIT_MARK_FILE, quitWithin } from './quit-mark.js'
-import { ScreenLoader, unavailablePage } from './screen.js'
+import { ScreenLoader, unavailablePage, createScreenFiles } from './screen.js'
 import { setupProblem } from './bot-readiness.js'
 import {
   listenForClaim,
@@ -372,6 +371,8 @@ process.on('unhandledRejection', (reason) =>
   )
 )
 const reader = new HistoryReader(dataDir)
+/** The screen's files and the /api beside them, answered on pacenote://app */
+const screenFiles = createScreenFiles({ webDistDir, webDevUrl, reader, log })
 /**
  * The app writes the task collections it runs into the run history (the bot
  * writes its answers). A collection left running when the app last quit ended
@@ -871,68 +872,6 @@ function resolveDataDir(): string {
       ? path.join(homedir(), value.slice(1))
       : value
   )
-}
-
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'none'",
-].join('; ')
-
-function registerAppProtocol(): void {
-  protocol.handle('pacenote', async (request) => {
-    const url = new URL(request.url)
-    if (url.hostname !== 'app')
-      return new Response('Not found', { status: 404 })
-    if (url.pathname.startsWith('/api/'))
-      return handleLocalApi(reader, request.method, url)
-    try {
-      return await screenFile(url.pathname)
-    } catch (error) {
-      if (url.pathname === '/')
-        log.warn(`The screen's page could not be read: ${errorText(error)}`)
-      throw error
-    }
-  })
-}
-
-/**
- * A file of the screen, by its path under pacenote://app. The page itself
- * fails when it cannot be read, rather than reading "Not found", so the window
- * tries again (ScreenLoader): an upgrade may be swapping it.
- */
-async function screenFile(pathname: string): Promise<Response> {
-  const page = pathname === '/'
-  const filePath = path.resolve(
-    webDistDir,
-    page ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '')
-  )
-  const relative = path.relative(webDistDir, filePath)
-  if (relative.startsWith('..') || path.isAbsolute(relative))
-    return new Response('Not found', { status: 404 })
-  if (!page && (!existsSync(filePath) || !statSync(filePath).isFile()))
-    return new Response('Not found', { status: 404 })
-  const response = await net.fetch(pathToFileURL(filePath).toString())
-  if (!filePath.endsWith('.html')) return response
-  const headers = new Headers(response.headers)
-  headers.set('content-security-policy', CSP)
-  return new Response(response.body, { status: response.status, headers })
-}
-
-/** Rejects with why the screen would not load now (ScreenLoader's probe) */
-async function probeScreen(): Promise<void> {
-  const response = webDevUrl
-    ? await fetch(webDevUrl, { signal: AbortSignal.timeout(5_000) })
-    : await screenFile('/')
-  if (!response.ok)
-    throw new Error(
-      `The screen answered ${response.status} ${response.statusText}`
-    )
-  await response.arrayBuffer()
 }
 
 const errorText = (error: unknown) =>
@@ -2554,7 +2493,7 @@ async function createWindow(route = ''): Promise<void> {
   const screenUrl = webDevUrl ?? 'pacenote://app/'
   const screen = new ScreenLoader({
     load: () => window.loadURL(`${screenUrl}${route}`),
-    probe: probeScreen,
+    probe: () => screenFiles.probe(),
     showUnavailable: (reason) =>
       window.loadURL(
         `data:text/html;charset=utf-8,${encodeURIComponent(
@@ -2686,7 +2625,7 @@ if (!app.requestSingleInstanceLock()) {
   app
     .whenReady()
     .then(async () => {
-      registerAppProtocol()
+      screenFiles.registerAppProtocol()
       // pacenote:// links (the hub installer's, a teammate's share link's),
       // for this copy of the app
       if (app.isPackaged) app.setAsDefaultProtocolClient('pacenote')
