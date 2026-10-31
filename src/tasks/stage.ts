@@ -91,3 +91,33 @@ export function stageOf(
     return { stage: 'started', at: signals.sessionAt!, by: 'session' }
   return undefined
 }
+
+/**
+ * Each open task's stage: what you set, else what its sessions show, live
+ * from what AI tools do now when given. The Mac's Todo and a device's work
+ * them out alike, each from what it has of the tasks.
+ */
+export function stagesOf(
+  data:
+    | {
+        tasks: TaskView[]
+        stages?: StageRecords
+        working?: Record<string, { at: string }>
+      }
+    | null
+    | undefined,
+  live?: Record<string, unknown>,
+  now = Date.now()
+): Record<string, TaskStage> {
+  const stages: Record<string, TaskStage> = {}
+  for (const task of data?.tasks ?? []) {
+    const stage = stageOf(
+      task,
+      data?.stages?.[task.id],
+      { sessionAt: data?.working?.[task.id]?.at, live: !!live?.[task.id] },
+      now
+    )
+    if (stage) stages[task.id] = stage
+  }
+  return stages
+}

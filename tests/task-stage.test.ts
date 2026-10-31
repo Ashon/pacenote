@@ -7,8 +7,10 @@ import {
   cleanStages,
   RECENT_SESSION_MS,
   stageOf,
+  stagesOf,
   type StageRecord,
 } from '../src/tasks/stage.js'
+import { sortForTab, tabOf } from '../src/tasks/tabs.js'
 import {
   buildView,
   decide,
@@ -126,6 +128,66 @@ describe("an open task's stage", () => {
     ).toEqual({ a: { stage: 'waiting', at: iso(NOW) } })
     expect(cleanStages([])).toEqual({})
     expect(cleanStages('nope')).toEqual({})
+  })
+})
+
+describe("Todo's tabs, the same on the Mac and on a device", () => {
+  const view = (id: string, extra: Partial<TaskView> = {}): TaskView => ({
+    ...open(),
+    id,
+    ...extra,
+  })
+
+  it('lists an open task waiting on someone under Waiting', () => {
+    const stages = stagesOf(
+      {
+        tasks: [view('a'), view('b'), view('c', { status: 'maybe' })],
+        stages: { a: record('waiting', HOUR), b: record('started', HOUR) },
+      },
+      undefined,
+      NOW
+    )
+    expect(tabOf(view('a'), stages.a)).toBe('waiting')
+    expect(tabOf(view('b'), stages.b)).toBe('open')
+    expect(tabOf(view('c', { status: 'maybe' }))).toBe('maybe')
+    expect(tabOf(view('d', { status: 'dismissed' }))).toBe('done')
+    expect(stages.c).toBeUndefined()
+  })
+
+  it('takes a stage from a session or from an AI tool at work now', () => {
+    const tasks = [view('a'), view('b')]
+    const stages = stagesOf(
+      { tasks, working: { a: { at: iso(NOW - HOUR) } } },
+      { b: { by: 'claude' } },
+      NOW
+    )
+    expect(stages.a).toMatchObject({ stage: 'started', by: 'session' })
+    expect(stages.b).toMatchObject({ stage: 'started', by: 'session' })
+  })
+
+  it('orders each tab: in progress, longest waiting, latest settled', () => {
+    const stages = {
+      b: { stage: 'started' as const, at: iso(NOW), by: 'you' as const },
+    }
+    expect(
+      sortForTab([view('a'), view('b')], 'open', stages).map((t) => t.id)
+    ).toEqual(['b', 'a'])
+    const waiting = {
+      a: { stage: 'waiting' as const, at: iso(NOW - HOUR), by: 'you' as const },
+      b: {
+        stage: 'waiting' as const,
+        at: iso(NOW - 5 * HOUR),
+        by: 'you' as const,
+      },
+    }
+    expect(
+      sortForTab([view('a'), view('b')], 'waiting', waiting).map((t) => t.id)
+    ).toEqual(['b', 'a'])
+    const settled = [
+      view('a', { status: 'dismissed', settledAt: iso(NOW - 5 * HOUR) }),
+      view('b', { status: 'closed', settledAt: iso(NOW - HOUR) }),
+    ]
+    expect(sortForTab(settled, 'done', {}).map((t) => t.id)).toEqual(['b', 'a'])
   })
 })
 

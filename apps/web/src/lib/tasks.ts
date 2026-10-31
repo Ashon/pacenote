@@ -1,10 +1,5 @@
-import {
-  stageOf,
-  type StageRecord,
-  type StageRecords,
-  type TaskStage,
-} from '@src/tasks/stage'
-import type { TaskDecision, TaskView, WorkTool } from '@src/tasks/types'
+import type { StageRecord } from '@src/tasks/stage'
+import type { TaskDecision, WorkTool } from '@src/tasks/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
@@ -174,35 +169,6 @@ export function useAddTask() {
     await client.invalidateQueries({ queryKey: ['tasks'] })
     return result ?? {}
   }
-}
-
-/**
- * Each open task's stage (src/tasks/stage.ts): what you set, else what its
- * sessions show, live from what AI tools do now when given
- */
-export function stagesOf(
-  data:
-    | {
-        tasks: TaskView[]
-        stages?: StageRecords
-        working?: Record<string, { at: string }>
-      }
-    | null
-    | undefined,
-  live?: Record<string, unknown>,
-  now = Date.now()
-): Record<string, TaskStage> {
-  const stages: Record<string, TaskStage> = {}
-  for (const task of data?.tasks ?? []) {
-    const stage = stageOf(
-      task,
-      data?.stages?.[task.id],
-      { sessionAt: data?.working?.[task.id]?.at, live: !!live?.[task.id] },
-      now
-    )
-    if (stage) stages[task.id] = stage
-  }
-  return stages
 }
 
 /**

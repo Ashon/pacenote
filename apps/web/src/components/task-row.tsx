@@ -1,6 +1,6 @@
 import { localized } from '@src/i18n/locale'
 import { CLI_NAMES } from '@src/tasks/own-ai'
-import { ADDED_BY_YOU, LOCAL, sourceOf } from '@src/tasks/sources'
+import { sourceOf } from '@src/tasks/sources'
 import type { StageRecord, TaskStage } from '@src/tasks/stage'
 import type {
   DismissReason,
@@ -64,7 +64,6 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { formatDateTime, formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { macNamed, useMacs } from '@/lib/macs'
-import { daysSince } from '@/lib/today'
 import {
   taskDetailQuery,
   taskHash,
@@ -77,6 +76,7 @@ import {
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { switchLine } from './own-ai-status'
+import { AreaPill, Pill, StagePill, TaskMeta } from './task-meta'
 import { PaceSpinner } from './pace-spinner'
 import { text } from './task-row.text'
 
@@ -289,19 +289,6 @@ export function TaskRow({
 
   // From a session on this Mac, it has no thread: no reply to draft.
   const local = task.source.app === 'local'
-  const who = local
-    ? task.addedBy === ADDED_BY_YOU
-      ? t.addedByYou
-      : follows
-        ? t.leftAfter(follows)
-        : t.keptFromSession
-    : task.kind === 'promised'
-      ? t.promised
-      : task.askedBy
-        ? t.askedBy(task.askedBy, task.group)
-        : task.group
-          ? t.askedOf(task.group)
-          : undefined
   // This Mac is kept in English in the task, as AI tools read it too
   const sourceLabel = local ? t.thisMac : sourceOf(task).label
   const by = closedBy(task.closed?.by)
@@ -425,53 +412,22 @@ export function TaskRow({
                 </span>
               </button>
             </CollapsibleTrigger>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
-              {[
-                who,
-                local && task.source.label === LOCAL.label
-                  ? t.thisMac
-                  : task.source.label,
-                formatRelative(task.postedAt),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
+            <TaskMeta task={task} follows={follows}>
               {task.due && !settled && (
-                <span
-                  {...flash('due')}
-                  className="motion-flash rounded-xl bg-status-interrupted/12 px-2 py-px font-medium text-status-interrupted"
-                >
+                <Pill tone="due" {...flash('due')} className="motion-flash">
                   {task.due}
-                </span>
+                </Pill>
               )}
-              {settledLabel && (
-                <span className="rounded-full bg-muted px-2 py-px font-medium">
-                  {settledLabel}
-                </span>
-              )}
-              {stage?.stage === 'started' && !atWork.mounted && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/12 px-2 py-px font-medium text-primary">
-                  <span
-                    aria-hidden="true"
-                    className="size-1.5 rounded-full bg-primary"
-                  />
-                  {t.inProgress}
-                </span>
-              )}
-              {stage?.stage === 'waiting' && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-px font-medium">
-                  <Clock aria-hidden="true" className="size-3" />
-                  {t.waitingFor(daysSince(stage.at))}
-                </span>
-              )}
-              {area && (
-                <a
-                  href={areaHash(area.id)}
-                  title={t.inArea(area.name)}
-                  className="rounded-xl bg-muted px-2 py-px font-medium hover:text-foreground"
-                >
-                  {area.name}
-                </a>
-              )}
+              {settledLabel && <Pill>{settledLabel}</Pill>}
+              {/* An AI tool at work on it says so itself, below */}
+              <StagePill
+                stage={
+                  stage?.stage === 'started' && atWork.mounted
+                    ? undefined
+                    : stage
+                }
+              />
+              {area && <AreaPill area={area} href={areaHash(area.id)} />}
               {task.repo && (
                 <span
                   {...flash('repo')}
@@ -517,7 +473,7 @@ export function TaskRow({
                   {t.updated(formatRelative(recent.at))}
                 </span>
               )}
-            </p>
+            </TaskMeta>
             {asking.mounted && (
               <div
                 ref={asking.ref}

@@ -1,3 +1,4 @@
+import { stagesOf } from '@src/tasks/stage'
 import {
   Bot,
   Bug,
@@ -12,7 +13,7 @@ import {
 import { Tooltip } from '@/components/ui/tooltip'
 import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
-import { stagesOf, useTasks } from '@/lib/tasks'
+import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { PacenoteMark } from './logo'
 import { text } from './sidebar.text'

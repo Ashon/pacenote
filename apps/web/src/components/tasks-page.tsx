@@ -2,7 +2,8 @@ import { newTokens } from '@history/usage'
 import { localized } from '@src/i18n/locale'
 import type { MacsView } from '@src/macs/types'
 import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
-import type { TaskStage } from '@src/tasks/stage'
+import { stagesOf } from '@src/tasks/stage'
+import { sortForTab, tabOf, type TodoTab } from '@src/tasks/tabs'
 import type { TasksLive } from '@src/tasks/types'
 import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
 import {
@@ -37,7 +38,6 @@ import {
 import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import {
-  stagesOf,
   taskHash,
   useCollect,
   useDecide,
@@ -65,20 +65,10 @@ import {
   YourWorkSkeleton,
 } from './your-work'
 
-type Tab = 'open' | 'waiting' | 'maybe' | 'done' | 'collections'
+type Tab = TodoTab | 'collections'
 
 /** How many rows a long list shows at first, and Show more adds each time */
 const ROWS_AT_ONCE = 10
-
-/** The tab a task is listed under: an open one waiting on someone, Waiting */
-const tabOf = (task: TaskView, stage?: TaskStage): Tab =>
-  task.status === 'open'
-    ? stage?.stage === 'waiting'
-      ? 'waiting'
-      : 'open'
-    : task.status === 'maybe'
-      ? 'maybe'
-      : 'done'
 
 /** Cmd-N here, Ctrl-N elsewhere: New task */
 const isMac = /Mac/.test(navigator.platform)
@@ -242,17 +232,8 @@ export function TasksPage({
   const kept = (task: TaskView) =>
     task.id === openId && held?.id === openId && held.tab === tab
   const listed = data.tasks.filter((task) => tabIn(task) === tab || kept(task))
-  const at = (iso?: string) => Date.parse(iso ?? '') || 0
-  if (tab === 'done') listed.sort((a, b) => at(b.settledAt) - at(a.settledAt))
-  // In progress first; waiting, the longest first
-  if (tab === 'open')
-    listed.sort(
-      (a, b) =>
-        Number(stages[b.id]?.stage === 'started') -
-        Number(stages[a.id]?.stage === 'started')
-    )
-  if (tab === 'waiting')
-    listed.sort((a, b) => at(stages[a.id]?.at) - at(stages[b.id]?.at))
+  // In progress first; waiting, the longest first; the latest settled first
+  if (tab !== 'collections') sortForTab(listed, tab, stages)
   // New tasks wait unless there is nothing in the list for them to move
   const isNew = (task: TaskView) =>
     seen !== undefined && !seen.has(task.id) && task.id !== openId

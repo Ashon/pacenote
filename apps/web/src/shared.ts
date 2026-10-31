@@ -23,6 +23,16 @@ export { RunList } from './components/run-list'
 export { SettingsPage } from './components/settings-page'
 export { YouPage } from './components/you-page'
 export { PacenoteMark } from './components/logo'
+// A task's line under its title, as the Mac's Todo row draws it: who, where
+// and when, then the pills each screen adds
+export {
+  AreaPill,
+  Pill,
+  StagePill,
+  TaskMeta,
+  whereOf,
+  whoOf,
+} from './components/task-meta'
 
 // The screens' words, in English and Korean, where the app's own screens say
 // the same things; `localized` and `useText` below take them as they are
@@ -85,12 +95,20 @@ export { cn, go } from './lib/utils'
 
 // The Mac's own code the device speaks with: what people asked and what they
 // said they would do, as the Mac lists it (the same buildView the Mac's Todo
-// runs), where a task stands, which area it falls in, the settings the Mac's
-// Settings screen holds, and the device's side of the channel — these hold no
-// file access, so they run on the device as they do on the Mac
+// runs), where a task stands and the tab and order it is listed in, which
+// area it falls in, the settings the Mac's Settings screen holds, and the
+// device's side of the channel — these hold no file access, so they run on
+// the device as they do on the Mac
 export { buildView, viewOf } from '@src/tasks/view'
-export { RECENT_SESSION_MS, cleanStages, stageOf } from '@src/tasks/stage'
-export type { StageRecord, TaskStage } from '@src/tasks/stage'
+export {
+  RECENT_SESSION_MS,
+  cleanStages,
+  stageOf,
+  stagesOf,
+} from '@src/tasks/stage'
+export type { StageRecord, StageRecords, TaskStage } from '@src/tasks/stage'
+export { sortForTab, tabOf } from '@src/tasks/tabs'
+export type { TodoTab } from '@src/tasks/tabs'
 export {
   ADDED_BY_YOU,
   LOCAL,
