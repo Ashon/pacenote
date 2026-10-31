@@ -11,16 +11,10 @@ import {
   type SettingsChanges,
   type SettingsIssue,
 } from '@src/settings/fields'
-import {
-  MESSENGER_IDS,
-  MESSENGER_NAMES,
-  type MessengerId,
-} from '@src/messengers/ids'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import {
   CircleCheck,
   LoaderCircle,
-  PlugZap,
   RotateCcw,
   Save,
   TriangleAlert,
@@ -40,49 +34,32 @@ import {
 } from '@/lib/desktop'
 import { useSettingsView } from '@/lib/setup'
 import { useText } from '@/lib/i18n'
-import { cn, go as goTo } from '@/lib/utils'
-import { McpConnections } from './mcp-connections'
-import { OwnAiStatus } from './own-ai-status'
-import { isOwnCli } from '@src/tasks/own-ai'
-import { RepoFolders } from './repo-folders'
-import { SandboxSignIn } from './sandbox-sign-in'
-import { SlackYou } from './slack-you'
-import { SlackAppSetup } from './slack-app-setup'
-import {
-  EnvironmentDetails,
-  LoginChecks,
-  PendingList,
-  VmFooter,
-} from './sandbox-panel'
+import { cn } from '@/lib/utils'
+import { EnvironmentDetails, VmFooter } from './sandbox-panel'
 import { text } from './settings-page.text'
 import { DevicesSection, MacsSection } from './settings-devices'
-import { ToolsSection } from './tools-section'
+import {
+  AnswersSection,
+  GeneralSection,
+  LogsSection,
+  MessengersSection,
+  OpsSection,
+  SandboxSection,
+  type SettingsCtx,
+  TasksSection,
+} from './settings-sections'
 import { connectionStates } from '@src/settings/tools'
 import {
   AppsHere,
-  CardHeader,
-  CheckResult,
-  Chip,
   type ChoiceExtras,
   FieldRow,
-  GroupBody,
   GroupCard,
-  HelpCard,
   type Hint,
-  HubPairing,
-  LanguagePicker,
-  OnTheMacNote,
-  PathControl,
-  Row,
   SECTION_ICON,
   sectionInfo,
   SettingsNav,
   SectionSkeleton,
   SectionTitle,
-  SubHeading,
-  Switch,
-  ThemePicker,
-  UpdatesCard,
   type Section,
 } from './settings-parts'
 
@@ -399,7 +376,6 @@ export function SettingsPage() {
   const builtIn = valueOf('REASONER_SANDBOX') === 'vm'
   const vmStatus = sandbox.status?.vm
   const opsOn = valueOf('OPS_TOOLS') === 'on'
-  const pending = sandbox.status?.pending ?? []
   const hubMode = valueOf('SLACK_CONNECTION') === 'hub'
   // Pace answers only you; with your own app, once it knows who you are
   const onlyYou = hubMode || isSet('MENTION_ALLOWED_USERS')
@@ -411,14 +387,6 @@ export function SettingsPage() {
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
     : isSet('SLACK_APP_TOKEN') && isSet('SLACK_BOT_TOKEN')
-  /** How each messenger is connected, beside its heading */
-  const messengerChips: Record<MessengerId, React.ReactNode> = {
-    slack: slackReady ? (
-      <Chip tone="ok">{hubMode ? t.teamHub : t.ownApp}</Chip>
-    ) : (
-      <Chip tone="warn">{hubMode ? t.notPaired : t.notConnected}</Chip>
-    ),
-  }
   const hints: Partial<Record<Section, Hint>> = {
     // Short enough to sit beside "Messengers"; the Slack heading says what is
     // missing.
@@ -505,280 +473,51 @@ export function SettingsPage() {
   const fieldsOf = (id: SettingGroup) =>
     localizedFields.filter((field) => field.group === id && shown(field))
 
-  /**
-   * Each messenger's cards, shown under its heading in the Messengers section;
-   * like the sections below, built only when shown
-   */
-  const messengerCards: Record<MessengerId, () => React.ReactNode> = {
-    slack: () => (
-      <>
-        {card('slack', {
-          action: !remote && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={runCheck}
-              disabled={check === 'running'}
-            >
-              {check === 'running' ? (
-                <LoaderCircle className="animate-spin" />
-              ) : (
-                <PlugZap />
-              )}
-              {t.checkConnection}
-            </Button>
-          ),
-          children:
-            check && check !== 'running' ? <CheckResult items={check} /> : null,
-          after: remote ? (
-            <OnTheMacNote mac={remote} />
-          ) : hubMode ? (
-            <HubPairing
-              hubUrl={valueOf('HUB_URL')}
-              allow={valueOf('MENTION_ALLOWED_USERS')}
-              onAddress={(url) => set('HUB_URL', url)}
-              paired={
-                view.values.SLACK_CONNECTION === 'hub' &&
-                Boolean(view.secrets.HUB_TOKEN?.set)
-              }
-              onPaired={(text) => {
-                // Pairing saved the connection itself; drop those drafts and
-                // show what is saved now.
-                drop('SLACK_CONNECTION', 'HUB_URL')
-                setCheck(undefined)
-                load()
-                setNotice({ tone: 'ok', text })
-              }}
-              onDisconnected={() => {
-                setCheck(undefined)
-                load()
-                setNotice({ tone: 'ok', text: t.hubDisconnected })
-              }}
-            />
-          ) : !isSet('SLACK_APP_TOKEN') || !isSet('SLACK_BOT_TOKEN') ? (
-            <SlackAppSetup />
-          ) : undefined,
-        })}
-        {card('access')}
-      </>
-    ),
+  /** The page's draft and its handlers, which every section builds from */
+  const ctx: SettingsCtx = {
+    t,
+    view,
+    remote,
+    settings,
+    sandbox,
+    supervisor,
+    loginItem,
+    update,
+    hubMode,
+    builtIn,
+    slackReady,
+    valueOf,
+    isSet,
+    set,
+    drop,
+    changed: (key) => key in changes,
+    issueOf,
+    card,
+    row,
+    fieldsOf,
+    groups,
+    check,
+    runCheck,
+    setCheck,
+    load,
+    setNotice,
+    go,
   }
-
   const content: Record<Section, () => React.ReactNode> = {
-    messengers: () =>
-      MESSENGER_IDS.map((id) => (
-        <div key={id} className="space-y-3">
-          <SubHeading title={MESSENGER_NAMES[id]} chip={messengerChips[id]} />
-          {messengerCards[id]()}
-        </div>
-      )),
-    answers: () =>
-      (['reasoner', 'requests', 'diagrams'] as const).map((id) => card(id)),
-    sandbox: () => (
-      <>
-        {card('environment', {
-          // Settings Pace picks up on its restart, such as the limits here
-          children: !remote && pending.length > 0 && (
-            <PendingList pending={pending} sandbox={sandbox} />
-          ),
-        })}
-        {builtIn &&
-          card('credentials', {
-            help: t.credentialsHelp(valueOf('REASONER')),
-            after: remote ? (
-              <OnTheMacNote mac={remote} />
-            ) : (
-              <>
-                <LoginChecks sandbox={sandbox} />
-                <SandboxSignIn
-                  className="border-t border-border bg-well/60 px-4 py-3"
-                  cli={valueOf('REASONER') === 'codex' ? 'codex' : 'claude'}
-                  signedIn={Boolean(sandbox.status?.signedIn)}
-                  ready={Boolean(
-                    sandbox.status?.vm?.kernel && sandbox.status.vm.image
-                  )}
-                  onSignedIn={() => {
-                    sandbox.refresh()
-                    // A claude token set by hand is gone from the file now.
-                    load()
-                    setNotice({
-                      tone: 'warn',
-                      text: t.sandboxSignedIn,
-                      restart: true,
-                    })
-                  }}
-                />
-              </>
-            ),
-          })}
-      </>
-    ),
-    ops: () => (
-      <ToolsSection
-        valueOf={valueOf}
-        isSet={isSet}
-        changed={(key) => key in changes}
-        hasIssue={(key) => Boolean(issueOf(key))}
-        keysOf={(id) => fieldsOf(id).map((field) => field.key)}
-        fields={(id) => <GroupBody fields={fieldsOf(id)} row={row} />}
-        card={(id, chip) => card(id, { chip })}
-        groups={groups}
-        labelOf={settingLabel}
-        sectionLabel={(id) => sectionInfo(id).label}
-        go={go}
-        sandbox={sandbox}
-      />
-    ),
-    tasks: () => (
-      <>
-        {card('ownWork', {
-          after: remote ? (
-            <OnTheMacNote mac={remote} />
-          ) : (
-            <OwnAiStatus
-              chosen={
-                isOwnCli(view.values.TASKS_AI) ? view.values.TASKS_AI : 'claude'
-              }
-              fallback={view.values.TASKS_AI_FALLBACK !== 'off'}
-            />
-          ),
-        })}
-        {card('tasks', {
-          after: valueOf('TASKS') === 'on' && !remote && (
-            <>
-              <SlackYou
-                owners={
-                  hubMode
-                    ? []
-                    : valueOf('MENTION_ALLOWED_USERS')
-                        .split(',')
-                        .map((id) => id.trim())
-                        .filter(Boolean)
-                }
-              />
-              <McpConnections about={t.mcpTasks} />
-            </>
-          ),
-        })}
-        {card('work', {
-          after: valueOf('TASKS') === 'on' && !remote && <RepoFolders />,
-        })}
-      </>
-    ),
-    logs: () => (
-      <>
-        {card('history', {
-          after: valueOf('HISTORY_SHARE') === 'on' && !remote && (
-            <McpConnections about={t.mcpHistory} />
-          ),
-        })}
-        {card('logs')}
-      </>
-    ),
+    messengers: () => <MessengersSection ctx={ctx} />,
+    answers: () => <AnswersSection ctx={ctx} />,
+    sandbox: () => <SandboxSection ctx={ctx} />,
+    ops: () => <OpsSection ctx={ctx} />,
+    tasks: () => <TasksSection ctx={ctx} />,
+    logs: () => <LogsSection ctx={ctx} />,
     macs: () => (
       <>
         <MacsSection />
         <DevicesSection />
       </>
     ),
-    general: () => (
-      <>
-        <section className="surface-group">
-          <CardHeader title={t.app} help={t.appHelp} />
-          <div className="divide-y divide-border">
-            <Row label={t.theme} help={t.themeHelp}>
-              <ThemePicker />
-            </Row>
-            <Row label={t.language} help={t.languageHelp}>
-              <LanguagePicker />
-            </Row>
-            {loginItem.state && (
-              <Row
-                label={t.openAtLogin}
-                help={
-                  loginItem.state.available
-                    ? t.openAtLoginHelp
-                    : t.openAtLoginInstalled
-                }
-                warning={
-                  loginItem.state.needsApproval
-                    ? t.openAtLoginApproval
-                    : undefined
-                }
-              >
-                <div className="flex items-center gap-2">
-                  {loginItem.state.needsApproval && (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={loginItem.openSystemSettings}
-                    >
-                      {t.openLoginItems}
-                    </Button>
-                  )}
-                  <Switch
-                    checked={loginItem.state.on}
-                    disabled={!loginItem.state.available}
-                    onChange={loginItem.set}
-                  />
-                </div>
-              </Row>
-            )}
-            {supervisor?.off ? (
-              <Row label={t.paceOff} help={t.paceOffHelp}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    void botControl()
-                      ?.setUp()
-                      .then(() => goTo('#/setup'))
-                  }
-                >
-                  {t.setUpPace}
-                </Button>
-              </Row>
-            ) : (
-              supervisor && (
-                <Row label={t.autoStart} help={t.autoStartHelp}>
-                  <Switch
-                    checked={supervisor.autoStart}
-                    onChange={(value) => void botControl()?.setAutoStart(value)}
-                  />
-                </Row>
-              )
-            )}
-          </div>
-        </section>
-        <UpdatesCard update={update} />
-        <HelpCard />
-        <section className="surface-group">
-          <CardHeader title={t.files} help={t.filesHelp} />
-          <div className="divide-y divide-border">
-            <Row
-              label={t.settingsFile}
-              help={view.exists ? t.settingsFileHere : t.settingsFileMissing}
-              issue={view.problem}
-            >
-              <PathControl
-                path={view.file}
-                label={t.showInFinder}
-                onOpen={() => void settings.revealFile()}
-              />
-            </Row>
-            <Row label={t.historyFolder} help={t.historyFolderHelp}>
-              <PathControl
-                path={view.dataDir}
-                label={t.open}
-                onOpen={() => void settings.openDataDir()}
-              />
-            </Row>
-          </div>
-        </section>
-      </>
-    ),
+    general: () => <GeneralSection ctx={ctx} />,
   }
-
   return (
     // A narrow screen keeps the section list as icons (@settings), and narrow
     // content stacks each row (@content).
