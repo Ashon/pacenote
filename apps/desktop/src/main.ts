@@ -215,8 +215,9 @@ import { SettingsStore } from './settings.js'
 import { SetupStore } from './setup.js'
 import { BundleWatch } from './bundle-watch.js'
 import { markQuit, QUIT_MARK_FILE, quitWithin } from './quit-mark.js'
-import { ScreenLoader, unavailablePage, createScreenFiles } from './screen.js'
+import { createScreenFiles } from './screen.js'
 import { TrayMenu, truncateLabel } from './tray.js'
+import { MainWindow } from './window.js'
 import { setupProblem } from './bot-readiness.js'
 import {
   listenForClaim,
@@ -412,9 +413,27 @@ if (themeSource === 'light' || themeSource === 'dark')
 let isQuitting = false
 /** Stops telling the window about task files changing on disk */
 let stopTasksWatch: (() => void) | undefined
-let mainWindow: BrowserWindow | undefined
-/** Loads the window's screen, and again while it fails (screen.ts) */
-let mainScreen: ScreenLoader | undefined
+/** The window and the screen it loads (window.ts) */
+const mainWindow = new MainWindow({
+  appName,
+  icon: appIcon,
+  preload: path.join(distDir, 'preload.cjs'),
+  dev: !app.isPackaged,
+  webDevUrl,
+  probe: () => screenFiles.probe(),
+  quitting: () => isQuitting,
+  restarting: () => restarting || (bundleWatch?.check() ?? false),
+  passing: () => bundleWatch?.swapping() ?? false,
+  reopen: () => relaunch('Opened while quitting; opening again once gone'),
+  capture: captureFile
+    ? {
+        width: Number(process.env.PACENOTE_DESKTOP_CAPTURE_WIDTH),
+        height: Number(process.env.PACENOTE_DESKTOP_CAPTURE_HEIGHT),
+        save: (window) => capture(window, captureFile),
+      }
+    : undefined,
+  log,
+})
 let trayMenu: TrayMenu | undefined
 let toolPathCache: string | undefined
 
@@ -470,7 +489,7 @@ const hubInstall = new HubInstall({
     log.info(
       `Hub install: ${state.step}${'url' in state ? ` (${state.url})` : ''}`
     )
-    mainWindow?.webContents.send('pacenote:hub:install-changed', state)
+    mainWindow.send('pacenote:hub:install-changed', state)
   },
 })
 /** The hub a pacenote:// link opened, until the window takes it */
@@ -492,8 +511,8 @@ function openLink(link: string): void {
   void hubInstall.check(url)
   if (!app.isReady()) return
   // Settings takes it, or setup where it is
-  showMainWindow(setup.view().open ? undefined : '#/settings/messengers')
-  mainWindow?.webContents.send('pacenote:hub:linked')
+  mainWindow.show(setup.view().open ? undefined : '#/settings/messengers')
+  mainWindow.send('pacenote:hub:linked')
 }
 // Before ready: a link that opened the app comes before it is
 app.on('open-url', (event, link) => {
@@ -561,7 +580,7 @@ function claimStep<T>(run: () => Promise<T>): Promise<T> {
 const sandboxSignIn = new SandboxSignIn({
   env: process.env,
   onPrompt: (prompt) =>
-    mainWindow?.webContents.send('pacenote:sandbox:login-prompt', prompt),
+    mainWindow.send('pacenote:sandbox:login-prompt', prompt),
 })
 
 /** Adds the MCP server to Claude Code and Codex, and checks they reach it */
@@ -581,7 +600,7 @@ const ownAi = new OwnAi({
     return isOwnCli(chosen) ? chosen : 'claude'
   },
   fallback: () => settings.effectiveEnv().TASKS_AI_FALLBACK !== 'off',
-  onChange: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
+  onChange: () => mainWindow.send('pacenote:tasks:changed'),
 })
 /**
  * opencode's run for Pacenote's own work: Pacenote's config (written once, in
@@ -747,9 +766,9 @@ if (supervisor) {
       : {}),
   })
   macs.on('change', () => {
-    mainWindow?.webContents.send('pacenote:macs:changed', macs?.view())
+    mainWindow.send('pacenote:macs:changed', macs?.view())
     // Todo says when another Mac collects
-    mainWindow?.webContents.send('pacenote:tasks:changed')
+    mainWindow.send('pacenote:tasks:changed')
   })
   const thisMac = macs
   fromMac = new SetupFromMac({
@@ -816,7 +835,7 @@ if (supervisor) {
     bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
   })
   fromMac.on('change', (state) =>
-    mainWindow?.webContents.send('pacenote:setup:mac-changed', state)
+    mainWindow.send('pacenote:setup:mac-changed', state)
   )
   todoSync = new TodoSync({
     dataDir,
@@ -825,7 +844,7 @@ if (supervisor) {
     collections: () =>
       collectionRuns(7).flatMap((run) => collectionRow(run) ?? []),
     log: (message) => log.info(message),
-    changed: () => mainWindow?.webContents.send('pacenote:tasks:changed'),
+    changed: () => mainWindow.send('pacenote:tasks:changed'),
   })
   deviceAsks = new DeviceAsks({
     macs,
@@ -872,35 +891,6 @@ function resolveDataDir(): string {
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
 
-/**
- * Shows the window; with a route (e.g. "#/settings") it also switches to that
- * screen.
- */
-function showMainWindow(route?: string): void {
-  // Asked for while quitting, such as opened again right after Quit while Pace
-  // stops: a window now would go with this copy, so the app opens again once
-  // it is gone.
-  if (isQuitting) {
-    relaunch('Opened while quitting; opening again once gone')
-    return
-  }
-  if (!mainWindow) {
-    void createWindow(route).catch((error: unknown) =>
-      log.error(`The window could not open: ${errorText(error)}`)
-    )
-    return
-  }
-  // A screen that would not load is tried again at once.
-  mainScreen?.retryNow()
-  if (route)
-    void mainWindow.webContents.executeJavaScript(
-      `location.hash = ${JSON.stringify(route)}`
-    )
-  if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
-  mainWindow.focus()
-}
-
 function botSummary(): {
   label: string
   active: number
@@ -935,7 +925,7 @@ function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
     troubles,
     (key) => botRunning || !unknownWithoutBot(key)
   )
-  if (fresh.length === 0 || mainWindow?.isFocused()) return
+  if (fresh.length === 0 || mainWindow.isFocused()) return
   if (!Notification.isSupported()) return
   for (const trouble of fresh) {
     log.info(`Notifying: ${trouble.title}: ${trouble.body}`)
@@ -943,7 +933,7 @@ function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
       title: trouble.title,
       body: trouble.body,
     })
-    notice.on('click', () => showMainWindow(trouble.route))
+    notice.on('click', () => mainWindow.show(trouble.route))
     // macOS shows notifications only for a signed app (an unsigned
     // development build gets this) and only once notifications are allowed
     notice.on('failed', (_event, error) =>
@@ -1013,10 +1003,10 @@ function createTray(): void {
     setupOpen: () => setup.view().open,
     update: () =>
       updates?.current.available ? updates.current.latest?.version : undefined,
-    openWindow: (route) => showMainWindow(route),
+    openWindow: (route) => mainWindow.show(route),
     startBot: () => void supervisor?.start(),
     restartBot: () => void supervisor?.restart(),
-    openSettings: (route) => showMainWindow(route),
+    openSettings: (route) => mainWindow.show(route),
     quit: () => app.quit(),
   })
   trayMenu.create()
@@ -1070,7 +1060,7 @@ function loginItem(): LoginItemState {
 /** Bot control from the UI. Accepts requests only from the main window. */
 function registerBotIpc(): void {
   const fromMainWindow = (event: Electron.IpcMainInvokeEvent) =>
-    event.sender === mainWindow?.webContents
+    mainWindow.sentBy(event.sender)
   /**
    * A channel only the main window may use: anything else gets denied, the
    * channel's own empty answer. A channel whose denied answer depends on the
@@ -1160,7 +1150,7 @@ function registerBotIpc(): void {
     trayMenu?.reset()
     updateTray()
     // The window takes it wherever it was set, as the end-to-end tests do
-    mainWindow?.webContents.send('pacenote:app:language-changed', language)
+    mainWindow.send('pacenote:app:language-changed', language)
     return language
   })
   // Settings > Devices: your Macs, and where Pace answers
@@ -1485,7 +1475,7 @@ function registerBotIpc(): void {
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
   stopTasksWatch = watchTasks(dataDir, () =>
-    mainWindow?.webContents.send('pacenote:tasks:changed')
+    mainWindow.send('pacenote:tasks:changed')
   )
   handle('pacenote:tasks:collect', undefined, () => {
     if (!tasksSettings().on)
@@ -1877,11 +1867,12 @@ function registerBotIpc(): void {
     return task ? suggestFolders(task, { home: homedir(), dataDir }) : []
   })
   handle('pacenote:tasks:choose-folder', undefined, async (repo) => {
-    if (!mainWindow) return undefined
+    const window = mainWindow.current
+    if (!window) return undefined
     // Next to the folder you worked in last, where your checkouts are
     const [last] = recentFolders(homedir(), { leaveOut: [dataDir], limit: 1 })
     const t = localized(text)
-    const result = await dialog.showOpenDialog(mainWindow, {
+    const result = await dialog.showOpenDialog(window, {
       title: typeof repo === 'string' ? t.whereIs(repo) : t.chooseFolder,
       defaultPath: last ? path.dirname(last.path) : homedir(),
       properties: ['openDirectory'],
@@ -2184,8 +2175,7 @@ function registerBotIpc(): void {
           ? env.NOTES_LANGUAGE
           : getLocale(),
         log: log.child('setup'),
-        onMention: (user) =>
-          mainWindow?.webContents.send('pacenote:setup:claimed', user),
+        onMention: (user) => mainWindow.send('pacenote:setup:claimed', user),
       })
       return { ok: true as const }
     })
@@ -2294,7 +2284,7 @@ function registerBotIpc(): void {
     sandboxSignIn.signOut(cli)
   })
   sandbox.on('job', (job) => {
-    mainWindow?.webContents.send('pacenote:sandbox:job-changed', job)
+    mainWindow.send('pacenote:sandbox:job-changed', job)
     // A finished job may have started or stopped the proxy or the broker; the
     // bot checks the sandbox again.
     if (job.state !== 'running') supervisor?.recheckSandbox()
@@ -2310,7 +2300,7 @@ function registerBotIpc(): void {
   ] as const
   let last = supervisor?.current
   supervisor?.on('change', (state) => {
-    mainWindow?.webContents.send('pacenote:bot:changed', state)
+    mainWindow.send('pacenote:bot:changed', state)
     if (TRAY_FIELDS.some((key) => state[key] !== last?.[key])) updateTray()
     last = state
     // Pace takes the mentions from here on, so setup stops listening for
@@ -2320,7 +2310,7 @@ function registerBotIpc(): void {
         if (!claim) return
         await stopClaim()
         claimPaused = false
-        mainWindow?.webContents.send(
+        mainWindow.send(
           'pacenote:setup:claim-ended',
           state.phase === 'external'
             ? localized(text).startedElsewhere
@@ -2328,154 +2318,12 @@ function registerBotIpc(): void {
         )
       })
   })
-  handle(
-    'pacenote:window:full-screen',
-    false,
-    () => mainWindow?.isFullScreen() ?? false
-  )
+  handle('pacenote:window:full-screen', false, () => mainWindow.isFullScreen())
   handle('pacenote:app:update', null, () => updates?.current ?? null)
   updates?.on('change', (state) => {
-    mainWindow?.webContents.send('pacenote:app:update-changed', state)
+    mainWindow.send('pacenote:app:update-changed', state)
     updateTray()
   })
-}
-
-async function createWindow(route = ''): Promise<void> {
-  if (mainWindow) {
-    showMainWindow(route || undefined)
-    return
-  }
-  const window = new BrowserWindow({
-    // For captures the size can be changed: a narrow width for tight layouts, a
-    // tall height for long screens.
-    width:
-      (captureFile && Number(process.env.PACENOTE_DESKTOP_CAPTURE_WIDTH)) ||
-      1360,
-    height:
-      (captureFile && Number(process.env.PACENOTE_DESKTOP_CAPTURE_HEIGHT)) ||
-      880,
-    minWidth: 600,
-    minHeight: 600,
-    show: false,
-    title: appName,
-    icon: appIcon,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1714' : '#fafdfb',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 15 },
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      preload: path.join(distDir, 'preload.cjs'),
-      // Tells the UI it runs from the repository (preload reads it from argv).
-      additionalArguments: app.isPackaged ? [] : ['--pacenote-dev'],
-    },
-  })
-  mainWindow = window
-  if (!captureFile) window.once('ready-to-show', () => window.show())
-  // Full screen hides the traffic lights, so the title bar stops keeping room
-  // for them.
-  const fullScreen = (on: boolean) => () =>
-    window.webContents.send('pacenote:window:full-screen-changed', on)
-  window.on('enter-full-screen', fullScreen(true))
-  window.on('leave-full-screen', fullScreen(false))
-  window.on('close', (event) => {
-    if (!isQuitting) {
-      event.preventDefault()
-      window.hide()
-    }
-  })
-  // A window whose process ended is blank: it loads again, unless that keeps
-  // happening.
-  const gone: number[] = []
-  window.webContents.on('render-process-gone', (_event, details) => {
-    log.error(
-      `The window's process ended (${details.reason}, exit code ${details.exitCode})`
-    )
-    if (details.reason === 'clean-exit' || isQuitting) return
-    const now = Date.now()
-    gone.push(now)
-    while (gone.length && now - gone[0]! > 60_000) gone.shift()
-    if (gone.length > 3) {
-      log.error('Not reloading the window: its process keeps ending.')
-      return
-    }
-    window.webContents.reload()
-  })
-  window.on('unresponsive', () => log.warn('The window stopped responding.'))
-  window.on('responsive', () => log.info('The window responds again.'))
-  // External addresses such as Slack links open in the default browser.
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https:\/\//.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
-  const screenUrl = webDevUrl ?? 'pacenote://app/'
-  const screen = new ScreenLoader({
-    load: () => window.loadURL(`${screenUrl}${route}`),
-    probe: () => screenFiles.probe(),
-    showUnavailable: (reason) =>
-      window.loadURL(
-        `data:text/html;charset=utf-8,${encodeURIComponent(
-          unavailablePage({ app: appName, reason, retryUrl: screenUrl })
-        )}`
-      ),
-    // An upgrade put a new version in place: that one opens instead.
-    gone: () =>
-      window.isDestroyed() ||
-      isQuitting ||
-      restarting ||
-      (bundleWatch?.check() ?? false),
-    passing: () => bundleWatch?.swapping() ?? false,
-    log,
-  })
-  mainScreen = screen
-  window.on('closed', () => {
-    if (mainWindow === window) mainWindow = undefined
-    if (mainScreen === screen) mainScreen = undefined
-  })
-  window.webContents.on('will-navigate', (event, url) => {
-    // "Try again" on the page that says why the screen is not there
-    if (screen.unavailable) {
-      event.preventDefault()
-      screen.retryNow()
-      return
-    }
-    if (
-      !url.startsWith('pacenote://app/') &&
-      !(webDevUrl && url.startsWith(webDevUrl))
-    )
-      event.preventDefault()
-  })
-  // The screen failing later, such as reloaded while an upgrade swaps its
-  // files, is loaded again the same way, on the screen it was on. One
-  // navigation cut short by the next (-3) is no failure.
-  window.webContents.on(
-    'did-fail-load',
-    (_event, code, _description, url, isMainFrame) => {
-      if (!isMainFrame || code === -3 || url.startsWith('data:')) return
-      route = URL.canParse(url) ? new URL(url).hash : route
-      void screen.load()
-    }
-  )
-  if (webDevUrl) await waitForUrl(webDevUrl)
-  // Not waited for: the screen may take its time, and the app goes on.
-  const loaded = screen.load()
-  if (captureFile) await loaded.then(() => capture(window, captureFile))
-}
-
-/**
- * Waits until the dev server is up. (pnpm desktop:dev starts the UI and the app
- * together) One that stays down is the screen's to try again for.
- */
-async function waitForUrl(url: string): Promise<void> {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    try {
-      if ((await fetch(url, { signal: AbortSignal.timeout(1_000) })).ok) return
-    } catch {
-      // Still starting.
-    }
-    await sleep(250)
-  }
 }
 
 async function capture(window: BrowserWindow, file: string): Promise<void> {
@@ -2515,7 +2363,7 @@ async function reportStartupError(error: unknown): Promise<void> {
   }
   log.error(`Could not start: ${message}`)
   openOnActivate()
-  showMainWindow()
+  mainWindow.show()
 }
 
 /** When this copy last quit, for the next one to read (quit-mark.ts) */
@@ -2530,7 +2378,7 @@ let opensOnActivate = false
 function openOnActivate(): void {
   if (opensOnActivate) return
   opensOnActivate = true
-  app.on('activate', () => showMainWindow())
+  app.on('activate', () => mainWindow.show())
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -2539,7 +2387,7 @@ if (!app.requestSingleInstanceLock()) {
   // Opened again: usually to show the window, or after an upgrade put a new
   // version in this one's place, which this copy then restarts into.
   app.on('second-instance', () => {
-    if (!bundleWatch?.check()) showMainWindow()
+    if (!bundleWatch?.check()) mainWindow.show()
   })
   app
     .whenReady()
@@ -2596,7 +2444,7 @@ if (!app.requestSingleInstanceLock()) {
       updates?.start(updateUrl ? 1_000 : 30_000)
       if (atLogin) log.info('Opened at login; the window waits')
       else
-        await createWindow(
+        await mainWindow.open(
           setup.view().open
             ? firstRun()
               ? '#/start'
