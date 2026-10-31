@@ -38,7 +38,7 @@ export function whoOf(
 }
 
 /** Where it was asked: this Mac, or its channel */
-export function whereOf(task: TaskView, t: RowWords): string | undefined {
+export function whereOf(task: TaskView, t: RowWords): string {
   return task.source.app === 'local' && task.source.label === LOCAL.label
     ? t.thisMac
     : task.source.label

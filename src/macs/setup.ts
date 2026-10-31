@@ -5,7 +5,7 @@ import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import { setupDial, type MacChannel, type MacHello } from './channel.js'
 import { hostPort } from './network.js'
 import { text } from './setup.text.js'
-import type { FromMacState, SetupPayload } from './types.js'
+import type { FromMacMode, FromMacState, SetupPayload } from './types.js'
 
 /**
  * A new Mac's setup, taken from your other Mac (the Slack step's "Connect to
@@ -30,15 +30,21 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
   >()
   /** The try now: an older one's events are let go */
   private attempt = 0
+  /** What this look takes in (FromMacMode) */
+  private mode: FromMacMode = 'pace'
 
   constructor(
     private readonly options: {
       /** This Mac, as the other one will show it */
       me: () => MacHello
-      /** Takes in what the other Mac sent; throws when it cannot */
+      /**
+       * Takes in what the other Mac sent, as the look that found it asked
+       * (mode); throws when it cannot
+       */
       apply: (
         payload: SetupPayload,
-        from: { name: string; address?: string }
+        from: { name: string; address?: string },
+        mode: FromMacMode
       ) => Promise<void> | void
       log: (message: string) => void
       /** Look on the network with Bonjour (off in tests) */
@@ -54,9 +60,13 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     return this.state
   }
 
-  /** Looks for a Mac waiting in Add a device on this network */
-  look(): void {
+  /**
+   * Looks for a Mac waiting in Add a device on this network, for what it
+   * takes this time: Pace's setup, Todo's first run, or Settings (FromMacMode)
+   */
+  look(mode: FromMacMode = 'pace'): void {
     this.cancel()
+    this.mode = mode
     if (this.options.bonjour !== false) {
       this.bonjour = new Bonjour({
         service: SETUP_SERVICE,
@@ -188,10 +198,14 @@ export class SetupFromMac extends EventEmitter<{ change: [FromMacState] }> {
     target: { instance: string } | { address: string }
   ): Promise<void> {
     try {
-      await this.options.apply(payload, {
-        name,
-        ...('address' in target ? { address: target.address.trim() } : {}),
-      })
+      await this.options.apply(
+        payload,
+        {
+          name,
+          ...('address' in target ? { address: target.address.trim() } : {}),
+        },
+        this.mode
+      )
     } catch (err) {
       const message = (err as Error).message
       channel.send({ t: 'setup-failed', error: message })
