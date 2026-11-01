@@ -59,7 +59,9 @@ describe('the sandbox sign-in', () => {
   /**
    * A pacenote-vm that runs claude's login: it prints the page, reads the code
    * it is handed, and on the right one leaves the credentials file in the
-   * folder mounted at /run/login, as claude does
+   * folder mounted at /run/login, as claude does. It has no extension, so a
+   * package.json of "type": "module" above the temp folder makes it ESM: it
+   * takes fs where both kinds can.
    */
   function fakeVm(): string {
     const bin = path.join(root, 'pacenote-vm')
@@ -75,7 +77,7 @@ process.stdin.once('data', (chunk) => {
     console.log('Login failed: Invalid code')
     process.exit(1)
   }
-  require('fs').writeFileSync(mount[0] + '/.credentials.json', '{}')
+  process.getBuiltinModule('node:fs').writeFileSync(mount[0] + '/.credentials.json', '{}')
   console.log('Login successful.')
   process.exit(0)
 })
