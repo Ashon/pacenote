@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { TasksSettings } from './settings.js'
 import {
+  ADDED_BY_YOU,
   findMessage,
   LOCAL,
   SOURCES,
@@ -469,7 +470,13 @@ export interface NewFollowUp {
 export function addFollowUp(
   dataDir: string,
   item: NewFollowUp,
-  options: { addedBy?: string; repo?: string; now?: Date } = {}
+  options: {
+    addedBy?: string
+    repo?: string
+    /** Where it was added, when it has no repository: This Mac otherwise */
+    label?: string
+    now?: Date
+  } = {}
 ): { task: Task; added: boolean } | { error: string } {
   return withTasksLock(dataDir, () => {
     const now = options.now ?? new Date()
@@ -494,7 +501,7 @@ export function addFollowUp(
       source: {
         app: 'local',
         conversation: repo ?? 'local',
-        label: repo ?? LOCAL.label,
+        label: repo ?? options.label ?? LOCAL.label,
         message: key,
       },
       title,
@@ -514,4 +521,31 @@ export function addFollowUp(
     writeTasks(dataDir, { ...file, tasks: [...file.tasks, task] })
     return { task, added: true }
   })
+}
+
+/**
+ * Todo's New task: a task you add yourself, here or on a device of yours
+ * (from: its name, as Your devices has it, which the task says it was added
+ * on), in a project's repository or none. As the bridge hands it: anything.
+ */
+export function addYourTask(
+  dataDir: string,
+  title: unknown,
+  repo: unknown,
+  from?: unknown
+): { id: string } | { error: string } | undefined {
+  if (typeof title !== 'string' || !title.trim()) return undefined
+  const device =
+    typeof from === 'string' && from.trim() ? from.trim() : undefined
+  const result = addFollowUp(
+    dataDir,
+    {
+      title,
+      why: device ? `Added on ${device}` : 'Added by you',
+      repo: typeof repo === 'string' ? repo : undefined,
+    },
+    { addedBy: ADDED_BY_YOU, label: device }
+  )
+  if ('error' in result) return result
+  return { id: result.task.id }
 }

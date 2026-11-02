@@ -93,6 +93,8 @@ export { recapText, type CopyFormat } from './lib/recap'
 export { ThemeProvider, useTheme } from './lib/theme'
 export type { ThemeMode } from './lib/theme'
 export { useSupervisor } from './lib/desktop'
+// Your areas as the Mac has them, which New task offers as its projects
+export { useYou } from './lib/you'
 export { cn, go } from './lib/utils'
 
 // The Mac's own code the device speaks with: what people asked and what they
@@ -138,6 +140,9 @@ export type {
   WorkTool,
 } from '@src/tasks/types'
 export { taskArea } from '@src/you/task-area'
+// New task's project: guessed from its words, or one you pick
+export { areaChoices, guessArea } from '@src/you/guess'
+export type { AreaChoice, AreaGuess } from '@src/you/guess'
 // The run history's kinds and states, which the phone filters its run list by
 export type { RunKind, RunStatus } from '@history/types'
 export type {

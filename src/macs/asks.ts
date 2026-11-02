@@ -36,6 +36,8 @@ export const DEVICE_CHANGES = {
   'you.takeOut': 'pacenote:you:take-out',
   'you.merge': 'pacenote:you:merge',
   'you.leave': 'pacenote:you:leave',
+  // Todo's New task: on the Mac, as added on the device (argsFromDevice)
+  'tasks.add': 'pacenote:tasks:add',
 } as const
 
 export const DEVICE_ASKS = { ...DEVICE_READS, ...DEVICE_CHANGES }
@@ -69,9 +71,15 @@ export const MAC_ONLY_SETTINGS: ReadonlySet<string> = new Set([
 
 /**
  * What a device's ask takes to the Mac: a change to settings without those
- * that stay on the Mac
+ * that stay on the Mac, and a task it adds with where it was added (from,
+ * the device's name as Your devices has it), never a place it says itself
  */
-export function argsFromDevice(what: DeviceAsk, args: unknown[]): unknown[] {
+export function argsFromDevice(
+  what: DeviceAsk,
+  args: unknown[],
+  from?: string
+): unknown[] {
+  if (what === 'tasks.add') return [args[0], args[1], from]
   if (what !== 'settings.validate' && what !== 'settings.save') return args
   const changes = Object.fromEntries(
     Object.entries((args[0] ?? {}) as Record<string, unknown>).filter(

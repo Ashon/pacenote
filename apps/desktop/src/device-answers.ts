@@ -44,7 +44,7 @@ export class DeviceAnswers {
     if (what === API_ASK) return apiForDevice(reader, args[0])
     const run = this.bridged.get(DEVICE_ASKS[what])
     if (!run) throw new Error(`${what} is not answered on this Mac`)
-    const taken = argsFromDevice(what, args)
+    const taken = argsFromDevice(what, args, peerName(peer))
     if (what === 'settings.save')
       log(
         `Settings changed from ${peerName(peer)}: ${Object.keys(

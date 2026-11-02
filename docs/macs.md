@@ -126,7 +126,7 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   released) never gets your Macs' key or your Slack app: Add a device gives it one made from that key and its id, which
   each of your Macs works out again as it says hello, and none does once you remove it. It asks the Mac it reaches for
   what the Mac's own screens show, and the Mac answers only what a device may ask, never a secret
-  ([src/macs/asks.ts](../src/macs/asks.ts)).
+  ([src/macs/asks.ts](../src/macs/asks.ts)). A task you add on a device is the Mac's, kept as added on that device.
 - **Pace follows only within one Slack app.** Each Mac says which Slack app Pace answers through there, one way (a hash
   of its key), and Pace moves only between Macs of the same app of your own. Macs that only share Todo never stand by
   for one another.

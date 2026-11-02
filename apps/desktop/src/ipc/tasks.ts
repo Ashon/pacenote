@@ -12,7 +12,6 @@ import {
   saveRepo,
   suggestFolders,
 } from '../../../../src/tasks/folders.js'
-import { ADDED_BY_YOU } from '../../../../src/tasks/sources.js'
 import {
   allTaskViews,
   buildView,
@@ -35,7 +34,7 @@ import {
   readWork,
   updateWork,
 } from '../../../../src/tasks/work.js'
-import { addFollowUp } from '../../../../src/tasks/write.js'
+import { addYourTask } from '../../../../src/tasks/write.js'
 import {
   answerGroup,
   notYourGroups,
@@ -181,21 +180,11 @@ export function registerTasksIpc(
     if (stage === 'started' || stage === 'waiting' || stage === 'open')
       setStage(dataDir, id, stage)
   })
-  // A task you add yourself (Todo's New task), in a project's repository
-  ipc.handle('pacenote:tasks:add', undefined, (title, repo) => {
-    if (typeof title !== 'string' || !title.trim()) return undefined
-    const result = addFollowUp(
-      dataDir,
-      {
-        title,
-        why: 'Added by you',
-        repo: typeof repo === 'string' ? repo : undefined,
-      },
-      { addedBy: ADDED_BY_YOU }
-    )
-    if ('error' in result) return result
-    return { id: result.task.id }
-  })
+  // A task you add yourself (Todo's New task), in a project's repository;
+  // from a device of yours, the device it was added on (DeviceAnswers)
+  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from) =>
+    addYourTask(dataDir, title, repo, from)
+  )
   ipc.handle('pacenote:tasks:leave-out', [], (label) => {
     if (typeof label !== 'string' || !label.trim()) return []
     const { exclude } = todo.current()

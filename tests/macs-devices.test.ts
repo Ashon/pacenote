@@ -24,6 +24,8 @@ import {
 } from '../src/macs/channel.js'
 import { GROUP_FILE, Macs, MACS_FILE } from '../src/macs/macs.js'
 import { tailnetAddresses } from '../src/macs/network.js'
+import { readTasks } from '../src/tasks/store.js'
+import { addYourTask } from '../src/tasks/write.js'
 
 /** Waits for the Macs to get there, with room for a busy run */
 const poll = <T>(check: () => T) =>
@@ -253,15 +255,20 @@ describe('your devices and your Macs', () => {
           saved.push(changes)
           return { issues: [], restarted: false }
         },
+        'pacenote:tasks:add': (title, repo, from) =>
+          addYourTask(dataDir, title, repo, from),
       }
       const reader = new HistoryReader(dataDir)
       const asks = new DeviceAsks({
         macs,
-        answer: async (what, args) => {
+        answer: async (what, args, peer) => {
           if (what === API_ASK) return apiForDevice(reader, args[0])
+          const from = macs.view().devices.find((d) => d.id === peer)?.name
           return valueForDevice(
             what,
-            await bridged[DEVICE_ASKS[what]]?.(...argsFromDevice(what, args))
+            await bridged[DEVICE_ASKS[what]]?.(
+              ...argsFromDevice(what, args, from)
+            )
           )
         },
         log: () => undefined,
@@ -307,6 +314,21 @@ describe('your devices and your Macs', () => {
         { REASONER: 'codex', SLACK_BOT_TOKEN: 'xoxb-new', OPS_FS_ROOT: '/' },
       ])
       expect(saved).toEqual([{ REASONER: 'codex' }])
+      // A task added on the device: the Mac's own, saying where it was added
+      // (the device's name as Your devices has it, not one it sends)
+      const added = await ask('tasks.add', [
+        'Renew the staging TLS certificate',
+        undefined,
+        'This Mac',
+      ])
+      const id = (added.value as { id: string }).id
+      expect(id).toMatch(/^local:/)
+      expect(readTasks(dataDir).tasks.find((t) => t.id === id)).toMatchObject({
+        title: 'Renew the staging TLS certificate',
+        addedBy: 'you',
+        reason: 'Added on iPad',
+        source: { app: 'local', label: 'iPad' },
+      })
       // Anything else, it does not answer
       expect(await ask('tasks.list')).toMatchObject({ error: 'not-allowed' })
     },
