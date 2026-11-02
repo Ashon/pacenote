@@ -23,6 +23,8 @@ export { RunList } from './components/run-list'
 export { SettingsPage } from './components/settings-page'
 export { YouPage } from './components/you-page'
 export { PacenoteMark } from './components/logo'
+// The mark at work, which the app's pull to refresh shows as it waits
+export { PaceSpinner } from './components/pace-spinner'
 // A task's line under its title, as the Mac's Todo row draws it: who, where
 // and when, then the pills each screen adds
 export {
