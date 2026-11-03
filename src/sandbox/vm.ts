@@ -61,6 +61,21 @@ export interface VmSandboxOptions {
 /** What pacenote-vm says and takes (its formatVersion) */
 const VM_FORMAT = 1
 
+/**
+ * Gives a run's command stdout and stderr of its own, then runs it (sh -c
+ * OWN_STDIO sh COMMAND ARGS...). The image's port forwarders
+ * (egress-forward.mjs) share the run's pipes, and Node makes them non-blocking
+ * on their first connection. codex then dies on a full pipe ("failed printing
+ * to stdout") once a big tool result, such as a screenshot, fills it. The
+ * pipes opened again are the same pipes with flags of their own, which stay
+ * blocking.
+ */
+export const OWN_STDIO = [
+  '[ -p /proc/self/fd/1 ] && [ -w /proc/self/fd/1 ] && exec >/proc/self/fd/1',
+  '[ -p /proc/self/fd/2 ] && [ -w /proc/self/fd/2 ] && exec 2>/proc/self/fd/2',
+  'exec "$@"',
+].join('\n')
+
 /** HOME and /tmp: empty tmpfs on every run */
 const TMPFS = [
   '/tmp:size=256m,mode=1777',
@@ -233,7 +248,16 @@ export class VmSandbox implements Sandbox {
     try {
       const result = await runProcess(
         this.options.bin,
-        vmRunArgs(this.options, run, egress.socket, door?.socket),
+        vmRunArgs(
+          this.options,
+          {
+            ...run,
+            command: 'sh',
+            args: ['-c', OWN_STDIO, 'sh', run.command, ...run.args],
+          },
+          egress.socket,
+          door?.socket
+        ),
         {
           input: run.input,
           timeoutMs: run.timeoutMs,

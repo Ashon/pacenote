@@ -19,6 +19,8 @@ import { loadConfig } from '../src/config.js'
 import { EgressProxy, isLocalAddress } from '../src/sandbox/egress.js'
 import {
   memoryMiB,
+  OWN_STDIO,
+  VmSandbox,
   vmOutdated,
   vmProblems,
   vmRunArgs,
@@ -212,6 +214,48 @@ describe('built-in sandbox runs', () => {
         { command: 'pdftotext', args: ['/in/a.pdf', '-'] }
       ).slice(-6)
     ).toEqual(['--workdir', '/work', '--', 'pdftotext', '/in/a.pdf', '-'])
+  })
+
+  it('runs the command on stdout and stderr of its own, passing input, output and exit through', async () => {
+    // A pacenote-vm that runs the guest command here
+    const dir = mkdtempSync(path.join(root, 'own-stdio-'))
+    const bin = path.join(dir, 'pacenote-vm')
+    writeFileSync(
+      bin,
+      `#!/bin/sh\necho "$*" > "${dir}/args"\nwhile [ "$1" != -- ]; do shift; done\nshift\nexec "$@"\n`,
+      { mode: 0o755 }
+    )
+    const sandbox = new VmSandbox({
+      bin,
+      root: '/vm',
+      image: 'reasoner',
+      memoryMiB: 512,
+      cpus: 1,
+      allowlistFile: path.join(dir, 'allowed-domains.txt'),
+    })
+    try {
+      const result = await sandbox.run({
+        command: 'sh',
+        args: ['-c', 'cat; echo "$0 $1" >&2', 'a', 'b'],
+        input: 'hello',
+        timeoutMs: 10_000,
+      })
+      expect(result.stdout).toBe('hello')
+      expect(result.stderr.trim()).toBe('a b')
+      expect(readFileSync(path.join(dir, 'args'), 'utf8')).toContain(
+        `-- sh -c ${OWN_STDIO} sh sh -c`
+      )
+      await expect(
+        sandbox.run({
+          command: 'sh',
+          args: ['-c', 'exit 3'],
+          input: '',
+          timeoutMs: 10_000,
+        })
+      ).rejects.toMatchObject({ code: 3 })
+    } finally {
+      await sandbox.close()
+    }
   })
 
   it('reads the memory limit as a size such as 2g or 1536m', () => {
