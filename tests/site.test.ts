@@ -66,6 +66,7 @@ const SITE = build('site', {
   'v0.6.19': '2026-11-03T06:00:00Z',
   'v0.6.20': '2026-11-03T08:00:00Z',
   'v0.6.21': '2026-11-03T13:00:00Z',
+  'v0.6.22': '2026-11-03T15:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -383,14 +384,15 @@ describe('the news', () => {
         '<a class="news-featured" href="macs-without-slack/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 4)).toEqual([
+      'release v0.6.22/',
       'release v0.6.21/',
       'release v0.6.20/',
       'release v0.6.19/',
-      'release v0.6.18/',
     ])
     expect(rows('news/')).not.toContain('post macs-without-slack/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 14)).toEqual([
+    expect(rows('ko/news/').slice(0, 15)).toEqual([
+      'release v0.6.22/',
       'release v0.6.21/',
       'release v0.6.20/',
       'release v0.6.19/',
@@ -407,11 +409,11 @@ describe('the news', () => {
       'release ../../news/v0.6.10/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
-    expect(EVERY).toContain('ko/news/v0.6.21/')
+    expect(EVERY).toContain('ko/news/v0.6.22/')
     expect(read('ko/news/')).toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.22/')
+    expect(EVERY).not.toContain('news/v0.6.23/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -423,6 +425,7 @@ describe('the news', () => {
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
     // The newest eight, the one open among them
     const rail = [
+      '../v0.6.22/',
       '../v0.6.21/',
       '../v0.6.20/',
       '../v0.6.19/',
@@ -430,7 +433,6 @@ describe('the news', () => {
       './ *',
       '../v0.6.16/',
       '../v0.6.15/',
-      '../v0.6.14/',
     ]
     expect(recent('news/v0.6.17/').slice(0, 8)).toEqual(rail)
     // The Korean rail, its latest eight as the English one (the Korean list
@@ -445,9 +447,9 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest news: v0.6.21's notes, newer than the last feature post
-    expect(link('')).toEqual(['news/v0.6.21/', "What's new in v0.6.21"])
-    expect(link('ko/')).toEqual(['news/v0.6.21/', 'v0.6.21에서 달라진 점'])
+    // The latest news: v0.6.22's notes, newer than the last feature post
+    expect(link('')).toEqual(['news/v0.6.22/', "What's new in v0.6.22"])
+    expect(link('ko/')).toEqual(['news/v0.6.22/', 'v0.6.22에서 달라진 점'])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
