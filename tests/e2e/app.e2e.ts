@@ -56,9 +56,10 @@ let app: ElectronApplication | undefined
 /**
  * A screen for pacenote.dev's guide and news (site/shots/<lang>/<name>.png),
  * in English and in Korean, when E2E_SITE_SHOTS=1 (pnpm site:shots). The app
- * goes back to the language it had.
+ * goes back to the language it had. place puts the screen where the picture
+ * looks, again in each language.
  */
-async function siteShot(page: Page, name: string) {
+async function siteShot(page: Page, name: string, place?: () => Promise<void>) {
   if (!process.env.E2E_SITE_SHOTS) return
   const language = async (preference: string, lang: string) => {
     await page.evaluate(
@@ -70,6 +71,7 @@ async function siteShot(page: Page, name: string) {
     await language(lang, lang)
     // The screen in its new words, settled
     await page.waitForTimeout(600)
+    await place?.()
     const file = path.join(REPO, 'site/shots', lang, `${name}.png`)
     mkdirSync(path.dirname(file), { recursive: true })
     await page.screenshot({ path: file })
@@ -625,6 +627,9 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.screenshot({
       path: path.join(REPO, 'test-results/hub-admin-request.png'),
     })
+    await siteShot(page, 'hub-admin', () =>
+      manage.evaluate((card) => card.scrollIntoView({ block: 'start' }))
+    )
     await request.getByRole('button', { name: 'Add' }).click()
     await manage.locator('[data-hub-member="bob"]').waitFor()
     await eventually('the note that bob was added', () =>

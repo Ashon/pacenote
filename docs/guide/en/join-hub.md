@@ -14,7 +14,7 @@ your own login, from your Mac.
 - Pacenote on an Apple silicon Mac where Claude Code or Codex is signed in. New to it? Start with
   [From install to Pace's first answer](guide:install).
 - The link a teammate shared, or the hub's address.
-- If the hub lets only listed members use it, your Slack account on that list.
+- If the hub is only for members its admins add, an admin to add you. Mention Pace and the hub asks them for you.
 
 ## 1. Open the link
 
@@ -49,6 +49,11 @@ Connect again for a new one.
 
 A public address needs https. Plain http works only on your own network: a private address, or a name that exists only
 there.
+
+### Pace says it asked the hub's admins
+
+The hub is only for members its admins add. Once one adds you, Pace tells you so in the same place. If the code you
+sent is still good, Pacenote goes on to confirm it; otherwise connect again for a new one.
 
 ### The hub does not answer
 

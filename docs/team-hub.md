@@ -70,8 +70,10 @@ Installing it from Pacenote (on a Linux server with Docker):
    with no code to send in Slack. Otherwise (in setup, or with no member ID yet) it pairs with a code as usual once the
    hub answers.
 
-Running the same command again updates the hub: the tokens stay, the image follows the version. The command holds no
-secret, and the link only fills the address and asks before anything changes.
+Running the same command again updates the hub: the tokens stay, the image follows the version. For a newer release,
+put its version in the command's URL and `--version`, or change the image's version in `compose.yaml` and run
+`docker compose pull && docker compose up -d` in the hub's folder. The command holds no secret, and the link only fills
+the address and asks before anything changes.
 
 Running the hub by hand (on a server of its own, with Docker):
 
