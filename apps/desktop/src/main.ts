@@ -84,6 +84,7 @@ import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
 import { OwnAi } from './own-ai.js'
 import { isOwnCli, type OwnCli } from '../../../src/tasks/own-ai.js'
 import { watchTasks } from './tasks-watch.js'
+import { HubAdmin } from './hub-admin.js'
 import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
 import { OpencodeSessions } from './opencode-sessions.js'
@@ -354,6 +355,7 @@ function toolPath(): string {
  */
 const settings = new SettingsStore({ settingsFile, dataDir, env: process.env })
 const hubPairing = new HubPairing(settings)
+const hubAdmin = new HubAdmin(settings)
 /**
  * A team hub installed from Settings: Pace switches to it as soon as it
  * answers (docs/team-hub.md)
@@ -1069,6 +1071,7 @@ function registerIpc(): void {
     settingsFile,
     applySettings,
     hubPairing,
+    hubAdmin,
     hubInstall,
     takeLinkedHub: () => {
       const url = linkedHub

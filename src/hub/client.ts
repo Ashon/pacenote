@@ -4,7 +4,10 @@ import { checkItem, type SlackCheckItem } from '../messengers/slack/check.js'
 import { text } from './client.text.js'
 import {
   HUB_PATHS,
+  type HubAdminAct,
+  type HubAdminView,
   type HubMe,
+  type HubPerson,
   type PairConfirmResponse,
   type PairStartResponse,
   type PairStatus,
@@ -20,7 +23,7 @@ export function newHubToken(): { token: string; tokenHash: string } {
 }
 
 /**
- * The desktop's calls to the team hub's pairing and status endpoints
+ * The desktop's calls to the team hub's pairing, status and admin endpoints
  * (src/hub/server.ts)
  */
 export class HubClient {
@@ -59,6 +62,24 @@ export class HubClient {
 
   disconnect(token: string): Promise<{ ok: boolean }> {
     return this.request(HUB_PATHS.disconnect, { method: 'POST', token })
+  }
+
+  /** The hub as its admins manage it; not_admin for other members */
+  admin(token: string): Promise<HubAdminView> {
+    return this.request(HUB_PATHS.admin, { token })
+  }
+
+  /** An admin's change, answered with the hub as it is after it */
+  adminAct(token: string, act: HubAdminAct): Promise<HubAdminView> {
+    return this.request(HUB_PATHS.admin, { method: 'POST', token, body: act })
+  }
+
+  /** People in the workspace whose names have these words, for admins */
+  people(token: string, words: string): Promise<{ people: HubPerson[] }> {
+    return this.request(
+      `${HUB_PATHS.adminPeople}?q=${encodeURIComponent(words)}`,
+      { token }
+    )
   }
 
   private async request<T>(

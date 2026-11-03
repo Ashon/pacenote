@@ -11,6 +11,12 @@ const en = {
     'Your Pacenote desktop is not connected to the hub right now. Open Pacenote on your computer and mention me again.',
   notAllowed:
     "You are not on the list of members who can use Pacenote here. Ask the hub's admin.",
+  asked:
+    "You are not on the list of members who can use Pacenote here yet. I asked the hub's admins to add you, and I'll tell you here when one does.",
+  added:
+    'An admin added you to the hub. In Pacenote, open Settings > Messengers > Slack, connect to the team hub, then send me the code it shows.',
+  addedPairing: (label: string) =>
+    `An admin added you to the hub. Confirm the pairing for "${label}" in your Pacenote app to finish.`,
   paired: (label: string) =>
     `Code accepted for "${label}". Confirm the pairing in your Pacenote app to finish.`,
   unknownCode:
@@ -26,6 +32,12 @@ const ko: typeof en = {
     '지금 Pacenote 데스크톱이 허브에 연결되어 있지 않아요. 컴퓨터에서 Pacenote를 열고 다시 멘션해 주세요.',
   notAllowed:
     '여기서 Pacenote를 쓸 수 있는 팀원 목록에 없어요. 허브 관리자에게 문의해 주세요.',
+  asked:
+    '아직 여기서 Pacenote를 쓸 수 있는 팀원 목록에 없어요. 허브 관리자에게 추가를 요청했고, 추가되면 여기서 알려 드릴게요.',
+  added:
+    '관리자가 허브 팀원으로 추가했어요. Pacenote에서 설정 > 메신저 > Slack을 열고 팀 허브에 연결한 다음, 거기 나오는 코드를 저에게 보내 주세요.',
+  addedPairing: (label) =>
+    `관리자가 허브 팀원으로 추가했어요. Pacenote 앱에서 "${label}"의 페어링을 확인하면 끝나요.`,
   paired: (label) =>
     `"${label}"의 코드를 받았어요. Pacenote 앱에서 페어링을 확인하면 끝나요.`,
   unknownCode:

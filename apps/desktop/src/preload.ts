@@ -195,6 +195,11 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:hub:pair-confirm', options),
     pairCancel: () => ipcRenderer.invoke('pacenote:hub:pair-cancel'),
     disconnect: () => ipcRenderer.invoke('pacenote:hub:disconnect'),
+    // For the hub's admins: its members, who may use it, and their Macs
+    admin: () => ipcRenderer.invoke('pacenote:hub:admin'),
+    adminAct: (act: unknown) =>
+      ipcRenderer.invoke('pacenote:hub:admin-act', act),
+    people: (words: string) => ipcRenderer.invoke('pacenote:hub:people', words),
     // Installing a hub on a server: its command, then the wait for it
     installCommand: (input: unknown) =>
       ipcRenderer.invoke('pacenote:hub:install-command', input),

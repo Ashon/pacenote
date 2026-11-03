@@ -52,8 +52,14 @@ const HubEnvSchema = z.object({
    * from the request's X-Forwarded-* headers.
    */
   HUB_PUBLIC_URL: z.string().url().optional(),
-  /** Members who may pair and use the hub. Empty: everyone in the workspace */
+  /**
+   * Members the hub starts with, each added once (src/hub/access.ts): a hub
+   * that starts with some is for listed members. Empty: everyone in the
+   * workspace, until an admin says otherwise
+   */
   HUB_ALLOWED_USERS: userIds,
+  /** Admins whatever Pacenote says. Empty: the installer, or first member */
+  HUB_ADMINS: userIds,
   /** The language of the notes the hub posts in Slack: en, ko */
   HUB_NOTES_LANGUAGE: z.enum(LOCALES).default('en'),
   /**
@@ -81,6 +87,7 @@ interface HubConfig {
   dataDir: string
   publicUrl?: string
   allowedUsers: string[]
+  admins: string[]
   /** The language of the notes the hub posts in Slack */
   notesLocale: Locale
   /** The installer's desktop, to pair once (HUB_PAIR) */
@@ -111,6 +118,7 @@ export function loadHubConfig(env: NodeJS.ProcessEnv): HubConfig {
     dataDir: e.HUB_DATA_DIR,
     publicUrl: e.HUB_PUBLIC_URL,
     allowedUsers: e.HUB_ALLOWED_USERS,
+    admins: e.HUB_ADMINS,
     notesLocale: e.HUB_NOTES_LANGUAGE,
     pair: e.HUB_PAIR
       ? {

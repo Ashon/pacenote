@@ -408,6 +408,18 @@ export class FakeSlack {
         return ok({
           bot: { id: BOT_ID, app_id: APP_ID, user_id: this.botUserId },
         })
+      // The workspace's people, for a hub's admins to add; the bot is one
+      case 'users.list':
+        return ok({
+          members: [...this.users.values()].map((user) => ({
+            id: user.id,
+            name: user.name,
+            real_name: user.name,
+            is_bot: user.id === this.botUserId,
+            profile: { display_name: user.name },
+          })),
+          response_metadata: { next_cursor: '' },
+        })
       case 'users.info': {
         const user = this.users.get(args.user ?? '')
         if (!user) return fail('user_not_found')

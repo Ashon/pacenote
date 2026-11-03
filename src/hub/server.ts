@@ -9,6 +9,7 @@ import type { Duplex } from 'node:stream'
 import { type WebSocket, WebSocketServer } from 'ws'
 import { localized, type Locale } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
+import type { AccessRequest, HubAccess } from './access.js'
 import type { Pairings } from './pairing.js'
 import { Grants, type MentionEvent } from './policy.js'
 import {
@@ -16,13 +17,19 @@ import {
   HEX64,
   HUB_CLOSE,
   HUB_PATHS,
+  type HubAdminAct,
+  type HubAdminView,
   type HubMe,
+  type HubMemberView,
   type HubMessage,
+  type HubPerson,
   type HubTeam,
+  type HubUser,
   type PairConfirmResponse,
   PAIRING_ID,
   PING,
   PONG,
+  SLACK_USER_ID,
 } from './protocol.js'
 import { text } from './server.text.js'
 import type { DesktopRecord, DesktopStore } from './store.js'
@@ -55,6 +62,14 @@ export interface SlackGateway {
     threadTs?: string
   ): Promise<void>
   userName(userId: string): Promise<string>
+  /** The workspace's people, for admins to add (users.list) */
+  people(): Promise<SlackPerson[]>
+}
+
+/** Someone in the workspace, and every name they go by, to search */
+export interface SlackPerson {
+  user: HubUser
+  names: string[]
 }
 
 /** The installer's desktop, until it connects with its own name */
@@ -65,8 +80,8 @@ interface HubOptions {
   pairings: Pairings
   slack: SlackGateway
   team: HubTeam
-  /** Members who may pair and use the hub. Empty: everyone in the workspace */
-  allowedUsers?: readonly string[]
+  /** Who may pair and use the hub, and who manages it */
+  access: HubAccess
   /**
    * The URL desktops reach the hub at, for rewritten upload URLs. Else taken
    * from the request (X-Forwarded-*).
@@ -86,6 +101,10 @@ const MAX_API_BODY = 2 * 1024 * 1024
 const MAX_UPLOAD_BODY = 50 * 1024 * 1024
 const UPLOAD_TTL_MS = 10 * 60_000
 const HEARTBEAT_MS = 30_000
+/** How long the workspace's people are kept for admins' searches */
+const PEOPLE_TTL_MS = 5 * 60_000
+/** The most people a search answers */
+const PEOPLE_FOUND = 20
 
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
 
@@ -107,6 +126,9 @@ export class HubServer {
   >()
   private readonly alive = new WeakMap<WebSocket, boolean>()
   private readonly heartbeat: NodeJS.Timeout
+  /** Names Slack gave for member IDs the hub has no name for */
+  private readonly names = new Map<string, string>()
+  private people?: { at: number; list: SlackPerson[] }
 
   constructor(private readonly options: HubOptions) {
     this.http = createServer((req, res) => {
@@ -141,23 +163,55 @@ export class HubServer {
   /**
    * Pairs the desktop of whoever ran the installer (HUB_PAIR), once: their
    * Pacenote made the token and switches to the hub as soon as it answers, with
-   * no code to send in Slack. A member the hub does not allow is left out.
+   * no code to send in Slack. They are the hub's admin if it has none; a
+   * member the hub does not allow is left out.
    */
   async pairInstaller(pair: {
     user: string
     tokenHash: string
   }): Promise<void> {
-    const { store, slack, log } = this.options
-    const allowed = this.options.allowedUsers ?? []
-    if (allowed.length > 0 && !allowed.includes(pair.user)) {
+    const { store, slack, access, log } = this.options
+    const name = await slack.userName(pair.user).catch(() => pair.user)
+    const user = { id: pair.user, name }
+    if (access.claimFirst(user))
+      log.info(`${name} (${pair.user}), who installed the hub, is its admin`)
+    if (!access.allows(pair.user)) {
       log.warn(
-        `HUB_PAIR names ${pair.user}, who is not in HUB_ALLOWED_USERS; not paired`
+        `HUB_PAIR names ${pair.user}, who is not on the hub's members; not paired`
       )
       return
     }
-    const name = await slack.userName(pair.user).catch(() => pair.user)
-    if (store.seed(pair.tokenHash, { id: pair.user, name }, INSTALLER_LABEL))
+    if (store.seed(pair.tokenHash, user, INSTALLER_LABEL))
       log.info(`Paired ${name} (${pair.user})'s desktop from the installer`)
+  }
+
+  /**
+   * The hub's first admin, for one with none yet (from before admins, started
+   * without HUB_PAIR or HUB_ADMINS): the member who paired first
+   */
+  claimAdmin(): void {
+    const [first] = [...this.options.store.list()].sort((a, b) =>
+      a.pairedAt.localeCompare(b.pairedAt)
+    )
+    if (first && this.options.access.claimFirst(first.user))
+      this.options.log.info(
+        `${first.user.name} (${first.user.id}), the first member paired, is the hub's admin; HUB_ADMINS names others`
+      )
+  }
+
+  /** Slack's names for the members and admins hub.env named by ID */
+  async fillNames(): Promise<void> {
+    const { access, slack } = this.options
+    const ids = new Set([
+      ...access.unnamed(),
+      ...access.adminIds().filter((id) => !this.knownName(id)),
+    ])
+    for (const id of ids) {
+      const name = await slack.userName(id).catch(() => undefined)
+      if (!name || name === id) continue
+      this.names.set(id, name)
+      access.rename({ id, name })
+    }
   }
 
   /**
@@ -178,14 +232,26 @@ export class HubServer {
             `Could not send a notice to ${user}: ${(err as Error).message}`
           )
         )
-    const allowed = this.options.allowedUsers ?? []
-    if (allowed.length > 0 && !allowed.includes(user))
-      return notice(t.notAllowed)
-
     const command = CONNECT_COMMAND.exec(event.text ?? '')
-    if (command) {
+    const code = command && `${command[1]}-${command[2]}`
+    const { access } = this.options
+    if (!access.allows(user)) {
+      if (access.adminIds().length === 0) return notice(t.notAllowed)
+      // Someone turned away waits for an admin, with the code they sent
       const name = await slack.userName(user).catch(() => user)
-      const code = `${command[1]}-${command[2]}`
+      access.ask({
+        user: { id: user, name },
+        at: new Date().toISOString(),
+        channel: event.channel,
+        threadTs: event.thread_ts,
+        code: code ?? undefined,
+      })
+      log.info(`${name} (${user}) asked to be added to the hub`)
+      return notice(t.asked)
+    }
+
+    if (code) {
+      const name = await slack.userName(user).catch(() => user)
       const bound = this.options.pairings.bind(code, { id: user, name })
       log.info(`Pairing code from ${name} (${user}): ${bound.result}`)
       return notice(
@@ -261,6 +327,10 @@ export class HubServer {
       this.options.log.info(
         `Paired ${desktop.user.name} (${desktop.user.id}) with "${desktop.label}"${replaced ? `, replacing "${replaced.label}"` : ''}`
       )
+      if (this.options.access.claimFirst(desktop.user))
+        this.options.log.info(
+          `${desktop.user.name}, the hub's first member, is its admin`
+        )
       return json(res, 200, {
         user: desktop.user,
         team,
@@ -283,6 +353,7 @@ export class HubServer {
         user: desktop.user,
         team,
         connected: Boolean(ws && ws.readyState === ws.OPEN),
+        admin: this.options.access.isAdmin(desktop.user.id),
       } satisfies HubMe)
     }
     if (req.method === 'POST' && url.pathname === HUB_PATHS.disconnect) {
@@ -292,6 +363,25 @@ export class HubServer {
         `Unpaired ${desktop.user.name}'s desktop "${desktop.label}"`
       )
       return json(res, 200, { ok: true })
+    }
+    if (
+      url.pathname === HUB_PATHS.admin ||
+      url.pathname === HUB_PATHS.adminPeople
+    ) {
+      if (!this.options.access.isAdmin(desktop.user.id))
+        return json(res, 403, { error: 'not_admin' })
+      if (req.method === 'GET' && url.pathname === HUB_PATHS.admin)
+        return json(res, 200, this.adminView(desktop.user))
+      if (req.method === 'POST' && url.pathname === HUB_PATHS.admin) {
+        const error = await this.act(desktop.user, await readJson(req))
+        if (error)
+          return json(res, error === 'invalid_request' ? 400 : 409, { error })
+        return json(res, 200, this.adminView(desktop.user))
+      }
+      if (req.method === 'GET' && url.pathname === HUB_PATHS.adminPeople)
+        return json(res, 200, {
+          people: await this.findPeople(url.searchParams.get('q') ?? ''),
+        })
     }
     if (req.method === 'POST' && url.pathname.startsWith(HUB_PATHS.api))
       return this.proxyApi(
@@ -310,6 +400,191 @@ export class HubServer {
         url.searchParams.get('key') ?? ''
       )
     return json(res, 404, { error: 'not_found' })
+  }
+
+  /**
+   * The hub as its admins see it: who is on it, their Macs, and who waits.
+   * Nothing of any message.
+   */
+  private adminView(you: HubUser): HubAdminView {
+    const { access, store, team } = this.options
+    const users = new Map<string, HubUser>()
+    for (const member of access.members())
+      users.set(member.user.id, member.user)
+    for (const id of access.adminIds())
+      if (!users.has(id)) users.set(id, this.userKnown(id))
+    // A paired Mac's name for its member is the latest
+    for (const desktop of store.list()) users.set(desktop.user.id, desktop.user)
+    const members = [...users.values()].map((user): HubMemberView => {
+      const listed = access.members().find((m) => m.user.id === user.id)
+      const desktop = store.byUser(user.id)
+      const ws = desktop && this.sockets.get(desktop.id)
+      return {
+        user,
+        admin: access.isAdmin(user.id),
+        fixedAdmin: access.fixedAdmin(user.id),
+        listed: Boolean(listed),
+        addedAt: listed?.addedAt,
+        addedBy: listed?.addedBy,
+        desktop: desktop && {
+          label: desktop.label,
+          pairedAt: desktop.pairedAt,
+          lastSeenAt: desktop.lastSeenAt,
+          connected: Boolean(ws && ws.readyState === ws.OPEN),
+        },
+      }
+    })
+    // Admins first, then by name
+    members.sort(
+      (a, b) =>
+        Number(b.admin) - Number(a.admin) ||
+        a.user.name.localeCompare(b.user.name)
+    )
+    return {
+      team,
+      you,
+      rule: access.rule(),
+      members,
+      requests: [...access.requests()]
+        .reverse()
+        .map((request) => ({ user: request.user, at: request.at })),
+    }
+  }
+
+  /** An admin's change (HubAdminAct), or why it cannot be made */
+  private async act(
+    you: HubUser,
+    body: Record<string, unknown> | undefined
+  ): Promise<string | undefined> {
+    const { access, log } = this.options
+    const act = body as Partial<HubAdminAct> | undefined
+    if (act?.do === 'rule') {
+      if (act.rule !== 'everyone' && act.rule !== 'members')
+        return 'invalid_request'
+      access.setRule(
+        act.rule,
+        this.options.store.list().map((desktop) => desktop.user)
+      )
+      log.info(
+        `${you.name} opened the hub to ${act.rule === 'members' ? 'listed members' : 'everyone in the workspace'}`
+      )
+      return undefined
+    }
+    const id = act && 'user' in act ? act.user : undefined
+    if (typeof id !== 'string' || !SLACK_USER_ID.test(id))
+      return 'invalid_request'
+    // Your own Mac and access are yours, in Settings
+    if (id === you.id) return 'not_yourself'
+    const user = await this.userOf(id)
+    switch (act?.do) {
+      case 'add': {
+        const request = access.add(user, you)
+        log.info(`${you.name} added ${user.name} (${id}) to the hub's members`)
+        if (request) await this.tellAdded(request)
+        return undefined
+      }
+      case 'decline':
+        access.decline(id)
+        log.info(`${you.name} declined ${user.name} (${id})'s request`)
+        return undefined
+      case 'remove':
+        if (access.fixedAdmin(id)) return 'set_in_hub_env'
+        access.remove(id)
+        this.unpair(id, 'Removed from the hub by an admin')
+        log.info(`${you.name} removed ${user.name} (${id}) from the hub`)
+        return undefined
+      case 'disconnect':
+        this.unpair(id, 'Disconnected by an admin')
+        log.info(`${you.name} disconnected ${user.name} (${id})'s desktop`)
+        return undefined
+      case 'admin':
+        if (typeof act.admin !== 'boolean') return 'invalid_request'
+        if (access.fixedAdmin(id)) return 'set_in_hub_env'
+        access.setAdmin(user, act.admin)
+        log.info(
+          `${you.name} ${act.admin ? 'made' : 'took'} ${user.name} (${id}) ${act.admin ? 'an admin' : 'off the admins'}`
+        )
+        return undefined
+    }
+    return 'invalid_request'
+  }
+
+  /**
+   * Tells someone an admin added where they asked, and binds the code they
+   * sent if their pairing is still waiting for it
+   */
+  private async tellAdded(request: AccessRequest): Promise<void> {
+    const t = localized(text, this.options.notesLocale ?? 'en')
+    const bound = request.code
+      ? this.options.pairings.bind(request.code, request.user)
+      : undefined
+    await this.options.slack
+      .postEphemeral(
+        request.channel,
+        request.user.id,
+        bound?.result === 'bound' ? t.addedPairing(bound.label) : t.added,
+        request.threadTs
+      )
+      .catch((err: unknown) =>
+        this.options.log.warn(
+          `Could not tell ${request.user.name} they were added: ${(err as Error).message}`
+        )
+      )
+  }
+
+  /** Unpairs a member's Mac and closes its connection */
+  private unpair(userId: string, reason: string): void {
+    const desktop = this.options.store.byUser(userId)
+    if (!desktop) return
+    this.options.store.remove(desktop.id)
+    this.drop(desktop, HUB_CLOSE.revoked, reason)
+  }
+
+  /** People in the workspace whose names have these words in them */
+  private async findPeople(q: string): Promise<HubPerson[]> {
+    const words = q.trim().toLowerCase()
+    if (!words) return []
+    if (!this.people || this.people.at < Date.now() - PEOPLE_TTL_MS)
+      this.people = { at: Date.now(), list: await this.options.slack.people() }
+    const { access } = this.options
+    return this.people.list
+      .filter(
+        (person) =>
+          person.user.id.toLowerCase() === words ||
+          person.names.some((name) => name.toLowerCase().includes(words))
+      )
+      .slice(0, PEOPLE_FOUND)
+      .map(({ user }) => ({
+        user,
+        member: access.listed(user.id) || access.isAdmin(user.id),
+      }))
+  }
+
+  /** A name the hub has for a member ID already */
+  private knownName(id: string): string | undefined {
+    const { access, store } = this.options
+    const named = (user?: HubUser) =>
+      user && user.name !== user.id ? user.name : undefined
+    return (
+      named(store.byUser(id)?.user) ??
+      named(access.members().find((m) => m.user.id === id)?.user) ??
+      named(access.requests().find((r) => r.user.id === id)?.user) ??
+      this.names.get(id) ??
+      this.people?.list.find((person) => person.user.id === id)?.user.name
+    )
+  }
+
+  private userKnown(id: string): HubUser {
+    return { id, name: this.knownName(id) ?? id }
+  }
+
+  /** A member by ID, named as the hub knows them or as Slack does */
+  private async userOf(id: string): Promise<HubUser> {
+    const known = this.knownName(id)
+    if (known) return { id, name: known }
+    const name = await this.options.slack.userName(id).catch(() => id)
+    if (name !== id) this.names.set(id, name)
+    return { id, name }
   }
 
   private async proxyApi(

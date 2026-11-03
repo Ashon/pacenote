@@ -1,5 +1,6 @@
 import { shell } from 'electron'
 import { isMcpClientId } from '../../../../src/history/mcp-clients.js'
+import type { HubAdmin } from '../hub-admin.js'
 import type { HubInstall } from '../hub-install.js'
 import type { HubPairing } from '../hub-pairing.js'
 import { mcpLaunch, type McpClients } from '../mcp-clients.js'
@@ -17,6 +18,7 @@ export function registerSettingsIpc(
     settingsFile,
     applySettings,
     hubPairing,
+    hubAdmin,
     hubInstall,
     takeLinkedHub,
     mcpClients,
@@ -26,6 +28,8 @@ export function registerSettingsIpc(
     /** Restarts or starts Pace on the settings saved; false when it cannot */
     applySettings: () => Promise<boolean>
     hubPairing: HubPairing
+    /** The team hub as its admins manage it */
+    hubAdmin: HubAdmin
     /** A team hub installed from Settings or setup (deploy/hub/install.sh) */
     hubInstall: HubInstall
     /** The hub a pacenote:// link opened, once */
@@ -65,6 +69,10 @@ export function registerSettingsIpc(
     return { ...confirmed, started }
   })
   ipc.handle('pacenote:hub:pair-cancel', undefined, () => hubPairing.cancel())
+  // Managing the hub, for its admins: members, who may use it, their Macs
+  ipc.handleOrError('pacenote:hub:admin', () => hubAdmin.view())
+  ipc.handleOrError('pacenote:hub:admin-act', (act) => hubAdmin.act(act))
+  ipc.handleOrError('pacenote:hub:people', (words) => hubAdmin.people(words))
   // Installing a hub from Settings or setup (deploy/hub/install.sh)
   ipc.handleOrError('pacenote:hub:install-command', async (input) =>
     hubInstall.command(input)

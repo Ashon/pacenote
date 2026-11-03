@@ -24,10 +24,29 @@ Slack <--Socket Mode--> hub (deploy/hub: Slack tokens, paired desktops) <--WebSo
   setup) and changes nothing until the teammate connects, and says how to install Pacenote on a Mac without it. The
   address is after the `#`, which browsers never send, so neither the site nor a link preview sees it, and the page
   counts nothing. The link holds no secret: each teammate still pairs with a code from their own Slack account, and a hub
-  set to listed members (`HUB_ALLOWED_USERS`, the installer's `--allow`) needs theirs added first.
+  for listed members needs an admin to add them first (see Managing it below).
 - One desktop per member: pairing again replaces the previous desktop. Settings > Messengers > Slack > Disconnect unpairs it.
-- The hub sees mentions and thread content in transit (as Slack's own servers do) and stores only paired desktops.
-  Grants are kept in memory, so restarting the hub ends edits to answers in progress.
+- The hub sees mentions and thread content in transit (as Slack's own servers do) and stores only paired desktops and
+  who may use it. Grants are kept in memory, so restarting the hub ends edits to answers in progress.
+
+Managing it, for the hub's admins: Settings > Messengers > Slack shows them "Manage the hub" under the pairing, and shows
+other members nothing more. Pacenote asks the hub with its own hub token (`/admin`, `src/hub/server.ts`), and nothing of
+any message is in what it gets back.
+
+- Who can use it: everyone in the workspace, or the members admins add. Switching to members keeps everyone paired at
+  the time on the list, so nobody using the hub is cut off.
+- Asking to join: on a hub for listed members, someone else who mentions Pace is told, alone, that the hub's admins were
+  asked, and waits under "Asking to join". Once an admin adds them, the hub tells them so where they asked; if they sent a
+  pairing code that is still good, it goes on to their Mac to confirm. Declining tells them nothing.
+- Add a member finds people in the workspace by name (`users.list`, with the `users:read` scope the app has already).
+- Each member's Mac: connected now or when it was last seen. From a member's menu: Make admin (or Remove as admin),
+  Disconnect their Mac (they can pair again if the hub allows them), and on a hub for listed members, Remove from the hub,
+  which also disconnects their Mac. An admin's own access is theirs, in their own Settings.
+- Admins: those `HUB_ADMINS` names, who stay admins whatever Pacenote says, and those admins make in Pacenote. A hub
+  with none makes its first one the member who ran the installer (`HUB_PAIR`), or the first member to pair; a hub from
+  before admins makes it the member who paired first, once, when it starts.
+- Who may use it and who manages it are kept in `access.json` in the hub's data folder, next to `desktops.json`. The
+  hub log says each change and who made it.
 
 Installing it from Pacenote (on a Linux server with Docker):
 
@@ -74,7 +93,8 @@ Running the hub by hand (on a server of its own, with Docker):
    address (10.x, 172.16-31.x, 192.168.x, Tailscale's 100.64.x) or a name that exists only there (`hub.local`,
    `hub.internal`, a name without a dot); the hub token and the threads then cross that network unencrypted.
 5. Give members the URL, or pair your own Pacenote and share the link from "Share with teammates". `docker compose logs
-   -f hub` shows pairings, connections, routed mentions and refused calls.
+   -f hub` shows pairings, connections, routed mentions, refused calls and what admins change. The first member to pair
+   manages the hub (set `HUB_ADMINS` to choose).
 
 From the repository instead of the published image: `pnpm install && pnpm bundle`, which writes `deploy/hub/dist/hub.mjs`,
 then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the same image without starting it).
@@ -83,7 +103,8 @@ then `docker compose up -d --build` in `deploy/hub` (`pnpm hub:image` builds the
 | --- | --- |
 | `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN` | The Slack app's tokens (required) |
 | `HUB_PUBLIC_URL` | The URL members use (https, or http on your own network); upload URLs handed to desktops are built from it |
-| `HUB_ALLOWED_USERS` | Comma-separated Slack user IDs who may pair and use the hub. Empty: everyone |
+| `HUB_ALLOWED_USERS` | Comma-separated Slack user IDs the hub starts with as its members: with some, it is for listed members. Each is added once, the first time the hub starts with it, and the admins keep the list in Pacenote after that. Empty: everyone, until an admin says otherwise |
+| `HUB_ADMINS` | Comma-separated Slack user IDs who manage the hub whatever Pacenote says. Empty: the member who ran the installer, or the first to pair |
 | `HUB_NOTES_LANGUAGE` | The language of the notes the hub posts to members in Slack (pairing, not connected): `en` (default) or `ko` |
 | `HUB_PAIR` | Written by the installer: the member who installed it and the SHA-256 of their Pacenote's token (`U...:<hex>`). Paired once, the first time the hub starts with it, and left alone after, so a later pairing or disconnect stays |
 | `HUB_PORT`, `HUB_HOST`, `HUB_DATA_DIR` | Listen port (8790, 0 for any free one), address (0.0.0.0) and data folder (`/data`) |

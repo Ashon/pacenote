@@ -3,6 +3,7 @@ import { App, SocketModeReceiver } from '@slack/bolt'
 import { consoleSink, createLogger } from '../logger.js'
 import { slackFilesOrigin } from '../messengers/slack/api.js'
 import { slackLogger } from '../messengers/slack/logger.js'
+import { HubAccess } from './access.js'
 import { loadHubConfig } from './config.js'
 import { slackGateway } from './gateway.js'
 import { Pairings } from './pairing.js'
@@ -33,18 +34,26 @@ async function main(): Promise<void> {
   const auth = await app.client.auth.test()
   const team = { id: auth.team_id ?? '', name: auth.team ?? '' }
 
+  const access = new HubAccess(path.join(config.dataDir, 'access.json'), {
+    members: config.allowedUsers,
+    admins: config.admins,
+  })
   const hub = new HubServer({
     store: new DesktopStore(path.join(config.dataDir, 'desktops.json')),
     pairings: new Pairings(),
     slack: slackGateway(config.botToken, app.client, config.apiUrl),
     team,
-    allowedUsers: config.allowedUsers,
+    access,
     publicUrl: config.publicUrl,
     filesOrigin: slackFilesOrigin(config.apiUrl),
     notesLocale: config.notesLocale,
     log,
   })
   if (config.pair) await hub.pairInstaller(config.pair)
+  hub.claimAdmin()
+  void hub
+    .fillNames()
+    .catch((err: unknown) => log.warn('Could not name hub.env members', err))
   app.event('app_mention', async ({ body }) => {
     await hub.handleMention(body as unknown as Record<string, unknown>)
   })
@@ -56,7 +65,7 @@ async function main(): Promise<void> {
   const port = await hub.listen(config.port, config.host)
   log.info(
     `Hub started: bot=${auth.user} @ ${team.name} (${team.id}), listening on ${config.host}:${port}, ` +
-      `allowed members=${config.allowedUsers.length > 0 ? config.allowedUsers.length : 'all'}`
+      `for ${access.rule() === 'members' ? `${access.members().length} listed members` : 'everyone in the workspace'}, admins=${access.adminIds().length}`
   )
 
   let stopping = false

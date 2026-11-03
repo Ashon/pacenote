@@ -12,6 +12,7 @@ import { LoaderCircle, PlugZap } from 'lucide-react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { botControl, useLoginItem, useSandbox } from '@/lib/desktop'
+import { HubAdminCard } from './hub-admin'
 import { go as goTo } from '@/lib/utils'
 import type { Locale } from '@src/i18n/locale'
 import { isOwnCli } from '@src/tasks/own-ai'
@@ -113,6 +114,9 @@ export interface SettingsCtx {
 export function MessengersSection({ ctx }: { ctx: SettingsCtx }) {
   const { t, view, remote, hubMode, valueOf, isSet, set, drop, load } = ctx
   const slackReady = ctx.slackReady
+  const hubPaired =
+    view.values.SLACK_CONNECTION === 'hub' &&
+    Boolean(view.secrets.HUB_TOKEN?.set)
   return (
     <>
       {MESSENGER_IDS.map((id) => (
@@ -156,10 +160,7 @@ export function MessengersSection({ ctx }: { ctx: SettingsCtx }) {
                 hubUrl={valueOf('HUB_URL')}
                 allow={valueOf('MENTION_ALLOWED_USERS')}
                 onAddress={(url) => set('HUB_URL', url)}
-                paired={
-                  view.values.SLACK_CONNECTION === 'hub' &&
-                  Boolean(view.secrets.HUB_TOKEN?.set)
-                }
+                paired={hubPaired}
                 onPaired={(text) => {
                   // Pairing saved the connection itself; drop those drafts and
                   // show what is saved now.
@@ -178,6 +179,10 @@ export function MessengersSection({ ctx }: { ctx: SettingsCtx }) {
               <SlackAppSetup />
             ) : undefined,
           })}
+          {/* For the hub's admins, on the hub this Mac is paired with */}
+          {hubMode && hubPaired && !remote && (
+            <HubAdminCard key={view.values.HUB_URL} />
+          )}
           {ctx.card('access')}
         </div>
       ))}

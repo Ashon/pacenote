@@ -80,6 +80,13 @@ export const HUB_PATHS = {
   pairConfirm: '/pair/confirm',
   me: '/me',
   disconnect: '/disconnect',
+  /**
+   * For the hub's admins: GET the members and the access rule, POST a change
+   * (HubAdminAct); both answer HubAdminView
+   */
+  admin: '/admin',
+  /** GET /admin/people?q=<words>: people in the workspace, to add */
+  adminPeople: '/admin/people',
 } as const
 
 /**
@@ -124,7 +131,69 @@ export interface HubMe {
   team: HubTeam
   /** Whether this desktop has a live /connect WebSocket */
   connected: boolean
+  /** Whether its member manages the hub (/admin). Hubs before 0.6.18 omit it */
+  admin?: boolean
 }
+
+/** Who may pair and use the hub: everyone in the workspace, or its members */
+export type HubAccessRule = 'everyone' | 'members'
+
+/** GET /admin: the hub as its admins manage it. Nothing of any message */
+export interface HubAdminView {
+  team: HubTeam
+  /** The admin asking */
+  you: HubUser
+  rule: HubAccessRule
+  /** Everyone the hub knows: paired, listed or an admin */
+  members: HubMemberView[]
+  /** People turned away who wait for an admin, the latest first */
+  requests: HubRequestView[]
+}
+
+export interface HubMemberView {
+  user: HubUser
+  admin: boolean
+  /** hub.env makes them an admin (HUB_ADMINS): Pacenote cannot change it */
+  fixedAdmin: boolean
+  /** On the list of members */
+  listed: boolean
+  addedAt?: string
+  /** The admin who added them */
+  addedBy?: HubUser
+  /** Their paired Mac */
+  desktop?: {
+    label: string
+    pairedAt: string
+    lastSeenAt?: string
+    connected: boolean
+  }
+}
+
+export interface HubRequestView {
+  user: HubUser
+  at: string
+}
+
+/** GET /admin/people: someone in the workspace, and whether the hub has them */
+export interface HubPerson {
+  user: HubUser
+  member: boolean
+}
+
+/** POST /admin: what an admin changes, by Slack member ID */
+export type HubAdminAct =
+  | { do: 'rule'; rule: HubAccessRule }
+  /** Puts them on the list, answering their request if they asked */
+  | { do: 'add'; user: string }
+  | { do: 'decline'; user: string }
+  /** Takes them off the list (and the admins), and unpairs their Mac */
+  | { do: 'remove'; user: string }
+  /** Unpairs their Mac; they can pair again if the hub allows them */
+  | { do: 'disconnect'; user: string }
+  | { do: 'admin'; user: string; admin: boolean }
+
+/** Slack member IDs, as the hub takes them */
+export const SLACK_USER_ID = /^[UW][A-Z0-9]+$/
 
 /** Desktop tokens, token hashes and pairing ids: random bytes as hex */
 export const HEX64 = /^[0-9a-f]{64}$/

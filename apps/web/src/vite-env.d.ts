@@ -6,7 +6,10 @@ import type {
   UpdateState,
 } from '@runtime/types'
 import type {
+  HubAdminAct,
+  HubAdminView,
   HubInstallState,
+  HubPerson,
   HubTeam,
   HubUser,
   PairStartResponse,
@@ -365,6 +368,13 @@ declare global {
         >
         pairCancel(): Promise<void>
         disconnect(): Promise<{ issues: SettingsIssue[] } | { error: string }>
+        /**
+         * For the hub's admins. The error is the hub's code: not_admin for
+         * other members, not_found from a hub before 0.6.18
+         */
+        admin(): Promise<HubAdminView | { error: string }>
+        adminAct(act: HubAdminAct): Promise<HubAdminView | { error: string }>
+        people(words: string): Promise<HubPerson[] | { error: string }>
         /**
          * The command that installs a hub on a server (deploy/hub/install.sh),
          * then the wait for it. switchHere: Pace switches to the hub once it

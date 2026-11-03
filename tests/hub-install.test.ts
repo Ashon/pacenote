@@ -16,6 +16,7 @@ import { runInNewContext } from 'node:vm'
 import { afterAll, describe, expect, it } from 'vitest'
 import { HubInstall } from '../apps/desktop/src/hub-install.js'
 import type { SettingsStore } from '../apps/desktop/src/settings.js'
+import { HubAccess } from '../src/hub/access.js'
 import { loadHubConfig } from '../src/hub/config.js'
 import {
   hubFromLink,
@@ -159,25 +160,36 @@ describe("the installer's desktop on the hub", () => {
     const slack = {
       userName: async () => 'alice',
     } as unknown as SlackGateway
-    const hub = (allowedUsers: string[] = []) =>
+    const hub = (access = new HubAccess(undefined)) =>
       new HubServer({
         store,
         pairings: new Pairings(),
         slack,
         team: { id: 'T1', name: 'acme' },
-        allowedUsers,
+        access,
         log: createLogger('error', 'hub', []),
       })
     const pair = { user: 'U0ALICE', tokenHash: hash('token-1') }
-    // A member the hub does not allow is left out.
-    await hub(['U0BOB']).pairInstaller(pair)
+    // A member the hub does not allow is left out: HUB_ADMINS names someone
+    // else, so the installer is not its admin.
+    const bobs = new HubAccess(undefined, {
+      members: ['U0BOB'],
+      admins: ['U0BOB'],
+    })
+    await hub(bobs).pairInstaller(pair)
     expect(store.list()).toEqual([])
+    expect(bobs.isAdmin('U0ALICE')).toBe(false)
 
-    await hub().pairInstaller(pair)
+    // A hub with no admin yet makes the installer its admin.
+    const access = new HubAccess(undefined, { members: ['U0BOB'] })
+    await hub(access).pairInstaller(pair)
     expect(store.byTokenHash(pair.tokenHash)?.user).toEqual({
       id: 'U0ALICE',
       name: 'alice',
     })
+    expect(access.adminIds()).toEqual(['U0ALICE'])
+    expect(access.allows('U0ALICE')).toBe(true)
+    expect(access.allows('U0EVE')).toBe(false)
     // Disconnected later: a restart with the same HUB_PAIR does not bring it
     // back.
     store.remove(store.byTokenHash(pair.tokenHash)!.id)

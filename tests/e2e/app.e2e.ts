@@ -508,7 +508,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
 
   it('installs a team hub from Settings, and Pace switches to it once it answers', async () => {
     world = await World.create([])
-    const { slack, alice } = world
+    const { slack, alice, bob, ops } = world
     // The address the hub will answer at, on this computer
     const port = await new Promise<number>((resolve) => {
       const probe = createServer().listen(0, '127.0.0.1', () => {
@@ -595,6 +595,62 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       path: path.join(REPO, 'test-results/hub-share.png'),
     })
     await siteShot(page, 'messengers-hub')
+
+    // The installer is the hub's admin: Settings manages it from here.
+    const manage = page.locator('[data-hub-admin]')
+    await manage.getByRole('heading', { name: 'Manage the hub' }).waitFor()
+    await manage
+      .locator('[data-hub-member="alice"][data-connected="true"]')
+      .waitFor()
+    // For listed members: those paired now stay on, anyone else asks.
+    await manage.getByRole('radio', { name: 'Members you add' }).click()
+    await page.locator('[data-hub-admin="members"]').waitFor()
+    await hub.waitFor(/alice opened the hub to listed members/)
+    await slack.mention({
+      channel: ops.id,
+      user: bob.id,
+      text: `<@${slack.botUserId}> can you look at this?`,
+    })
+    await eventually('the note for bob alone', () =>
+      slack.ephemerals.find(
+        (note) =>
+          note.user === bob.id &&
+          /I asked the hub's admins to add you/.test(note.text)
+      )
+    )
+    // Requests show at the next look; they wait there until then.
+    const request = manage.locator('[data-hub-request="bob"]')
+    await request.waitFor({ timeout: 30_000 })
+    await request.scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/hub-admin-request.png'),
+    })
+    await request.getByRole('button', { name: 'Add' }).click()
+    await manage.locator('[data-hub-member="bob"]').waitFor()
+    await eventually('the note that bob was added', () =>
+      slack.ephemerals.find(
+        (note) =>
+          note.user === bob.id &&
+          /An admin added you to the hub/.test(note.text)
+      )
+    )
+    expect(
+      await manage.locator('[data-hub-member="bob"]').textContent()
+    ).toContain('No Mac paired · added by alice')
+
+    // Someone else, found in the workspace by name, then made an admin.
+    const carol = slack.addUser({ id: 'U0CAROL', name: 'carol' })
+    await manage.getByRole('textbox', { name: 'Add a member' }).fill('car')
+    const found = manage.locator('[data-hub-person="carol"]')
+    await found.getByRole('button', { name: 'Add' }).click()
+    const carolRow = manage.locator(`[data-hub-member="${carol.name}"]`)
+    await carolRow.waitFor()
+    await carolRow.getByRole('button', { name: 'More for carol' }).click()
+    await page.getByRole('menuitem', { name: 'Make admin' }).click()
+    await carolRow.getByText('Admin').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/hub-admin.png'),
+    })
   })
 
   it("opens in macOS's language, and changes language from Settings at once", async () => {

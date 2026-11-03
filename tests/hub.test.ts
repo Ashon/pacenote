@@ -11,6 +11,7 @@ import {
   startFailureProblem,
 } from '../apps/desktop/src/bot-readiness.js'
 import { checkConfig, loadConfig } from '../src/config.js'
+import { HubAccess } from '../src/hub/access.js'
 import { checkHub, HubClient, newHubToken } from '../src/hub/client.js'
 import { isHubUrl } from '../src/hub/address.js'
 import { loadHubConfig } from '../src/hub/config.js'
@@ -272,6 +273,7 @@ describe('hub server', () => {
       notices.push({ user, text })
     },
     userName: async (id) => (id === alice.id ? alice.name : id),
+    people: async () => [],
   }
   const store = new DesktopStore(path.join(root, 'data', 'desktops.json'))
   const hub = new HubServer({
@@ -279,6 +281,7 @@ describe('hub server', () => {
     pairings: new Pairings(),
     slack,
     team: { id: 'T1', name: 'ashon' },
+    access: new HubAccess(undefined),
     log: createLogger('error', 'hub', []),
   })
   let base = ''
@@ -456,6 +459,200 @@ describe('hub server', () => {
   })
 })
 
+describe("the hub's admins", () => {
+  const notices: { user: string; text: string }[] = []
+  const bob = { id: 'U0BOB', name: 'bob' }
+  const carol = { id: 'U0CAROL', name: 'carol' }
+  const dan = { id: 'U0DAN', name: 'dan' }
+  const everyone = [alice, bob, carol, dan]
+  const slack: SlackGateway = {
+    call: async () => ({ status: 200, json: { ok: true } }),
+    download: async () => new Response(''),
+    upload: async () => new Response(''),
+    async postEphemeral(_channel, user, text) {
+      notices.push({ user, text })
+    },
+    userName: async (id) => everyone.find((u) => u.id === id)?.name ?? id,
+    people: async () =>
+      everyone.map((user) => ({
+        user,
+        names: [user.name, `${user.name} real`],
+      })),
+  }
+  const dir = path.join(root, 'admins')
+  const accessFile = path.join(dir, 'access.json')
+  const store = new DesktopStore(path.join(dir, 'desktops.json'))
+  const hub = new HubServer({
+    store,
+    pairings: new Pairings(),
+    slack,
+    team: { id: 'T1', name: 'ashon' },
+    access: new HubAccess(accessFile),
+    log: createLogger('error', 'hub', []),
+  })
+  let client: HubClient
+  const mention = (user: string, text: string) => ({
+    event: { type: 'app_mention', user, text, channel: 'C1', ts: '1.1' },
+  })
+  /** A member's Mac paired as Settings pairs it, by its token */
+  const pair = async (user: { id: string; name: string }) => {
+    const { token, tokenHash } = newHubToken()
+    const started = await client.pairStart(tokenHash, `${user.name}'s Mac`)
+    await hub.handleMention(mention(user.id, `<@B1> connect ${started.code}`))
+    await client.pairConfirm(started.pairingId, token)
+    return token
+  }
+
+  beforeAll(async () => {
+    client = new HubClient(
+      `http://127.0.0.1:${await hub.listen(0, '127.0.0.1')}`
+    )
+  })
+  afterAll(() => hub.close())
+
+  it('makes its first member the admin, who decides who else may use it', async () => {
+    const aliceToken = await pair(alice)
+    expect(await client.me(aliceToken)).toMatchObject({ admin: true })
+    const bobToken = await pair(bob)
+    expect(await client.me(bobToken)).toMatchObject({ admin: false })
+    await expect(client.admin(bobToken)).rejects.toThrow('not_admin')
+
+    let view = await client.admin(aliceToken)
+    expect(view).toMatchObject({ rule: 'everyone', you: alice, requests: [] })
+    expect(
+      view.members.map((m) => [m.user.name, m.admin, m.desktop?.label])
+    ).toEqual([
+      ['alice', true, "alice's Mac"],
+      ['bob', false, "bob's Mac"],
+    ])
+
+    // For listed members, those paired now stay on.
+    view = await client.adminAct(aliceToken, { do: 'rule', rule: 'members' })
+    expect(view.rule).toBe('members')
+    expect(view.members.every((m) => m.listed && !m.addedBy)).toBe(true)
+
+    // Someone else is turned away and asks, and the code they sent waits.
+    const carolMac = newHubToken()
+    const started = await client.pairStart(carolMac.tokenHash, "carol's Mac")
+    await hub.handleMention(mention(carol.id, `<@B1> connect ${started.code}`))
+    expect(notices.at(-1)).toEqual({
+      user: carol.id,
+      text: expect.stringContaining("I asked the hub's admins"),
+    })
+    expect(await client.pairStatus(started.pairingId)).toEqual({
+      status: 'pending',
+    })
+    view = await client.admin(aliceToken)
+    expect(view.requests).toEqual([{ user: carol, at: expect.any(String) }])
+
+    // Added, their pairing goes on with that code.
+    view = await client.adminAct(aliceToken, { do: 'add', user: carol.id })
+    expect(view.requests).toEqual([])
+    expect(view.members.find((m) => m.user.id === carol.id)).toMatchObject({
+      listed: true,
+      addedBy: alice,
+    })
+    expect(notices.at(-1)).toEqual({
+      user: carol.id,
+      text: expect.stringContaining('Confirm the pairing for "carol\'s Mac"'),
+    })
+    expect(await client.pairStatus(started.pairingId)).toEqual({
+      status: 'bound',
+      user: carol,
+    })
+    await client.pairConfirm(started.pairingId, carolMac.token)
+
+    // Declined, the request goes, and nobody is told.
+    await hub.handleMention(mention(dan.id, '<@B1> hi'))
+    view = await client.admin(aliceToken)
+    expect(view.requests.map((r) => r.user)).toEqual([dan])
+    const told = notices.length
+    view = await client.adminAct(aliceToken, { do: 'decline', user: dan.id })
+    expect(view.requests).toEqual([])
+    expect(notices.length).toBe(told)
+
+    // An admin can make another; removed, a member's Mac is unpaired and
+    // they are turned away.
+    await client.adminAct(aliceToken, {
+      do: 'admin',
+      user: bob.id,
+      admin: true,
+    })
+    expect(await client.me(bobToken)).toMatchObject({ admin: true })
+    view = await client.adminAct(aliceToken, { do: 'remove', user: bob.id })
+    expect(view.members.map((m) => m.user.id)).toEqual([alice.id, carol.id])
+    await expect(client.me(bobToken)).rejects.toThrow('hub_unauthorized')
+    await hub.handleMention(mention(bob.id, '<@B1> hi'))
+    expect(notices.at(-1)?.user).toBe(bob.id)
+    expect(notices.at(-1)?.text).toContain("I asked the hub's admins")
+
+    // An admin's own access is theirs, in Settings.
+    await expect(
+      client.adminAct(aliceToken, { do: 'remove', user: alice.id })
+    ).rejects.toThrow('not_yourself')
+    await expect(
+      client.adminAct(aliceToken, { do: 'add', user: 'not an id' })
+    ).rejects.toThrow('invalid_request')
+
+    // Disconnecting a Mac keeps its member on the list.
+    view = await client.adminAct(aliceToken, {
+      do: 'disconnect',
+      user: carol.id,
+    })
+    const carolNow = view.members.find((m) => m.user.id === carol.id)
+    expect(carolNow?.listed).toBe(true)
+    expect(carolNow?.desktop).toBeUndefined()
+
+    // People to add, found by any of their names.
+    expect((await client.people(aliceToken, 'DAN re')).people).toEqual([
+      { user: dan, member: false },
+    ])
+    expect((await client.people(aliceToken, 'car')).people).toEqual([
+      { user: carol, member: true },
+    ])
+    await expect(client.people(bobToken, 'car')).rejects.toThrow(
+      'hub_unauthorized'
+    )
+
+    // Kept across a restart.
+    const again = new HubAccess(accessFile)
+    expect(again.rule()).toBe('members')
+    expect(again.adminIds()).toEqual([alice.id])
+    expect(again.allows(carol.id)).toBe(true)
+    expect(again.allows(bob.id)).toBe(false)
+  })
+
+  it('starts from hub.env: each member it lists once, and HUB_ADMINS for good', () => {
+    const file = path.join(root, 'env-access', 'access.json')
+    const owner = { id: 'U0ROOT', name: 'root' }
+    const first = new HubAccess(file, {
+      members: [bob.id],
+      admins: [owner.id],
+    })
+    expect(first.rule()).toBe('members')
+    expect(first.allows(bob.id)).toBe(true)
+    expect(first.allows(carol.id)).toBe(false)
+    expect(first.fixedAdmin(owner.id)).toBe(true)
+    expect(first.unnamed()).toEqual([bob.id])
+
+    // What an admin changes stays, though hub.env still names them.
+    first.remove(bob.id)
+    first.setRule('everyone', [])
+    const later = new HubAccess(file, {
+      members: [bob.id, carol.id],
+      admins: [owner.id],
+    })
+    expect(later.rule()).toBe('everyone')
+    expect(later.listed(bob.id)).toBe(false)
+    // One it names for the first time is added.
+    expect(later.listed(carol.id)).toBe(true)
+    // HUB_ADMINS stay admins, so the hub has one already.
+    later.setAdmin(owner, false)
+    expect(later.isAdmin(owner.id)).toBe(true)
+    expect(later.claimFirst(alice)).toBe(false)
+  })
+})
+
 describe('desktop side of the hub', () => {
   const store = new DesktopStore(path.join(root, 'data2', 'desktops.json'))
   const pairings = new Pairings()
@@ -465,12 +662,14 @@ describe('desktop side of the hub', () => {
     upload: async () => new Response(''),
     postEphemeral: async () => undefined,
     userName: async () => alice.name,
+    people: async () => [],
   }
   const hub = new HubServer({
     store,
     pairings,
     slack,
     team: { id: 'T1', name: 'ashon' },
+    access: new HubAccess(undefined),
     log: createLogger('error', 'hub', []),
   })
   let base = ''
@@ -778,9 +977,11 @@ describe("the hub's notes in Slack", () => {
           notices.push(text)
         },
         userName: async (id) => id,
+        people: async () => [],
       },
       team: { id: 'T1', name: 'ashon' },
-      allowedUsers: ['U0BOB'],
+      // No admin to ask: the note says so
+      access: new HubAccess(undefined, { members: ['U0BOB'] }),
       notesLocale: config.notesLocale,
       log: createLogger('error', 'hub', []),
     })

@@ -1,6 +1,6 @@
 import type { WebClient } from '@slack/web-api'
 import { DEFAULT_SLACK_API_URL } from '../messengers/slack/api.js'
-import type { SlackGateway } from './server.js'
+import type { SlackGateway, SlackPerson } from './server.js'
 
 /**
  * The hub's Slack calls, made with the bot token. The token never leaves this
@@ -59,6 +59,30 @@ export function slackGateway(
       return (
         user?.profile?.display_name || user?.real_name || user?.name || userId
       )
+    },
+    async people() {
+      const people: SlackPerson[] = []
+      let cursor: string | undefined
+      // 200 a page, up to 10,000 people
+      for (let page = 0; page < 50; page++) {
+        const res = await client.users.list({ limit: 200, cursor })
+        for (const user of res.members ?? []) {
+          if (!user.id || user.deleted || user.is_bot) continue
+          if (user.id === 'USLACKBOT') continue
+          const names = [
+            user.profile?.display_name,
+            user.real_name,
+            user.name,
+          ].filter((name): name is string => Boolean(name))
+          people.push({
+            user: { id: user.id, name: names[0] ?? user.id },
+            names,
+          })
+        }
+        cursor = res.response_metadata?.next_cursor || undefined
+        if (!cursor) break
+      }
+      return people
     },
   }
 }
