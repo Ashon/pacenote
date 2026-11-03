@@ -25,6 +25,7 @@ import { SlackAppSetup } from './slack-app-setup'
 import { SlackYou } from './slack-you'
 import { text } from './settings-page.text'
 import {
+  AccentPicker,
   CardHeader,
   CheckResult,
   Chip,
@@ -334,6 +335,9 @@ export function GeneralSection({ ctx }: { ctx: SettingsCtx }) {
         <div className="divide-y divide-border">
           <Row label={t.theme} help={t.themeHelp}>
             <ThemePicker />
+          </Row>
+          <Row label={t.color} help={t.colorHelp}>
+            <AccentPicker />
           </Row>
           <Row label={t.language} help={t.languageHelp}>
             <LanguagePicker />

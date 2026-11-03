@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './motion.css';
+@import './accents.css';
 
 @plugin "@tailwindcss/typography";
 
@@ -92,6 +93,9 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  /* Text in the theme's color takes its ink, a step deeper than the fill
+     where the fill is light (orange, yellow); the same color elsewhere */
+  --text-color-primary: var(--primary-ink);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -139,6 +143,8 @@
  *   chart-4 is the series stacked on the gradient (task collections on tokens per day): the brand's deep green in
  *   light (#007c5c, a step lighter than primary, which darkened for text; diagrams lead with it too), mint in dark, so
  *   it differs from the gradient in lightness in both.
+ * Other accents (accents.css, Settings > General) are this green turned to their hue: the same lightness, the same
+ * contrasts. The statuses stay as they are in every one; they mean the same everywhere.
  * Surfaces, not borders, set the levels. Higher surfaces are lighter. (same rule in light and dark)
  *   sidebar: the window's chrome, card: the one content surface raised beside it,
  *   card-accent: emphasized surface such as bot replies and the setup notice,
@@ -150,11 +156,15 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
+  /* The mark's three stops: the logo, Pace's spinner, the gradient bars */
+  --mark-1: #01ab78;
+  --mark-2: #1fc289;
+  --mark-3: #48c89c;
   --pacenote-gradient: linear-gradient(
     74deg,
-    #01ab78 0%,
-    #1fc289 46%,
-    #48c89c 100%
+    var(--mark-1) 0%,
+    var(--mark-2) 46%,
+    var(--mark-3) 100%
   );
   --background: oklch(0.99 0.004 165);
   --foreground: oklch(0.23 0.025 172);
@@ -169,6 +179,7 @@
   --popover-foreground: oklch(0.23 0.025 172);
   --primary: #007154;
   --primary-foreground: #ffffff;
+  --primary-ink: #007154;
   --secondary: oklch(0.945 0.018 165);
   --secondary-foreground: oklch(0.3 0.05 168);
   --muted: oklch(0.95 0.011 168);
@@ -213,6 +224,7 @@
   --popover-foreground: oklch(0.93 0.012 165);
   --primary: #3ccb96;
   --primary-foreground: #04281d;
+  --primary-ink: #3ccb96;
   --secondary: oklch(0.25 0.02 172);
   --secondary-foreground: oklch(0.9 0.015 165);
   --muted: oklch(0.225 0.014 175);

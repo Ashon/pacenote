@@ -168,7 +168,7 @@ Settings:
 
   | Section | What it holds |
   | --- | --- |
-  | General | Theme, language, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
+  | General | Theme, color, language, opening the app at login, starting the bot with the app, updates, the settings file and run history folder |
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing and, once paired, "Copy share link" for teammates, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, diagrams and images |
   | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login |
@@ -288,6 +288,10 @@ Other:
   the same shape on the macOS icon grid (an 824 body in 1024, shadow, highlight) as `assets/pacenote-icon.png`.
   Development runs use the PNG as the Dock icon as is, so this does the system's processing by hand.
 - `PACENOTE_DESKTOP_THEME=light|dark` pins the theme. (The default follows the system; it can also be changed under "Theme" in Settings > General)
+- "Color" in Settings > General turns buttons, selections, the surfaces' faint tint and Pace's mark and spinner to green, blue,
+  purple, pink, red, orange or yellow; statuses keep their own colors. Each device keeps its own (`pacenote.accent` in the
+  window's storage). The app icon, the menu bar and the site stay green. The other colors are green turned around the wheel:
+  `apps/web/src/accents.css`, which `pnpm accents` writes from `index.css`, so change green there and run it again.
 - The app reads in English and Korean: macOS's language by default, or the one chosen under "Language" in Settings > General
   (kept in `desktop.json`). `PACENOTE_DESKTOP_LANGUAGE=en|ko` stands in for macOS's language, as the end-to-end tests do. See
   [Languages](i18n.md).

@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { MarkStops } from './logo'
 import './pace-spinner.css'
 
 /** The ring, radius 164 around the center, drawn from the pupil's spot. */
@@ -37,7 +38,7 @@ const INK = [
  * second look, squints in thought, glides along the ring, now and then opens
  * into an arc like a lens, or comes to the middle to face you and skims a few
  * lines (keyframes in pace-spinner.css, made by scripts/spinner-keyframes.py).
- * Only the mask moves; the gradient stays put.
+ * Only the mask moves; the gradient stays put, in the accent's colors.
  * With writing, it writes instead, for as long as Pace writes something for
  * you (Recap's Write it up, a drafted reply): the ring closes like a page and
  * the dot comes off it as a pen and writes two lines. Show it only while the
@@ -131,9 +132,7 @@ export function PaceSpinner({
           x2="458"
           y2="198"
         >
-          <stop offset="0" stopColor="#01ab78" />
-          <stop offset="0.46" stopColor="#1fc289" />
-          <stop offset="1" stopColor="#48c89c" />
+          <MarkStops />
         </linearGradient>
         <mask
           id={`${id}-mask`}

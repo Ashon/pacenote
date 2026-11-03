@@ -31,6 +31,7 @@
     "slack:check": "tsx src/tools/check-slack.ts",
     "k8s:kubeconfig": "tsx src/tools/sandbox-job.ts kubeconfig",
     "desktop:build": "pnpm build && pnpm bundle && pnpm --filter @pacenote/web build && pnpm --filter @pacenote/desktop build",
+    "accents": "python3 scripts/accent-palette.py && prettier --write apps/web/src/accents.css",
     "spinner": "python3 scripts/spinner-keyframes.py",
     "mcp": "tsx src/tools/history-mcp.ts",
     "desktop": "VITE_PACENOTE_DEBUG=1 pnpm desktop:build && pnpm --filter @pacenote/desktop start",

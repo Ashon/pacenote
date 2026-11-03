@@ -41,7 +41,7 @@ import {
   type LanguagePreference,
 } from '@/lib/i18n'
 import { useHubPairing } from '@/lib/hub'
-import { useTheme, type ThemeMode } from '@/lib/theme'
+import { ACCENTS, useTheme, type ThemeMode } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { hubShareLink } from '@src/hub/share'
 import { isLocale, LOCALES, LOCALE_NAMES, localized } from '@src/i18n/locale'
@@ -1123,6 +1123,38 @@ export function ThemePicker() {
       }))}
       onChange={(value) => setMode(value as ThemeMode)}
     />
+  )
+}
+
+/**
+ * The accent: a swatch for each, from green around the color wheel. Each is
+ * drawn in its own colors (data-accent gives it that accent's tokens), the
+ * chosen one ringed.
+ */
+export function AccentPicker() {
+  const t = useText(text)
+  const { accent, setAccent } = useTheme()
+  return (
+    <div role="radiogroup" aria-label={t.color} className="flex gap-2.5 px-1">
+      {ACCENTS.map((value) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={accent === value}
+          aria-label={t.accents[value]}
+          title={t.accents[value]}
+          data-accent={value}
+          onClick={() => setAccent(value)}
+          className={cn(
+            'size-5 rounded-full bg-primary focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
+            accent === value
+              ? 'shadow-[0_0_0_2px_var(--card),0_0_0_4px_var(--primary)]'
+              : 'shadow-[inset_0_0_0_1px_rgb(0_0_0/0.1)]'
+          )}
+        />
+      ))}
+    </div>
   )
 }
 

@@ -90,8 +90,8 @@ export {
 export { daysSince, todayLines } from './lib/today'
 export type { TodayLine } from './lib/today'
 export { recapText, type CopyFormat } from './lib/recap'
-export { ThemeProvider, useTheme } from './lib/theme'
-export type { ThemeMode } from './lib/theme'
+export { ACCENTS, ThemeProvider, useTheme } from './lib/theme'
+export type { Accent, ThemeMode } from './lib/theme'
 export { useSupervisor } from './lib/desktop'
 // Your areas as the Mac has them, which New task offers as its projects
 export { useYou } from './lib/you'

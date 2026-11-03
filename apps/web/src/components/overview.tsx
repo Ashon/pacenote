@@ -776,7 +776,9 @@ interface DayBar {
 /**
  * Pill-shaped bars: filled over the background (well) by value, never under
  * 12% so a small day still shows. Each part on top is a pill of its own,
- * at least as tall as the bar is wide, so every end stays round. The columns
+ * at least as tall as the bar is wide, so every end stays round, and 2px
+ * apart from what is under it, so it reads where its color is near the
+ * bar's (failures in a red accent). The columns
  * share the width, so the chart never grows past its section; when they get
  * too narrow for every date, every other date (counting back from today) is
  * hidden.
@@ -833,7 +835,7 @@ function DayBars({
                     <div
                       key={part.index}
                       className={cn(
-                        'absolute inset-x-0 top-0 rounded-full',
+                        'absolute inset-x-0 top-0 rounded-full shadow-[0_2px_0_var(--well)]',
                         topClassNames[part.index]
                       )}
                       style={{
