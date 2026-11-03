@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     revealFile: () => ipcRenderer.invoke('pacenote:settings:reveal-file'),
     openDataDir: () => ipcRenderer.invoke('pacenote:settings:open-data-dir'),
     historyMcp: () => ipcRenderer.invoke('pacenote:settings:history-mcp'),
+    found: (workFolder?: string, fresh = false) =>
+      ipcRenderer.invoke('pacenote:settings:found', workFolder, fresh),
   },
   // Your tasks: the list and your decisions (AI tools add them over MCP)
   tasks: {

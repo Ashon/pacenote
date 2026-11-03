@@ -128,6 +128,14 @@ Setup: no value of the target environment lives in the code; all of them go into
 its place). Each feature is optional, and the broker starts without the tools of any feature left empty.
 Files the broker generates, such as the host list and kubeconfig, are also created outside the repository, in `~/.pacenote/ops-broker/`.
 
+Under the settings you would otherwise type, Settings > Tools offers what it finds on this Mac, to pick with a click
+(`apps/desktop/src/found.ts`): folders in your home with repositories in them; your gh account and its orgs (without
+gh, the owners of the work folder's repositories); your kubeconfig contexts (`kubectl config get-contexts`); and
+the users, keys and private /24 ranges of the hosts in your SSH config, following its `Include` lines, without
+git hosting (GitHub, GitLab, Bitbucket) or VMs on this Mac (`127.0.0.1`). It reads names and paths only: keys are
+found by path, never opened. A name picked goes into the unsaved changes like a typed one. When gh is signed out
+or gh or kubectl is missing, the setting says so, with Look again for after. Your devices never see these names.
+
 | Feature | Settings | If empty |
 | --- | --- | --- |
 | File reads (`fs_*`) | `OPS_FS_ROOT` | File and PR tools off |

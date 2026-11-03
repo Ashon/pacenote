@@ -22,6 +22,7 @@ import type {
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type { ServerCheck } from '@src/pace/mcp-relay'
+import type { FoundOnMac } from '@src/settings/found'
 import type {
   McpServerCandidate,
   McpServerDraft,
@@ -162,6 +163,11 @@ declare global {
             }
           | undefined
         >
+        /**
+         * Names on this Mac to pick in Tools (src/settings/found.ts), with
+         * the owners of workFolder's repositories; fresh looks again
+         */
+        found(workFolder?: string, fresh?: boolean): Promise<FoundOnMac>
       }
       /** Your tasks (src/tasks) */
       tasks: {

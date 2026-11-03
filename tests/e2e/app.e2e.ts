@@ -508,6 +508,121 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await github.getByText('Read is off').waitFor()
   })
 
+  it('offers names found on this Mac in Settings > Tools, to pick instead of typing', async () => {
+    world = await World.create([])
+    // The app's home is the world's: a folder of repositories and an SSH
+    // config with a host to check, one on GitHub and a VM on this Mac
+    const git = path.join(world.root, 'git')
+    mkdirSync(path.join(git, 'acme/api/.git'), { recursive: true })
+    writeFileSync(
+      path.join(git, 'acme/api/.git/config'),
+      '[remote "origin"]\n\turl = git@github.com:acme/api.git\n'
+    )
+    const ssh = path.join(world.root, '.ssh')
+    mkdirSync(ssh, { recursive: true })
+    writeFileSync(path.join(ssh, 'ops_key'), 'never read')
+    writeFileSync(
+      path.join(ssh, 'config'),
+      [
+        'Host gpu-01',
+        '  HostName 192.168.30.11',
+        '  User ops',
+        '  IdentityFile ~/.ssh/ops_key',
+        'Host github.com',
+        '  User git',
+        'Host orb',
+        '  HostName 127.0.0.1',
+        '  User default',
+      ].join('\n')
+    )
+    const page = await launch(world, {
+      settings: [
+        'REASONER_SANDBOX=vm',
+        `MENTION_ALLOWED_USERS=${world.alice.id}`,
+        'OPS_TOOLS=on',
+      ],
+    })
+    await page.evaluate("window.location.hash = '#/settings/tools'")
+    await page.getByRole('heading', { name: 'Tools' }).waitFor()
+
+    // The work folder: a folder of your home with repositories in it
+    await page
+      .locator('[data-connection="files"]')
+      .getByRole('button')
+      .first()
+      .click()
+    const folder = page.locator('[data-found="OPS_FS_ROOT"]')
+    const chip = folder.getByRole('button', { name: git })
+    await chip.waitFor()
+    expect(await chip.getAttribute('aria-pressed')).toBe('false')
+    await chip.click()
+    expect(
+      await page.locator('[data-setting="OPS_FS_ROOT"] input').inputValue()
+    ).toBe(git)
+    expect(await chip.getAttribute('aria-pressed')).toBe('true')
+
+    // SSH: the host's user, key and range, not GitHub's or the VM's
+    await page
+      .locator('[data-connection="ssh"]')
+      .getByRole('button')
+      .first()
+      .click()
+    const users = page.locator('[data-found="OPS_SSH_USER"]')
+    await users.getByRole('button', { name: 'ops' }).click()
+    expect(await users.getByRole('button', { name: 'git' }).count()).toBe(0)
+    expect(await users.getByRole('button', { name: 'default' }).count()).toBe(0)
+    await page
+      .locator('[data-found="OPS_SSH_KEY"]')
+      .getByRole('button', { name: path.join(ssh, 'ops_key') })
+      .click()
+    const range = page
+      .locator('[data-found="OPS_SSH_ALLOWED_CIDR"]')
+      .getByRole('button', { name: '192.168.30.0/24' })
+    expect(await range.getAttribute('title')).toBe(
+      'Your SSH hosts in it: gpu-01'
+    )
+    await range.click()
+    // All three picked, the connection is on before it is saved.
+    await page
+      .locator('[data-connection="ssh"]')
+      .getByText('On', { exact: true })
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/tools-found.png'),
+    })
+    await page
+      .locator('[data-connection="github"]')
+      .getByRole('button')
+      .first()
+      .click()
+    await page.locator('[data-setting="OPS_GIT_ALLOWED_OWNERS"]').waitFor()
+    // Until the rows have stopped moving, for a still picture
+    await page.evaluate(
+      `Promise.all(document.getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => a.finished))`
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/tools-found-github.png'),
+    })
+
+    // Picked names save like typed ones.
+    await page
+      .locator('footer')
+      .getByRole('button', { name: 'Save', exact: true })
+      .click()
+    const file = path.join(world.home, 'settings.json')
+    await eventually('the picked names in the file', () => {
+      const ops = JSON.parse(readFileSync(file, 'utf8')).ops
+      return ops.workDir === git &&
+        ops.ssh?.user === 'ops' &&
+        ops.ssh?.key === path.join(ssh, 'ops_key') &&
+        ops.ssh?.allowedRange === '192.168.30.0/24'
+        ? true
+        : undefined
+    })
+  })
+
   it('installs a team hub from Settings, and Pace switches to it once it answers', async () => {
     world = await World.create([])
     const { slack, alice, bob, ops } = world

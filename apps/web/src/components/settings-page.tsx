@@ -35,6 +35,7 @@ import {
 import { useSettingsView } from '@/lib/setup'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { FoundNames } from './found-names'
 import { EnvironmentDetails, VmFooter } from './sandbox-panel'
 import { text } from './settings-page.text'
 import { DevicesSection, MacsSection } from './settings-devices'
@@ -48,6 +49,7 @@ import {
   type SettingsCtx,
   TasksSection,
 } from './settings-sections'
+import { FOUND_KEYS } from '@src/settings/found'
 import { connectionStates } from '@src/settings/tools'
 import {
   AppsHere,
@@ -411,10 +413,27 @@ export function SettingsPage() {
   }
 
   /**
-   * What a choice field shows beside its options: the run environment's
-   * readiness and setup under each sandbox, and what the chosen one has ready
+   * What a field shows besides its control: the run environment's readiness
+   * and setup under each sandbox, what the chosen one has ready, and the names
+   * this Mac has for a Tools setting, to pick instead of typing
    */
   const choiceExtras: Partial<Record<string, ChoiceExtras>> = {
+    ...(!remote &&
+      Object.fromEntries(
+        FOUND_KEYS.map((key) => [
+          key,
+          {
+            below: (
+              <FoundNames
+                setting={key}
+                value={key in draft ? draft[key]! : (view.values[key] ?? '')}
+                workFolder={valueOf('OPS_FS_ROOT')}
+                onChange={(value) => set(key, value)}
+              />
+            ),
+          },
+        ])
+      )),
     ...(sandbox.available && {
       REASONER_SANDBOX: {
         footers: { vm: <VmFooter sandbox={sandbox} /> },

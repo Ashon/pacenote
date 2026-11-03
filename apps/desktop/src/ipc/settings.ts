@@ -1,5 +1,6 @@
 import { shell } from 'electron'
 import { isMcpClientId } from '../../../../src/history/mcp-clients.js'
+import type { FoundHere } from '../found.js'
 import type { HubAdmin } from '../hub-admin.js'
 import type { HubInstall } from '../hub-install.js'
 import type { HubPairing } from '../hub-pairing.js'
@@ -8,8 +9,9 @@ import type { Desktop } from './context.js'
 import type { Ipc } from './gate.js'
 
 /**
- * Settings: its values, saved and applied to Pace; the team hub, paired or
- * installed; and the AI tools Pacenote's MCP server is added to
+ * Settings: its values, saved and applied to Pace; the names on this Mac Tools
+ * offers to pick; the team hub, paired or installed; and the AI tools
+ * Pacenote's MCP server is added to
  */
 export function registerSettingsIpc(
   ipc: Ipc,
@@ -23,6 +25,7 @@ export function registerSettingsIpc(
     takeLinkedHub,
     mcpClients,
     historyMcp,
+    found,
   }: {
     settingsFile: string
     /** Restarts or starts Pace on the settings saved; false when it cannot */
@@ -37,6 +40,7 @@ export function registerSettingsIpc(
     mcpClients: McpClients
     /** The history MCP server, as the AI tools launch it */
     historyMcp: string
+    found: FoundHere
   }
 ): void {
   const { dataDir, settings } = desktop
@@ -56,6 +60,16 @@ export function registerSettingsIpc(
         return { issues, restarted: false }
       return { issues, restarted: await applySettings() }
     }
+  )
+  // This Mac's names for Tools to pick from: yours, so devices never get them
+  ipc.windowOnly(
+    'pacenote:settings:found',
+    () => ({ names: {}, gaps: [] }),
+    (workFolder, fresh) =>
+      found.find(
+        typeof workFolder === 'string' ? workFolder : undefined,
+        fresh === true
+      )
   )
   // Team hub pairing
   ipc.handleOrError('pacenote:hub:pair-start', (url) => hubPairing.start(url))
