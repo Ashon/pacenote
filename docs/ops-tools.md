@@ -3,7 +3,8 @@ Settings > Tools shows what Pace can reach when it answers you, and what it may 
 GitHub, Jira, Kubernetes, SSH hosts) let the reasoner CLI query operational state and, where you turn on Write, fix code
 into draft PRs and write Jira issues and comments. Credentials and the work directory are never put into the
 reasoner's VM; only a separate relay (`ops-broker`), in a VM of its own, holds them. The reasoner can only request
-fixed queries through MCP tools.
+fixed queries through MCP tools. Under them come the HTTP MCP servers you add yourself
+([Your MCP servers](#your-mcp-servers)), which Pace reaches from this Mac.
 
 ```
 reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH_USER--> inventory hosts (within OPS_SSH_ALLOWED_CIDR)
@@ -78,6 +79,34 @@ reasoner VM --127.0.0.1:8080--> socket on this Mac --> broker VM --127.0.0.1:312
 - Its image (ssh, git, ripgrep and kubectl) is built by "Set up built-in sandbox" when ops tools are on; the broker's code
   is mounted from the app at each start, so a newer Pacenote needs no new image.
 - Settings apply when Pace restarts.
+
+## Your MCP servers
+
+The MCP servers you set up for Claude Code or Codex on this Mac are not Pace's: the CLI in the sandbox loads none of
+your settings, and a VM with no network device could not reach them anyway. Settings > Tools > MCP servers lists the
+HTTP MCP servers Pace may use when it answers, with the headers it sends them (an `Authorization: Bearer` token, an API
+key):
+
+```
+reasoner VM --127.0.0.1:8080/pace/servers/<name>/mcp--> the run's door in Pace --headers from mcp-servers.json--> your server
+ (no headers, no network device)                       (relays tools/list and tools/call)                        (internet, your network or this Mac)
+```
+
+- Add one by name and URL (streamable HTTP, or SSE for older servers), or from those Claude Code (`~/.claude.json`,
+  yours and each project's) and Codex (`~/.codex/config.toml`) have on this Mac: Pace copies it once, with the headers
+  it finds there. A header those keep elsewhere (`${VARIABLE}`, `bearer_token_env_var`) is filled in here. Servers that
+  run as a program (stdio) are not offered, as they would run on this Mac outside the sandbox.
+- They live in `~/.pacenote/mcp-servers.json`, which only you can read. The screen gets each header by name, never its
+  value, and your iPhone, iPad and Android app see none of them.
+- Pace connects to each server from this Mac and relays the run's calls (`src/pace/mcp-relay.ts`). The reasoner's VM
+  never reaches the server or sees its headers. As the server is reached from this Mac, one on `localhost` or your own
+  network works too, and the row says so: add only servers you trust.
+- Read lists the tools the server marks read-only (`readOnlyHint`); Write, off until you turn it on, lists all its other
+  tools. Pace refuses a call to a tool it does not list, and uses one that changes something only when asked.
+- Each server works for you alone, in the built-in sandbox; on this Mac's own run environment Pace uses none. The file
+  is read on every request, so a change applies to the next answer without a restart.
+- Check tools in a server's row connects once and lists its tools as Read or Write, so you see what each switch opens.
+- Not yet: servers that sign in with OAuth, and a server's resources and prompts (tools only).
 
 ## Code changes and PRs
 

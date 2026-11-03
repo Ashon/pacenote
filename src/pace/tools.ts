@@ -345,7 +345,8 @@ export function serveOwnTools(options: OwnToolsOptions): OwnTools {
   }
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+/** A request's JSON body, read whole */
+export async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = []
   for await (const chunk of req) chunks.push(chunk as Buffer)
   const text = Buffer.concat(chunks).toString('utf8')

@@ -419,10 +419,22 @@ export class MentionResponder {
       const outputDir = path.join(attachmentsDir, 'generated')
       await mkdir(outputDir, { recursive: true })
       const started = Date.now()
+      const requester = {
+        user: mention.userId,
+        conversation: mention.conversation,
+        label,
+        thread: mention.thread,
+        run: run?.id,
+        message: mention.message,
+        permalink: messenger.permalink(mention, mention.message),
+      }
       const system = systemPrompt(messenger.profile, {
         canReadWorkspace: readOnlyDir !== undefined,
         opsTools: reasoner.mcpServerNames.includes('ops'),
         ownTools: reasoner.mcpServerNames.includes('pacenote'),
+        yourServers: reasoner
+          .yourServers?.(requester)
+          .map((server) => server.name),
         diagrams: this.deps.renderer !== undefined,
         imageGeneration: reasoner.backend === 'codex',
         // The app tells Pace its language (PACENOTE_LOCALE, src/index.ts)
@@ -438,15 +450,7 @@ export class MentionResponder {
         outputDir,
         signal: cutOff.signal,
         onEvent: run ? (step) => run?.event(step) : undefined,
-        requester: {
-          user: mention.userId,
-          conversation: mention.conversation,
-          label,
-          thread: mention.thread,
-          run: run?.id,
-          message: mention.message,
-          permalink: messenger.permalink(mention, mention.message),
-        },
+        requester,
       })
       reasoning = false
       this.deps.onReasoner?.(undefined)

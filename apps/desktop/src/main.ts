@@ -32,7 +32,11 @@ import {
   securePrivateDir,
   securePrivateFile,
 } from '../../../src/settings/home.js'
-import { settingsFilePath, vmRootPath } from '../../../src/settings/paths.js'
+import {
+  mcpServersPath,
+  settingsFilePath,
+  vmRootPath,
+} from '../../../src/settings/paths.js'
 import {
   dropClaudeToken,
   moveEnvSettings,
@@ -101,6 +105,7 @@ import type { Desktop } from './ipc/context.js'
 import { Ipc } from './ipc/gate.js'
 import { registerMacsIpc } from './ipc/macs.js'
 import { registerSandboxIpc } from './ipc/sandbox.js'
+import { registerServersIpc } from './ipc/servers.js'
 import { registerSettingsIpc } from './ipc/settings.js'
 import { registerSetupIpc } from './ipc/setup.js'
 import { registerTaskWorkIpc } from './ipc/task-work.js'
@@ -1087,6 +1092,10 @@ function registerIpc(): void {
     sandboxSignIn,
     supervisor,
     settingsFile,
+  })
+  registerServersIpc(ipc, {
+    file: mcpServersPath(),
+    version: app.getVersion(),
   })
   // The tray shows none of Pace's output, so a line it prints leaves the tray
   // be; the tray's timer still follows bot.json.

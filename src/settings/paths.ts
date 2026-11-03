@@ -34,6 +34,12 @@ const inHome =
 export const settingsFilePath = inHome('settings.json')
 
 /**
+ * The MCP servers Pace may use (Settings > Tools), with the headers Pace sends
+ * them, read on each request (mcp-servers.ts)
+ */
+export const mcpServersPath = inHome('mcp-servers.json')
+
+/**
  * Egress allowlist the built-in sandbox's proxy reads on each request. Created
  * from sandbox/allowed-domains.txt if missing.
  */

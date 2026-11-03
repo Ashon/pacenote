@@ -12,6 +12,11 @@ import {
   claudeCredential,
 } from './sandbox/claude-credential.js'
 import { connectSlack } from './messengers/slack/connect.js'
+import {
+  paceTools,
+  serveYourServers,
+  yourServerRefs,
+} from './pace/mcp-relay.js'
 import { serveOwnTools } from './pace/tools.js'
 import { createReasoner } from './reasoners/cli.js'
 import { hostCliProblems } from './reasoners/host-check.js'
@@ -26,7 +31,12 @@ import {
   securePrivateDir,
   securePrivateFile,
 } from './settings/home.js'
-import { pacenoteHome, settingsFilePath } from './settings/paths.js'
+import { readMcpServers } from './settings/mcp-servers.js'
+import {
+  mcpServersPath,
+  pacenoteHome,
+  settingsFilePath,
+} from './settings/paths.js'
 import { secretValues } from './settings/fields.js'
 import { loadSettings } from './settings/load-settings.js'
 import { moveEnvSettings, upgradeSettings } from './settings/settings-file.js'
@@ -142,21 +152,44 @@ async function main(): Promise<void> {
     ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
     : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
+  const version = process.env.PACENOTE_VERSION ?? 'dev'
   // Pace's own tools, for the reasoner in the VM: the Todo, work and recaps of
-  // the person it answers, and its earlier answers in the channel
+  // the person it answers, and its earlier answers in the channel; and the MCP
+  // servers they added in Settings > Tools, which Pace reaches from here
   if (sandbox instanceof VmSandbox)
     sandbox.attachOwnTools(
-      serveOwnTools({
-        dataDir: config.dataDir,
-        home: homedir(),
-        settings: () => readTasksSettings(process.env, settingsFilePath()),
-        owner: () => messenger.owner,
-        isPublic: (conversation) => messenger.isPublic(conversation),
-        history: config.history ? new HistoryReader(config.dataDir) : undefined,
-        version: process.env.PACENOTE_VERSION ?? 'dev',
-      })
+      paceTools(
+        serveOwnTools({
+          dataDir: config.dataDir,
+          home: homedir(),
+          settings: () => readTasksSettings(process.env, settingsFilePath()),
+          owner: () => messenger.owner,
+          isPublic: (conversation) => messenger.isPublic(conversation),
+          history: config.history
+            ? new HistoryReader(config.dataDir)
+            : undefined,
+          version,
+        }),
+        serveYourServers({
+          file: mcpServersPath(),
+          owner: () => messenger.owner,
+          version,
+        })
+      )
     )
-  const reasoner = createReasoner(config.reasoner, sandbox)
+  const reasoner = createReasoner(
+    sandbox instanceof VmSandbox
+      ? {
+          ...config.reasoner,
+          // Read for each request, and only for the person Pace answers
+          yourServers: (requester) =>
+            requester && requester.user === messenger.owner
+              ? yourServerRefs(readMcpServers(mcpServersPath()))
+              : [],
+        }
+      : config.reasoner,
+    sandbox
+  )
 
   let renderer: DiagramRenderer | undefined
   if (config.render.enabled) {

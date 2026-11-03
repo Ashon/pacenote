@@ -29,7 +29,9 @@ import {
   type ConnectionId,
   type ConnectionState,
 } from '@src/settings/tools'
+import { McpServersCard } from './mcp-servers-card'
 import { AllowlistCard, BrokerCard } from './sandbox-panel'
+import { Access } from './tools-parts'
 import { text } from './tools-section.text'
 
 type Sandbox = ReturnType<typeof useSandbox>
@@ -67,7 +69,8 @@ const TONE: Record<Tone, { text: string; dot: string }> = {
  * Settings > Tools: what Pace can reach when it answers, and what it may
  * change. A line on top says it in words; under it each connection is a row
  * that opens in place with its settings and its Read and Write switches, then
- * the reference folder the CLI reads itself, and web access. The settings are
+ * the MCP servers you added, the reference folder the CLI reads itself, and
+ * web access. The settings are
  * drafts until the save bar saves them, so the line and the rows follow each
  * switch as it is flipped.
  */
@@ -183,6 +186,12 @@ export function ToolsSection({
       {builtIn && sandbox.available && opsOn && (
         <BrokerCard sandbox={sandbox} />
       )}
+
+      <McpServersCard
+        builtIn={builtIn}
+        sandboxLabel={sectionLabel('sandbox')}
+        goSandbox={() => go('sandbox')}
+      />
 
       {card(
         'reference',
@@ -420,28 +429,6 @@ function ConnectionRow({
         </p>
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-/** Read or Write, beside a connection's name */
-function Access({
-  write,
-  children,
-}: {
-  write?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <span
-      className={cn(
-        'rounded-full px-2 text-caption leading-5',
-        write
-          ? 'bg-card text-primary ring-1 ring-primary/35 ring-inset'
-          : 'bg-secondary text-secondary-foreground'
-      )}
-    >
-      {children}
-    </span>
   )
 }
 

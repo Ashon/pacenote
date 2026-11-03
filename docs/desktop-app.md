@@ -172,7 +172,7 @@ Settings:
   | Messengers | Each chat app under its own heading with how it is connected. Slack: the connection (team hub with pairing and, once paired, "Copy share link" for teammates, or your own app's tokens, with "Create the Slack app" from Pacenote's manifest until they are in) with "Check connection", who can ask (only you: your Slack member ID), Socket Mode keepalive (advanced) |
   | Answers | Reasoner CLI, model, timeout, concurrent requests, time zone, diagrams and images |
   | Sandbox | Run environment (on this Mac or the built-in sandbox) with the built-in sandbox's state and setup, limits, the reasoner login |
-  | Tools | A line on what Pace can reach now; the connections (work folder, GitHub, Jira, Kubernetes, SSH hosts) as rows that open in place on their settings and their Read and Write switches; the broker; the reference folder the CLI reads itself; allowed domains |
+  | Tools | A line on what Pace can reach now; the connections (work folder, GitHub, Jira, Kubernetes, SSH hosts) as rows that open in place on their settings and their Read and Write switches; the broker; your MCP servers, added by hand or from Claude Code and Codex, each with Read and Write; the reference folder the CLI reads itself; allowed domains |
   | History & logs | Run history and retention, log level |
 
 - The section list shows what needs attention: "Not connected" when Slack tokens are missing, "Set up" for a built-in sandbox

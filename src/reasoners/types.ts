@@ -55,6 +55,11 @@ export interface Reasoner {
   readonly canReadFiles: boolean
   /** Names of the attached MCP servers */
   readonly mcpServerNames: string[]
+  /**
+   * The MCP servers the user added (Settings > Tools) that a request for
+   * someone gets, on top of the attached ones
+   */
+  yourServers?(requester: Requester | undefined): McpServerRef[]
   complete(request: ReasonRequest): Promise<string>
 }
 
@@ -82,6 +87,11 @@ export interface ReasonerOptions {
   reasoningEffort?: string
   timeoutMs: number
   mcpServers?: McpServerRef[]
+  /**
+   * More MCP servers for a request, read on each one: those the user added in
+   * Settings > Tools, for them alone
+   */
+  yourServers?: (requester: Requester | undefined) => McpServerRef[]
   auth?: ReasonerAuth
   /**
    * Paths the CLI never reads on this Mac, even inside the reference directory

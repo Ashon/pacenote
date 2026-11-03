@@ -21,6 +21,13 @@ import type {
   SettingsView,
 } from '@src/settings/fields'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
+import type { ServerCheck } from '@src/pace/mcp-relay'
+import type {
+  McpServerCandidate,
+  McpServerDraft,
+  McpServerIssue,
+  McpServerView,
+} from '@src/settings/mcp-servers'
 import type { LanguagePreference, LanguageState } from '@/lib/i18n'
 import type {
   ClaimedUser,
@@ -454,6 +461,30 @@ declare global {
           }) => void
         ): () => void
         onJob(callback: (job: SandboxJob) => void): () => void
+      }
+      /** The MCP servers Pace may use (Settings > Tools) */
+      servers: {
+        list(): Promise<
+          | { servers: McpServerView[]; found: McpServerCandidate[] }
+          | { error: string }
+        >
+        /** Adds a server, or saves the one named previous */
+        save(
+          draft: McpServerDraft,
+          previous?: string
+        ): Promise<{ issues: McpServerIssue[] } | { error: string }>
+        /** Adds one found in an AI tool, with the headers it lacks */
+        addFound(
+          url: string,
+          name: string,
+          headers: Record<string, string>
+        ): Promise<{ issues: McpServerIssue[] } | { error: string }>
+        remove(name: string): Promise<void>
+        /** Connects once and lists its tools */
+        check(
+          draft: McpServerDraft,
+          previous?: string
+        ): Promise<ServerCheck | { error: string }>
       }
     }
   }

@@ -250,4 +250,16 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
     onLoginPrompt: subscribe<unknown>('pacenote:sandbox:login-prompt'),
     onJob: subscribe<unknown>('pacenote:sandbox:job-changed'),
   },
+  // MCP servers for Pace: their headers come back by name only
+  servers: {
+    list: () => ipcRenderer.invoke('pacenote:servers:list'),
+    save: (draft: unknown, previous?: string) =>
+      ipcRenderer.invoke('pacenote:servers:save', draft, previous),
+    addFound: (url: string, name: string, headers: Record<string, string>) =>
+      ipcRenderer.invoke('pacenote:servers:add-found', url, name, headers),
+    remove: (name: string) =>
+      ipcRenderer.invoke('pacenote:servers:remove', name),
+    check: (draft: unknown, previous?: string) =>
+      ipcRenderer.invoke('pacenote:servers:check', draft, previous),
+  },
 })

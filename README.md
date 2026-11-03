@@ -120,7 +120,8 @@ and where you contribute. You add it to each tool with one click, and only if yo
   from a `pacenote/` branch; your working copy is left as it is.
 - **Give your credentials to the model.** Slack and hub tokens never reach the CLI. With connections on in Settings >
   Tools, SSH keys and cluster, GitHub and Jira tokens stay in a separate broker, which the model asks for read-only
-  lookups and, only where you turn on Write, draft PRs and Jira issues or comments.
+  lookups and, only where you turn on Write, draft PRs and Jira issues or comments. The headers of MCP servers you add
+  there stay with Pace on your Mac, which makes the calls for the model.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
   only your other Macs reach it, on your own network: ones you paired or set up with the same Slack app, or a new one
   while Add a device waits.

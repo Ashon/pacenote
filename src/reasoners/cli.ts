@@ -1,10 +1,11 @@
 import { ProcessExitError } from '../sandbox/process.js'
-import type { Sandbox } from '../sandbox/runtime.js'
+import type { Requester, Sandbox } from '../sandbox/runtime.js'
 import { claudeAdapter } from './claude.js'
 import { codexAdapter } from './codex.js'
 import type { ReasonerId } from './ids.js'
 import type {
   CliAdapter,
+  McpServerRef,
   Reasoner,
   ReasonerOptions,
   ReasonRequest,
@@ -42,11 +43,22 @@ export class CliReasoner implements Reasoner {
     )
   }
 
+  yourServers(requester: Requester | undefined): McpServerRef[] {
+    return this.options.yourServers?.(requester) ?? []
+  }
+
   async complete(request: ReasonRequest): Promise<string> {
     const readOnlyDir = this.canReadFiles ? request.readOnlyDir : undefined
+    const yours = this.yourServers(request.requester)
     const { after, ...invocation } = await this.adapter.invocation(request, {
       sandbox: this.box,
-      options: this.options,
+      options:
+        yours.length > 0
+          ? {
+              ...this.options,
+              mcpServers: [...(this.options.mcpServers ?? []), ...yours],
+            }
+          : this.options,
       readOnlyDir,
     })
     const onEvent = request.onEvent

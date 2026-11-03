@@ -10,9 +10,12 @@ export function readJson<T>(file: string, fallback: T): T {
   }
 }
 
-/** Writes through a temporary file, so no half-written file is left behind */
-export function writeJson(file: string, value: unknown): void {
-  write(file, `${JSON.stringify(value, null, 2)}\n`)
+/**
+ * Writes through a temporary file, so no half-written file is left behind;
+ * with a mode (0o600 for a file holding secrets), the file gets it
+ */
+export function writeJson(file: string, value: unknown, mode?: number): void {
+  write(file, `${JSON.stringify(value, null, 2)}\n`, mode)
 }
 
 /**
@@ -30,9 +33,9 @@ export function writeJsonIfChanged(file: string, value: unknown): void {
   if (was !== text) write(file, text)
 }
 
-function write(file: string, text: string): void {
+function write(file: string, text: string, mode?: number): void {
   mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
-  writeFileSync(tmp, text)
+  writeFileSync(tmp, text, mode === undefined ? undefined : { mode })
   renameSync(tmp, file)
 }
