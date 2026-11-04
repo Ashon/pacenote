@@ -123,8 +123,8 @@ and where you contribute. You add it to each tool with one click, and only if yo
   lookups and, only where you turn on Write, draft PRs and Jira issues or comments. The headers of MCP servers you add
   there stay with Pace on your Mac, which makes the calls for the model.
 - **Open a public endpoint or phone home.** It connects to Slack over Socket Mode, so nothing listens for the internet:
-  only your other Macs reach it, on your own network: ones you paired or set up with the same Slack app, or a new one
-  while Add a device waits.
+  only your other Macs and devices reach it, on your own network: Macs you paired or set up with the same Slack app,
+  phones and tablets you paired, or a new one while Add a device waits.
   Besides Slack (or your hub), your AI
   service and the services you connect in Settings > Tools, it talks only to GitHub to check for updates, and downloads the
   sandbox's images when you set it up. There is no telemetry.

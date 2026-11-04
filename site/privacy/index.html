@@ -91,8 +91,8 @@
         <div class="claim">
           <h2>Open a public endpoint or phone home</h2>
           <p>It connects out to Slack over Socket Mode, so nothing on your Mac accepts connections from the internet:
-            only your own Macs reach it, on your own network: ones you paired or set up with the same Slack app, once
-            you turn that on, or a new one while Add a device waits for it. There is
+            only your own Macs and devices reach it, on your own network: Macs you paired or set up with the same Slack
+            app, once you turn that on, phones and tablets you paired, or a new one while Add a device waits for it. There is
             no telemetry; everything it contacts is listed below.</p>
           <p class="check">Check it: <a href="https://github.com/Ashon/pacenote/blob/main/docs/how-it-works.md">How it works</a></p>
         </div>
@@ -123,6 +123,7 @@
               <tr><td>Lookups through connections and, where you turn on Write, draft PRs and Jira issues or comments</td><td>The services you connect: your hosts and clusters, GitHub, Jira</td><td>When Pace uses them; off until you turn them on</td></tr>
               <tr><td>The tool calls Pace makes with the MCP servers you add, with the headers you saved for them</td><td>Those servers, from your Mac</td><td>When Pace uses them; none until you add one, and Write starts off</td></tr>
               <tr><td>Your tasks, decisions, work log, recaps and areas</td><td>Your other Macs, paired or with the same Slack app, directly and encrypted, on your own network</td><td>Only once you pair them or turn on Settings &gt; Devices on each</td></tr>
+              <tr><td>Your Todo, and what Recap, You, Pace's screens and Settings show, with secrets only as set or not</td><td>A phone or tablet you paired, directly and encrypted, on your network or over Tailscale</td><td>While it is connected, once you pair it in Add a device</td></tr>
               <tr><td>Your Slack app's tokens, who Pace answers and how Todo collects; with no Slack app, the key your Macs know each other by and how Todo collects</td><td>A Mac of yours, directly and encrypted, once, after both show the same 6 digits and you Allow</td><td>Only when you click Add a device</td></tr>
               <tr><td>An update check</td><td>GitHub</td><td>Shortly after start, then every 12 hours</td></tr>
               <tr><td>Sandbox images</td><td>GitHub's container registry and the hosts the images are built from</td><td>When you set up the sandbox</td></tr>
@@ -136,6 +137,23 @@
         <p>Settings, run history, your tasks and recaps live in <code>~/.pacenote</code>, a folder only you can read. Run
           history is kept for 30 days unless you change it. With Settings &gt; Devices on, your tasks and recaps are kept on
           your other Mac too. Uninstalling keeps the folder; delete it to remove them.</p>
+      </section>
+
+      <section class="block" id="devices" aria-labelledby="devices-title">
+        <h2 id="devices-title">The iPhone, iPad and Android app</h2>
+        <p>The app keeps the tasks you write on the device, with no account and no Mac. Paired with your Mac, it shows
+          your Todo as your Mac has it and talks to that Mac and nothing else: directly, on your network or over your
+          Tailscale, with no Pacenote server in between. Pairing gives the device a key of its own once both screens show
+          the same number and you Allow it on the Mac, and every message after that is encrypted end to end, so no one
+          else can read it, the developer included. It sends no analytics or crash reports and has no ads or trackers.</p>
+        <p>Your tasks and the Todo your Mac last sent stay on the device and are left out of backups. Its key stays in the
+          iOS keychain or, on Android, sealed with a key in its Keystore. Tasks you wrote before pairing go to your Mac
+          when you pair, and leave the device once the Mac has them. Forget this Mac in the app, and it lets go of the key
+          and the list the Mac sent; Remove the device in Settings &gt; Devices on your Mac, and every Mac turns it
+          away.</p>
+        <p>It looks on your local network only to find your Mac; iPhone and iPad ask you once. The sample Mac you can
+          look around with is made up and lives in the app, so nothing you do there leaves the device. Like Pace, the app
+          never sends anything for you: copy a reply draft and send it yourself.</p>
       </section>
 
       <section class="block" id="site" aria-labelledby="site-title">
