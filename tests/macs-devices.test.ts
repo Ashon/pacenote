@@ -255,8 +255,8 @@ describe('your devices and your Macs', () => {
           saved.push(changes)
           return { issues: [], restarted: false }
         },
-        'pacenote:tasks:add': (title, repo, from) =>
-          addYourTask(dataDir, title, repo, from),
+        'pacenote:tasks:add': (title, repo, from, due) =>
+          addYourTask(dataDir, title, repo, from, due),
       }
       const reader = new HistoryReader(dataDir)
       const asks = new DeviceAsks({
@@ -315,11 +315,10 @@ describe('your devices and your Macs', () => {
       ])
       expect(saved).toEqual([{ REASONER: 'codex' }])
       // A task added on the device: the Mac's own, saying where it was added
-      // (the device's name as Your devices has it, not one it sends)
+      // (the device's name as Your devices has it: a device sends none)
       const added = await ask('tasks.add', [
         'Renew the staging TLS certificate',
         undefined,
-        'This Mac',
       ])
       const id = (added.value as { id: string }).id
       expect(id).toMatch(/^local:/)
@@ -329,6 +328,17 @@ describe('your devices and your Macs', () => {
         reason: 'Added on iPad',
         source: { app: 'local', label: 'iPad' },
       })
+      // A newer device's says when it is due, after its repository
+      const due = await ask('tasks.add', [
+        'Book the team offsite',
+        undefined,
+        'Friday',
+      ])
+      expect(
+        readTasks(dataDir).tasks.find(
+          (t) => t.id === (due.value as { id: string }).id
+        )
+      ).toMatchObject({ due: 'Friday', reason: 'Added on iPad' })
       // Anything else, it does not answer
       expect(await ask('tasks.list')).toMatchObject({ error: 'not-allowed' })
     },

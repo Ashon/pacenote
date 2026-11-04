@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Sparkles,
   SquareTerminal,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -35,6 +36,7 @@ import {
   formatShortDay,
   formatTokens,
 } from '@/lib/format'
+import { clearFound, openAiSheet, useAiSheet } from '@/lib/ai-sheet'
 import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import {
@@ -56,6 +58,7 @@ import { PaceSpinner } from './pace-spinner'
 import { NewTask } from './new-task'
 import { closedBy, TaskRow } from './task-row'
 import { Page } from './page'
+import { StartCard } from './start-card'
 import { text } from './tasks-page.text'
 import { lastToday, Today, TodaySkeleton } from './today'
 import {
@@ -125,6 +128,8 @@ export function TasksPage({
   const macs = useMacs()
   const decide = useDecide()
   const setStage = useStage()
+  // What Let your AI help's first look added, once it closed
+  const { found } = useAiSheet()
   const [tab, setTab] = useState<Tab>('open')
   // New task, open above the tabs (Cmd-N)
   const [adding, setAdding] = useState(false)
@@ -223,6 +228,8 @@ export function TasksPage({
       </Page>
     )
 
+  // No AI set up for Pacenote's own work: where one would help, it says so
+  const noAi = data.aiSet === false
   const open = data.tasks.filter((task) => tabIn(task) === 'open')
   // Open, but waiting on someone else
   const onOthers = data.tasks.filter((task) => tabIn(task) === 'waiting')
@@ -312,6 +319,7 @@ export function TasksPage({
           <CollectButton
             running={Boolean(data.collect.running)}
             elsewhere={data.collect.elsewhere?.name}
+            noAi={noAi}
           />
         </>
       }
@@ -322,6 +330,17 @@ export function TasksPage({
         live={live}
         titleOf={(id) => data.tasks.find((task) => task.id === id)?.title}
       />
+      <StartCard tasks={data.tasks.length} onNewTask={() => setAdding(true)} />
+      {found && (
+        <FoundNotice
+          {...found}
+          onMaybes={() => {
+            clearFound()
+            setTab('maybe')
+            showAll()
+          }}
+        />
+      )}
       <TodoFirst />
       <Today
         lines={todayLines(data.tasks, stages, data.working, live?.working)}
@@ -448,7 +467,9 @@ export function TasksPage({
                   {tab === 'open'
                     ? data.collectedAt
                       ? t.nothingOpen
-                      : t.nothingYet
+                      : noAi
+                        ? t.nothingYetNoAi
+                        : t.nothingYet
                     : tab === 'waiting'
                       ? t.noWaiting
                       : tab === 'maybe'
@@ -624,13 +645,23 @@ function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
 function CollectButton({
   running,
   elsewhere,
+  noAi = false,
 }: {
   running: boolean
   /** Another of your Macs collecting now */
   elsewhere?: string
+  /** No AI set up yet: it opens Let your AI help instead */
+  noAi?: boolean
 }) {
   const t = useText(text)
   const { collect, stop } = useCollect()
+  if (noAi && !running && !elsewhere)
+    return (
+      <Button size="sm" variant="outline" onClick={() => openAiSheet()}>
+        <Sparkles />
+        {t.findWithAi}
+      </Button>
+    )
   if (elsewhere && !running)
     return (
       <Button size="sm" variant="secondary" disabled>
@@ -655,6 +686,42 @@ function CollectButton({
       <RefreshCw />
       {t.collectNow}
     </Button>
+  )
+}
+
+/**
+ * What Let your AI help's first look added, once it closed on Todo (the
+ * task-first canvas's "처음 시작", O3): the tasks you added stay as they were
+ */
+function FoundNotice({
+  by,
+  added,
+  maybe,
+  onMaybes,
+}: {
+  by: string
+  added: number
+  maybe: number
+  onMaybes: () => void
+}) {
+  const t = useText(text)
+  return (
+    <section
+      role="status"
+      aria-label={t.foundTitle}
+      className="mt-5 flex items-center gap-3 rounded-xl bg-card-accent py-2.5 pr-2.5 pl-4"
+    >
+      <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
+      <p className="min-w-0 flex-1 text-copy">{t.foundBy(by, added, maybe)}</p>
+      {maybe > 0 && (
+        <Button size="xs" variant="ghost" onClick={onMaybes}>
+          {t.lookAtMaybes}
+        </Button>
+      )}
+      <Button size="xs" variant="outline" onClick={clearFound}>
+        {t.foundRight}
+      </Button>
+    </section>
   )
 }
 

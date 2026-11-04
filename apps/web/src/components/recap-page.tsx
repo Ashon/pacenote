@@ -51,7 +51,8 @@ import {
 } from '@/lib/recap'
 import { cn, go } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
-import { taskHash } from '@/lib/tasks'
+import { openAiSheet } from '@/lib/ai-sheet'
+import { taskHash, useTasks } from '@/lib/tasks'
 import { switchLine } from './own-ai-status'
 import { PaceSpinner } from './pace-spinner'
 import { text } from './recap-page.text'
@@ -94,6 +95,10 @@ export function RecapPage({
   /** The recap whose text just came, which comes in as it is written */
   const [arrived, setArrived] = useState<string>()
   const [error, setError] = useState<string>()
+  // No AI set up on this Mac yet: Write it up says what it would do. A
+  // device's screen asks the Mac, which says so itself.
+  const onMac = Boolean(window.pacenoteDesktop?.setup)
+  const noAi = useTasks({ enabled: onMac }).data?.aiSet === false && onMac
   const view = recap.data
   const shownKey = view ? `${view.period}:${view.key}` : undefined
   // Back on a recap later, its text is simply there.
@@ -128,7 +133,7 @@ export function RecapPage({
           <span className="flex-1" />
           {view && view.areas.length > 0 && (
             <span className="flex items-center gap-1.5">
-              {!view.written && (
+              {!view.written && !noAi && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -191,6 +196,21 @@ export function RecapPage({
                 </Button>
               </div>
             </div>
+            {noAi && (
+              <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-well px-4 py-2.5 text-copy text-muted-foreground">
+                <PenLine aria-hidden="true" className="size-4 shrink-0" />
+                <span className="min-w-0">{t.writeUpNoAi}</span>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="text-foreground"
+                  onClick={() => openAiSheet()}
+                >
+                  {t.setUpAi}
+                </Button>
+                <span className="min-w-0">{t.copyWithoutAi}</span>
+              </p>
+            )}
             {error && (
               <p role="alert" className="mt-3 text-copy text-status-failed">
                 {error}

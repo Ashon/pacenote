@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { OwnAi, refusalOf } from '../apps/desktop/src/own-ai.js'
 import {
+  aiSetUp,
   cliOrder,
   resetFrom,
   switchWords,
@@ -225,5 +226,16 @@ describe("which CLI does Pacenote's own work", () => {
     } finally {
       rmSync(dataDir, { recursive: true, force: true })
     }
+  })
+
+  it('counts an AI as set up once one is chosen, or one collected here', () => {
+    // A new install: none chosen, nothing collected
+    expect(aiSetUp({}, false)).toBe(false)
+    expect(aiSetUp({ TASKS_AI: ' ' }, false)).toBe(false)
+    // Chosen for Pacenote's own work, or for Pace (the same step sets both)
+    expect(aiSetUp({ TASKS_AI: 'codex' }, false)).toBe(true)
+    expect(aiSetUp({ REASONER: 'claude' }, false)).toBe(true)
+    // An earlier version's, which collected with the default
+    expect(aiSetUp({}, true)).toBe(true)
   })
 })

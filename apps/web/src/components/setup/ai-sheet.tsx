@@ -1,59 +1,97 @@
 import { localized } from '@src/i18n/locale'
+import { todoFirstRun } from '@src/settings/setup'
 import { CLI_NAMES, isOwnCli } from '@src/tasks/own-ai'
 import { text as sourcesText } from '@src/tasks/sources.text'
-import {
-  Check,
-  LoaderCircle,
-  MessageSquare,
-  MonitorSmartphone,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { LoaderCircle, MessageSquare, MonitorSmartphone, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
-import { botControl } from '@/lib/desktop'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AI_STEPS,
+  type AiSheetStart,
+  closeAiSheet,
+  type Found,
+  lastReached,
+  REACHED_KEY,
+  useAiSheet,
+} from '@/lib/ai-sheet'
 import { useText } from '@/lib/i18n'
-import { readStored, writeStored } from '@/lib/storage'
+import { writeStored } from '@/lib/storage'
 import { useDetect, useFromMac, useSettingsView, useSetup } from '@/lib/setup'
 import { useCollect, useTasks } from '@/lib/tasks'
-import { cn } from '@/lib/utils'
+import { cn, go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
-import { PacenoteMark } from '../logo'
 import { AiStep } from './ai-step'
 import { text } from './first-run.text'
 import { FromMacBody } from './from-mac'
 import { Note, StepFrame } from './parts'
 
-type Step = 'ai' | 'sources' | 'look'
-const STEPS: Step[] = ['ai', 'sources', 'look']
+type Step = (typeof AI_STEPS)[number]
 
 /**
- * The furthest step reached, kept in this window, so the first run picks up
- * where it was when the window draws it again (a language change)
+ * Let your AI help (the task-first canvas's "처음 시작", O2): a sheet over the
+ * window's right side with the three steps a new install's first run took
+ * the whole window for, your AI, where your work is, and a first look at what
+ * is asked of you. Todo's start card opens it, and so does every place an AI
+ * would help before one is set up (Find tasks with AI, Recap's Set up AI).
+ * It ends on Todo, which says what the look added; Pace stays off until it
+ * is set up from the start card or Settings.
  */
-const REACHED_KEY = 'pacenote.first-run.reached'
-
-function lastReached(): number {
-  const reached = Number(readStored(REACHED_KEY))
-  return reached > 0 && reached < STEPS.length ? reached : 0
+export function AiSheet() {
+  const t = useText(text)
+  const { open } = useAiSheet()
+  // Closing, it keeps what it showed while it slides out
+  const shown = useRef<AiSheetStart>('ai')
+  if (open) shown.current = open
+  return (
+    <Dialog
+      open={Boolean(open)}
+      onOpenChange={(next) => {
+        if (!next) closeAiSheet()
+      }}
+    >
+      <DialogContent
+        variant="sheet"
+        aria-describedby={undefined}
+        className="w-[min(40rem,calc(100vw-1rem))]"
+      >
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-6">
+          <DialogTitle className="text-body font-semibold">
+            {t.sheetTitle}
+          </DialogTitle>
+          <span className="flex-1" />
+          <DialogClose asChild>
+            <Button size="icon-sm" variant="ghost" aria-label={t.close}>
+              <X />
+            </Button>
+          </DialogClose>
+        </header>
+        <div className="min-h-0 flex-1">
+          <SheetSteps start={shown.current} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
-/**
- * A new install's first run (the task-first canvas, T5): your AI, where your
- * work is, and a first look at what is asked of you, with your projects. It
- * turns Todo on and ends on it, with no Slack app to make: Pace stays off
- * until you set it up, here or in Settings. It takes the whole window, as
- * Pace's setup does.
- */
-export function FirstRun({ onLeave }: { onLeave: (hash: string) => void }) {
+/** The steps, from where they were left, or your other Mac's at once */
+function SheetSteps({ start }: { start: AiSheetStart }) {
   const t = useText(text)
   const setup = useSetup()
   const detect = useDetect()
   const settings = useSettingsView()
   const [reached, setReached] = useState(lastReached)
-  const [step, setStep] = useState<Step>(STEPS[reached]!)
-  const isMac = window.pacenoteDesktop?.platform === 'darwin'
-  const go = (next: Step) => {
-    const furthest = Math.max(reached, STEPS.indexOf(next))
+  const [step, setStep] = useState<Step>(
+    start === 'mac' ? 'sources' : AI_STEPS[reached]!
+  )
+  const goTo = (next: Step) => {
+    const furthest = Math.max(reached, AI_STEPS.indexOf(next))
     setStep(next)
     setReached(furthest)
     writeStored(REACHED_KEY, String(furthest))
@@ -61,136 +99,46 @@ export function FirstRun({ onLeave }: { onLeave: (hash: string) => void }) {
   }
   const chosen = settings.view?.values.TASKS_AI
   const cli = isOwnCli(chosen) ? chosen : 'claude'
-  const finish = async () => {
+  // A first run ends here (the start card goes); Pace's setup is its own.
+  const finish = async (found?: Found) => {
     writeStored(REACHED_KEY, '0')
-    await setup.save({ finished: true })
-    onLeave('#/tasks')
+    if (setup.view && todoFirstRun(setup.view))
+      await setup.save({ finished: true })
+    closeAiSheet(found)
+    go('#/tasks')
   }
 
-  const body =
-    step === 'ai' ? (
-      <AiStep
-        detect={detect}
-        settings={settings.view}
-        of={[1, 3]}
-        lead={t.aiLead}
-        onDone={() => go('sources')}
-      />
-    ) : step === 'sources' ? (
+  if (start === 'mac')
+    return (
       <SourcesStep
         cli={cli}
-        onDone={async () => {
-          // Todo on, written down, so it goes to your other Macs too
-          await window.pacenoteDesktop?.settings.save({ TASKS: 'on' })
-          go('look')
-        }}
-        // Paired with your other Mac: Todo came on with what it sent, and
-        // your tasks follow from there, so no first look is needed
+        fromMacFirst
+        onDone={async () => {}}
         onFromMac={() => void finish()}
       />
-    ) : (
-      <LookStep cli={cli} onDone={() => void finish()} />
     )
-
-  return (
-    <div className="flex h-full flex-col bg-sidebar">
-      <header
-        className={cn(
-          'titlebar-drag grid h-12 shrink-0 place-items-center text-body font-semibold text-muted-foreground',
-          isMac && 'pl-[72px]'
-        )}
-      >
-        {t.title}
-      </header>
-      <div className="flex min-h-0 flex-1">
-        <nav
-          aria-label={t.stepsLabel}
-          className="flex w-56 shrink-0 flex-col px-3 pb-4"
-        >
-          <div className="flex h-10 items-center gap-2.5 px-2.5 pb-3">
-            <PacenoteMark className="size-6 shrink-0" />
-            <span className="text-heading">Pacenote</span>
-          </div>
-          <ol className="flex flex-col gap-0.5">
-            {STEPS.map((each, index) => {
-              const current = each === step
-              // Done: passed on the way to the furthest step reached
-              const done = !current && index < reached
-              const inner = (
-                <>
-                  <span
-                    className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded-full text-meta font-semibold',
-                      current
-                        ? 'bg-primary text-primary-foreground'
-                        : index <= reached
-                          ? 'bg-primary/12 text-primary'
-                          : 'text-muted-foreground ring-1 ring-border'
-                    )}
-                  >
-                    {done ? (
-                      <Check className="size-3.5" strokeWidth={2.5} />
-                    ) : (
-                      index + 1
-                    )}
-                  </span>
-                  {t.steps[each]}
-                </>
-              )
-              const className = cn(
-                'flex min-h-10 w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-body',
-                current
-                  ? 'bg-selected font-semibold text-foreground'
-                  : index <= reached
-                    ? 'text-foreground hover:bg-selected/50'
-                    : 'text-muted-foreground'
-              )
-              return (
-                <li key={each}>
-                  {current ? (
-                    <span aria-current="step" className={className}>
-                      {inner}
-                    </span>
-                  ) : index <= reached ? (
-                    <button
-                      type="button"
-                      className={className}
-                      onClick={() => go(each)}
-                    >
-                      {inner}
-                    </button>
-                  ) : (
-                    <span className={className}>{inner}</span>
-                  )}
-                </li>
-              )
-            })}
-          </ol>
-          <span className="flex-1" />
-          <div className="flex flex-col gap-1 px-2.5">
-            <span className="text-body font-semibold">{t.pace}</span>
-            <span className="text-meta text-muted-foreground">{t.paceHow}</span>
-            <button
-              type="button"
-              onClick={() =>
-                void botControl()
-                  ?.setUp()
-                  .then(() => onLeave('#/setup'))
-              }
-              className="mt-1 self-start text-body font-semibold text-primary hover:underline"
-            >
-              {t.setUpPace}
-            </button>
-          </div>
-        </nav>
-        <main
-          className="content-surface mr-3 mb-3 min-w-0 flex-1 overflow-hidden rounded-[20px] bg-card"
-          style={{ boxShadow: 'var(--card-shadow)' }}
-        >
-          {body}
-        </main>
-      </div>
-    </div>
+  return step === 'ai' ? (
+    <AiStep
+      detect={detect}
+      settings={settings.view}
+      of={[1, 3]}
+      lead={t.aiLead}
+      onDone={() => goTo('sources')}
+    />
+  ) : step === 'sources' ? (
+    <SourcesStep
+      cli={cli}
+      onDone={async () => {
+        // Todo on, written down, so it goes to your other Macs too
+        await window.pacenoteDesktop?.settings.save({ TASKS: 'on' })
+        goTo('look')
+      }}
+      // Paired with your other Mac: Todo came on with what it sent, and
+      // your tasks follow from there, so no first look is needed
+      onFromMac={() => void finish()}
+    />
+  ) : (
+    <LookStep cli={cli} onDone={(found) => void finish(found)} />
   )
 }
 
@@ -200,17 +148,24 @@ export function FirstRun({ onLeave }: { onLeave: (hash: string) => void }) {
  */
 function SourcesStep({
   cli,
+  fromMacFirst = false,
   onDone,
   onFromMac,
 }: {
   cli: 'claude' | 'codex' | 'opencode'
+  /** Opened for your other Mac (the start card's): that alone, no step */
+  fromMacFirst?: boolean
   onDone: () => Promise<void>
   onFromMac: () => void
 }) {
   const t = useText(text)
   const [saving, setSaving] = useState(false)
-  const [fromMac, setFromMac] = useState(false)
+  const [fromMac, setFromMac] = useState(fromMacFirst)
   const mac = useFromMac('todo')
+  // Opened for it, it looks for your other Mac at once
+  useEffect(() => {
+    if (fromMacFirst) void window.pacenoteDesktop?.setup?.macLook('todo')
+  }, [fromMacFirst])
   // Leaving the step lets your other Mac go
   useEffect(() => () => void window.pacenoteDesktop?.setup?.macCancel(), [])
   // opencode collects through Claude Code or Codex (src/tasks/own-ai.ts)
@@ -220,21 +175,27 @@ function SourcesStep({
   return (
     <StepFrame
       step="slack"
-      of={[2, 3]}
+      of={fromMacFirst ? null : [2, 3]}
       title={fromMac ? t.fromMac : t.sourcesTitle}
       lead={fromMac ? t.fromMacLead : t.sourcesLead}
       footer={
         <>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (fromMac) mac.cancel()
-              else mac.look()
-              setFromMac(!fromMac)
-            }}
-          >
-            {fromMac ? t.cancel : t.fromMac}
-          </Button>
+          {fromMacFirst ? (
+            <DialogClose asChild>
+              <Button variant="ghost">{t.cancel}</Button>
+            </DialogClose>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (fromMac) mac.cancel()
+                else mac.look()
+                setFromMac(!fromMac)
+              }}
+            >
+              {fromMac ? t.cancel : t.fromMac}
+            </Button>
+          )}
           <span className="flex-1" />
           {paired ? (
             <Button onClick={onFromMac}>{t.openTodo}</Button>
@@ -302,7 +263,8 @@ function LookStep({
   onDone,
 }: {
   cli: 'claude' | 'codex' | 'opencode'
-  onDone: () => void
+  /** With what the look added, when it ran and found */
+  onDone: (found?: Found) => void
 }) {
   const t = useText(text)
   const tasks = useTasks().data
@@ -341,7 +303,20 @@ function LookStep({
             </Button>
           )}
           <span className="flex-1" />
-          <Button disabled={Boolean(running)} onClick={onDone}>
+          <Button
+            disabled={Boolean(running)}
+            onClick={() =>
+              onDone(
+                last?.ok
+                  ? {
+                      by: CLI_NAMES[last.by ?? cli],
+                      added: last.added,
+                      maybe: last.maybe,
+                    }
+                  : undefined
+              )
+            }
+          >
             {last?.ok ? t.looksRight : t.openTodo}
           </Button>
         </>

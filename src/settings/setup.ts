@@ -92,6 +92,14 @@ export function setupView(
 }
 
 /**
+ * A new install's first run, which Todo's start card holds: setup not ended,
+ * and nothing of Pace's setup saved yet (a Slack step, who you are, your
+ * other Mac's). One part way through Pace's setup goes on with that instead.
+ */
+export const todoFirstRun = ({ open, record }: SetupView): boolean =>
+  open && record.step === 'ai' && !record.slack && !record.me && !record.fromMac
+
+/**
  * Setup opened again after it ended (Overview, when Pace cannot start): it
  * picks up where it was, but from the review at the latest, since the first
  * answer it waited for came before or never will.

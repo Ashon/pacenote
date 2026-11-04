@@ -43,6 +43,7 @@ import {
   upgradeSettings,
   readSettingsValues,
 } from '../../../src/settings/settings-file.js'
+import { todoFirstRun } from '../../../src/settings/setup.js'
 import { BotSupervisor } from './bot.js'
 import { isLocale, localized, setLocale } from '../../../src/i18n/locale.js'
 import { DESKTOP_PREFS_FILE } from '../../../src/i18n/user.js'
@@ -413,20 +414,12 @@ const setup = new SetupStore(dataDir, () => ({
   answered: reader.list({ kind: 'mention', limit: 1 }).length > 0,
 }))
 /**
- * A Pacenote nothing was set up in yet, Pace or Todo: it opens on Todo's
- * first run (#/start), with Pace off until it is set up from Settings. One
- * part way through Pace's setup (a Slack step saved) goes on with that.
+ * A Pacenote nothing was set up in yet, Pace or Todo: it opens on Todo with
+ * its start card (until that is closed, or your AI found your tasks), with
+ * Pace off until it is set up from there or Settings. One part way through
+ * Pace's setup (a Slack step saved) goes on with that.
  */
-const firstRun = (): boolean => {
-  const { open, record } = setup.view()
-  return (
-    open &&
-    record.step === 'ai' &&
-    !record.slack &&
-    !record.me &&
-    !record.fromMac
-  )
-}
+const firstRun = (): boolean => todoFirstRun(setup.view())
 /**
  * The screen the window opens on: Todo when it is on, unless you chose
  * Overview (desktop.json's landing), else Overview as before
@@ -1234,8 +1227,15 @@ if (!app.requestSingleInstanceLock()) {
         todoSync?.start()
         deviceAsks?.start()
       }
-      // A new install starts with Todo, and Pace off until it is set up.
-      if (firstRun()) supervisor?.setOff(true)
+      // A new install starts on Todo, on and with nothing in it yet, and Pace
+      // off until it is set up: Todo's start card holds the rest (your AI,
+      // your other Mac, your devices, Pace).
+      if (firstRun()) {
+        supervisor?.setOff(true)
+        if (settings.effectiveEnv().TASKS !== 'on')
+          for (const problem of settings.save({ TASKS: 'on' }))
+            log.warn(`Todo could not turn on: ${problem.message}`)
+      }
       // The bot starts independently of the window and does not wait for it.
       if (supervisor?.current.autoStart && supervisor.current.phase === 'idle')
         void supervisor.start()
@@ -1249,7 +1249,7 @@ if (!app.requestSingleInstanceLock()) {
         await mainWindow.open(
           setup.view().open
             ? firstRun()
-              ? '#/start'
+              ? '#/tasks'
               : '#/setup'
             : // Opened by a link from the hub's installer
               linkedHub

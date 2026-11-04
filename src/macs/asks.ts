@@ -79,7 +79,8 @@ export function argsFromDevice(
   args: unknown[],
   from?: string
 ): unknown[] {
-  if (what === 'tasks.add') return [args[0], args[1], from]
+  // title, repo, where it was added, and when it is due (a newer device's)
+  if (what === 'tasks.add') return [args[0], args[1], from, args[2]]
   if (what !== 'settings.validate' && what !== 'settings.save') return args
   const changes = Object.fromEntries(
     Object.entries((args[0] ?? {}) as Record<string, unknown>).filter(

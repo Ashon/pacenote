@@ -4,6 +4,7 @@ import path from 'node:path'
 import { localized } from '../../../../src/i18n/locale.js'
 import { liveTasks, readActivity } from '../../../../src/tasks/activity.js'
 import { recentCollections } from '../../../../src/tasks/collections.js'
+import { aiSetUp } from '../../../../src/tasks/own-ai.js'
 import {
   checkFolder,
   readRepos,
@@ -103,10 +104,12 @@ export function registerTasksIpc(
     const areas = readYou(dataDir).areas
     const work = readWork(dataDir)
     const collections = recentCollections(dataDir, collectionRuns(7))
+    const collect = collectState(collections)
     return {
       settings: current,
-      collect: collectState(collections),
+      collect,
       ai: ownAi.now(),
+      aiSet: aiSetUp(settings.effectiveEnv(), Boolean(collect.last)),
       collections,
       ...view,
       working: sessions.working(open, work.entries),
@@ -182,8 +185,9 @@ export function registerTasksIpc(
   })
   // A task you add yourself (Todo's New task), in a project's repository;
   // from a device of yours, the device it was added on (DeviceAnswers)
-  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from) =>
-    addYourTask(dataDir, title, repo, from)
+  // From a device, as argsFromDevice hands it: with where it was added
+  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from, due) =>
+    addYourTask(dataDir, title, repo, from, due)
   )
   ipc.handle('pacenote:tasks:leave-out', [], (label) => {
     if (typeof label !== 'string' || !label.trim()) return []

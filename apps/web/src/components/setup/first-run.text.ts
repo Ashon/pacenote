@@ -2,6 +2,8 @@ import { josa } from '@src/i18n/korean'
 import type { Locale } from '@src/i18n/locale'
 
 const en = {
+  sheetTitle: 'Let your AI help',
+  close: 'Close',
   title: 'Set up Pacenote',
   stepsLabel: 'Setup steps',
   steps: {
@@ -56,6 +58,8 @@ const en = {
 }
 
 const ko: typeof en = {
+  sheetTitle: 'AI에게 도움받기',
+  close: '닫기',
   title: 'Pacenote 초기 설정',
   stepsLabel: '초기 설정 단계',
   steps: {

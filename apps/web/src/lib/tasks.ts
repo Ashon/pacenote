@@ -14,12 +14,12 @@ export const taskDetailQuery = (id: string) => ({
 })
 
 /** Your tasks, from the desktop app (none on the dev server) */
-export function useTasks() {
+export function useTasks(options: { enabled?: boolean } = {}) {
   const bridge = window.pacenoteDesktop?.tasks
   return useQuery({
     queryKey: ['tasks'],
     queryFn: async () => (await bridge?.list()) ?? null,
-    enabled: Boolean(bridge),
+    enabled: Boolean(bridge) && (options.enabled ?? true),
     refetchInterval: 3_000,
   })
 }
@@ -164,8 +164,8 @@ export function useStage() {
 /** Adds a task of your own (New task): its id, or the error to show */
 export function useAddTask() {
   const client = useQueryClient()
-  return async (title: string, repo?: string) => {
-    const result = await window.pacenoteDesktop?.tasks.add(title, repo)
+  return async (title: string, repo?: string, due?: string) => {
+    const result = await window.pacenoteDesktop?.tasks.add(title, repo, due)
     await client.invalidateQueries({ queryKey: ['tasks'] })
     return result ?? {}
   }

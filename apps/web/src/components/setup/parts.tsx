@@ -24,8 +24,11 @@ export function StepFrame({
   footer,
 }: {
   step: SetupStep
-  /** Where it is in another set of steps (the first run's): n of total */
-  of?: [number, number]
+  /**
+   * Where it is in another set of steps (Let your AI help's): n of total;
+   * null: a step of none
+   */
+  of?: [number, number] | null
   /** The part of the step it is on: "Your own Slack app" */
   part?: string
   title: string
@@ -42,16 +45,21 @@ export function StepFrame({
         {/* Lines break where they read well: no word left alone at the end
             of a paragraph, and a title or lead in even lines. */}
         <div className="@container mx-auto max-w-3xl px-10 pt-9 pb-8 text-pretty">
-          <p className="text-body font-semibold text-primary">
-            {of
-              ? t.stepOf(...of)
-              : t.stepOf(SETUP_STEPS.indexOf(step) + 1, SETUP_STEPS.length)}
-            {part && ` · ${part}`}
-          </p>
+          {of !== null && (
+            <p className="text-body font-semibold text-primary">
+              {of
+                ? t.stepOf(...of)
+                : t.stepOf(SETUP_STEPS.indexOf(step) + 1, SETUP_STEPS.length)}
+              {part && ` · ${part}`}
+            </p>
+          )}
           <h1
             ref={heading}
             tabIndex={-1}
-            className="mt-1 text-title text-balance outline-none"
+            className={cn(
+              'text-title text-balance outline-none',
+              of !== null && 'mt-1'
+            )}
           >
             {title}
           </h1>

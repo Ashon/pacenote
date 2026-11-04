@@ -14,6 +14,10 @@ const en = {
   before: (period: RecapPeriod) => `The ${period} before`,
   after: (period: RecapPeriod) => `The ${period} after`,
   writeItUp: 'Write it up',
+  writeUpNoAi:
+    'Write it up turns this into a few lines for your standup or your manager, with your own AI.',
+  setUpAi: 'Set up AI',
+  copyWithoutAi: 'Copy works without it.',
   writingItUp: 'Writing it up',
   desktopOnly: 'Recaps are counted by the desktop app.',
   // Copy
@@ -97,6 +101,10 @@ const ko: typeof en = {
   before: (period) => `이전 ${PERIOD[period]}`,
   after: (period) => `다음 ${PERIOD[period]}`,
   writeItUp: '정리하기',
+  writeUpNoAi:
+    '정리하기는 내 AI로 이 기록을 스탠드업이나 매니저에게 보낼 몇 줄로 바꿔요.',
+  setUpAi: 'AI 설정',
+  copyWithoutAi: '복사는 AI 없이도 돼요.',
   writingItUp: '정리하는 중',
   desktopOnly: '회고는 데스크톱 앱이 집계해요.',
   copyAs: {

@@ -250,8 +250,8 @@ const en = {
   ),
   openOnOtherMac: (choice: (words: string) => ReactNode) => (
     <>
-      On the other Mac, choose {choice('From your other Mac')} in its first run,
-      or {choice('Pair')} in Settings &gt; Devices.
+      On the other Mac, choose {choice('From your other Mac')} on Todo&apos;s
+      start card, or {choice('Pair')} in Settings &gt; Devices.
     </>
   ),
   waitingOnNetwork: (clock: string) =>
@@ -524,7 +524,7 @@ const ko: typeof en = {
   ),
   openOnOtherMac: (choice) => (
     <>
-      다른 Mac의 첫 실행에서 {choice('다른 Mac에서 가져오기')}를, 또는 설정 &gt;
+      다른 Mac의 할 일 시작 카드에서 {choice('다른 Mac에서')}를, 또는 설정 &gt;
       내 기기에서 {choice('페어링')}을 선택하세요.
     </>
   ),

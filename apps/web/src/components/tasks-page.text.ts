@@ -24,6 +24,8 @@ const en = {
   nothingOpen:
     'Nothing open. The next collection reads what is new since this one.',
   nothingYet: 'Nothing yet. A first collection reads the last 7 days.',
+  nothingYetNoAi:
+    'Nothing yet. Add a task, or let your AI find what is asked of you.',
   noMaybes: 'No Maybes.',
   nothingSettled: 'Nothing settled in the last 14 days.',
   dismissRate: (percent: number) =>
@@ -55,6 +57,8 @@ const en = {
   noProject: 'No project',
   keptHere: 'Kept on This Mac',
   addHint: 'Enter adds it to Open · Esc closes',
+  due: 'Due',
+  duePlaceholder: 'Due, if any',
   guessedFrom: (word: string) => `the project was guessed from “${word}”`,
   guessed: 'guessed',
 
@@ -63,6 +67,17 @@ const en = {
   collecting: 'Collecting',
   stop: 'Stop',
   collectNow: 'Collect now',
+  // No AI set up yet: Let your AI help
+  findWithAi: 'Find tasks with AI',
+  foundTitle: 'What your AI found',
+  foundBy: (by: string, added: number, maybe: number) =>
+    added + maybe === 0
+      ? `${by} found nothing asked of you in the last 7 days. Collect now looks again.`
+      : `${by} added ${added} ${added === 1 ? 'task' : 'tasks'}${
+          maybe ? ` and ${maybe} ${maybe === 1 ? 'Maybe' : 'Maybes'}` : ''
+        } from the last 7 days. The tasks you added are as you left them.`,
+  foundRight: 'Looks right',
+  lookAtMaybes: 'Look at the Maybes',
 
   // What an AI tool does with your tasks over MCP
   anAiTool: 'An AI tool',
@@ -167,6 +182,8 @@ const ko: typeof en = {
   nothingOpen:
     '열린 할 일이 없어요. 다음 모으기는 이번 이후에 새로 온 것만 읽어요.',
   nothingYet: '아직 없어요. 첫 모으기는 지난 7일을 읽어요.',
+  nothingYetNoAi:
+    '아직 없어요. 할 일을 적거나, AI가 나에게 온 일을 찾게 하세요.',
   noMaybes: '후보가 없어요.',
   nothingSettled: '지난 14일 동안 끝내거나 제외한 할 일이 없어요.',
   dismissRate: (percent) =>
@@ -196,6 +213,8 @@ const ko: typeof en = {
   noProject: '프로젝트 없음',
   keptHere: '이 Mac에 둬요',
   addHint: 'Enter로 열림에 추가 · Esc로 닫기',
+  due: '기한',
+  duePlaceholder: '기한(있으면)',
   guessedFrom: (word) => `“${word}”에서 프로젝트를 짐작했어요`,
   guessed: '짐작',
 
@@ -203,6 +222,16 @@ const ko: typeof en = {
   collecting: '모으는 중',
   stop: '중지',
   collectNow: '지금 모으기',
+  findWithAi: 'AI로 할 일 찾기',
+  foundTitle: 'AI가 찾은 것',
+  foundBy: (by, added, maybe) =>
+    added + maybe === 0
+      ? `${josa(by, '이/가')} 지난 7일 동안 나에게 온 일을 찾지 못했어요. 지금 모으기로 다시 찾아요.`
+      : `${josa(by, '이/가')} 지난 7일에서 할 일 ${added}개${
+          maybe ? `와 후보 ${maybe}개` : ''
+        }를 더했어요. 내가 적은 할 일은 그대로예요.`,
+  foundRight: '좋아요',
+  lookAtMaybes: '후보 보기',
 
   anAiTool: 'AI 도구',
   liveCollecting: (tool, added) =>

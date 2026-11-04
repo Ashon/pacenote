@@ -408,7 +408,7 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
       follow: false,
       firstRun: true,
     })
-    await air.page.getByRole('button', { name: 'Set up Pace instead' }).click()
+    await air.page.getByRole('button', { name: 'Set up Pace' }).click()
     await air.page
       .getByRole('heading', { name: 'Which AI service do you already use?' })
       .waitFor()
@@ -572,22 +572,21 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await shot(pro, 'todo-settings')
     await pro.page.getByRole('button', { name: 'Add a device' }).click()
     await pro.page.getByText('Waiting for it on this network').waitFor()
-    await pro.page.getByText('in its first run', { exact: false }).waitFor()
+    await pro.page.getByText("on Todo's start card", { exact: false }).waitFor()
     await shot(pro, 'todo-adding')
     // The key Add a device made, readable by you alone
     const key = path.join(pro.home, GROUP_FILE)
     expect(statSync(key).mode & 0o777).toBe(0o600)
 
-    // The Air's first run: its own AI, then your other Mac at step 2.
+    // The Air's first run: Todo's start card, From your other Mac.
     const air = await openMac(world, 'MacBook Air', 1, {
       follow: false,
       firstRun: true,
     })
-    await air.page.getByRole('button', { name: 'Use Claude' }).click()
     await air.page
-      .getByRole('heading', { name: 'Where your work is' })
-      .waitFor()
-    await air.page.getByRole('button', { name: 'From your other Mac' }).click()
+      .getByRole('region', { name: 'Your tasks, on this Mac' })
+      .getByRole('button', { name: 'Connect', exact: true })
+      .click()
     await air.page
       .getByRole('heading', { name: 'From your other Mac' })
       .waitFor()

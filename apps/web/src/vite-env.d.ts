@@ -187,6 +187,11 @@ declare global {
               collect: TasksCollect
               /** Pacenote's own work: the CLI chosen, and what each last did */
               ai: OwnAiNow
+              /**
+               * false: no AI was set up for Pacenote's own work yet, and none
+               * ever collected here (aiSetUp in src/tasks/own-ai.ts)
+               */
+              aiSet?: boolean
               /** The last 7 days' collections, newest first */
               collections: CollectionRecord[]
               /** Each open task's latest session: its tool and last activity */
@@ -214,10 +219,14 @@ declare global {
         ): Promise<void>
         /** In progress, waiting on someone else, or back to open */
         stage(id: string, stage: StageRecord['stage']): Promise<void>
-        /** Adds a task of your own, in a repository's project or none */
+        /**
+         * Adds a task of your own, in a repository's project or none, due
+         * when you say ("Friday")
+         */
         add(
           title: string,
-          repo?: string
+          repo?: string,
+          due?: string
         ): Promise<{ id?: string; error?: string } | undefined>
         leaveOut(label: string): Promise<SettingsIssue[]>
         /**

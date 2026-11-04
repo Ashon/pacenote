@@ -26,7 +26,7 @@ import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
 import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { saveRepo } from '../../src/tasks/folders.js'
-import { decide } from '../../src/tasks/store.js'
+import { decide, readTasks } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
 import { withHub } from './support/hub.js'
@@ -148,9 +148,8 @@ async function launch(
     legacy?: boolean
     env?: Record<string, string>
     /**
-     * A new install: true goes on from Todo's first run to Pace's setup
-     * (Set up Pace instead), as the tests of Pace's setup start; todo stays
-     * on the first run
+     * A new install: true goes on from Todo's start card to Pace's setup
+     * (Set up Pace), as the tests of Pace's setup start; todo stays on Todo
      */
     firstRun?: boolean | 'todo'
   } = {}
@@ -195,10 +194,12 @@ async function launch(
   page.setDefaultTimeout(20_000)
   await page.waitForLoadState('domcontentloaded')
   if (options.firstRun === true) {
-    // Todo's first run, unless Pace's setup was under way already
-    const paceInstead = page.getByRole('button', {
-      name: /^(Set up Pace instead|대신 Pace 설정)$/,
-    })
+    // Todo's start card, unless Pace's setup was under way already
+    const paceInstead = page
+      .getByRole('region', {
+        name: /^(Your tasks, on this Mac|내 할 일, 이 Mac에)$/,
+      })
+      .getByRole('button', { name: /^(Set up Pace|Pace 설정)$/ })
     const wizard = page.getByText(/^(Step \d of 5|5단계 중 \d단계)/)
     // The one not there times out later: nothing waits on it.
     const either = (locator: typeof wizard) => locator.waitFor().catch(() => {})
@@ -875,56 +876,98 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(await page.getByText('Finish setting up Pace').count()).toBe(0)
   })
 
-  it("opens a new install on Todo's first run, with Pace off until it is set up from Settings", async () => {
+  it('opens a new install on Todo with its start card, and sets your AI up in a sheet, with Pace off until it is set up from Settings', async () => {
     world = await World.create([])
     const prefs = () =>
       JSON.parse(
         readFileSync(path.join(world!.home, 'desktop.json'), 'utf8')
       ) as Record<string, unknown>
-    // The fake Claude Code collects with no Slack connector (step 3)
+    // No AI chosen yet (REASONER empty); the fake Claude Code collects with
+    // no Slack connector (step 3)
     let page = await launch(world, {
       firstRun: 'todo',
+      settings: ['REASONER='],
       env: { FAKE_CLAUDE_DIR: world.claudeDir },
     })
 
-    // 1. Your AI: the fake claude, signed in
-    await page
+    // Todo, on, with the start card; no AI yet, so no Collect now
+    await page.getByRole('heading', { name: 'Todo' }).waitFor()
+    const card = page.getByRole('region', { name: 'Your tasks, on this Mac' })
+    await card.waitFor()
+    await page.getByRole('button', { name: 'Find tasks with AI' }).waitFor()
+    expect(
+      await page.getByRole('button', { name: 'Collect now' }).count()
+    ).toBe(0)
+    expect(saved(world).TASKS).toBe('on')
+    await page.getByText('Pace: Off').waitFor()
+    expect(prefs().pace).toBe('off')
+
+    // A task of your own, due Friday: the card folds to a line
+    await card.getByRole('button', { name: 'New task' }).click()
+    await page.getByPlaceholder('What to do').fill('Book the team offsite')
+    await page.getByLabel('Due').fill('Friday')
+    await page.keyboard.press('Enter')
+    await page.getByText('Book the team offsite').waitFor()
+    expect(
+      readTasks(world.home).tasks.find(
+        (task) => task.title === 'Book the team offsite'
+      )
+    ).toMatchObject({ due: 'Friday', addedBy: 'you' })
+    await card
+      .getByText('Let your AI find what is asked of you', { exact: false })
+      .waitFor()
+
+    // Recap counts it without an AI, and says what Write it up would do
+    await page.evaluate("window.location.hash = '#/recap'")
+    await page.getByText('Write it up turns this', { exact: false }).waitFor()
+    expect(
+      await page.getByRole('button', { name: 'Write it up' }).count()
+    ).toBe(0)
+    await page.evaluate("window.location.hash = '#/tasks'")
+
+    // Let your AI help, over Todo. 1. Your AI: the fake claude, signed in
+    await card.getByRole('button', { name: 'Set up AI' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Let your AI help' })
+    await sheet
       .getByRole('heading', { name: 'Which AI service do you already use?' })
       .waitFor()
-    await page.getByText('Step 1 of 3').waitFor()
-    await page
+    await sheet.getByText('Step 1 of 3').waitFor()
+    await sheet
       .getByRole('radiogroup', { name: 'AI service' })
       .getByText('Signed in')
       .waitFor()
-    await page.getByRole('button', { name: 'Use Claude' }).click()
+    await sheet.getByRole('button', { name: 'Use Claude' }).click()
 
     // 2. Where your work is: Slack through Claude Code's connector, read only
-    await page.getByRole('heading', { name: 'Where your work is' }).waitFor()
-    await page
+    await sheet.getByRole('heading', { name: 'Where your work is' }).waitFor()
+    await sheet
       .getByText(/Connect Slack in claude\.ai's Settings > Connectors/)
       .waitFor()
     await page.screenshot({
       path: path.join(REPO, 'test-results/first-run-sources.png'),
     })
     await siteShot(page, 'first-run')
-    await page.getByRole('button', { name: 'Continue' }).click()
+    await sheet.getByRole('button', { name: 'Continue' }).click()
 
     // 3. A first look, and Todo; Pace never asked to be set up. The fake
     // Claude Code has no Slack connector: the look is this Mac's alone, said
     // as such and not as a failure, with its projects.
-    await page.getByRole('heading', { name: 'A first look' }).waitFor()
-    expect(saved(world).TASKS).toBe('on')
-    await page.getByRole('button', { name: 'Collect now' }).click()
-    await page
+    await sheet.getByRole('heading', { name: 'A first look' }).waitFor()
+    await sheet.getByRole('button', { name: 'Collect now' }).click()
+    await sheet
       .getByText('Claude Code has no Slack connector yet', { exact: false })
       .waitFor()
     expect(await page.getByRole('alert').count()).toBe(0)
-    await page.getByRole('region', { name: 'Your projects' }).waitFor()
+    await sheet.getByRole('region', { name: 'Your projects' }).waitFor()
     await page.screenshot({
       path: path.join(REPO, 'test-results/first-run-no-connector.png'),
     })
-    await page.getByRole('button', { name: 'Open Todo' }).click()
+    await sheet.getByRole('button', { name: 'Open Todo' }).click()
+    await sheet.waitFor({ state: 'detached' })
     await page.getByRole('heading', { name: 'Todo' }).waitFor()
+    // Set up now: Collect now, and the start card is gone for good
+    await page.getByRole('button', { name: 'Collect now' }).waitFor()
+    expect(await card.count()).toBe(0)
     const nav = page.getByRole('navigation', { name: 'Sections' })
     for (const name of ['Todo', 'Recap', 'You', 'Settings'])
       await nav.getByRole('button', { name }).waitFor()

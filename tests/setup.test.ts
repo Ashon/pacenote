@@ -17,6 +17,7 @@ import {
   reopened,
   setupView,
   stepToFix,
+  todoFirstRun,
 } from '../src/settings/setup.js'
 
 const root = mkdtempSync(path.join(tmpdir(), 'pacenote-setup-'))
@@ -44,6 +45,30 @@ describe('first-run setup', () => {
     expect(
       setupView({ step: 'slack' }, { configured: true, answered: true }).view
     ).toEqual({ open: true, record: { step: 'slack' } })
+  })
+
+  it("holds a new install's first run on Todo until Pace's setup is under way", () => {
+    expect(todoFirstRun({ open: true, record: { step: 'ai' } })).toBe(true)
+    // Ended: closed, or the AI's first look
+    expect(
+      todoFirstRun({
+        open: false,
+        record: { step: 'ai', finishedAt: '2026-11-04T00:00:00Z' },
+      })
+    ).toBe(false)
+    // Pace's setup under way goes on with that
+    expect(todoFirstRun({ open: true, record: { step: 'runtime' } })).toBe(
+      false
+    )
+    expect(
+      todoFirstRun({ open: true, record: { step: 'ai', slack: 'hub' } })
+    ).toBe(false)
+    expect(
+      todoFirstRun({
+        open: true,
+        record: { step: 'ai', fromMac: { name: 'MacBook Pro', at: '' } },
+      })
+    ).toBe(false)
   })
 
   it('keeps the furthest step, who you are, and when it finished', () => {

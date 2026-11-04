@@ -170,6 +170,18 @@ export interface CliReadiness {
 }
 
 /** The CLI chosen, whether the other one takes over, what each last did */
+/**
+ * Whether an AI was set up for Pacenote's own work: chosen in Let your AI
+ * help or in Settings > Todo (TASKS_AI), or for Pace (REASONER), which the
+ * same step sets, or one that collected here before. Without one, Todo and
+ * Recap show where an AI would help rather than start it.
+ */
+export const aiSetUp = (
+  values: Readonly<Record<string, string | undefined>>,
+  collected: boolean
+): boolean =>
+  Boolean(values.TASKS_AI?.trim() || values.REASONER?.trim()) || collected
+
 export interface OwnAiNow {
   chosen: OwnCli
   fallback: boolean

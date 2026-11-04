@@ -1,15 +1,11 @@
 import type { SettingsView } from '@src/settings/fields'
-import {
-  SETUP_STEPS,
-  type CliCheck,
-  type SetupStep,
-  type SetupView,
-} from '@src/settings/setup'
+import { SETUP_STEPS, type CliCheck, type SetupStep } from '@src/settings/setup'
 import {
   mergeProgress,
   vmSetupProgress,
   type VmSetupProgress,
 } from '@src/sandbox/vm-progress'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { desktopValue, useDesktopValue, useSandbox } from './desktop'
 import type { FromMacMode, FromMacState } from '@src/macs/types'
@@ -30,22 +26,28 @@ export const stepIndex = (step: SetupStep) => SETUP_STEPS.indexOf(step)
 export const allowedIds = (value: string | undefined) =>
   (value ?? '').split(/[\s,]+/).filter(Boolean)
 
-/** The setup record, and saving changes to it. undefined outside the app */
+/**
+ * The setup record, and saving changes to it: one for every screen that shows
+ * it (Todo's start card, Let your AI help, Pace's setup). undefined outside
+ * the app
+ */
 export function useSetup() {
   const bridge = window.pacenoteDesktop?.setup
-  const [view, setView] = useState<SetupView>()
-  useEffect(() => {
-    void bridge?.state().then((value) => value && setView(value))
-  }, [bridge])
+  const client = useQueryClient()
+  const { data: view } = useQuery({
+    queryKey: ['setup'],
+    queryFn: async () => (await bridge?.state()) ?? null,
+    enabled: Boolean(bridge),
+  })
   const save = useCallback(
     async (patch: Parameters<NonNullable<typeof bridge>['save']>[0]) => {
       const next = await bridge?.save(patch)
-      if (next) setView(next)
+      if (next) client.setQueryData(['setup'], next)
       return next ?? undefined
     },
-    [bridge]
+    [bridge, client]
   )
-  return { view, save }
+  return { view: view ?? undefined, save }
 }
 
 export interface Detected {

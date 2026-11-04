@@ -95,8 +95,9 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     stage: (id: string, stage: string) =>
       ipcRenderer.invoke('pacenote:tasks:stage', id, stage),
-    add: (title: string, repo?: string) =>
-      ipcRenderer.invoke('pacenote:tasks:add', title, repo),
+    // The third is where a device's task was added, which the Mac says
+    add: (title: string, repo?: string, due?: string) =>
+      ipcRenderer.invoke('pacenote:tasks:add', title, repo, undefined, due),
     leaveOut: (label: string) =>
       ipcRenderer.invoke('pacenote:tasks:leave-out', label),
     // Collect now: Claude Code reads Slack, read only, in the main process

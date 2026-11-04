@@ -18,9 +18,10 @@ import { text } from './tasks-page.text'
 
 /**
  * Todo's New task (Cmd-N): a task of your own, on This Mac, in the project
- * its words point to (src/you/guess.ts) or the one you pick. A task joins a
- * project by its repository, so only projects with one are offered. It
- * stays open for the next one; Esc closes it.
+ * its words point to (src/you/guess.ts) or the one you pick, and due when you
+ * say in your own words ("Friday"). A task joins a project by its repository,
+ * so only projects with one are offered. It stays open for the next one; Esc
+ * closes it.
  */
 export function NewTask({
   areas,
@@ -35,6 +36,7 @@ export function NewTask({
   const t = useText(text)
   const add = useAddTask()
   const [title, setTitle] = useState('')
+  const [due, setDue] = useState('')
   // undefined: the guess; null: no project, as you picked
   const [picked, setPicked] = useState<AreaChoice | null>()
   const [error, setError] = useState<string>()
@@ -43,15 +45,22 @@ export function NewTask({
   const guess = picked === undefined ? guessArea(title, areas ?? []) : undefined
   const project = picked === undefined ? guess : (picked ?? undefined)
 
+  const closeOnEscape = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    onClose()
+  }
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!title.trim() || busy) return
     setBusy(true)
-    const result = await add(title, project?.repo)
+    const result = await add(title, project?.repo, due.trim() || undefined)
     setBusy(false)
     setError(result.error)
     if (!result.id) return
     setTitle('')
+    setDue('')
     setPicked(undefined)
     onAdded(result.id)
   }
@@ -67,11 +76,16 @@ export function NewTask({
           maxLength={120}
           className="h-9 flex-1"
           onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Escape') return
-            event.preventDefault()
-            onClose()
-          }}
+          onKeyDown={closeOnEscape}
+        />
+        <Input
+          aria-label={t.due}
+          placeholder={t.duePlaceholder}
+          value={due}
+          maxLength={60}
+          className="h-9 w-36"
+          onChange={(event) => setDue(event.target.value)}
+          onKeyDown={closeOnEscape}
         />
         {choices.length > 0 && (
           <DropdownMenu>

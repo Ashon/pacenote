@@ -526,13 +526,15 @@ export function addFollowUp(
 /**
  * Todo's New task: a task you add yourself, here or on a device of yours
  * (from: its name, as Your devices has it, which the task says it was added
- * on), in a project's repository or none. As the bridge hands it: anything.
+ * on), in a project's repository or none, with when it is due in your words
+ * ("Friday") when you say. As the bridge hands it: anything.
  */
 export function addYourTask(
   dataDir: string,
   title: unknown,
   repo: unknown,
-  from?: unknown
+  from?: unknown,
+  due?: unknown
 ): { id: string } | { error: string } | undefined {
   if (typeof title !== 'string' || !title.trim()) return undefined
   const device =
@@ -543,6 +545,7 @@ export function addYourTask(
       title,
       why: device ? `Added on ${device}` : 'Added by you',
       repo: typeof repo === 'string' ? repo : undefined,
+      due: typeof due === 'string' ? due.slice(0, 60) : undefined,
     },
     { addedBy: ADDED_BY_YOU, label: device }
   )
