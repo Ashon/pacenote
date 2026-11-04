@@ -92,7 +92,9 @@ export function totalsLine(view: RecapView): string {
   const { totals } = view
   return [
     t.done(totals.done),
-    t.commits(totals.commits),
+    // Counted only where there are git emails to count them by: a device
+    // with no Mac has no commits to say none of
+    (totals.commits > 0 || view.emails.length > 0) && t.commits(totals.commits),
     t.workOn(totals.days),
     totals.carried &&
       (view.current

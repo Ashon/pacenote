@@ -59,6 +59,16 @@ import { text } from './recap-page.text'
 
 const PERIODS: RecapPeriod[] = ['day', 'week', 'month']
 
+/** What a device with no Mac says in its recap, in its own words */
+export interface RecapAlone {
+  /** Under the periods: what a Mac would add, and the ways to one */
+  line: React.ReactNode
+  /** At its foot, what it was counted from: "From 3 tasks done on this iPad" */
+  from: (done: number) => string
+  /** A period with nothing in it */
+  empty: (period: RecapPeriod) => string
+}
+
 /** The period you looked at last, in this browser */
 const PERIOD_KEY = 'pacenote.recap.period'
 
@@ -80,12 +90,19 @@ export function RecapPage({
   period,
   periodKey,
   copySlot,
+  alone,
 }: {
   period: RecapPeriod
   /** The period's key; the current one when none */
   periodKey?: string
   /** A finger's screen supplies its own Copy: a sheet, not a desktop menu */
   copySlot?: (view: RecapView) => React.ReactNode
+  /**
+   * A device with no Mac (the iPhone, iPad and Android app), its recap counted
+   * from its own tasks: there is no Write it up, and the line under the
+   * periods says what a Mac adds, where this one says what an AI would
+   */
+  alone?: RecapAlone
 }) {
   const t = useText(text)
   const bridge = window.pacenoteDesktop?.recap
@@ -97,7 +114,7 @@ export function RecapPage({
   const [error, setError] = useState<string>()
   // No AI set up on this Mac yet: Write it up says what it would do. A
   // device's screen asks the Mac, which says so itself.
-  const onMac = Boolean(window.pacenoteDesktop?.setup)
+  const onMac = Boolean(window.pacenoteDesktop?.setup) && !alone
   const noAi = useTasks({ enabled: onMac }).data?.aiSet === false && onMac
   const view = recap.data
   const shownKey = view ? `${view.period}:${view.key}` : undefined
@@ -133,7 +150,7 @@ export function RecapPage({
           <span className="flex-1" />
           {view && view.areas.length > 0 && (
             <span className="flex items-center gap-1.5">
-              {!view.written && !noAi && (
+              {!view.written && !noAi && !alone && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -211,6 +228,7 @@ export function RecapPage({
                 <span className="min-w-0">{t.copyWithoutAi}</span>
               </p>
             )}
+            {alone?.line}
             {error && (
               <p role="alert" className="mt-3 text-copy text-status-failed">
                 {error}
@@ -226,6 +244,7 @@ export function RecapPage({
                 {view && (
                   <RecapBody
                     view={view}
+                    alone={alone}
                     writing={writing === shownKey}
                     arrived={arrived === shownKey}
                     onWriteAgain={() => void writeUp()}
@@ -283,11 +302,13 @@ function CopyButton({ view }: { view: RecapView }) {
 
 function RecapBody({
   view,
+  alone,
   writing,
   arrived,
   onWriteAgain,
 }: {
   view: RecapView
+  alone?: RecapAlone
   writing: boolean
   /** Its text just came: it comes in word by word */
   arrived: boolean
@@ -337,14 +358,14 @@ function RecapBody({
       </Swap>
       {empty ? (
         <p className="mt-5 border-t border-border py-8 text-copy text-muted-foreground">
-          {t.empty(view.period)}
+          {alone ? alone.empty(view.period) : t.empty(view.period)}
         </p>
       ) : view.period === 'day' && view.day ? (
         <DayBody view={view} />
       ) : (
         <AreasBody view={view} />
       )}
-      {!empty && <Sources view={view} />}
+      {!empty && <Sources view={view} alone={alone} />}
     </div>
   )
 }
@@ -722,9 +743,15 @@ const Quiet = ({ children }: { children: React.ReactNode }) => (
 )
 
 /** Where the recap comes from, at its foot */
-function Sources({ view }: { view: RecapView }) {
+function Sources({ view, alone }: { view: RecapView; alone?: RecapAlone }) {
   const t = useText(text)
   const { totals } = view
+  if (alone)
+    return totals.done > 0 ? (
+      <p className="mt-5 border-t border-border pt-3.5 text-meta text-muted-foreground">
+        {alone.from(totals.done)}
+      </p>
+    ) : null
   const parts = [
     totals.done > 0 && t.tasksDone(totals.done),
     totals.commits > 0 && t.commits(totals.commits, view.emails),

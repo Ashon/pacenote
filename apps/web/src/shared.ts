@@ -17,7 +17,7 @@
 // these make to window.pacenoteDesktop, with src/macs/asks.ts on the Mac)
 export { BotPage } from './components/bot-page'
 export { Overview } from './components/overview'
-export { RecapPage } from './components/recap-page'
+export { RecapPage, type RecapAlone } from './components/recap-page'
 export { RunDetail } from './components/run-detail'
 export { RunList } from './components/run-list'
 export { SettingsPage } from './components/settings-page'
