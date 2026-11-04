@@ -1,6 +1,6 @@
 ---
 title: Install and first run
-summary: Install Pacenote with Homebrew, gather what is asked of you in three steps, and set up Pace when you want it.
+summary: Install Pacenote with Homebrew, write your tasks on Todo, let your AI help when you want it, and set up Pace if you like.
 kind: start
 order: 1
 shot: first-run
@@ -25,23 +25,43 @@ brew install --cask pacenote
 
 ## First run
 
-Open Pacenote. A new install opens on three steps, with no Slack app to make:
+Open Pacenote. A new install opens on Todo, with no account and no AI needed to start, and no Slack app to make. A card
+on top shows the ways in:
 
-![The first run's second step: this Mac, then Slack through your AI tool's connector](shot:first-run)
+![A new install: Todo, with the start card on top](shot:first-run)
+
+- **New task** writes one of your own, with when it is due if you like. Your tasks stay on this Mac, and Cmd-N adds one
+  whenever Todo is open.
+- **Set up AI** lets your AI find what is asked of you and write your recaps (below).
+- **Connect**, under From your other Mac, brings your Todo from Pacenote on another of your Macs (below).
+- **Add a device** opens Settings > Devices, to pair your iPhone or iPad.
+
+Once a task is in, the card folds to one line that offers Set up AI. **Close** puts it away.
+
+### Let your AI help
+
+**Set up AI** opens three steps in a sheet over Todo:
+
+![Setting up your AI, its second step: this Mac, then Slack through your AI tool's connector](shot:ai-sheet)
 
 1. **Your AI.** Choose Claude Code or Codex. Pacenote checks that it is on this Mac and signed in.
 2. **Where your work is.** The sessions and commits on this Mac, and Slack, read only through your AI tool's own Slack
    connector. Connect Slack in claude.ai's Settings > Connectors (or ChatGPT's Settings > Apps) if it is not yet.
-3. **A first look.** **Collect now** reads your last 7 days in Slack and finds your projects. Then Todo opens. With no
-   Slack connector yet, it looks at this Mac alone, and Collect now on Todo reads Slack once you connect it.
+3. **A first look.** **Collect now** reads your last 7 days in Slack and finds your projects. Then Todo says what it
+   added. With no Slack connector yet, it looks at this Mac alone, and Collect now on Todo reads Slack once you connect
+   it.
 
-Pacenote on another of your Macs already? At step 2, choose **From your other Mac**, click **Add a device** in
-Settings > Devices on that Mac, and Allow there once both show the same 6 digits. This Mac takes how Todo collects from
-it and opens on Todo, which stays the same on both. A Mac set up already pairs from its own Settings > Devices, with
-**Pair**.
+Without an AI, Todo still keeps the tasks you write, and Recap counts them. Find tasks with AI on Todo and Set up AI on
+Recap open the same sheet.
 
-Pace, which answers when you mention it in Slack, stays off until you set it up: **Set up Pace instead** on the first
-run, or **Set up Pace** in Settings > General.
+### From your other Mac
+
+Pacenote on another of your Macs already? Click **Connect** on the card, click **Add a device** in Settings > Devices on
+that Mac, and Allow there once both show the same 6 digits. This Mac takes how Todo collects from it, and Todo stays the
+same on both. A Mac set up already pairs from its own Settings > Devices, with **Pair**.
+
+Pace, which answers when you mention it in Slack, is optional and stays off until you set it up: **Set up Pace** on the
+card, or in Settings > General.
 
 ## Pace's setup, step by step
 

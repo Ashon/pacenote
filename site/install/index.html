@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Install - Pacenote</title>
-  <meta name="description" content="Install Pacenote with Homebrew. What you need, the first run that ends on your Todo, Pace's setup when you want it, and how to update or remove it.">
+  <meta name="description" content="Install Pacenote with Homebrew. What you need, the first run that opens on your Todo, Pace's setup when you want it, and how to update or remove it.">
   <link rel="canonical" href="https://pacenote.dev/install/">
   <link rel="alternate" hreflang="en" href="https://pacenote.dev/install/">
   <link rel="alternate" hreflang="ko" href="https://pacenote.dev/ko/install/">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f3f9f6" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1a17" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Install Pacenote">
-  <meta property="og:description" content="Three Homebrew commands, then a first run that ends on your Todo.">
+  <meta property="og:description" content="Three Homebrew commands, then Pacenote opens on your Todo.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://pacenote.dev/install/">
   <meta property="og:site_name" content="Pacenote">
@@ -45,8 +45,8 @@
   <main id="main">
     <div class="page-head">
       <h1>Install Pacenote</h1>
-      <p class="lede">Three Homebrew commands, then a first run in the app that ends on your Todo. Pace, the Slack
-        assistant, is there when you want it.</p>
+      <p class="lede">Three Homebrew commands, then the app opens on your Todo. Your AI and Pace, the Slack assistant,
+        are there when you want them.</p>
       <div class="get">
         <div class="command" role="group" aria-label="Install with Homebrew">
           <code id="install-command"><span>brew tap ashon/tap</span>
@@ -73,14 +73,15 @@
       </section>
 
       <section class="block" id="setup" aria-labelledby="setup-title">
-        <h2 id="setup-title">The first run ends on your Todo</h2>
+        <h2 id="setup-title">The first run opens on your Todo</h2>
         <ol class="steps down">
           <li>Install with Homebrew: add the tap with <code>brew tap ashon/tap</code>, trust it with
             <code>brew trust ashon/tap</code>, then run <code>brew install --cask pacenote</code>. Homebrew loads casks only
             from taps you trust, so without the trust it refuses the install.</li>
-          <li>Open Pacenote. The first run asks for your AI, shows where your work is read from, and collects your last
-            7 days. Then Todo opens.</li>
-          <li>For Pace in Slack, choose <b>Set up Pace</b> in Settings &gt; General, or on the first run. It walks you
+          <li>Open Pacenote. It opens on Todo, with no account and no AI needed: write a task with <b>New task</b>, or
+            choose <b>Set up AI</b> on the card on top, which asks for your AI, shows where your work is read from, and
+            collects your last 7 days.</li>
+          <li>For Pace in Slack, choose <b>Set up Pace</b> in Settings &gt; General, or on Todo's start card. It walks you
             through where answers run, Slack and a review, and is done when <code>@Pace</code> answers you in a
             thread.</li>
         </ol>

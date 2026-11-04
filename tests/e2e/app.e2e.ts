@@ -902,6 +902,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(saved(world).TASKS).toBe('on')
     await page.getByText('Pace: Off').waitFor()
     expect(prefs().pace).toBe('off')
+    await siteShot(page, 'first-run', () => page.mouse.move(0, 0))
 
     // A task of your own, due Friday: the card folds to a line
     await card.getByRole('button', { name: 'New task' }).click()
@@ -947,7 +948,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await page.screenshot({
       path: path.join(REPO, 'test-results/first-run-sources.png'),
     })
-    await siteShot(page, 'first-run')
+    await siteShot(page, 'ai-sheet')
     await sheet.getByRole('button', { name: 'Continue' }).click()
 
     // 3. A first look, and Todo; Pace never asked to be set up. The fake

@@ -69,7 +69,7 @@ shows the work as it happens.
 
 ### Ask Pace in Slack, if you want it
 
-Turn Pace on from the first run or Settings > General, then mention `@Pace` in a thread. Pace reads the thread and its
+Turn Pace on from Todo's start card or Settings > General, then mention `@Pace` in a thread. Pace reads the thread and its
 files (text, images, PDFs), works the question out with the `claude` or `codex` CLI you are signed in to, and answers in
 the thread. The app keeps every run with each step Pace took, so you can see how it got there. In the built-in sandbox,
 diagrams and charts in an answer come back as images, and Pace can use your Todo: ask it to keep what a thread needs
@@ -98,8 +98,8 @@ to post.
 ### Move between your Macs
 
 With Pacenote on two Macs, Todo is the same on both, merged directly over your network with no server in between. Pair
-them once with no Slack app: Add a device on one, then From your other Mac in the other's first run (or Pair in its
-Settings > Devices). With your own Slack app, Pace answers on the one you're using and moves with you when you leave it
+them once with no Slack app: Add a device on one, then Connect under From your other Mac on the other's Todo (or Pair
+in its Settings > Devices). With your own Slack app, Pace answers on the one you're using and moves with you when you leave it
 for the other; Macs with the same Slack app find each other with nothing to pair. See [Your Macs](docs/macs.md). Coming
 soon: iPhone and iPad, paired over your network the same way.
 
@@ -153,10 +153,11 @@ brew install --cask pacenote
 Homebrew loads casks only from taps you trust, so without `brew trust` the install is refused and upgrades skip
 Pacenote.
 
-Open Pacenote. A first run asks for your AI, shows where your work is read from (this Mac, then Slack through your AI
-tool's connector) and collects your last 7 days, then opens Todo. There is no Slack app to make. For Pace, choose **Set
-up Pace** on the first run or in Settings > General: its setup takes you through where answers run, Slack and a review,
-and ends when Pace answers you in Slack for the first time.
+Open Pacenote. A new install opens on Todo, with no account, no AI and no Slack app needed: write your tasks with
+**New task**, or choose **Set up AI** on the card on top, which asks for your AI, shows where your work is read from
+(this Mac, then Slack through your AI tool's connector) and collects your last 7 days. For Pace, choose **Set up Pace**
+on that card or in Settings > General: its setup takes you through where answers run, Slack and a review, and ends when
+Pace answers you in Slack for the first time.
 
 `brew upgrade --cask pacenote` updates the app. Settings and run history live in `~/.pacenote` and are kept across
 upgrades and uninstalls. To run from source instead, see [Installation](docs/installation.md).

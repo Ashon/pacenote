@@ -119,14 +119,17 @@ Bot management:
   answer is not cut off halfway. The display still sleeps, and closing the lid still sleeps the Mac.
 - Stop and app quit send SIGTERM. The bot gives requests in progress up to 15 seconds, then stops their reasoner runs (the CLI
   and whatever it started, or the container). Those, and the mentions still waiting their turn, resume on the next start.
-- A new install opens on Todo's first run (`#/start`, `apps/web/src/components/setup/first-run.tsx`): your AI, where your
-  work is (this Mac's sessions and commits, and Slack through the AI tool's own connector), and a first collection with
-  the projects it finds. With no Slack connector yet, the first look is this Mac's alone, said as such rather than as
-  a failure. Instead of step 2, **From your other Mac** pairs it with one waiting in Add a device and takes how Todo
-  collects from there ([Your Macs](macs.md#pair-macs-with-no-slack-app)), then opens Todo. It writes `TASKS=on` and
-  ends on Todo. Pace is off meanwhile and after (`desktop.json`'s
+- A new install opens on Todo with `TASKS=on` and the start card on top (`apps/web/src/components/start-card.tsx`):
+  New task, Set up AI, Connect (your other Mac) and Add a device. Set up AI opens the AI sheet over the window
+  (`apps/web/src/components/setup/ai-sheet.tsx`, also `#/start`): your AI, where your work is (this Mac's sessions and
+  commits, and Slack through the AI tool's own connector), and a first collection with the projects it finds, which
+  leaves a notice on Todo of what it added. With no Slack connector yet, the first look is this Mac's alone, said as
+  such rather than as a failure. Connect opens the sheet at **From your other Mac**, which pairs with one waiting in Add
+  a device and takes how Todo collects from there ([Your Macs](macs.md#pair-macs-with-no-slack-app)). Without an AI
+  (no `TASKS_AI` or `REASONER`, and no collection yet), Collect now is Find tasks with AI and Recap offers Set up AI.
+  Once a task is in, the card folds to one line; Close puts it away. Pace is off meanwhile and after (`desktop.json`'s
   `pace: 'off'`): it never starts by itself, the status bar says "Pace: Off", Overview, Runs and Pace leave the sidebar,
-  and nothing asks to set it up. Set up Pace (the first run, Settings > General, the tray) turns it on and opens Pace's
+  and nothing asks to set it up. Set up Pace (the start card, Settings > General, the tray) turns it on and opens Pace's
   setup; starting Pace any other way turns it on too. A Pacenote set up before keeps Pace as it was. The window opens
   on Todo when Todo is on, unless you chose Overview (`desktop.json`'s `landing`); someone who used Pace before is told
   so once, on Todo.

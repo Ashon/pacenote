@@ -92,7 +92,7 @@ Pacenote that runs Todo alone, with Pace off, pairs the same way, with nothing o
 1. On one Mac, click **Add a device** in Settings > Devices. The first time, it makes the key your Macs will know each
    other by, and it waits for 10 minutes, as above.
 2. On the other Mac:
-   - **A new install**: at the first run's second step, choose **From your other Mac**.
+   - **A new install**: on Todo's start card, click **Connect** under From your other Mac.
    - **Set up already**: click **Pair** under **Pair with your other Mac** in Settings > Devices.
 
    Either finds the waiting Mac on your network, or takes its address (Tailscale).
@@ -127,6 +127,11 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   each of your Macs works out again as it says hello, and none does once you remove it. It asks the Mac it reaches for
   what the Mac's own screens show, and the Mac answers only what a device may ask, never a secret
   ([src/macs/asks.ts](../src/macs/asks.ts)). A task you add on a device is the Mac's, kept as added on that device.
+  The tasks a device wrote before it paired come over once with `tasks.handOver`
+  ([src/tasks/hand-over.ts](../src/tasks/hand-over.ts)): the Mac adds only ones new to it, with how you left them there
+  (done, dismissed, in progress, waiting), and never changes a task it has. From a device, Todo sync takes only what you
+  decided and the stages you set, so a device never makes or changes a task by sending a list. A Mac before 0.6.23
+  answers the handover not-allowed, and the device keeps its tasks.
 - **Pace follows only within one Slack app.** Each Mac says which Slack app Pace answers through there, one way (a hash
   of its key), and Pace moves only between Macs of the same app of your own. Macs that only share Todo never stand by
   for one another.
