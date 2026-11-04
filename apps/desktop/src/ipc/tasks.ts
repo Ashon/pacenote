@@ -35,6 +35,7 @@ import {
   readWork,
   updateWork,
 } from '../../../../src/tasks/work.js'
+import { handOverTasks } from '../../../../src/tasks/hand-over.js'
 import { addYourTask } from '../../../../src/tasks/write.js'
 import {
   answerGroup,
@@ -42,7 +43,7 @@ import {
   yourGroups,
 } from '../../../../src/tasks/you.js'
 import { taskArea } from '../../../../src/you/areas.js'
-import { readYou } from '../../../../src/you/store.js'
+import { countYou, readYou } from '../../../../src/you/store.js'
 import type { Session } from '../handoff.js'
 import { text } from '../main.text.js'
 import type { OpencodeSessions } from '../opencode-sessions.js'
@@ -186,9 +187,24 @@ export function registerTasksIpc(
   // A task you add yourself (Todo's New task), in a project's repository;
   // from a device of yours, the device it was added on (DeviceAnswers)
   // From a device, as argsFromDevice hands it: with where it was added
-  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from, due) =>
-    addYourTask(dataDir, title, repo, from, due)
+  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from, due, peer) =>
+    addYourTask(dataDir, title, repo, from, due, peer)
   )
+  // What a device of yours wrote before it paired, as argsFromDevice hands it:
+  // with the device that asked. New tasks only, each in the project its words
+  // point to, as New task guesses one.
+  ipc.handle('pacenote:tasks:hand-over', null, async (tasks, peer, from) => {
+    if (typeof peer !== 'string' || typeof from !== 'string') return null
+    const you = await countYou({ dataDir, home: homedir() }).catch(
+      () => undefined
+    )
+    return handOverTasks(
+      dataDir,
+      tasks,
+      { id: peer, name: from },
+      { areas: you?.areas }
+    )
+  })
   ipc.handle('pacenote:tasks:leave-out', [], (label) => {
     if (typeof label !== 'string' || !label.trim()) return []
     const { exclude } = todo.current()

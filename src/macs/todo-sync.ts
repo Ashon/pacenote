@@ -191,9 +191,17 @@ export class TodoSync {
     return known
   }
 
-  /** Merges what another Mac sent into the files here */
-  private receive(peer: string, parts: Partial<Parts>): void {
+  /**
+   * Merges what another Mac sent into the files here. A device of yours sends
+   * what you decided there and the stages you set, and nothing else is taken
+   * from one: the tasks it adds come as asks (tasks.add, tasks.handOver), so
+   * it never makes or changes a task here by sending a list.
+   */
+  private receive(peer: string, sent: Partial<Parts>): void {
     const { dataDir } = this.options
+    const parts: Partial<Parts> = this.options.macs.isDevice(peer)
+      ? { decisions: sent.decisions, stages: sent.stages }
+      : sent
     const known = this.knownFor(peer)
     const here = this.options.macs.id
     let changed = false

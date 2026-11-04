@@ -475,6 +475,8 @@ export function addFollowUp(
     repo?: string
     /** Where it was added, when it has no repository: This Mac otherwise */
     label?: string
+    /** The device of yours it was added on */
+    device?: Task['device']
     now?: Date
   } = {}
 ): { task: Task; added: boolean } | { error: string } {
@@ -517,6 +519,7 @@ export function addFollowUp(
       repo,
       follows: after?.id,
       summary: item.summary?.trim().slice(0, 600) || undefined,
+      ...(options.device && { device: options.device }),
     }
     writeTasks(dataDir, { ...file, tasks: [...file.tasks, task] })
     return { task, added: true }
@@ -526,15 +529,16 @@ export function addFollowUp(
 /**
  * Todo's New task: a task you add yourself, here or on a device of yours
  * (from: its name, as Your devices has it, which the task says it was added
- * on), in a project's repository or none, with when it is due in your words
- * ("Friday") when you say. As the bridge hands it: anything.
+ * on, and its id there), in a project's repository or none, with when it is
+ * due in your words ("Friday") when you say. As the bridge hands it: anything.
  */
 export function addYourTask(
   dataDir: string,
   title: unknown,
   repo: unknown,
   from?: unknown,
-  due?: unknown
+  due?: unknown,
+  deviceId?: unknown
 ): { id: string } | { error: string } | undefined {
   if (typeof title !== 'string' || !title.trim()) return undefined
   const device =
@@ -547,7 +551,13 @@ export function addYourTask(
       repo: typeof repo === 'string' ? repo : undefined,
       due: typeof due === 'string' ? due.slice(0, 60) : undefined,
     },
-    { addedBy: ADDED_BY_YOU, label: device }
+    {
+      addedBy: ADDED_BY_YOU,
+      label: device,
+      ...(device &&
+        typeof deviceId === 'string' &&
+        deviceId && { device: { id: deviceId, name: device } }),
+    }
   )
   if ('error' in result) return result
   return { id: result.task.id }

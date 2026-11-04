@@ -46,6 +46,13 @@ const en = {
   leftAfter: (title: string) => `Left after “${title}”`,
   keptFromSession: 'Kept from a session',
   addedByYou: 'You added it',
+  // A task of your own, opened: where and when it was written
+  addedOnAt: (device: string, when: string, beforePairing: boolean) =>
+    `Added on ${device} ${when}${
+      beforePairing ? ', before it paired with your Mac' : ''
+    }.`,
+  addedByYouAt: (when: string) => `You added it ${when}.`,
+  keptFromSessionAt: (when: string) => `Kept from a session ${when}.`,
   // Stages: in progress, waiting on someone else
   inProgress: 'In progress',
   /** Since when it waits, by calendar days */
@@ -262,6 +269,12 @@ const ko: typeof en = {
   leftAfter: (title) => `“${title}” 이후 남은 일`,
   keptFromSession: '세션에서 남긴 일',
   addedByYou: '직접 추가함',
+  addedOnAt: (device, when, beforePairing) =>
+    `${when} ${device}에서 적었어요${
+      beforePairing ? '. Mac과 페어링하기 전이에요' : ''
+    }.`,
+  addedByYouAt: (when) => `${when} 직접 추가했어요.`,
+  keptFromSessionAt: (when) => `${when} 세션에서 남겼어요.`,
   inProgress: '진행 중',
   waitingFor: (days) =>
     days === 0

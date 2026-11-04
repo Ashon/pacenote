@@ -24,7 +24,9 @@ import {
 } from '../src/macs/channel.js'
 import { GROUP_FILE, Macs, MACS_FILE } from '../src/macs/macs.js'
 import { tailnetAddresses } from '../src/macs/network.js'
-import { readTasks } from '../src/tasks/store.js'
+import { TodoSync } from '../src/macs/todo-sync.js'
+import { handOverTasks } from '../src/tasks/hand-over.js'
+import { readDecisions, readStages, readTasks } from '../src/tasks/store.js'
 import { addYourTask } from '../src/tasks/write.js'
 
 /** Waits for the Macs to get there, with room for a busy run */
@@ -255,8 +257,13 @@ describe('your devices and your Macs', () => {
           saved.push(changes)
           return { issues: [], restarted: false }
         },
-        'pacenote:tasks:add': (title, repo, from, due) =>
-          addYourTask(dataDir, title, repo, from, due),
+        'pacenote:tasks:add': (title, repo, from, due, peer) =>
+          addYourTask(dataDir, title, repo, from, due, peer),
+        'pacenote:tasks:hand-over': (tasks, peer, from) =>
+          handOverTasks(dataDir, tasks, {
+            id: String(peer),
+            name: String(from),
+          }),
       }
       const reader = new HistoryReader(dataDir)
       const asks = new DeviceAsks({
@@ -267,7 +274,7 @@ describe('your devices and your Macs', () => {
           return valueForDevice(
             what,
             await bridged[DEVICE_ASKS[what]]?.(
-              ...argsFromDevice(what, args, from)
+              ...argsFromDevice(what, args, from, peer)
             )
           )
         },
@@ -327,6 +334,7 @@ describe('your devices and your Macs', () => {
         addedBy: 'you',
         reason: 'Added on iPad',
         source: { app: 'local', label: 'iPad' },
+        device: { id: 'ipad-1', name: 'iPad' },
       })
       // A newer device's says when it is due, after its repository
       const due = await ask('tasks.add', [
@@ -339,8 +347,100 @@ describe('your devices and your Macs', () => {
           (t) => t.id === (due.value as { id: string }).id
         )
       ).toMatchObject({ due: 'Friday', reason: 'Added on iPad' })
+      // What it wrote before it paired: new tasks only, with how it left them;
+      // one the Mac has stays as it is, and an id no device makes is no task
+      const handed = await ask('tasks.handOver', [
+        [
+          {
+            id: 'local:0123456789ab',
+            title: 'Draft the release notes for 0.7',
+            addedAt: '2026-11-03T09:00:00.000Z',
+            stage: { stage: 'started', at: '2026-11-03T10:00:00.000Z' },
+          },
+          { id, title: 'Renamed on the iPad' },
+          { id: 'C1:1730000000.000100', title: 'A Slack task, made up' },
+        ],
+      ])
+      expect(handed.value).toEqual({ added: 1, already: 1, skipped: 1 })
+      const tasks = readTasks(dataDir).tasks
+      expect(tasks.find((t) => t.id === 'local:0123456789ab')).toMatchObject({
+        title: 'Draft the release notes for 0.7',
+        reason: 'Added on iPad',
+        postedAt: '2026-11-03T09:00:00.000Z',
+        device: { id: 'ipad-1', name: 'iPad', handedOver: expect.any(String) },
+      })
+      expect(tasks.find((t) => t.id === id)?.title).toBe(
+        'Renew the staging TLS certificate'
+      )
+      expect(tasks.some((t) => t.id === 'C1:1730000000.000100')).toBe(false)
+      expect(readStages(dataDir)['local:0123456789ab']?.stage).toBe('started')
+      // Handed over again (the device did not hear back): nothing twice
+      expect(
+        (
+          await ask('tasks.handOver', [
+            [{ id: 'local:0123456789ab', title: 'Draft the release notes' }],
+          ])
+        ).value
+      ).toEqual({ added: 0, already: 1, skipped: 0 })
       // Anything else, it does not answer
       expect(await ask('tasks.list')).toMatchObject({ error: 'not-allowed' })
+    },
+    NETWORK_MS
+  )
+
+  it(
+    "takes what you decided on a device, never a device's list of tasks",
+    async () => {
+      const { dataDir, macs, address } = await mac()
+      const mine = addYourTask(dataDir, 'Rotate the deploy key', undefined)
+      const id = (mine as { id: string }).id
+      const sync = new TodoSync({
+        dataDir,
+        macs,
+        collections: () => [],
+        log: () => undefined,
+      })
+      sync.start()
+      stops.push(() => sync.stop())
+      const device = await linkDevice(await pairDevice(macs), address())
+      await poll(() => macs.isDevice('ipad-1')).toBe(true)
+      const at = new Date().toISOString()
+      const made = {
+        id: 'local:ffffffffffff',
+        source: {
+          app: 'local',
+          conversation: 'local',
+          label: 'iPad',
+          message: 'ffffffffffff',
+        },
+        title: 'Made by sending a list',
+        kind: 'promised',
+        confidence: 'sure',
+        reason: 'Sent',
+        postedAt: at,
+        foundAt: at,
+      }
+      device.send({
+        t: 'todo',
+        parts: {
+          tasks: {
+            tasks: [
+              { ...readTasks(dataDir).tasks[0], title: 'Changed by a list' },
+              made,
+            ],
+          },
+          work: { entries: [], notIt: [] },
+          decisions: {
+            decisions: { [id]: { status: 'done', at } },
+            takenBack: {},
+          },
+          stages: {},
+        },
+      })
+      await poll(() => readDecisions(dataDir)[id]?.status).toBe('done')
+      expect(readTasks(dataDir).tasks.map((t) => [t.id, t.title])).toEqual([
+        [id, 'Rotate the deploy key'],
+      ])
     },
     NETWORK_MS
   )

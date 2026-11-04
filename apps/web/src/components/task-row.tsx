@@ -76,7 +76,7 @@ import {
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { switchLine } from './own-ai-status'
-import { AreaPill, Pill, StagePill, TaskMeta } from './task-meta'
+import { AreaPill, Pill, StagePill, TaskMeta, writtenOf } from './task-meta'
 import { PaceSpinner } from './pace-spinner'
 import { text } from './task-row.text'
 
@@ -913,10 +913,12 @@ function TaskOpen({
             {all && rest.map(earlierLine)}
             {!earlier.last && !sessions[0] && !suggested.length && (
               <p className="flex min-h-[30px] items-center text-meta text-muted-foreground">
-                {t.nothingEarlier(
-                  task.repo,
-                  task.kind === 'asked' ? task.askedBy : undefined
-                )}
+                {task.source.app === 'local'
+                  ? writtenOf(task, t)
+                  : t.nothingEarlier(
+                      task.repo,
+                      task.kind === 'asked' ? task.askedBy : undefined
+                    )}
               </p>
             )}
             {rest.length > 0 && (

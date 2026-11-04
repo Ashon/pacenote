@@ -26,6 +26,7 @@ import { SIGNED_OUT } from '../../apps/desktop/src/task-collector.js'
 import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { saveRepo } from '../../src/tasks/folders.js'
+import { handOverTasks } from '../../src/tasks/hand-over.js'
 import { decide, readTasks } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
@@ -3169,6 +3170,33 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await form.getByLabel('What to do').press('Escape')
     await form.waitFor({ state: 'detached' })
     expect(review).toBeDefined()
+    // What your iPhone wrote before it paired, handed over: yours, from there.
+    // Opened, it says where and when it was written, as it has no thread.
+    handOverTasks(
+      home,
+      [
+        {
+          id: 'local:0a1b2c3d4e5f',
+          title: 'Book the team offsite',
+          addedAt: new Date(Date.now() - 45 * 60_000).toISOString(),
+        },
+      ],
+      { id: 'iphone-1', name: 'iPhone' }
+    )
+    // Held while you look, as any new task is, until you show it
+    await page.getByRole('button', { name: '1 new task' }).click()
+    const handed = row('local:0a1b2c3d4e5f')
+    await handed.getByText(/^You added it · iPhone · 45m ago/).waitFor()
+    await handed.getByRole('button', { name: 'Book the team offsite' }).click()
+    await handed
+      .getByText('Added on iPhone 45m ago, before it paired with your Mac.')
+      .waitFor()
+    await page.getByRole('tab', { name: 'Open 5' }).waitFor()
+    // Once the row has opened
+    await page.waitForTimeout(500)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-handed-over.png'),
+    })
   })
 
   it("hands Pacenote's own work to Codex while Claude Code is at its usage limit, and says so in Todo and Settings", async () => {

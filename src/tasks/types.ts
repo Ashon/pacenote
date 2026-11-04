@@ -68,6 +68,12 @@ export interface Task {
   /** The task it carries on from: work a session left after that one */
   follows?: string
   /**
+   * The device of yours it was added on (Todo's New task there): its id in
+   * Your devices and its name then. handedOver: when it came to a Mac, written
+   * on the device before it paired (src/tasks/hand-over.ts).
+   */
+  device?: { id: string; name: string; handedOver?: string }
+  /**
    * The user group it was asked of, as @handle, when that group is all that
    * made it maybe yours: Todo asks whether the group means you
    */

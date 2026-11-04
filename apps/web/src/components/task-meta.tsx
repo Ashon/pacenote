@@ -37,6 +37,20 @@ export function whoOf(
   return task.group ? t.askedOf(task.group) : undefined
 }
 
+/**
+ * A task of your own has no thread: where and when it was written, said in
+ * the opened row where a thread's earlier messages would be. One a device
+ * wrote before it paired says so.
+ */
+export function writtenOf(task: TaskView, t: RowWords): string {
+  const when = formatRelative(task.postedAt)
+  if (task.device)
+    return t.addedOnAt(task.device.name, when, Boolean(task.device.handedOver))
+  return task.addedBy === ADDED_BY_YOU
+    ? t.addedByYouAt(when)
+    : t.keptFromSessionAt(when)
+}
+
 /** Where it was asked: this Mac, or its channel */
 export function whereOf(task: TaskView, t: RowWords): string {
   return task.source.app === 'local' && task.source.label === LOCAL.label
