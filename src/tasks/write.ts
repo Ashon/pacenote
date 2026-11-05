@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
+import { FILLED_IN, standingFill, TOOK_BACK, wasFilled } from './filled.js'
 import type { TasksSettings } from './settings.js'
 import {
   ADDED_BY_YOU,
@@ -447,6 +448,160 @@ export function updateTask(
   })
 }
 
+/**
+ * What your AI fills in a task you added (src/tasks/fill.ts): only what the
+ * task lacks, each already checked against what it was given
+ */
+export interface TaskFill {
+  repo?: string
+  action?: TaskAction
+  summary?: string
+  /** The open task it carries on from, by id */
+  follows?: string
+  /** Who asked for it, named in its title */
+  askedBy?: string
+  /** When it is due, in its title's own words */
+  due?: string
+  /** An open task that is the same one written again, by id */
+  same?: string
+}
+
+/**
+ * Fills in a task you added with what your AI found, once, and keeps what it
+ * filled as one update (FILLED_IN). What you set stays: a project you picked
+ * (only one guessed from the words may change: repoGuessed), a due date you
+ * wrote, the title. A task you settled meanwhile, or one filled in already,
+ * is left as it is. undefined when there is no such task.
+ */
+export function fillInTask(
+  dataDir: string,
+  id: string,
+  fill: TaskFill,
+  options: { repoGuessed?: boolean; by?: string; now?: Date } = {}
+):
+  | { task: Task; changed: TaskUpdate['changed']; same?: string }
+  | { task: Task; refused: string }
+  | undefined {
+  const now = options.now ?? new Date()
+  return withTasksLock(dataDir, () => {
+    const file = readTasks(dataDir)
+    const task = file.tasks.find((t) => t.id === id)
+    if (!task) return undefined
+    const decisions = readDecisions(dataDir)
+    const status = viewOf(task, decisions).status
+    if (status !== 'open') return { task, refused: `it is ${status}` }
+    if (task.addedBy !== ADDED_BY_YOU)
+      return { task, refused: 'you did not add it' }
+    if (wasFilled(task)) return { task, refused: 'it is filled in already' }
+    const openTask = (other: string | undefined) =>
+      other !== undefined &&
+      other !== task.id &&
+      file.tasks.some(
+        (t) => t.id === other && viewOf(t, decisions).status === 'open'
+      )
+
+    const changed: TaskUpdate['changed'] = []
+    const next: Partial<Task> = {}
+    const set = <F extends TaskField>(field: F, to: string) => {
+      const from = task[field] as string | undefined
+      if (from === to) return
+      changed.push(from ? { field, from, to } : { field, to })
+      ;(next as Record<string, string>)[field] = to
+    }
+    const repo = repoOf(fill.repo)
+    if (
+      repo &&
+      (!task.repo ||
+        (options.repoGuessed && task.repo.toLowerCase() !== repo.toLowerCase()))
+    )
+      set('repo', repo)
+    if (fill.action) set('action', fill.action)
+    if (fill.summary?.trim() && !task.summary)
+      set('summary', fill.summary.trim().slice(0, 600))
+    if (!task.follows && openTask(fill.follows)) set('follows', fill.follows!)
+    if (fill.askedBy?.trim() && task.kind === 'promised') {
+      set('askedBy', fill.askedBy.trim().slice(0, 60))
+      set('kind', 'asked' satisfies TaskKind)
+    }
+    if (fill.due?.trim() && !task.due) set('due', fill.due.trim().slice(0, 60))
+    const same = openTask(fill.same) ? fill.same : undefined
+    if (!changed.length && !same) return { task, changed }
+    const updated: Task = {
+      ...task,
+      ...next,
+      ...(same && { looksLike: { task: same, at: now.toISOString() } }),
+      updates: [
+        ...(task.updates ?? []),
+        { at: now.toISOString(), why: FILLED_IN, by: options.by, changed },
+      ].slice(-UPDATES_KEPT),
+    }
+    writeTasks(dataDir, {
+      ...file,
+      tasks: file.tasks.map((t) => (t.id === id ? updated : t)),
+    })
+    return { task: updated, changed, ...(same && { same }) }
+  })
+}
+
+/**
+ * Undo of a fill: each field your AI filled, while it is still as filled,
+ * back as you wrote it, kept as an update (TOOK_BACK). One it filled in from
+ * nothing is left empty, not taken out, so your other Macs take it back too
+ * (a merge keeps the latest version's fields). undefined when there is
+ * nothing to take back.
+ */
+export function takeBackFill(
+  dataDir: string,
+  ref: string,
+  now = new Date()
+): { task: Task; changed: TaskUpdate['changed'] } | undefined {
+  return changeTask(dataDir, ref, (task, write) => {
+    const fill = standingFill(task)
+    if (!fill) return undefined
+    const changed: TaskUpdate['changed'] = []
+    const next: Record<string, string> = {}
+    for (const { field, from, to } of fill.changed) {
+      if (to === undefined || task[field] !== to) continue
+      next[field] = from ?? ''
+      changed.push(from ? { field, from: to, to: from } : { field, from: to })
+    }
+    const update: TaskUpdate = {
+      at: now.toISOString(),
+      why: TOOK_BACK,
+      by: ADDED_BY_YOU,
+      changed,
+    }
+    const updated = write({
+      ...task,
+      ...next,
+      updates: [...(task.updates ?? []), update].slice(-UPDATES_KEPT),
+    })
+    return { task: updated, changed }
+  })
+}
+
+/**
+ * You said a task you added and the open task it looks like are two: Todo
+ * asks no more. (The same task: Todo dismisses the one you added and opens
+ * the other.) undefined when it asks nothing.
+ */
+export function keepBoth(
+  dataDir: string,
+  ref: string,
+  now = new Date()
+): { task: Task } | undefined {
+  return changeTask(dataDir, ref, (task, write) => {
+    const like = task.looksLike
+    if (!like || like.keptBoth) return undefined
+    return {
+      task: write({
+        ...task,
+        looksLike: { ...like, keptBoth: now.toISOString() },
+      }),
+    }
+  })
+}
+
 /** A task an AI tool keeps from a session on this Mac */
 export interface NewFollowUp {
   title: string
@@ -488,7 +643,7 @@ export function addFollowUp(
     const afterId = item.after ? taskIdOf(item.after) : undefined
     const after = afterId ? file.tasks.find((t) => t.id === afterId) : undefined
     if (item.after && !after) return { error: `No task ${item.after}` }
-    const repo = repoOf(item.repo) ?? after?.repo ?? options.repo
+    const repo = repoOf(item.repo) ?? (after?.repo || options.repo)
     const same = file.tasks.find(
       (t) =>
         t.source.app === 'local' &&

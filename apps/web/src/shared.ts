@@ -121,8 +121,15 @@ export {
   sourceNames,
 } from '@src/tasks/sources'
 export type { MessageRef, Source } from '@src/tasks/sources'
-export { CLI_NAMES, OWN_CLIS, isOwnCli } from '@src/tasks/own-ai'
+export { CLI_NAMES, OWN_CLIS, aiSetUp, isOwnCli } from '@src/tasks/own-ai'
 export type { OwnCli } from '@src/tasks/own-ai'
+// What your AI filled in a task you added, as the Mac's row says it
+export {
+  FILLED_SHOWN_MS,
+  isFillUpdate,
+  standingFill,
+  wasFilled,
+} from '@src/tasks/filled'
 export type {
   DismissReason,
   Task,

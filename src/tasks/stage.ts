@@ -1,3 +1,4 @@
+import { isFillUpdate } from './filled.js'
 import type { TaskView } from './types.js'
 
 /**
@@ -53,9 +54,17 @@ export function cleanStages(value: unknown): StageRecords {
   return records
 }
 
-/** When the collection last changed the task: someone said something new */
+/**
+ * When the collection last changed the task: someone said something new.
+ * Your AI filling in a task you added, or Undo of it, is not that.
+ */
 const changedAt = (task: TaskView): number =>
-  Math.max(0, ...(task.updates ?? []).map((update) => Date.parse(update.at)))
+  Math.max(
+    0,
+    ...(task.updates ?? [])
+      .filter((update) => !isFillUpdate(update))
+      .map((update) => Date.parse(update.at))
+  )
 
 /**
  * An open task's stage: what you set, unless newer evidence moved it. A task

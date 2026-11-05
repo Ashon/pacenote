@@ -237,6 +237,11 @@ export const EnvSchema = z.object({
    */
   TASKS_AI: z.enum(OWN_CLIS).default('claude'),
   TASKS_AI_FALLBACK: z.enum(['on', 'off']).default('on'),
+  /**
+   * A task you add (here, on a device of yours, or handed over when it
+   * pairs) filled in by that CLI: its project, what kind it is, what to know
+   */
+  TASKS_FILL: z.enum(['on', 'off']).default('on'),
   /** opencode's provider/model for it; empty: opencode's own default */
   TASKS_AI_OPENCODE_MODEL: z.string().optional(),
 

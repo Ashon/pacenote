@@ -95,9 +95,22 @@ contextBridge.exposeInMainWorld('pacenoteDesktop', {
       ipcRenderer.invoke('pacenote:tasks:decide', id, decision),
     stage: (id: string, stage: string) =>
       ipcRenderer.invoke('pacenote:tasks:stage', id, stage),
-    // The third is where a device's task was added, which the Mac says
-    add: (title: string, repo?: string, due?: string) =>
-      ipcRenderer.invoke('pacenote:tasks:add', title, repo, undefined, due),
+    // The third is where a device's task was added and the fifth its id,
+    // which the Mac says
+    add: (title: string, repo?: string, due?: string, guessed?: boolean) =>
+      ipcRenderer.invoke(
+        'pacenote:tasks:add',
+        title,
+        repo,
+        undefined,
+        due,
+        undefined,
+        guessed === true
+      ),
+    takeBackFill: (id: string) =>
+      ipcRenderer.invoke('pacenote:tasks:take-back-fill', id),
+    keepBoth: (id: string) =>
+      ipcRenderer.invoke('pacenote:tasks:keep-both', id),
     leaveOut: (label: string) =>
       ipcRenderer.invoke('pacenote:tasks:leave-out', label),
     // Collect now: Claude Code reads Slack, read only, in the main process

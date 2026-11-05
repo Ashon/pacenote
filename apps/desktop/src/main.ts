@@ -88,7 +88,8 @@ import { appMcpLaunch, McpClients, mcpLaunch } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
 import { OwnAi } from './own-ai.js'
-import { isOwnCli, type OwnCli } from '../../../src/tasks/own-ai.js'
+import { aiSetUp, isOwnCli, type OwnCli } from '../../../src/tasks/own-ai.js'
+import { Filler } from './filler.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubAdmin } from './hub-admin.js'
 import { HubPairing } from './hub-pairing.js'
@@ -507,6 +508,26 @@ const taskCollector = new TaskCollector({
   codex: () => codexDefaults(process.env),
   recorder: (startedAt, cli) => recordCollection(history, startedAt, cli),
   last: latestCollection(dataDir, collectionRuns(90)),
+})
+
+/**
+ * New tasks filled in by your AI, in the background, once each is kept as
+ * you wrote it: on unless Settings > Todo turns it off, with an AI set up
+ */
+const filler = new Filler({
+  dataDir,
+  ownAi,
+  ownWork,
+  opencodeRun,
+  on: () => {
+    const env = settings.effectiveEnv()
+    return (
+      env.TASKS_FILL !== 'off' &&
+      aiSetUp(env, Boolean(taskCollector.state.last))
+    )
+  },
+  log,
+  onChange: () => mainWindow.send('pacenote:tasks:changed'),
 })
 
 /**
@@ -1055,6 +1076,7 @@ function registerIpc(): void {
     opencodeSessions,
     collectionRuns,
     collectState,
+    filler,
   })
   registerTaskWorkIpc(ipc, desktop, {
     todo,

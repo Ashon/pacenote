@@ -36,7 +36,11 @@ import {
   updateWork,
 } from '../../../../src/tasks/work.js'
 import { handOverTasks } from '../../../../src/tasks/hand-over.js'
-import { addYourTask } from '../../../../src/tasks/write.js'
+import {
+  addYourTask,
+  keepBoth,
+  takeBackFill,
+} from '../../../../src/tasks/write.js'
 import {
   answerGroup,
   notYourGroups,
@@ -44,6 +48,7 @@ import {
 } from '../../../../src/tasks/you.js'
 import { taskArea } from '../../../../src/you/areas.js'
 import { countYou, readYou } from '../../../../src/you/store.js'
+import type { Filler } from '../filler.js'
 import type { Session } from '../handoff.js'
 import { text } from '../main.text.js'
 import type { OpencodeSessions } from '../opencode-sessions.js'
@@ -68,6 +73,7 @@ export function registerTasksIpc(
     opencodeSessions,
     collectionRuns,
     collectState,
+    filler,
   }: {
     todo: TodoSettings
     sessions: TaskSessions
@@ -80,6 +86,8 @@ export function registerTasksIpc(
     ) => ReturnType<Desktop['reader']['collections']>
     /** Collect now as Todo shows it, here or on another of your Macs */
     collectState: (collections: CollectionRecord[]) => TasksCollect
+    /** New tasks filled in by your AI */
+    filler: Filler
   }
 ): void {
   const { dataDir, settings, ownAi } = desktop
@@ -111,6 +119,8 @@ export function registerTasksIpc(
       collect,
       ai: ownAi.now(),
       aiSet: aiSetUp(settings.effectiveEnv(), Boolean(collect.last)),
+      // The tasks your AI is filling in now (filler.ts)
+      filling: filler.filling(),
       collections,
       ...view,
       working: sessions.working(open, work.entries),
@@ -187,9 +197,26 @@ export function registerTasksIpc(
   // A task you add yourself (Todo's New task), in a project's repository;
   // from a device of yours, the device it was added on (DeviceAnswers)
   // From a device, as argsFromDevice hands it: with where it was added
-  ipc.handle('pacenote:tasks:add', undefined, (title, repo, from, due, peer) =>
-    addYourTask(dataDir, title, repo, from, due, peer)
+  // guessed: its project was guessed from its words, not picked (a newer
+  // screen's or device's), which your AI may change when it fills it in
+  ipc.handle(
+    'pacenote:tasks:add',
+    undefined,
+    (title, repo, from, due, peer, guessed) => {
+      const added = addYourTask(dataDir, title, repo, from, due, peer)
+      if (!added || 'error' in added) return added
+      filler.add({ id: added.id, repoGuessed: guessed === true || !repo })
+      return { ...added, filling: filler.filling().includes(added.id) }
+    }
   )
+  // Undo of what your AI filled in, on the task's row
+  ipc.handle('pacenote:tasks:take-back-fill', undefined, (id) => {
+    if (typeof id === 'string') takeBackFill(dataDir, id)
+  })
+  // It is not the task it looks like: asked no more
+  ipc.handle('pacenote:tasks:keep-both', undefined, (id) => {
+    if (typeof id === 'string') keepBoth(dataDir, id)
+  })
   // What a device of yours wrote before it paired, as argsFromDevice hands it:
   // with the device that asked. New tasks only, each in the project its words
   // point to, as New task guesses one.
@@ -198,12 +225,15 @@ export function registerTasksIpc(
     const you = await countYou({ dataDir, home: homedir() }).catch(
       () => undefined
     )
-    return handOverTasks(
+    const { open, ...handed } = handOverTasks(
       dataDir,
       tasks,
       { id: peer, name: from },
       { areas: you?.areas }
     )
+    // Each in the project its words point to: your AI may change it
+    for (const id of open ?? []) filler.add({ id, repoGuessed: true })
+    return handed
   })
   ipc.handle('pacenote:tasks:leave-out', [], (label) => {
     if (typeof label !== 'string' || !label.trim()) return []

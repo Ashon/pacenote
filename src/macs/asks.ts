@@ -42,6 +42,10 @@ export const DEVICE_CHANGES = {
   // (src/tasks/hand-over.ts); a Mac before this one answers not-allowed, and
   // the device keeps them
   'tasks.handOver': 'pacenote:tasks:hand-over',
+  // Undo of what your AI filled in a task, and "not the same task" (a Mac
+  // before 0.6.24 answers not-allowed)
+  'tasks.takeBackFill': 'pacenote:tasks:take-back-fill',
+  'tasks.keepBoth': 'pacenote:tasks:keep-both',
 } as const
 
 export const DEVICE_ASKS = { ...DEVICE_READS, ...DEVICE_CHANGES }
@@ -85,9 +89,10 @@ export function argsFromDevice(
   from?: string,
   peer?: string
 ): unknown[] {
-  // title, repo, where it was added, when it is due (a newer device's), and
-  // the device's id
-  if (what === 'tasks.add') return [args[0], args[1], from, args[2], peer]
+  // title, repo, where it was added, when it is due (a newer device's), the
+  // device's id, and whether the repo was guessed from the words (newer still)
+  if (what === 'tasks.add')
+    return [args[0], args[1], from, args[2], peer, args[3] === true]
   // the tasks, and the device that hands them over
   if (what === 'tasks.handOver') return [args[0], peer, from]
   if (what !== 'settings.validate' && what !== 'settings.save') return args

@@ -8,8 +8,8 @@ the pieces are drawn in [Architecture](architecture.md#your-tasks-and-ai-tools).
 
 ## Which AI does the work
 
-Collect now, reply drafts, Looks done and Recap's Write it up run headless on this Mac, with your own login, on the AI
-chosen in Settings > Todo > Pacenote's own work: Claude Code, Codex or opencode.
+Collect now, filling in new tasks, reply drafts, Looks done and Recap's Write it up run headless on this Mac, with your
+own login, on the AI chosen in Settings > Todo > Pacenote's own work: Claude Code, Codex or opencode.
 
 - **Claude Code** runs as `claude -p` with only project settings (none, in the data folder), Pacenote's task tools and
   the read tools of your claude.ai Slack connector; the connector's tools that write are denied.
@@ -118,6 +118,23 @@ A collection is told who you are, so it can tell what is asked of you from what 
   waiting longest on someone else, counted from the list with no model.
 - **New task** (⌘N) adds a task of your own on This Mac, in the project its words point to (or the one you pick, among
   those with a repository); its row says "You added it".
+- **Fill in new tasks** (Settings > Todo, on by default, only with an AI set up): a task you add here, on your iPhone,
+  iPad or Android phone (paired), or one a device hands over when it pairs, is kept as you wrote it at once, and your
+  AI fills in what it lacks a moment later: its project, what kind it is (code, reply, other), two or three sentences
+  of what to know, the open task it carries on from, who asked (only a name its title says) and when it is due (only
+  words its title says). The row says "Claude Code is filling it in", then "Filled in just now" for a day; the opened
+  row has a Filled in line with Undo. One that looks like an open task asks "Same task" (the new one is dismissed and
+  the other opens) or "Keep both".
+  - Pacenote gathers what the AI is given (`src/tasks/fill.ts`): your projects (You's areas), your open tasks, how
+    tasks ended in the last 30 days and, for the repositories the task's words point to, their state on this Mac read
+    with git (the branch, recent commits, commits on no remote, changes not committed). The CLI runs with no tools
+    (`apps/desktop/src/filler.ts`), and its answer is checked against that: a repository you have, an open task's id,
+    a name or a date in the title. Tasks added one after another go together after 5 seconds, one run at a time; when
+    the AI cannot (at its limit, signed out), the task stays as you wrote it.
+  - What you set stays: the title, a project you picked (one guessed from the words may change) and a due date you
+    wrote. The fill is one update ("Filled in when you added it"), and Undo another ("Took back what was filled in"),
+    which leaves the fields it filled empty so your other Macs take it back too. Neither moves a waiting task or counts
+    as an update of its thread. An older Pacenote shows them as updates and ignores `looksLike`.
 - Open tasks fade after 7 days and drop after 14; done, dismissed and closed ones are kept 14 days.
 - Above Done's list, the screen shows how many of the tasks you settled you dismissed. Above about 30%, tasks are picked
   too loosely.

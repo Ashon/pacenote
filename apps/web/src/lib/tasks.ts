@@ -100,6 +100,23 @@ export function useProposal(id: string) {
 }
 
 /**
+ * What your AI filled in a task you added: Undo takes it back, and Keep both
+ * says it is not the task it looks like; each returns the error to show
+ */
+export function useFill(id: string) {
+  const bridge = window.pacenoteDesktop?.tasks
+  const client = useQueryClient()
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['tasks'] })
+    await client.invalidateQueries({ queryKey: ['task', id] })
+  }
+  return {
+    takeBack: () => after(bridge?.takeBackFill(id), refresh),
+    keepBoth: () => after(bridge?.keepBoth(id), refresh),
+  }
+}
+
+/**
  * Whether a user group a Maybe was asked of means you; returns the error to
  * show, if any. Yes changes Settings, so the settings screen reloads too.
  */
@@ -164,8 +181,19 @@ export function useStage() {
 /** Adds a task of your own (New task): its id, or the error to show */
 export function useAddTask() {
   const client = useQueryClient()
-  return async (title: string, repo?: string, due?: string) => {
-    const result = await window.pacenoteDesktop?.tasks.add(title, repo, due)
+  return async (
+    title: string,
+    repo?: string,
+    due?: string,
+    /** The project was guessed from its words, not picked */
+    guessed?: boolean
+  ) => {
+    const result = await window.pacenoteDesktop?.tasks.add(
+      title,
+      repo,
+      due,
+      guessed
+    )
     await client.invalidateQueries({ queryKey: ['tasks'] })
     return result ?? {}
   }

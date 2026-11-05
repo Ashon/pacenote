@@ -79,6 +79,12 @@ export interface Task {
    */
   group?: string
   /**
+   * An open task this one looks like, as your AI said when it filled it in:
+   * Todo asks whether it is the same task. keptBoth: when you said they are
+   * two. An older Pacenote does not know it and leaves it be.
+   */
+  looksLike?: { task: string; at: string; keptBoth?: string }
+  /**
    * The thread in two or three sentences, written when it was collected: who
    * wants what, and why. Pacenote keeps no messages, so this is the reminder.
    */
@@ -112,9 +118,20 @@ export interface Task {
   }
 }
 
-/** A field update_task can change */
+/**
+ * A field update_task can change, and the ones your AI fills in a task you
+ * added (src/tasks/fill.ts): the task it carries on from, and who asked
+ */
 export type TaskField =
-  'title' | 'due' | 'summary' | 'action' | 'repo' | 'confidence'
+  | 'title'
+  | 'due'
+  | 'summary'
+  | 'action'
+  | 'repo'
+  | 'confidence'
+  | 'follows'
+  | 'askedBy'
+  | 'kind'
 
 /** One change to a task after it was added, and why */
 export interface TaskUpdate {

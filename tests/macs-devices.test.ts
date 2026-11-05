@@ -361,7 +361,12 @@ describe('your devices and your Macs', () => {
           { id: 'C1:1730000000.000100', title: 'A Slack task, made up' },
         ],
       ])
-      expect(handed.value).toEqual({ added: 1, already: 1, skipped: 1 })
+      expect(handed.value).toEqual({
+        added: 1,
+        already: 1,
+        skipped: 1,
+        open: ['local:0123456789ab'],
+      })
       const tasks = readTasks(dataDir).tasks
       expect(tasks.find((t) => t.id === 'local:0123456789ab')).toMatchObject({
         title: 'Draft the release notes for 0.7',

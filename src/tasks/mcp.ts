@@ -14,6 +14,7 @@ import { countYou } from '../you/store.js'
 import type { AreaRole } from '../you/types.js'
 import { recordActivity } from './activity.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
+import { isFillUpdate } from './filled.js'
 import { yourRepos } from './folders.js'
 import type { TasksSettings } from './settings.js'
 import { SOURCE_IDS, sourceNames, sourceOf, taskIdOf } from './sources.js'
@@ -733,7 +734,10 @@ export function registerTaskTools(
             wrapUp: view.wrapUp?.text,
             // How the thread changed it since it was added
             changes: view.updates
-              ?.filter((update) => update.changed.some((c) => c.from))
+              ?.filter(
+                (update) =>
+                  !isFillUpdate(update) && update.changed.some((c) => c.from)
+              )
               .slice(-3)
               .map((update) => ({
                 at: update.at,

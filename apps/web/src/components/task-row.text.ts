@@ -41,6 +41,36 @@ const en = {
   } as Record<string, string>,
   nowAction: (what: string | undefined) => `Now ${what}`,
   summaryUpdated: 'Summary updated',
+  nowFollows: 'Carries on another task',
+  askedNow: (who: string | undefined) => `Asked by ${who}`,
+  nowKind: 'Now asked of you',
+
+  // What your AI filled in a task you added (src/tasks/fill.ts)
+  fillingIn: (tool: string) => `${tool} is filling it in`,
+  filledIn: (when: string) => `Filled in ${when}`,
+  filledLabel: 'Filled in',
+  carriesOn: 'Carries on',
+  /** What it filled, by field, as a list reads it */
+  filledField: {
+    repo: 'project',
+    action: 'what kind',
+    summary: 'what to know',
+    follows: 'what it carries on',
+    askedBy: 'who asked',
+    due: 'when it’s due',
+  } as Record<string, string>,
+  filledWhat: (fields: string[]) => {
+    const [first = '', ...rest] = fields
+    const list = [first.charAt(0).toUpperCase() + first.slice(1), ...rest]
+    return list.length > 1
+      ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`
+      : list[0]!
+  },
+  filledBy: (tool: string) => `${tool}, when you added it`,
+  undoFill: 'Undo',
+  looksLike: 'Looks like one you have:',
+  sameTask: 'Same task',
+  keepBoth: 'Keep both',
 
   // Who it is from
   leftAfter: (title: string) => `Left after “${title}”`,
@@ -265,6 +295,28 @@ const ko: typeof en = {
   },
   nowAction: (what) => `이제 ${what}`,
   summaryUpdated: '요약 바뀜',
+  nowFollows: '다른 할 일에서 이어짐',
+  askedNow: (who) => `${who}님의 요청`,
+  nowKind: '이제 받은 요청',
+
+  fillingIn: (tool) => `${josa(tool, '이/가')} 채우는 중`,
+  filledIn: (when) => `${when} 채움`,
+  filledLabel: '채운 것',
+  carriesOn: '이어지는 일',
+  filledField: {
+    repo: '프로젝트',
+    action: '어떤 일인지',
+    summary: '알아둘 것',
+    follows: '이어지는 일',
+    askedBy: '요청한 사람',
+    due: '마감',
+  },
+  filledWhat: (fields) => fields.join(', '),
+  filledBy: (tool) => `${tool}, 적었을 때`,
+  undoFill: '되돌리기',
+  looksLike: '이미 있는 일 같아요:',
+  sameTask: '같은 일',
+  keepBoth: '둘 다 두기',
 
   leftAfter: (title) => `“${title}” 이후 남은 일`,
   keptFromSession: '세션에서 남긴 일',

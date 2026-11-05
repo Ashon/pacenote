@@ -58,6 +58,11 @@ export interface HandedOver {
   already: number
   /** Not a task: no title, or an id a device does not make */
   skipped: number
+  /**
+   * The ones new here that are still open, for your AI to fill in (the Mac's
+   * own: a device reads only the counts)
+   */
+  open?: string[]
 }
 
 /** The most one handover takes */
@@ -161,7 +166,15 @@ export function handOverTasks(
           ...stages,
         })
     }
-    return { added: added.length, already, skipped }
+    const open = added
+      .filter((task) => !decisions[task.id])
+      .map((task) => task.id)
+    return {
+      added: added.length,
+      already,
+      skipped,
+      ...(open.length && { open }),
+    }
   })
 }
 

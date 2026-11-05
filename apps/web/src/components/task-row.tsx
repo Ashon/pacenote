@@ -1,6 +1,7 @@
 import { localized } from '@src/i18n/locale'
+import { FILLED_SHOWN_MS, isFillUpdate, standingFill } from '@src/tasks/filled'
 import { CLI_NAMES } from '@src/tasks/own-ai'
-import { sourceOf } from '@src/tasks/sources'
+import { ADDED_BY_YOU, sourceOf } from '@src/tasks/sources'
 import type { StageRecord, TaskStage } from '@src/tasks/stage'
 import type {
   DismissReason,
@@ -67,6 +68,7 @@ import { macNamed, useMacs } from '@/lib/macs'
 import {
   taskDetailQuery,
   taskHash,
+  useFill,
   useGroupAnswer,
   useProposal,
   useRepoFolders,
@@ -76,7 +78,14 @@ import {
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { switchLine } from './own-ai-status'
-import { AreaPill, Pill, StagePill, TaskMeta, writtenOf } from './task-meta'
+import {
+  AreaPill,
+  Pill,
+  StagePill,
+  TaskMeta,
+  whereOf,
+  writtenOf,
+} from './task-meta'
 import { PaceSpinner } from './pace-spinner'
 import { text } from './task-row.text'
 
@@ -125,9 +134,14 @@ const isNews = (change: Change) =>
   change.from !== undefined ||
   ['due', 'title', 'confidence'].includes(change.field)
 
-/** The latest update that changed the task as its thread went on */
+/**
+ * The latest update that changed the task as its thread went on: not your
+ * AI filling in a task you added, nor Undo of it
+ */
 function lastChange(task: TaskView): TaskUpdate | undefined {
-  return (task.updates ?? []).filter((u) => u.changed.some(isNews)).slice(-1)[0]
+  return (task.updates ?? [])
+    .filter((u) => !isFillUpdate(u) && u.changed.some(isNews))
+    .slice(-1)[0]
 }
 
 /**
@@ -154,6 +168,12 @@ function changeWords(change: Change): string {
       return t.nowAction(t.actionWord[to ?? ''] ?? to)
     case 'summary':
       return t.summaryUpdated
+    case 'follows':
+      return t.nowFollows
+    case 'askedBy':
+      return t.askedNow(to)
+    case 'kind':
+      return t.nowKind
   }
 }
 
@@ -169,6 +189,10 @@ export function TaskRow({
   live,
   stage,
   follows,
+  followsTask,
+  filling,
+  looksLike,
+  onSame,
   proposal,
   area,
   askGroup,
@@ -196,6 +220,14 @@ export function TaskRow({
   stage?: TaskStage
   /** The title of the task it carries on from, for one a session left */
   follows?: string
+  /** The task it carries on from, which your AI found for one you added */
+  followsTask?: TaskView
+  /** Your AI filling it in now, by the CLI's name (filler.ts) */
+  filling?: string
+  /** The open task your AI says it looks like, until you say */
+  looksLike?: TaskView
+  /** It is that task: this one goes, and that one opens */
+  onSame?: () => void
   /** Its quiet session says it looks done (done-watch.ts) */
   proposal?: Proposal
   /** The area of your work it is in (You), linked to it */
@@ -307,6 +339,13 @@ export function TaskRow({
   const change = settled ? undefined : lastChange(task)
   const recent =
     change && Date.now() - Date.parse(change.at) < WEEK ? change : undefined
+  // What your AI filled in, said on the row for a day
+  const fill = settled ? undefined : standingFill(task)
+  const justFilled =
+    fill && Date.now() - Date.parse(fill.at) < FILLED_SHOWN_MS
+      ? fill
+      : undefined
+  const fillAct = useFill(task.id)
 
   const dismiss = (
     <Button size="sm" variant="secondary" onClick={() => setDismissing(true)}>
@@ -463,6 +502,17 @@ export function TaskRow({
                   className="motion-fade rounded-full bg-primary/12 px-2 py-px font-medium text-primary"
                 >
                   {t.looksDone}
+                </span>
+              )}
+              {filling && acting && (
+                <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
+                  <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
+                  {t.fillingIn(filling)}
+                </span>
+              )}
+              {justFilled && !filling && !open && (
+                <span className="rounded-full bg-primary/12 px-2 py-px font-medium text-primary">
+                  {t.filledIn(formatRelative(justFilled.at))}
                 </span>
               )}
               {recent && !open && (
@@ -680,6 +730,39 @@ export function TaskRow({
             </span>
           </div>
         </div>
+        {looksLike && acting && (
+          <div
+            role="group"
+            aria-label={t.looksLike}
+            className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 pl-6 text-meta text-muted-foreground"
+          >
+            <span>{t.looksLike}</span>
+            <a
+              href={taskHash(looksLike.id)}
+              className="font-medium text-foreground hover:text-primary"
+            >
+              {looksLike.title}
+            </a>
+            <span>
+              {[
+                looksLike.repo || whereOf(looksLike, t),
+                formatRelative(looksLike.postedAt),
+              ].join(' · ')}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Button size="xs" variant="outline" onClick={onSame}>
+                {t.sameTask}
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => void fillAct.keepBoth().then(setError)}
+              >
+                {t.keepBoth}
+              </Button>
+            </span>
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-2 pl-6 text-copy text-status-failed">
             {error}
@@ -702,6 +785,13 @@ export function TaskRow({
             onDraft={() => void draft()}
             onStartHere={(tool) => void continueIn(tool)}
             proposal={task.status === 'open' ? proposal : undefined}
+            followsTask={
+              task.addedBy === ADDED_BY_YOU && task.follows
+                ? followsTask
+                : undefined
+            }
+            fill={fill}
+            onUndoFill={() => void fillAct.takeBack().then(setError)}
             onError={setError}
           />
         </CollapsibleContent>
@@ -783,6 +873,9 @@ function TaskOpen({
   onDraft,
   onStartHere,
   proposal,
+  followsTask,
+  fill,
+  onUndoFill,
   onError,
 }: {
   task: TaskView
@@ -794,6 +887,11 @@ function TaskOpen({
   onStartHere: (tool: WorkTool) => void
   /** What its quiet session looked like, waiting for you */
   proposal?: Proposal
+  /** The task it carries on from, for one you added */
+  followsTask?: TaskView
+  /** What your AI filled in, standing */
+  fill?: TaskUpdate
+  onUndoFill: () => void
   /** What went wrong with something done here, or none */
   onError: (error: string | undefined) => void
 }) {
@@ -805,7 +903,7 @@ function TaskOpen({
   const macs = useMacs()
   const [all, setAll] = useState(false)
   const replyId = useId()
-  const summary = task.summary ?? task.reason
+  const summary = task.summary || task.reason
   const settled = !['open', 'maybe'].includes(task.status)
   const change = settled ? undefined : lastChange(task)
   const flash = useFlash({ summary })
@@ -863,6 +961,53 @@ function TaskOpen({
             </span>
             <span className="text-meta text-muted-foreground">
               {formatRelative(change.at)}
+            </span>
+          </Line>
+        )}
+        {followsTask && (
+          <Line label={t.carriesOn}>
+            <a
+              href={taskHash(followsTask.id)}
+              className="select-text hover:text-primary"
+            >
+              {followsTask.title}
+            </a>
+            <span className="text-meta text-muted-foreground">
+              {[
+                followsTask.status === 'open'
+                  ? whereOf(followsTask, t)
+                  : t.settled[followsTask.status],
+                formatRelative(followsTask.postedAt),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </Line>
+        )}
+        {fill && (
+          <Line
+            label={t.filledLabel}
+            actions={
+              <Button
+                size="xs"
+                variant="ghost"
+                className="text-primary"
+                onClick={onUndoFill}
+              >
+                <Undo2 />
+                {t.undoFill}
+              </Button>
+            }
+          >
+            <span>
+              {t.filledWhat(
+                fill.changed
+                  .map((change) => t.filledField[change.field])
+                  .filter((word): word is string => Boolean(word))
+              )}
+            </span>
+            <span className="text-meta text-muted-foreground">
+              {t.filledBy(closedBy(fill.by) ?? CLI_NAMES.claude)}
             </span>
           </Line>
         )}

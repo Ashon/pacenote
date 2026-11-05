@@ -102,7 +102,7 @@ export const GROUPS_KO: Record<SettingGroup, { label: string; help: string }> =
     },
     ownWork: {
       label: 'Pacenote 자체 작업',
-      help: '지금 모으기, 답장 초안, 끝난 것 같음, 회고의 정리하기는 이 Mac에서 내 로그인으로 화면 없이 실행돼요.',
+      help: '지금 모으기, 새 할 일 채우기, 답장 초안, 끝난 것 같음, 회고의 정리하기는 이 Mac에서 내 로그인으로 화면 없이 실행돼요.',
     },
     tasks: {
       label: '할 일 모으기',
@@ -351,6 +351,10 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   TASKS_AI_FALLBACK: {
     label: '안 될 때 전환하기',
     help: '사용 한도에 닿았거나, 쓸 수 없거나, 로그아웃됐거나, Slack 커넥터가 없으면 Claude Code나 Codex가 대신 작업해요. 한도에 닿은 쪽은 한도가 초기화될 때까지 기다려요.',
+  },
+  TASKS_FILL: {
+    label: '새 할 일 채우기',
+    help: '여기나 iPhone에서 적은 할 일에 프로젝트, 어떤 일인지, 알아둘 것을 채워요. 내 프로젝트, 열린 할 일, 그 저장소의 최근 작업을 보고요. 아무것도 바꾸거나 보내지 않고, 되돌리기로 되돌릴 수 있어요.',
   },
   TASKS: {
     label: 'Slack에서 내 할 일 모으기',

@@ -78,7 +78,13 @@ describe('tasks a device wrote before it paired', () => {
         iphone,
         { areas: [payments], now }
       )
-    ).toEqual({ added: 4, already: 0, skipped: 0 })
+    ).toEqual({
+      added: 4,
+      already: 0,
+      skipped: 0,
+      // Still open: for your AI to fill in
+      open: ['local:aaaaaaaaaaaa', 'local:bbbbbbbbbbbb'],
+    })
 
     const tasks = readTasks(dir).tasks
     // Its words point to a project: in that project's repository
@@ -160,7 +166,12 @@ describe('tasks a device wrote before it paired', () => {
         { id: 'ipad-1', name: 'iPad' },
         { now }
       )
-    ).toEqual({ added: 1, already: 2, skipped: 0 })
+    ).toEqual({
+      added: 1,
+      already: 2,
+      skipped: 0,
+      open: ['local:eeeeeeeeeeee'],
+    })
     const after = readTasks(dir).tasks
     expect(after[0]).toEqual(before.tasks[0])
     expect(after.map((task) => task.title)).toEqual([

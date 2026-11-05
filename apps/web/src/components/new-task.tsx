@@ -55,7 +55,12 @@ export function NewTask({
     event.preventDefault()
     if (!title.trim() || busy) return
     setBusy(true)
-    const result = await add(title, project?.repo, due.trim() || undefined)
+    const result = await add(
+      title,
+      project?.repo,
+      due.trim() || undefined,
+      picked === undefined && Boolean(guess)
+    )
     setBusy(false)
     setError(result.error)
     if (!result.id) return

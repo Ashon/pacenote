@@ -204,6 +204,11 @@ declare global {
               groups: { yours: string[]; notYours: string[] }
               /** The area each task is in, for those in one (src/you) */
               areas: Record<string, TaskArea>
+              /**
+               * The tasks your AI is filling in now (desktop's filler.ts);
+               * none from a Mac before 0.6.24
+               */
+              filling?: string[]
             })
           | null
         >
@@ -226,8 +231,22 @@ declare global {
         add(
           title: string,
           repo?: string,
-          due?: string
-        ): Promise<{ id?: string; error?: string } | undefined>
+          due?: string,
+          /** The repo was guessed from its words: your AI may change it */
+          guessed?: boolean
+        ): Promise<
+          | {
+              id?: string
+              error?: string
+              /** Your AI fills it in next (a Mac from 0.6.24) */
+              filling?: boolean
+            }
+          | undefined
+        >
+        /** Undo of what your AI filled in a task you added */
+        takeBackFill(id: string): Promise<{ error?: string } | undefined>
+        /** A task you added is not the one it looks like: asked no more */
+        keepBoth(id: string): Promise<{ error?: string } | undefined>
         leaveOut(label: string): Promise<SettingsIssue[]>
         /**
          * Runs a collection (the AI chosen, Slack read only) and waits for it

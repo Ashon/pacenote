@@ -1,6 +1,7 @@
 import { newTokens } from '@history/usage'
 import { localized } from '@src/i18n/locale'
 import type { MacsView } from '@src/macs/types'
+import { looksLikeOf } from '@src/tasks/filled'
 import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
 import { stagesOf } from '@src/tasks/stage'
 import { sortForTab, tabOf, type TodoTab } from '@src/tasks/tabs'
@@ -151,6 +152,13 @@ export function TasksPage({
   // Each open task's stage: started, waiting (src/tasks/stage.ts)
   const stages = stagesOf(data, live?.working)
   const tabIn = (task: TaskView) => tabOf(task, stages[task.id])
+  // The open task your AI says one you added looks like, until you say
+  const sameAs = (task: TaskView) => {
+    const like = looksLikeOf(task)
+    return like
+      ? data?.tasks.find((each) => each.id === like && each.status === 'open')
+      : undefined
+  }
 
   // A task opened from a link shows under its own tab.
   useEffect(() => {
@@ -448,6 +456,23 @@ export function TasksPage({
                             ?.title
                         : undefined
                     }
+                    followsTask={
+                      task.follows
+                        ? data.tasks.find((each) => each.id === task.follows)
+                        : undefined
+                    }
+                    filling={
+                      data.filling?.includes(task.id)
+                        ? CLI_NAMES[data.ai.chosen]
+                        : undefined
+                    }
+                    looksLike={sameAs(task)}
+                    onSame={() => {
+                      const same = sameAs(task)
+                      if (!same) return
+                      void decide(task.id, { status: 'dismissed' })
+                      go(taskHash(same.id))
+                    }}
                     open={task.id === openId}
                     gone={tabIn(task) !== tab}
                     logEntry={task.id === openId ? logEntry : undefined}
