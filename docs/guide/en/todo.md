@@ -50,6 +50,11 @@ progress to pick up, and the one waiting longest on someone else. A line shows o
 **New task** (⌘N) adds one to Open, kept on This Mac. Its project is guessed from its words and can be changed; only a
 project with a repository is offered, as a task joins a project by its repository.
 
+With an AI set up, your AI fills in a task you add a moment later: its project, what kind it is, what to know and the
+open task it carries on from, from your projects, your open tasks and the recent work in its repository. The row says
+when it is filling it in; open the task to see what it filled in, with **Undo**. A task that looks like one you have
+asks **Same task** or **Keep both**. Turn it off in Settings > Todo > **Fill in new tasks**.
+
 Open tasks fade after 7 days and drop after 14.
 
 ## More

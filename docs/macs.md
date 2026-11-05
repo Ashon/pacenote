@@ -126,8 +126,10 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   released) never gets your Macs' key or your Slack app: Add a device gives it one made from that key and its id, which
   each of your Macs works out again as it says hello, and none does once you remove it. It asks the Mac it reaches for
   what the Mac's own screens show, and the Mac answers only what a device may ask, never a secret
-  ([src/macs/asks.ts](../src/macs/asks.ts)). A task you add on a device is the Mac's, kept as added on that device.
-  The tasks a device wrote before it paired come over once with `tasks.handOver`
+  ([src/macs/asks.ts](../src/macs/asks.ts)). A task you add on a device is the Mac's, kept as added on that device,
+  and the Mac's AI fills it in as it does one added on the Mac ([Todo](tasks.md)); the device can take that back
+  (`tasks.takeBackFill`) or keep both of two tasks that look alike (`tasks.keepBoth`), which a Mac before 0.6.24
+  answers not-allowed. The tasks a device wrote before it paired come over once with `tasks.handOver`
   ([src/tasks/hand-over.ts](../src/tasks/hand-over.ts)): the Mac adds only ones new to it, with how you left them there
   (done, dismissed, in progress, waiting), and never changes a task it has. From a device, Todo sync takes only what you
   decided and the stages you set, so a device never makes or changes a task by sending a list. A Mac before 0.6.23

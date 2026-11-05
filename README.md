@@ -48,8 +48,9 @@ people call you, or a user group that means you. Anything it is not sure about w
 the list, a Maybe from a group asks once whether that group means you, and a message never becomes a task twice. With
 both on your Mac, the other one takes over when the one you chose is at its usage limit.
 
-**New task** (⌘N) adds one of your own, in the project its words point to. A task can be in progress (you mark it, or a
-session worked on it in the last day) or waiting on someone else until something new comes in its thread, and Today,
+**New task** (⌘N) adds one of your own, in the project its words point to, and your AI fills in what it lacks a moment
+later (its project, what kind it is, what to know), from your projects, your open tasks and the recent work in its
+repository, with Undo. A task can be in progress (you mark it, or a session worked on it in the last day) or waiting on someone else until something new comes in its thread, and Today,
 above the list, names the ask waiting on you, the task to pick up and the one waiting longest on someone else.
 
 ### Pick up where you left off, in either tool
