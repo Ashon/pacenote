@@ -8,6 +8,7 @@ import {
 import { MESSENGER_IDS, MESSENGER_NAMES } from '@src/messengers/ids'
 import type { SlackCheckItem } from '@src/messengers/slack/check'
 import type { SupervisorState, UpdateState } from '@runtime/types'
+import type { DesktopBridge } from '@src/desktop-bridge'
 import { LoaderCircle, PlugZap } from 'lucide-react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -76,7 +77,7 @@ export interface SettingsCtx {
   view: SettingsView
   /** On a device of yours: the Mac whose settings these are */
   remote?: string
-  settings: NonNullable<Window['pacenoteDesktop']>['settings']
+  settings: DesktopBridge['settings']
   sandbox: ReturnType<typeof useSandbox>
   supervisor: SupervisorState | undefined
   loginItem: ReturnType<typeof useLoginItem>

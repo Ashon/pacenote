@@ -1,3 +1,4 @@
+import type { HistoryMcpLaunch } from '@src/desktop-bridge'
 import type { McpClientStatus } from '@src/history/mcp-clients'
 import {
   ChevronRight,
@@ -152,14 +153,7 @@ function StateIcon({
 function ByHand() {
   const t = useText(text)
   const [open, setOpen] = useState(false)
-  const [launch, setLaunch] =
-    useState<
-      Awaited<
-        ReturnType<
-          NonNullable<Window['pacenoteDesktop']>['settings']['historyMcp']
-        >
-      >
-    >()
+  const [launch, setLaunch] = useState<HistoryMcpLaunch>()
   useEffect(() => {
     void window.pacenoteDesktop?.settings.historyMcp().then(setLaunch)
   }, [])

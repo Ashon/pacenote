@@ -27,7 +27,7 @@ import { tailnetAddresses } from '../src/macs/network.js'
 import { TodoSync } from '../src/macs/todo-sync.js'
 import { handOverTasks } from '../src/tasks/hand-over.js'
 import { readDecisions, readStages, readTasks } from '../src/tasks/store.js'
-import { addYourTask } from '../src/tasks/write.js'
+import { addYourTask, type YourTaskInput } from '../src/tasks/write.js'
 
 /** Waits for the Macs to get there, with room for a busy run */
 const poll = <T>(check: () => T) =>
@@ -257,8 +257,8 @@ describe('your devices and your Macs', () => {
           saved.push(changes)
           return { issues: [], restarted: false }
         },
-        'pacenote:tasks:add': (title, repo, from, due, peer) =>
-          addYourTask(dataDir, title, repo, from, due, peer),
+        'pacenote:tasks:add': (input) =>
+          addYourTask(dataDir, input as YourTaskInput),
         'pacenote:tasks:hand-over': (tasks, peer, from) =>
           handOverTasks(dataDir, tasks, {
             id: String(peer),
@@ -397,7 +397,7 @@ describe('your devices and your Macs', () => {
     "takes what you decided on a device, never a device's list of tasks",
     async () => {
       const { dataDir, macs, address } = await mac()
-      const mine = addYourTask(dataDir, 'Rotate the deploy key', undefined)
+      const mine = addYourTask(dataDir, { title: 'Rotate the deploy key' })
       const id = (mine as { id: string }).id
       const sync = new TodoSync({
         dataDir,

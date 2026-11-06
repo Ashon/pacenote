@@ -167,6 +167,10 @@ export {
 } from '@src/settings/fields'
 export type { SettingField, SettingSection } from '@src/settings/fields'
 
+// The desktop bridge (window.pacenoteDesktop) the screens call, which the
+// app's bridge.ts answers as the Mac's preload does
+export type { DesktopBridge, TodoListView } from '@src/desktop-bridge'
+
 // The channel as the Mac keeps it (src/macs/channel.ts on the wire): the asks
 // a device may make, which are these and no others, and the answer it gets
 export {

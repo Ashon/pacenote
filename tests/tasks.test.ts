@@ -805,7 +805,9 @@ describe('the task tools over MCP', () => {
       error: true,
       text: 'No task C9:1.0',
     })
-    expect(readActivity(data, NOW).map((event) => event.kind)).toEqual(['follow-up'])
+    expect(readActivity(data, NOW).map((event) => event.kind)).toEqual([
+      'follow-up',
+    ])
     // Listed with your tasks, but it has no thread for a collection to read.
     expect(JSON.parse((await call('my_tasks')).text).tasks).toMatchObject([
       { title: 'Update the runbook', source: 'This Mac' },

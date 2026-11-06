@@ -8,19 +8,21 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { isLocale, pickLocale, setLocale, type Locale } from '@src/i18n/locale'
+import {
+  isLocale,
+  pickLocale,
+  setLocale,
+  type LanguagePreference,
+  type LanguageState,
+  type Locale,
+} from '@src/i18n/locale'
 import { readStored } from './storage'
 
-export type { Locale } from '@src/i18n/locale'
-
-/** The app's language: macOS's (system), or one chosen in Settings */
-export type LanguagePreference = 'system' | Locale
-
-export interface LanguageState {
-  preference: LanguagePreference
-  /** The language the app is in now */
-  locale: Locale
-}
+export type {
+  LanguagePreference,
+  LanguageState,
+  Locale,
+} from '@src/i18n/locale'
 
 /** The dev server in a browser keeps the choice here */
 const KEY = 'pacenote.language'

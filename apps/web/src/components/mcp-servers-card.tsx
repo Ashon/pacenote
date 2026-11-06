@@ -22,6 +22,7 @@ import { useFlash } from '@/components/ui/motion'
 import { remoteMac } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import type { DesktopBridge } from '@src/desktop-bridge'
 import type { ServerCheck } from '@src/pace/mcp-relay'
 import type {
   McpServerCandidate,
@@ -34,7 +35,7 @@ import { CardHeader, Row } from './settings-parts'
 import { text } from './mcp-servers-card.text'
 import { Access } from './tools-parts'
 
-type Bridge = NonNullable<NonNullable<Window['pacenoteDesktop']>['servers']>
+type Bridge = DesktopBridge['servers']
 
 /** The editor that adds a server, open in place of a row */
 const NEW = '+'

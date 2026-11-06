@@ -1,5 +1,22 @@
 import { SETTING_FIELDS, type SettingsView } from '../settings/fields.js'
+import type { DesktopBridge } from '../desktop-bridge.js'
+import type { YourTaskInput } from '../tasks/write.js'
 import type { Macs } from './macs.js'
+
+/** A bridge call by the name a device asks for it by: "tasks.add" */
+export type BridgeCall = {
+  [K in keyof DesktopBridge & string]-?: NonNullable<
+    DesktopBridge[K]
+  > extends Record<string, unknown>
+    ? `${K}.${keyof NonNullable<DesktopBridge[K]> & string}`
+    : never
+}[keyof DesktopBridge & string]
+
+/**
+ * What a device asks on its own, not as a screen: the tasks it wrote before
+ * it paired (tasks.handOver, the app's local.ts)
+ */
+type DeviceOwnAsk = 'tasks.handOver'
 
 /**
  * What a device of yours (the iPhone, iPad and Android app) asks the Mac it is
@@ -21,7 +38,7 @@ export const DEVICE_READS = {
   'ai.state': 'pacenote:ai:state',
   'mcp.status': 'pacenote:mcp:status',
   'sandbox.status': 'pacenote:sandbox:status',
-} as const
+} as const satisfies Partial<Record<BridgeCall, `pacenote:${string}`>>
 
 /** What a device may change on the Mac, as you would there */
 export const DEVICE_CHANGES = {
@@ -46,7 +63,9 @@ export const DEVICE_CHANGES = {
   // before 0.6.24 answers not-allowed)
   'tasks.takeBackFill': 'pacenote:tasks:take-back-fill',
   'tasks.keepBoth': 'pacenote:tasks:keep-both',
-} as const
+} as const satisfies Partial<
+  Record<BridgeCall | DeviceOwnAsk, `pacenote:${string}`>
+>
 
 export const DEVICE_ASKS = { ...DEVICE_READS, ...DEVICE_CHANGES }
 
@@ -89,10 +108,21 @@ export function argsFromDevice(
   from?: string,
   peer?: string
 ): unknown[] {
-  // title, repo, where it was added, when it is due (a newer device's), the
-  // device's id, and whether the repo was guessed from the words (newer still)
-  if (what === 'tasks.add')
-    return [args[0], args[1], from, args[2], peer, args[3] === true]
+  // As the device's bridge called it: title, repo, when it is due (a newer
+  // device's) and whether the repo was guessed from the words (newer still)
+  if (what === 'tasks.add') {
+    const [title, repo, due, guessed] = args
+    return [
+      {
+        title,
+        repo,
+        from,
+        due,
+        peer,
+        guessed: guessed === true,
+      } satisfies YourTaskInput,
+    ]
+  }
   // the tasks, and the device that hands them over
   if (what === 'tasks.handOver') return [args[0], peer, from]
   if (what !== 'settings.validate' && what !== 'settings.save') return args

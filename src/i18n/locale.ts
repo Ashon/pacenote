@@ -7,6 +7,15 @@
 export const LOCALES = ['en', 'ko'] as const
 export type Locale = (typeof LOCALES)[number]
 
+/** The app's language: macOS's (system), or one chosen in Settings */
+export type LanguagePreference = 'system' | Locale
+
+export interface LanguageState {
+  preference: LanguagePreference
+  /** The language the app is in now */
+  locale: Locale
+}
+
 /** Each language by its own name, as a language picker shows it */
 export const LOCALE_NAMES: Record<Locale, string> = {
   en: 'English',

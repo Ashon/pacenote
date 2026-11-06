@@ -102,7 +102,7 @@ describe('filling in a task you added', () => {
     return dir
   }
   const added = (dir: string, title: string, repo?: string, due?: string) => {
-    const result = addYourTask(dir, title, repo, undefined, due)
+    const result = addYourTask(dir, { title, repo, due })
     if (!result || 'error' in result) throw new Error('not added')
     return result.id
   }

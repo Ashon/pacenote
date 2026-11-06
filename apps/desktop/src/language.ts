@@ -1,14 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { isLocale, pickLocale, type Locale } from '../../../src/i18n/locale.js'
+import {
+  isLocale,
+  pickLocale,
+  type LanguagePreference,
+  type LanguageState,
+} from '../../../src/i18n/locale.js'
 
-/** The app's language: macOS's (system), or one chosen in Settings */
-export type LanguagePreference = 'system' | Locale
-
-export interface LanguageState {
-  preference: LanguagePreference
-  /** The language the app is in now */
-  locale: Locale
-}
+export type { LanguagePreference, LanguageState }
 
 /**
  * desktop.json, the desktop app's own preferences (not the bot's settings

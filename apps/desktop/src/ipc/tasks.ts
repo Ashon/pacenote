@@ -41,6 +41,7 @@ import {
   addYourTask,
   keepBoth,
   takeBackFill,
+  type YourTaskInput,
 } from '../../../../src/tasks/write.js'
 import {
   answerGroup,
@@ -195,21 +196,20 @@ export function registerTasksIpc(
     if (stage === 'started' || stage === 'waiting' || stage === 'open')
       setStage(dataDir, id, stage)
   })
-  // A task you add yourself (Todo's New task), in a project's repository;
-  // from a device of yours, the device it was added on (DeviceAnswers)
-  // From a device, as argsFromDevice hands it: with where it was added
-  // guessed: its project was guessed from its words, not picked (a newer
-  // screen's or device's), which your AI may change when it fills it in
-  ipc.handle(
-    'pacenote:tasks:add',
-    undefined,
-    (title, repo, from, due, peer, guessed) => {
-      const added = addYourTask(dataDir, title, repo, from, due, peer)
-      if (!added || 'error' in added) return added
-      filler.add({ id: added.id, repoGuessed: guessed === true || !repo })
-      return { ...added, filling: filler.filling().includes(added.id) }
-    }
-  )
+  // A task you add yourself (Todo's New task), in a project's repository or
+  // none; from a device of yours, with the device it was added on
+  // (argsFromDevice). A project guessed from its words, not picked, your AI
+  // may change when it fills the task in.
+  ipc.handle('pacenote:tasks:add', undefined, (value) => {
+    const input = (value ?? {}) as YourTaskInput
+    const added = addYourTask(dataDir, input)
+    if (!added || 'error' in added) return added
+    filler.add({
+      id: added.id,
+      repoGuessed: input.guessed === true || !input.repo,
+    })
+    return { ...added, filling: filler.filling().includes(added.id) }
+  })
   // Undo of what your AI filled in, on the task's row
   ipc.handle('pacenote:tasks:take-back-fill', undefined, (id) => {
     if (typeof id === 'string') takeBackFill(dataDir, id)

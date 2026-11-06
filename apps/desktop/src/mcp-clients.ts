@@ -18,6 +18,7 @@ import {
   opencodeWithout,
   parseOpencodeConfig,
 } from '../../../src/history/opencode-config.js'
+import type { HistoryMcpLaunch } from '../../../src/desktop-bridge.js'
 import { runCommand, type CommandResult, type RunCommand } from './command.js'
 import { text } from './mcp-clients.text.js'
 
@@ -31,7 +32,7 @@ const PROBE_TIMEOUT_MS = 15_000
  * How AI tools launch Pacenote's MCP server: this app's own binary as Node,
  * with the bundled server. ready: the bundle exists (dev runs need pnpm bundle)
  */
-export function mcpLaunch(historyMcp: string): McpLaunch & { ready: boolean } {
+export function mcpLaunch(historyMcp: string): HistoryMcpLaunch {
   return {
     command: process.execPath,
     args: [historyMcp],
@@ -64,7 +65,7 @@ export class McpClients {
   constructor(
     private readonly options: {
       /** How this app launches the server; ready: the bundle exists */
-      launch: () => McpLaunch & { ready: boolean }
+      launch: () => HistoryMcpLaunch
       /**
        * PATH from the login shell, so claude and codex are found when the app
        * starts from Finder

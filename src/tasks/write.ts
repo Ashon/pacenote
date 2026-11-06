@@ -682,18 +682,32 @@ export function addFollowUp(
 }
 
 /**
+ * A task you add yourself, as the bridge hands it (tasks.add): anything,
+ * until read here
+ */
+export interface YourTaskInput {
+  title: unknown
+  /** The repository whose project it is in; none without one */
+  repo?: unknown
+  /** The device it was added on, as Your devices names it */
+  from?: unknown
+  /** When it is due, in your words ("Friday") */
+  due?: unknown
+  /** That device's id, as Your devices has it */
+  peer?: unknown
+  /** Its project was guessed from its words, not picked */
+  guessed?: unknown
+}
+
+/**
  * Todo's New task: a task you add yourself, here or on a device of yours
- * (from: its name, as Your devices has it, which the task says it was added
- * on, and its id there), in a project's repository or none, with when it is
- * due in your words ("Friday") when you say. As the bridge hands it: anything.
+ * (from: its name, which the task says it was added on, and peer, its id
+ * there), in a project's repository or none, with when it is due in your
+ * words when you say
  */
 export function addYourTask(
   dataDir: string,
-  title: unknown,
-  repo: unknown,
-  from?: unknown,
-  due?: unknown,
-  deviceId?: unknown
+  { title, repo, from, due, peer }: YourTaskInput
 ): { id: string } | { error: string } | undefined {
   if (typeof title !== 'string' || !title.trim()) return undefined
   const device =
@@ -710,8 +724,8 @@ export function addYourTask(
       addedBy: ADDED_BY_YOU,
       label: device,
       ...(device &&
-        typeof deviceId === 'string' &&
-        deviceId && { device: { id: deviceId, name: device } }),
+        typeof peer === 'string' &&
+        peer && { device: { id: peer, name: device } }),
     }
   )
   if ('error' in result) return result
