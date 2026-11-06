@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mergeTask } from '../src/macs/sync.js'
 import {
   fillInput,
@@ -84,7 +84,14 @@ const slackTask = (id: string, title: string, extra: Partial<Task> = {}) =>
 
 describe('filling in a task you added', () => {
   const dirs: string[] = []
+  // A task is added a minute before its fill, whatever day the tests run:
+  // added on the real clock, it would be newer than the fill on a later day.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(now.getTime() - 60_000))
+  })
   afterEach(() => {
+    vi.useRealTimers()
     for (const dir of dirs.splice(0))
       rmSync(dir, { recursive: true, force: true })
   })
