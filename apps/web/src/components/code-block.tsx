@@ -1,7 +1,7 @@
 import { Check, Copy } from 'lucide-react'
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useCopy } from '@/lib/clipboard'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { text as copyText } from './code-block.text'
@@ -14,21 +14,16 @@ export function CopyButton({
   className?: string
 }) {
   const t = useText(copyText)
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopy(1_200)
   return (
     <Button
       variant="ghost"
       size="icon-sm"
       className={className}
       aria-label={t.copy}
-      onClick={() => {
-        void navigator.clipboard.writeText(text).then(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1_200)
-        })
-      }}
+      onClick={() => void copy(text)}
     >
-      {copied ? <Check className="text-primary" /> : <Copy />}
+      {copied === 'yes' ? <Check className="text-primary" /> : <Copy />}
     </Button>
   )
 }

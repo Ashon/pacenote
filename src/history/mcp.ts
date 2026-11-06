@@ -2,11 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { errorResult, jsonResult, limitField } from '../mcp-tools.js'
-import {
-  registerTaskTools,
-  taskInstructions,
-  type TaskToolsOptions,
-} from '../tasks/mcp.js'
+import { registerTaskTools, type TaskToolsOptions } from '../tasks/mcp.js'
+import { taskInstructions } from '../tasks/prompts.js'
 import type { HistoryReader } from './reader.js'
 import {
   isCollection,

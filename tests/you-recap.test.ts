@@ -5,7 +5,7 @@ import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setLocale } from '../src/i18n/locale.js'
 import { registerTaskTools } from '../src/tasks/mcp.js'
 import { saveRepo } from '../src/tasks/folders.js'
@@ -24,11 +24,69 @@ import {
 import type { SessionMark } from '../src/you/sessions.js'
 import type { AreaRecord } from '../src/you/types.js'
 
-const root = mkdtempSync(path.join(tmpdir(), 'pacenote-recap-'))
-afterAll(() => rmSync(root, { recursive: true, force: true }))
-
 /** Thursday Oct 15 2026, 9:30 on this Mac */
 const NOW = new Date(2026, 9, 15, 9, 30).getTime()
+
+// Each test makes its own folders, so none counts on what another left
+const dirs: string[] = []
+afterEach(() => {
+  for (const dir of dirs.splice(0))
+    rmSync(dir, { recursive: true, force: true })
+})
+const fresh = () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-recap-'))
+  dirs.push(dir)
+  return dir
+}
+
+/**
+ * A checkout of Ashon/payments: two commits of yours, on main and on a
+ * branch, and one of mina's, made half an hour before NOW. git reads none of
+ * this Mac's own settings, here or when the recap looks.
+ */
+function paymentsRepo(): string {
+  const repo = path.join(fresh(), 'payments')
+  mkdirSync(repo, { recursive: true })
+  const when = `${Math.floor((NOW - 30 * 60_000) / 1000)} +0000`
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', repo, ...args], {
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_AUTHOR_DATE: when,
+        GIT_COMMITTER_DATE: when,
+      },
+    })
+  git('init', '-q', '-b', 'main')
+  git('config', 'user.email', 'ashon@acme.dev')
+  git('config', 'user.name', 'ashon')
+  const save = (file: string, message: string, author?: string) => {
+    writeFileSync(path.join(repo, file), file)
+    git('add', file)
+    git(
+      ...(author ? ['-c', `user.email=${author}`, '-c', 'user.name=mina'] : []),
+      'commit',
+      '-q',
+      '-m',
+      message
+    )
+  }
+  save('a', 'feat: retry backoff')
+  save('b', 'fix: from mina', 'mina@acme.dev')
+  git('switch', '-q', '-c', 'work')
+  save('c', 'wip: on a branch')
+  return repo
+}
+
+/** The tests that read commits: git as the recap runs it, without your own */
+function withoutGitSettings() {
+  beforeEach(() => {
+    vi.stubEnv('GIT_CONFIG_GLOBAL', '/dev/null')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+}
 const at = (day: number, hour = 12) =>
   new Date(2026, 9, day, hour).toISOString()
 
@@ -324,38 +382,15 @@ describe('a recap', () => {
 })
 
 describe('your commits', () => {
+  withoutGitSettings()
+
   it('are yours only, on any branch, once across checkouts', async () => {
-    const repo = path.join(root, 'payments')
-    mkdirSync(repo, { recursive: true })
-    const git = (...args: string[]) =>
-      execFileSync('git', ['-C', repo, ...args], {
-        env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' },
-      })
-    git('init', '-q', '-b', 'main')
-    git('config', 'user.email', 'ashon@acme.dev')
-    git('config', 'user.name', 'ashon')
-    const save = (file: string, message: string, author?: string) => {
-      writeFileSync(path.join(repo, file), file)
-      git('add', file)
-      git(
-        ...(author
-          ? ['-c', `user.email=${author}`, '-c', 'user.name=mina']
-          : []),
-        'commit',
-        '-q',
-        '-m',
-        message
-      )
-    }
-    save('a', 'feat: retry backoff')
-    save('b', 'fix: from mina', 'mina@acme.dev')
-    git('switch', '-q', '-c', 'work')
-    save('c', 'wip: on a branch')
+    const repo = paymentsRepo()
     const { commits, emails } = await yourCommits({
       folders: new Map([['Ashon/payments', [repo, repo]]]),
       emails: [],
-      since: new Date(Date.now() - 3_600_000),
-      until: new Date(Date.now() + 60_000),
+      since: new Date(NOW - 3_600_000),
+      until: new Date(NOW + 60_000),
     })
     expect(commits.map((c) => c.subject).sort()).toEqual([
       'feat: retry backoff',
@@ -366,8 +401,19 @@ describe('your commits', () => {
 })
 
 describe('my_recap', () => {
+  withoutGitSettings()
+  // The recap counts on the clock: pinned, it is the same week however long
+  // the run takes and whatever day it runs on
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('gives an AI tool the week, with what was written for it', async () => {
-    const data = path.join(root, 'data')
+    const data = fresh()
     const settings = { on: true, dms: false, exclude: [] }
     const posted = Date.now() - 3_600_000
     const { added } = addTasks(
@@ -386,7 +432,7 @@ describe('my_recap', () => {
       by: 'claude-code',
       note: 'Merged the fix',
     })
-    saveRepo(data, 'Ashon/payments', path.join(root, 'payments'))
+    saveRepo(data, 'Ashon/payments', paymentsRepo())
     const week = periodKey('week', new Date())
     keepWritten(data, 'week', week, {
       text: 'You fixed the payment retries.',

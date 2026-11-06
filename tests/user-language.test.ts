@@ -10,7 +10,7 @@ import {
   recapPromptFor,
   taskPrompt,
   taskRules,
-} from '../src/tasks/mcp.js'
+} from '../src/tasks/prompts.js'
 
 /**
  * What an AI writes for the user follows the user's language, the app's:

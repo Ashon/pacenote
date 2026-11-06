@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/ui/inline-error'
 import { dateFormat, formatHourMinute } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -224,11 +225,7 @@ export function OwnAiStatus({
           })}
         </ul>
       )}
-      {error && (
-        <p role="alert" className="text-meta text-status-failed">
-          {error}
-        </p>
-      )}
+      <InlineError error={error} className="text-meta" />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useCopy } from '@/lib/clipboard'
 import { useText } from '@/lib/i18n'
 import { SETUP_STEPS, type SetupStep } from '@/lib/setup'
 import { cn } from '@/lib/utils'
@@ -161,12 +162,7 @@ export function CommandLine({
   raised?: boolean
 }) {
   const t = useText(partsText)
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 1_500)
-    return () => clearTimeout(timer)
-  }, [copied])
+  const { copied, copy } = useCopy(1_500)
   return (
     <span
       className={cn(
@@ -181,12 +177,10 @@ export function CommandLine({
         size="sm"
         variant="outline"
         aria-label={t.copyLabel(text)}
-        onClick={() =>
-          void navigator.clipboard.writeText(text).then(() => setCopied(true))
-        }
+        onClick={() => void copy(text)}
       >
-        {copied ? <Check /> : <Copy />}
-        {copied ? t.copied : t.copy}
+        {copied === 'yes' ? <Check /> : <Copy />}
+        {copied === 'yes' ? t.copied : t.copy}
       </Button>
     </span>
   )

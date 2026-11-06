@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { FieldLabel, Switch } from '@/components/ui/switch'
+import { useCopy } from '@/lib/clipboard'
 import { remoteMac } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
 import {
@@ -621,17 +622,8 @@ export function HubPairing({
 export function HubShare({ url }: { url: string }) {
   const t = useText(text)
   const locale = useLocale()
-  const [copied, setCopied] = useState<'yes' | 'failed'>()
-  useEffect(() => {
-    if (copied !== 'yes') return
-    const timer = setTimeout(() => setCopied(undefined), 1_500)
-    return () => clearTimeout(timer)
-  }, [copied])
-  const copy = () =>
-    void navigator.clipboard.writeText(hubShareLink(url, locale)).then(
-      () => setCopied('yes'),
-      () => setCopied('failed')
-    )
+  const { copied, copy: copyText } = useCopy(1_500)
+  const copy = () => void copyText(hubShareLink(url, locale))
   return (
     <div className="flex items-center gap-3" data-hub-share>
       <div className="min-w-0 flex-1">
@@ -1199,15 +1191,9 @@ export function LanguagePicker() {
 export function HelpCard() {
   const t = useText(text)
   const diagnostics = window.pacenoteDesktop?.diagnostics
-  const [copied, setCopied] = useState<'yes' | 'failed'>()
+  const { copied, copy: copyText } = useCopy()
   if (!diagnostics) return null
-  const copy = () =>
-    void diagnostics()
-      .then((text) => navigator.clipboard.writeText(text ?? ''))
-      .then(
-        () => setCopied('yes'),
-        () => setCopied('failed')
-      )
+  const copy = () => void copyText(diagnostics().then((text) => text ?? ''))
   return (
     <section className="surface-group">
       <CardHeader title={t.help} />

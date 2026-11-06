@@ -1,9 +1,8 @@
 import { Search, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useText } from '@/lib/i18n'
+import { isMac, shortcutKeyHeld } from '@/lib/platform'
 import { text } from './search-field.text'
-
-const isMac = /Mac/.test(navigator.platform)
 
 /**
  * Run search in the top bar. Cmd+K (Ctrl+K elsewhere) focuses it from anywhere;
@@ -21,7 +20,7 @@ export function SearchField({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && (isMac ? e.metaKey : e.ctrlKey)) {
+      if (e.key.toLowerCase() === 'k' && shortcutKeyHeld(e)) {
         e.preventDefault()
         input.current?.focus()
         input.current?.select()

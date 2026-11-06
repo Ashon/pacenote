@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
+import { useCopy } from '@/lib/clipboard'
 import { useLocale, useText } from '@/lib/i18n'
 import { CopyButton } from './code-block'
 import { text } from './hub-install.text'
@@ -53,7 +54,7 @@ export function HubInstall({
   const [allow, setAllow] = useState(initialAllow)
   const [lang, setLang] = useState<'en' | 'ko'>(locale === 'ko' ? 'ko' : 'en')
   const [error, setError] = useState<string>()
-  const [copied, setCopied] = useState(false)
+  const { copied, copy: copyText } = useCopy()
   // Each answer is acted on once, here
   const handled = useRef<string | undefined>(undefined)
 
@@ -81,12 +82,8 @@ export function HubInstall({
     void hub.installCommand({ url, allow, lang, switchHere }).then((res) => {
       if ('error' in res) return setError(res.error)
       setState(res)
-      if (res.step === 'waiting')
-        void navigator.clipboard
-          .writeText(res.command)
-          .then(() => setCopied(true))
-          // Not copied: the command shows with its own copy button
-          .catch(() => undefined)
+      // Not copied: the command shows with its own copy button
+      if (res.step === 'waiting') void copyText(res.command)
     })
   }
   const command =
@@ -180,7 +177,7 @@ export function HubInstall({
                     <CopyButton text={command} className="-my-1 shrink-0" />
                   </div>
                 )}
-                {copied && state.step === 'waiting' && (
+                {copied === 'yes' && state.step === 'waiting' && (
                   <p className="text-meta text-muted-foreground">
                     {t.copied}{' '}
                     {script && (

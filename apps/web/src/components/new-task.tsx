@@ -4,6 +4,7 @@ import { Check, ChevronDown, Folder } from 'lucide-react'
 import { useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/ui/inline-error'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,11 +153,7 @@ export function NewTask({
           .filter(Boolean)
           .join(' · ')}
       </p>
-      {error && (
-        <p role="alert" className="mt-1.5 text-copy text-status-failed">
-          {error}
-        </p>
-      )}
+      <InlineError error={error} className="mt-1.5" />
     </form>
   )
 }

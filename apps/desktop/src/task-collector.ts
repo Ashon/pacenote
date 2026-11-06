@@ -15,7 +15,7 @@ import {
   codexLineToEvents,
   type CodexDefaults,
 } from '../../../src/reasoners/codex.js'
-import { collectPrompt } from '../../../src/tasks/mcp.js'
+import { collectPrompt } from '../../../src/tasks/prompts.js'
 import {
   CLI_NAMES,
   NO_SLACK_YET,

@@ -1,10 +1,7 @@
 import {
-  SETTING_FIELDS,
   settingFields,
   settingGroups,
   settingLabel,
-  settingSectionOf,
-  shownFor,
   type SettingField,
   type SettingGroup,
   type SettingGroupInfo,
@@ -19,7 +16,7 @@ import {
   Save,
   TriangleAlert,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Placeholder } from '@/components/ui/motion'
@@ -32,6 +29,15 @@ import {
   useSupervisor,
   useUpdate,
 } from '@/lib/desktop'
+import {
+  draftValue,
+  fieldShown,
+  inSection,
+  issuesPlaced,
+  restartsPace,
+  typedValue,
+  useSettingsDraft,
+} from '@/lib/settings-draft'
 import { useSettingsView } from '@/lib/setup'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -72,10 +78,16 @@ const groupsById = () =>
     SettingGroup,
     SettingGroupInfo
   >
-/** The fields as saved and checked (their words are English) */
-const FIELD = new Map(SETTING_FIELDS.map((field) => [field.key, field]))
 /** What your own Slack app needs before the bot can start */
 const SLACK_APP_TOKENS = ['SLACK_APP_TOKEN', 'SLACK_BOT_TOKEN']
+
+/** What a save, or a link, says over the section */
+interface Notice {
+  tone: 'ok' | 'warn'
+  text: string
+  /** Pace takes the change once it restarts (or starts): it offers that */
+  restart?: boolean
+}
 
 /**
  * #/settings/<section> picks the section; plain #/settings opens the first one,
@@ -118,71 +130,32 @@ export function SettingsPage() {
   const sandbox = useSandbox()
   const [section, go] = useSection()
   const { view, refresh: load } = useSettingsView()
-  const [draft, setDraft] = useState<Record<string, string>>({})
-  const [editing, setEditing] = useState<Set<string>>(new Set())
-  const [issues, setIssues] = useState<SettingsIssue[]>([])
+  const draft = useSettingsDraft(view, settings)
+  const { changes, changeCount, issues, setIssues } = draft
   const [check, setCheck] = useState<SlackCheckItem[] | 'running'>()
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<{
-    tone: 'ok' | 'warn'
-    text: string
-    restart?: boolean
-  }>()
-
-  const current = useCallback(
-    (field: SettingField) =>
-      field.type === 'secret' ? '' : (view?.values[field.key] ?? ''),
-    [view]
-  )
-
-  // Sends only values that actually changed. Secrets are sent only when newly
-  // entered.
-  const changes = useMemo<SettingsChanges>(() => {
-    const result: SettingsChanges = {}
-    for (const field of SETTING_FIELDS) {
-      if (!(field.key in draft)) continue
-      const value = draft[field.key]!.trim()
-      if (field.type === 'secret') {
-        if (editing.has(field.key) && value) result[field.key] = value
-        continue
-      }
-      if (value !== current(field))
-        result[field.key] = value === '' ? null : value
-    }
-    return result
-  }, [draft, editing, current])
-  const changeCount = Object.keys(changes).length
+  const [notice, setNotice] = useState<Notice>()
 
   // A pacenote:// link from the hub's installer, or from the join page a
   // teammate's link opens: Messengers, with that hub filled in to connect to.
   // It saves nothing by itself.
   const fileHub =
     view?.values.SLACK_CONNECTION === 'hub' ? view.values.HUB_URL : undefined
+  const { fill } = draft
   useEffect(() => {
     const hub = window.pacenoteDesktop?.hub
     if (!hub) return
     const take = () =>
       void hub.takeLink().then((url) => {
         if (!url || url === fileHub) return
-        setDraft((d) => ({ ...d, SLACK_CONNECTION: 'hub', HUB_URL: url }))
+        fill({ SLACK_CONNECTION: 'hub', HUB_URL: url })
         window.location.hash = '#/settings/messengers'
         setNotice({ tone: 'ok', text: t.openedFromLink(url) })
       })
     take()
     return hub.onLinked(take)
+    // fill adds to the draft as it is then, from whichever render it came
   }, [fileHub, t])
-
-  useEffect(() => {
-    if (!settings || changeCount === 0) {
-      setIssues([])
-      return
-    }
-    const timer = setTimeout(
-      () => void settings.validate(changes).then(setIssues),
-      300
-    )
-    return () => clearTimeout(timer)
-  }, [settings, changes, changeCount])
 
   if (!settings) {
     return (
@@ -217,52 +190,10 @@ export function SettingsPage() {
    * The value in effect once the draft is saved: the draft, else the file,
    * else the default. Secrets read "set" or "".
    */
-  const valueOf = (key: string): string => {
-    const field = FIELD.get(key)
-    if (!field) return ''
-    if (field.type === 'secret') {
-      const entered = editing.has(key) && Boolean(draft[key]?.trim())
-      return entered || view.secrets[key]?.set ? 'set' : ''
-    }
-    const value = key in draft ? draft[key]!.trim() : (view.values[key] ?? '')
-    return value || field.default || ''
-  }
+  const valueOf = (key: string): string => draftValue(draft, view, key)
   const isSet = (key: string) => valueOf(key) !== ''
-  /** In the file now, as saved */
-  const saved = (field: SettingField) =>
-    field.type === 'secret'
-      ? Boolean(view.secrets[field.key]?.set)
-      : Boolean(view.values[field.key])
-  const shown = (field: SettingField) =>
-    !field.internal &&
-    (!field.retiring || saved(field)) &&
-    (!field.shownWhen ||
-      shownFor(field.shownWhen, valueOf(field.shownWhen.key)))
+  const shown = (field: SettingField) => fieldShown(field, view, valueOf)
 
-  const set = (key: string, value: string) =>
-    setDraft((d) => ({ ...d, [key]: value }))
-  /** Drops what was typed for these settings */
-  const drop = (...keys: string[]) =>
-    setDraft((prev) =>
-      Object.fromEntries(
-        Object.entries(prev).filter(([key]) => !keys.includes(key))
-      )
-    )
-  /** Opens a secret's input, or closes it and drops what was typed. */
-  const edit = (key: string, on: boolean) => {
-    setEditing((prev) => {
-      const next = new Set(prev)
-      if (on) next.add(key)
-      else next.delete(key)
-      return next
-    })
-    if (!on) drop(key)
-  }
-  const reset = () => {
-    setDraft({})
-    setEditing(new Set())
-    setIssues([])
-  }
   const runCheck = () => {
     setCheck('running')
     void settings.checkSlack(changes).then(setCheck)
@@ -273,9 +204,7 @@ export function SettingsPage() {
     supervisor?.phase === 'running' || supervisor?.phase === 'starting'
   // Changes Pace picks up only when it restarts (not those read where they
   // are used)
-  const botChanged = SETTING_FIELDS.some(
-    (field) => field.applies !== 'app' && field.key in changes
-  )
+  const botChanged = restartsPace(changes)
   /**
    * Saves values, then reads the settings again; done says how it went.
    * Issues found instead stay beside their fields.
@@ -298,7 +227,7 @@ export function SettingsPage() {
   }
   const save = (restart: boolean) =>
     store(changes, restart, (restarted) => {
-      reset()
+      draft.reset()
       setNotice(
         restarted || !botChanged
           ? {
@@ -319,10 +248,10 @@ export function SettingsPage() {
   // A secret's own Save: stores just that value and closes its input, leaving
   // the other unsaved changes as they are.
   const saveField = (field: SettingField) => {
-    const value = draft[field.key]?.trim()
+    const value = draft.values[field.key]?.trim()
     if (!value) return
     store({ [field.key]: value }, false, () => {
-      edit(field.key, false)
+      draft.edit(field.key, false)
       const label = settingLabel(field.key)
       // Your own Slack app needs both tokens before the bot can start.
       const other = SLACK_APP_TOKENS.includes(field.key)
@@ -354,13 +283,10 @@ export function SettingsPage() {
     issues.find((issue) => issue.key === key)?.message
   // Issues with no field on screen (general ones, or a field hidden by another
   // value) are spelled out in the save bar.
-  const offscreenIssues = issues.filter((issue) => {
-    const field = issue.key ? FIELD.get(issue.key) : undefined
-    return !field || !shown(field)
-  })
-  const issueSection = issues
-    .map((issue) => settingSectionOf(issue.key))
-    .find(Boolean)
+  const { offscreen: offscreenIssues, section: issueSection } = issuesPlaced(
+    issues,
+    shown
+  )
   // Whether this app can start or restart Pace now (not one running elsewhere)
   const canControl =
     supervisor &&
@@ -371,10 +297,12 @@ export function SettingsPage() {
 
   // What each section shows in the navigation: an issue dot, its unsaved
   // changes, or a short state.
-  const sectionChanges = (id: Section) =>
-    Object.keys(changes).filter((key) => settingSectionOf(key) === id).length
+  const sectionChanges = (id: Section) => inSection(Object.keys(changes), id)
   const sectionIssues = (id: Section) =>
-    issues.filter((issue) => settingSectionOf(issue.key) === id).length
+    inSection(
+      issues.map((issue) => issue.key),
+      id
+    )
   const groups = groupsById()
   const builtIn = valueOf('REASONER_SANDBOX') === 'vm'
   const vmStatus = sandbox.status?.vm
@@ -425,9 +353,13 @@ export function SettingsPage() {
             below: (
               <FoundNames
                 setting={key}
-                value={key in draft ? draft[key]! : (view.values[key] ?? '')}
+                value={
+                  key in draft.values
+                    ? draft.values[key]!
+                    : (view.values[key] ?? '')
+                }
                 workFolder={valueOf('OPS_FS_ROOT')}
-                onChange={(value) => set(key, value)}
+                onChange={(value) => draft.set(key, value)}
               />
             ),
           },
@@ -450,12 +382,12 @@ export function SettingsPage() {
       field={field}
       extras={choiceExtras[field.key]}
       view={view}
-      value={draft[field.key] ?? current(field)}
+      value={typedValue(draft, view, field)}
       changed={field.key in changes}
-      editing={editing.has(field.key)}
+      editing={draft.editing.has(field.key)}
       issue={issueOf(field.key)}
-      onChange={(value) => set(field.key, value)}
-      onEdit={(on) => edit(field.key, on)}
+      onChange={(value) => draft.set(field.key, value)}
+      onEdit={(on) => draft.edit(field.key, on)}
       onSave={() => saveField(field)}
       saving={saving}
     />
@@ -506,8 +438,8 @@ export function SettingsPage() {
     slackReady,
     valueOf,
     isSet,
-    set,
-    drop,
+    set: draft.set,
+    drop: draft.drop,
     changed: (key) => key in changes,
     issueOf,
     card,
@@ -554,38 +486,12 @@ export function SettingsPage() {
             <SectionTitle section={section} />
 
             {notice && (
-              <div
-                className={cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 text-copy',
-                  notice.tone === 'ok'
-                    ? 'bg-status-succeeded/10 text-status-succeeded'
-                    : 'bg-status-interrupted/10 text-status-interrupted'
-                )}
-              >
-                {notice.tone === 'ok' ? (
-                  <CircleCheck className="size-4 shrink-0" />
-                ) : (
-                  <TriangleAlert className="size-4 shrink-0" />
-                )}
-                <span className="select-text">{notice.text}</span>
-                {notice.restart && canControl && (
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    className="ml-auto"
-                    onClick={() => {
-                      const control = botControl()
-                      void (botLive ? control?.restart() : control?.start())
-                      setNotice({
-                        tone: 'ok',
-                        text: botLive ? t.restarting : t.starting,
-                      })
-                    }}
-                  >
-                    {botLive ? t.restartNow : t.startPace}
-                  </Button>
-                )}
-              </div>
+              <SaveNotice
+                notice={notice}
+                canControl={Boolean(canControl)}
+                botLive={botLive}
+                setNotice={setNotice}
+              />
             )}
 
             <Placeholder key="body" ready skeleton={<SectionSkeleton />}>
@@ -596,64 +502,164 @@ export function SettingsPage() {
         </ScrollArea>
 
         {changeCount > 0 && (
-          <footer className="shrink-0 border-t bg-canvas/95 px-8 py-3 backdrop-blur @max-[36rem]/content:px-4">
-            <div className="flex max-w-3xl flex-wrap items-center gap-2">
-              <span className="text-row">{t.unsavedChanges(changeCount)}</span>
-              {issues.length > 0 && (
-                <button
-                  type="button"
-                  disabled={!issueSection || issueSection === section}
-                  onClick={() => issueSection && go(issueSection)}
-                  className="flex min-w-0 items-center gap-1 text-left text-meta text-status-failed enabled:hover:underline"
-                >
-                  <TriangleAlert className="size-3.5 shrink-0" />
-                  <span className="truncate">
-                    {offscreenIssues[0]?.message ??
-                      t.issuesToFix(issues.length)}
-                    {issueSection && issueSection !== section
-                      ? ` (${sectionInfo(issueSection).label})`
-                      : ''}
-                  </span>
-                </button>
-              )}
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={reset}
-                  disabled={saving}
-                >
-                  <RotateCcw />
-                  {t.revert}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => save(false)}
-                  disabled={saving || issues.length > 0}
-                >
-                  <Save />
-                  {t.save}
-                </Button>
-                {canRestart && (
-                  <Button
-                    size="sm"
-                    onClick={() => save(true)}
-                    disabled={saving || issues.length > 0}
-                  >
-                    {saving ? (
-                      <LoaderCircle className="animate-spin" />
-                    ) : (
-                      <Save />
-                    )}
-                    {botLive ? t.saveRestart : t.saveStart}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </footer>
+          <SaveBar
+            changeCount={changeCount}
+            issues={issues}
+            // Spelled out when its field is not on screen
+            firstIssue={offscreenIssues[0]?.message}
+            issueSection={issueSection}
+            section={section}
+            go={go}
+            saving={saving}
+            onRevert={draft.reset}
+            onSave={save}
+            canRestart={Boolean(canRestart)}
+            botLive={botLive}
+          />
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * What a save, or a link, says over the section: done, or what is left to do.
+ * Changes Pace takes on a restart offer it here, while this app can.
+ */
+function SaveNotice({
+  notice,
+  canControl,
+  botLive,
+  setNotice,
+}: {
+  notice: Notice
+  /** This app can start or restart Pace now */
+  canControl: boolean
+  /** Pace is running or starting: it restarts rather than starts */
+  botLive: boolean
+  setNotice: (notice: Notice) => void
+}) {
+  const t = useText(text)
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-lg px-3 py-2 text-copy',
+        notice.tone === 'ok'
+          ? 'bg-status-succeeded/10 text-status-succeeded'
+          : 'bg-status-interrupted/10 text-status-interrupted'
+      )}
+    >
+      {notice.tone === 'ok' ? (
+        <CircleCheck className="size-4 shrink-0" />
+      ) : (
+        <TriangleAlert className="size-4 shrink-0" />
+      )}
+      <span className="select-text">{notice.text}</span>
+      {notice.restart && canControl && (
+        <Button
+          size="xs"
+          variant="outline"
+          className="ml-auto"
+          onClick={() => {
+            const control = botControl()
+            void (botLive ? control?.restart() : control?.start())
+            setNotice({
+              tone: 'ok',
+              text: botLive ? t.restarting : t.starting,
+            })
+          }}
+        >
+          {botLive ? t.restartNow : t.startPace}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The bar at the bottom while changes are unsaved: how many, the issues to
+ * fix (a click goes to their section), Revert, Save, and Save and restart (or
+ * start) Pace for changes it picks up on a restart
+ */
+function SaveBar({
+  changeCount,
+  issues,
+  firstIssue,
+  issueSection,
+  section,
+  go,
+  saving,
+  onRevert,
+  onSave,
+  canRestart,
+  botLive,
+}: {
+  changeCount: number
+  issues: SettingsIssue[]
+  /** The first issue with no field on screen, in words */
+  firstIssue?: string
+  /** The section of the first issue that has one */
+  issueSection?: Section
+  section: Section
+  go: (section: Section) => void
+  saving: boolean
+  onRevert: () => void
+  onSave: (restart: boolean) => void
+  canRestart: boolean
+  botLive: boolean
+}) {
+  const t = useText(text)
+  return (
+    <footer className="shrink-0 border-t bg-canvas/95 px-8 py-3 backdrop-blur @max-[36rem]/content:px-4">
+      <div className="flex max-w-3xl flex-wrap items-center gap-2">
+        <span className="text-row">{t.unsavedChanges(changeCount)}</span>
+        {issues.length > 0 && (
+          <button
+            type="button"
+            disabled={!issueSection || issueSection === section}
+            onClick={() => issueSection && go(issueSection)}
+            className="flex min-w-0 items-center gap-1 text-left text-meta text-status-failed enabled:hover:underline"
+          >
+            <TriangleAlert className="size-3.5 shrink-0" />
+            <span className="truncate">
+              {firstIssue ?? t.issuesToFix(issues.length)}
+              {issueSection && issueSection !== section
+                ? ` (${sectionInfo(issueSection).label})`
+                : ''}
+            </span>
+          </button>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRevert}
+            disabled={saving}
+          >
+            <RotateCcw />
+            {t.revert}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onSave(false)}
+            disabled={saving || issues.length > 0}
+          >
+            <Save />
+            {t.save}
+          </Button>
+          {canRestart && (
+            <Button
+              size="sm"
+              onClick={() => onSave(true)}
+              disabled={saving || issues.length > 0}
+            >
+              {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+              {botLive ? t.saveRestart : t.saveStart}
+            </Button>
+          )}
+        </div>
+      </div>
+    </footer>
   )
 }

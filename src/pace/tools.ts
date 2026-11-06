@@ -13,7 +13,7 @@ import {
 import type { Requester } from '../sandbox/runtime.js'
 import type { OwnTools } from '../sandbox/vm-broker.js'
 import { recordActivity } from '../tasks/activity.js'
-import { openTasks, recapSummary, workSummary } from '../tasks/mcp.js'
+import { openTasks, recapSummary, workSummary } from '../tasks/mcp-read.js'
 import type { TasksSettings } from '../tasks/settings.js'
 import { allTaskViews } from '../tasks/store.js'
 import { TASK_ACTIONS, type TaskView } from '../tasks/types.js'

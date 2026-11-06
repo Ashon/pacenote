@@ -7,6 +7,7 @@ import {
   formatShortDay,
   formatTokens,
   formatWait,
+  homePath,
   previewArgs,
 } from '../apps/web/src/lib/format.js'
 import { slackToMarkdown } from '../apps/web/src/lib/slack.js'
@@ -125,5 +126,18 @@ describe('in Korean', () => {
     expect(formatShortDay(friday, now)).toBe('금요일')
     setLocale('en')
     expect(formatShortDay(friday, now)).toBe('Fri')
+  })
+})
+
+describe('homePath', () => {
+  it('shows a path under your home folder from ~', () => {
+    expect(homePath('/Users/ashon/git/pacenote')).toBe('~/git/pacenote')
+    expect(homePath('/Users/ashon')).toBe('~')
+  })
+
+  it('leaves any other path as it is', () => {
+    expect(homePath('/opt/homebrew/bin')).toBe('/opt/homebrew/bin')
+    expect(homePath('/Users')).toBe('/Users')
+    expect(homePath('~/.pacenote')).toBe('~/.pacenote')
   })
 })

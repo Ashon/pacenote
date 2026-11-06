@@ -16,7 +16,7 @@ import {
   type Request,
   type Upload,
 } from '../messengers/types.js'
-import { formatTime, truncate } from '../messengers/text.js'
+import { formatTime } from '../messengers/text.js'
 import type { Reasoner } from '../reasoners/types.js'
 import {
   composeAnswer,
@@ -27,8 +27,16 @@ import {
   attachmentSection,
   loadAttachments,
   planAttachments,
-  type FileCandidate,
+  type LoadedDocument,
+  type SavedImage,
+  type SkippedFile,
 } from './attachments.js'
+import {
+  attachmentsLog,
+  contextLines,
+  fileCandidates,
+  recent,
+} from './conversation.js'
 import { failureAdvice, failureCause, failureReply } from './failure.js'
 import { collectGeneratedImages } from './generated.js'
 import {
@@ -44,8 +52,6 @@ import { CLI_NAMES } from '../tasks/own-ai.js'
 
 /** Run queue limit. Beyond it, the bot replies that it is busy. */
 const MAX_QUEUE = 10
-const CONTEXT_MESSAGES = 30
-const CONTEXT_MESSAGE_CHARS = 1_500
 /**
  * How long after it starts working a marked mention also gets the slow mark
  * (⏳)
@@ -131,23 +137,6 @@ export function isOwner(
   return Boolean(owner) && mention.userId === owner
 }
 
-/**
- * The context passed on: all of it when it is short, otherwise the first
- * message, which starts a thread and says what it is about, and the latest.
- * left: how many in between are left out.
- */
-function recent(messages: readonly ContextMessage[]): {
-  context: ContextMessage[]
-  left: number
-} {
-  if (messages.length <= CONTEXT_MESSAGES)
-    return { context: [...messages], left: 0 }
-  return {
-    context: [messages[0]!, ...messages.slice(-(CONTEXT_MESSAGES - 1))],
-    left: messages.length - CONTEXT_MESSAGES,
-  }
-}
-
 /** How a request was taken on, which says what the asker is told */
 type Taking = 'now' | 'queued' | 'resumed'
 
@@ -155,6 +144,38 @@ interface Figure {
   figure: number
   png: Buffer
   raw: string
+}
+
+/** The attachments passed to the reasoner, and those it cannot read */
+interface Attachments {
+  images: SavedImage[]
+  documents: LoadedDocument[]
+  unreadable: SkippedFile[]
+}
+
+/** A request being answered, as the stages of answering it share it */
+interface Answering {
+  messenger: Messenger
+  /** The request as it was taken on */
+  taken: InflightEntry
+  /** The request as recorded for a restart, kept up to date */
+  entry: InflightEntry
+  /** Marks to take off when done */
+  marks: Mark[]
+  /** Holds the slow mark back, or waits for it while it is being put */
+  stopSlow(): Promise<void>
+  /**
+   * Its own folder: the attachments downloaded, the images generated and the
+   * diagrams rendered. Removed when done.
+   */
+  dir: string
+  /** Where the images the reasoner generates land, in dir */
+  outputDir: string
+  /** Cuts its reasoner run off, to shut down */
+  cutOff: AbortController
+  run?: RunHandle
+  /** Only the reasoner's own errors say something about the reasoner. */
+  reasoning: boolean
 }
 
 /**
@@ -294,6 +315,12 @@ export class MentionResponder {
     }
   }
 
+  /**
+   * Answers a request once its turn comes, stage by stage: reads the
+   * conversation, loads the attachments, runs the reasoner and posts the
+   * answer. Cut off to shut down, it stays for the next start; any other
+   * failure is the asker's to know.
+   */
   private async respond(
     messenger: Messenger,
     taken: InflightEntry,
@@ -301,15 +328,34 @@ export class MentionResponder {
   ) {
     // Taken on while shutting down: it stays recorded for the next start.
     if (this.stopping) return
-    const { config, reasoner, log } = this.deps
-    const { key, mention, label } = taken
-    const where = `${reasoner.backend}@${reasoner.sandbox}`
-    /** The request as recorded for a restart, kept up to date */
-    let entry = taken
-    const note = (patch: Partial<InflightEntry>) => {
-      entry = { ...entry, ...patch }
-      this.record(entry)
+    const job = await this.begin(messenger, taken, put)
+    /** Whether it was cut off to shut down, and stays for the next start */
+    let kept = false
+    try {
+      const { request, context, lines } = await this.gather(job)
+      const attachments = await this.attach(job, context)
+      const answer = await this.reason(job, request, lines, attachments)
+      await this.post(job, answer)
+      job.run?.finish('succeeded')
+    } catch (err) {
+      kept = job.reasoning && job.cutOff.signal.aborted
+      if (kept) this.keep(job)
+      else await this.reportFailure(job, err)
+    } finally {
+      await this.settle(job, kept)
     }
+  }
+
+  /**
+   * Starts answering a request whose turn came: the mention shows it working
+   * instead of waiting, the slow mark is set to come, and it counts as active.
+   */
+  private async begin(
+    messenger: Messenger,
+    taken: InflightEntry,
+    put: Mark | undefined
+  ): Promise<Answering> {
+    const { mention } = taken
     // Its turn came: the mention shows it working instead of waiting.
     let working = put === 'working'
     if (put === 'waiting') {
@@ -336,228 +382,295 @@ export class MentionResponder {
     this.requests.active += 1
     this.requests.lastAt = new Date().toISOString()
     this.deps.onActivity?.({ ...this.requests })
-    const attachmentsDir = path.join(this.attachmentsRoot, randomUUID())
+    const dir = path.join(this.attachmentsRoot, randomUUID())
     const cutOff = new AbortController()
     this.running.add(cutOff)
-    let run: RunHandle | undefined
-    // Only the reasoner's own errors say something about the reasoner.
-    let reasoning = false
-    /** Whether it was cut off to shut down, and stays for the next start */
-    let kept = false
-
-    try {
-      // Read alongside the request and the run; a failure surfaces where it
-      // is awaited.
-      const reading = messenger.context(mention, [mention.message])
-      reading.catch(() => undefined)
-      const request = await messenger.request(mention)
-      run = this.openRun(messenger, mention, label, request, taken.runId)
-      note({ runId: run?.id, attempts: taken.attempts + 1 })
-      const { context, left } = recent(await reading)
-      run?.patch({ context: { messages: context.length } })
-      const time = (at: number) => formatTime(at, config.timezone)
-      const render = (line: ContextMessage) => {
-        const files = line.files.length
-          ? ` [attachments: ${line.files.map((f) => f.name).join(', ')}]`
-          : ''
-        return `${time(line.at)} ${line.author}: ${truncate(line.text, CONTEXT_MESSAGE_CHARS)}${files}`
-      }
-      const lines = context.map(render)
-      if (left > 0)
-        lines.splice(
-          1,
-          0,
-          `(${left} ${left === 1 ? 'message' : 'messages'} left out here)`
-        )
-
-      // Passes the request message attachments first, then recent attachments
-      // in the thread.
-      const candidates: FileCandidate[] = [
-        ...mention.files.map((file) => ({ file, source: 'request message' })),
-        ...[...context].reverse().flatMap((line) =>
-          line.files.map((file) => ({
-            file,
-            source: `thread ${time(line.at)} ${line.author}`,
-          }))
-        ),
-      ]
-      const files = await messenger.resolveFiles(candidates.map((c) => c.file))
-      const resolved = candidates.map((candidate, i) => ({
-        ...candidate,
-        file: files[i]!,
-      }))
-      const { planned, skipped } = planAttachments(resolved)
-      const { images, documents, failed } = await loadAttachments(planned, {
-        dir: attachmentsDir,
-        download: (file) => messenger.download(file),
-        extractPdfText: this.deps.extractPdfText,
-      })
-      const unreadable = [...skipped, ...failed]
-      if (run) await recordAttachments(run, images, documents, skipped, failed)
-      if (resolved.length > 0) {
-        log.info(
-          `${resolved.length} ${resolved.length === 1 ? 'attachment' : 'attachments'}: images ${images.length}, files ${documents.length}, unreadable ${unreadable.length}` +
-            (unreadable.length
-              ? ` (${unreadable.map((f) => `${f.name}: ${f.reason}`).join('; ')})`
-              : '')
-        )
-      }
-
-      const prompt = userPrompt({
-        venue: label,
-        context: lines,
-        author: request.author,
-        request: request.text,
-        attachments: attachmentSection(images, documents, unreadable),
-      })
-      const readOnlyDir = reasoner.canReadFiles
-        ? config.mention.workspace
-        : undefined
-      // Images generated by codex land here, so the folder must exist before
-      // it is shared into the VM.
-      const outputDir = path.join(attachmentsDir, 'generated')
-      await mkdir(outputDir, { recursive: true })
-      const started = Date.now()
-      const requester = {
-        user: mention.userId,
-        conversation: mention.conversation,
-        label,
-        thread: mention.thread,
-        run: run?.id,
-        message: mention.message,
-        permalink: messenger.permalink(mention, mention.message),
-      }
-      const system = systemPrompt(messenger.profile, {
-        canReadWorkspace: readOnlyDir !== undefined,
-        opsTools: reasoner.mcpServerNames.includes('ops'),
-        ownTools: reasoner.mcpServerNames.includes('pacenote'),
-        yourServers: reasoner
-          .yourServers?.(requester)
-          .map((server) => server.name),
-        diagrams: this.deps.renderer !== undefined,
-        imageGeneration: reasoner.backend === 'codex',
-        // The app tells Pace its language (PACENOTE_LOCALE, src/index.ts)
-        language: getLocale(),
-      })
-      run?.setPrompt(system, prompt)
-      reasoning = true
-      const written = await reasoner.complete({
-        system,
-        prompt,
-        readOnlyDir,
-        images: images.map(({ path, mimetype }) => ({ path, mimetype })),
-        outputDir,
-        signal: cutOff.signal,
-        onEvent: run ? (step) => run?.event(step) : undefined,
-        requester,
-      })
-      reasoning = false
-      this.deps.onReasoner?.(undefined)
-      // The thread is public: secrets go before anything is posted, and the
-      // run keeps the answer as posted.
-      const { text: answer, count: redacted } = redactAnswer(
-        written,
-        this.deps.secrets
-      )
-      if (redacted > 0) {
-        log.warn(
-          `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer to ${key}`
-        )
-        run?.event({
-          kind: 'note',
-          at: new Date().toISOString(),
-          text: `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer before posting it.`,
-        })
-      }
-      run?.patch({ answer })
-      log.info(`Answered mention ${key} (${where}, ${Date.now() - started}ms)`)
-
-      const { text, figures } = await this.renderDiagrams(
-        answer,
-        attachmentsDir
-      )
-      // Once any of it is in the thread, a restart does not answer again.
-      note({ answer: 'posting' })
-      const said = text.trim() ? `${text}\n\n` : ''
-      for (const chunk of messenger.render(
-        said + aiNote(reasoner.backend, config.notesLocale)
-      ))
-        await messenger.post(mention, chunk)
-      note({ answer: 'posted' })
-      const generated = await this.shrinkImages(
-        await collectGeneratedImages(outputDir),
-        attachmentsDir
-      )
-      if (run) await recordOutputs(run, generated, figures, log)
-      if (!(await this.postImages(messenger, mention, generated, figures))) {
-        run?.event({
-          kind: 'error',
-          at: new Date().toISOString(),
-          message: 'Image upload failed (check files:write)',
-        })
-      }
-      run?.finish('succeeded')
-    } catch (err) {
-      if (reasoning && cutOff.signal.aborted) {
-        // The run stays open: the next start resumes it, or marks it
-        // interrupted.
-        kept = true
-        log.info(
-          `Stopped answering ${key} to shut down; it resumes on the next start.`
-        )
-        run?.event({
-          kind: 'note',
-          at: new Date().toISOString(),
-          text: 'Stopped to shut down; resumes on the next start.',
-        })
-        return
-      }
-      log.error(`Failed to answer mention ${key}`, err)
-      const error = (err as Error).message
-      const cause = reasoning ? failureCause(error) : 'other'
-      run?.finish('failed', {
-        error,
-        ...(cause === 'other' ? {} : { cause }),
-      })
-      const advice = failureAdvice(cause, reasoner.backend, reasoner.sandbox)
-      // The status is the app's, so it is in the app's language.
-      if (advice?.lasting)
-        this.deps.onReasoner?.(
-          localized(text).lastAt(
-            advice.text,
-            formatTime(Date.now(), config.timezone)
-          )
-        )
-      // ⚠️ on the mention, and what it means to the asker alone; the error
-      // itself stays in the log and the run history.
-      await this.fail(
-        messenger,
-        mention,
-        failureReply(cause, reasoner.backend, {
-          own: this.deps.ownMentions,
-          timeoutMs: config.reasoner.timeoutMs,
-          locale: config.notesLocale,
-        })
-      )
-    } finally {
-      this.running.delete(cutOff)
-      clearTimeout(slow)
-      await slowing
-      if (kept) {
-        // The marks stay, and the attempt it did not get to finish does not
-        // count.
-        note({ attempts: taken.attempts })
-      } else {
-        await Promise.all(
-          marks.map((mark) => messenger.unmark?.(mention, mark))
-        )
-        this.forget(key)
-        this.requests.handled += 1
-      }
-      await rm(attachmentsDir, { recursive: true, force: true })
-      this.requests.active -= 1
-      this.deps.onActivity?.({ ...this.requests })
+    return {
+      messenger,
+      taken,
+      entry: taken,
+      marks,
+      stopSlow: async () => {
+        clearTimeout(slow)
+        await slowing
+      },
+      dir,
+      outputDir: path.join(dir, 'generated'),
+      cutOff,
+      reasoning: false,
     }
+  }
+
+  /**
+   * Reads the request and the conversation it is in, and opens its run (or
+   * reopens it, resumed after a restart).
+   */
+  private async gather(job: Answering) {
+    const { messenger, taken } = job
+    const { mention, label } = taken
+    // Read alongside the request and the run; a failure surfaces where it
+    // is awaited.
+    const reading = messenger.context(mention, [mention.message])
+    reading.catch(() => undefined)
+    const request = await messenger.request(mention)
+    job.run = this.openRun(messenger, mention, label, request, taken.runId)
+    this.note(job, { runId: job.run?.id, attempts: taken.attempts + 1 })
+    const { context, left } = recent(await reading)
+    job.run?.patch({ context: { messages: context.length } })
+    return {
+      request,
+      context,
+      lines: contextLines(context, left, this.deps.config.timezone),
+    }
+  }
+
+  /**
+   * Loads the files attached to the request and the conversation: images for
+   * the reasoner to see, documents as text, and those it cannot read.
+   */
+  private async attach(
+    job: Answering,
+    context: readonly ContextMessage[]
+  ): Promise<Attachments> {
+    const { messenger, taken, run } = job
+    // Passes the request message attachments first, then recent attachments
+    // in the thread.
+    const candidates = fileCandidates(
+      taken.mention.files,
+      context,
+      this.deps.config.timezone
+    )
+    const files = await messenger.resolveFiles(candidates.map((c) => c.file))
+    const resolved = candidates.map((candidate, i) => ({
+      ...candidate,
+      file: files[i]!,
+    }))
+    const { planned, skipped } = planAttachments(resolved)
+    const { images, documents, failed } = await loadAttachments(planned, {
+      dir: job.dir,
+      download: (file) => messenger.download(file),
+      extractPdfText: this.deps.extractPdfText,
+    })
+    const unreadable = [...skipped, ...failed]
+    if (run) await recordAttachments(run, images, documents, skipped, failed)
+    if (resolved.length > 0) {
+      this.deps.log.info(
+        attachmentsLog(
+          resolved.length,
+          images.length,
+          documents.length,
+          unreadable
+        )
+      )
+    }
+    return { images, documents, unreadable }
+  }
+
+  /**
+   * Runs the reasoner with its tools on the request, the conversation and the
+   * attachments, and returns its answer as it is to be posted.
+   */
+  private async reason(
+    job: Answering,
+    request: Request,
+    lines: string[],
+    { images, documents, unreadable }: Attachments
+  ): Promise<string> {
+    const { config, reasoner, log } = this.deps
+    const { messenger, taken, run } = job
+    const { key, mention, label } = taken
+    const prompt = userPrompt({
+      venue: label,
+      context: lines,
+      author: request.author,
+      request: request.text,
+      attachments: attachmentSection(images, documents, unreadable),
+    })
+    const readOnlyDir = reasoner.canReadFiles
+      ? config.mention.workspace
+      : undefined
+    // Images generated by codex land here, so the folder must exist before
+    // it is shared into the VM.
+    await mkdir(job.outputDir, { recursive: true })
+    const started = Date.now()
+    const requester = {
+      user: mention.userId,
+      conversation: mention.conversation,
+      label,
+      thread: mention.thread,
+      run: run?.id,
+      message: mention.message,
+      permalink: messenger.permalink(mention, mention.message),
+    }
+    const system = systemPrompt(messenger.profile, {
+      canReadWorkspace: readOnlyDir !== undefined,
+      opsTools: reasoner.mcpServerNames.includes('ops'),
+      ownTools: reasoner.mcpServerNames.includes('pacenote'),
+      yourServers: reasoner
+        .yourServers?.(requester)
+        .map((server) => server.name),
+      diagrams: this.deps.renderer !== undefined,
+      imageGeneration: reasoner.backend === 'codex',
+      // The app tells Pace its language (PACENOTE_LOCALE, src/index.ts)
+      language: getLocale(),
+    })
+    run?.setPrompt(system, prompt)
+    job.reasoning = true
+    const written = await reasoner.complete({
+      system,
+      prompt,
+      readOnlyDir,
+      images: images.map(({ path, mimetype }) => ({ path, mimetype })),
+      outputDir: job.outputDir,
+      signal: job.cutOff.signal,
+      onEvent: run ? (step) => run?.event(step) : undefined,
+      requester,
+    })
+    job.reasoning = false
+    this.deps.onReasoner?.(undefined)
+    // The thread is public: secrets go before anything is posted, and the
+    // run keeps the answer as posted.
+    const answer = this.redact(job, written)
+    run?.patch({ answer })
+    log.info(
+      `Answered mention ${key} (${reasoner.backend}@${reasoner.sandbox}, ${Date.now() - started}ms)`
+    )
+    return answer
+  }
+
+  /**
+   * The answer without the secrets this Pacenote holds; how many went is in
+   * the log and the run.
+   */
+  private redact(job: Answering, written: string): string {
+    const { text: answer, count: redacted } = redactAnswer(
+      written,
+      this.deps.secrets
+    )
+    if (redacted > 0) {
+      this.deps.log.warn(
+        `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer to ${job.taken.key}`
+      )
+      job.run?.event({
+        kind: 'note',
+        at: new Date().toISOString(),
+        text: `Redacted ${redacted} ${redacted === 1 ? 'secret' : 'secrets'} from the answer before posting it.`,
+      })
+    }
+    return answer
+  }
+
+  /**
+   * Posts the answer to the thread with the line under it, then the images
+   * the reasoner generated and the diagrams rendered from the answer.
+   */
+  private async post(job: Answering, answer: string): Promise<void> {
+    const { config, reasoner, log } = this.deps
+    const { messenger, run } = job
+    const { mention } = job.taken
+    const { text, figures } = await this.renderDiagrams(answer, job.dir)
+    // Once any of it is in the thread, a restart does not answer again.
+    this.note(job, { answer: 'posting' })
+    const said = text.trim() ? `${text}\n\n` : ''
+    for (const chunk of messenger.render(
+      said + aiNote(reasoner.backend, config.notesLocale)
+    ))
+      await messenger.post(mention, chunk)
+    this.note(job, { answer: 'posted' })
+    const generated = await this.shrinkImages(
+      await collectGeneratedImages(job.outputDir),
+      job.dir
+    )
+    if (run) await recordOutputs(run, generated, figures, log)
+    if (!(await this.postImages(messenger, mention, generated, figures))) {
+      run?.event({
+        kind: 'error',
+        at: new Date().toISOString(),
+        message: 'Image upload failed (check files:write)',
+      })
+    }
+  }
+
+  /** Notes a request cut off to shut down, which resumes on the next start */
+  private keep(job: Answering): void {
+    // The run stays open: the next start resumes it, or marks it
+    // interrupted.
+    this.deps.log.info(
+      `Stopped answering ${job.taken.key} to shut down; it resumes on the next start.`
+    )
+    job.run?.event({
+      kind: 'note',
+      at: new Date().toISOString(),
+      text: 'Stopped to shut down; resumes on the next start.',
+    })
+  }
+
+  /**
+   * Records why a request failed and tells the asker alone what it means. A
+   * failure that lasts until fixed also goes to the status.
+   */
+  private async reportFailure(job: Answering, err: unknown): Promise<void> {
+    const { config, reasoner, log } = this.deps
+    const { messenger, run } = job
+    const { key, mention } = job.taken
+    log.error(`Failed to answer mention ${key}`, err)
+    const error = (err as Error).message
+    const cause = job.reasoning ? failureCause(error) : 'other'
+    run?.finish('failed', {
+      error,
+      ...(cause === 'other' ? {} : { cause }),
+    })
+    const advice = failureAdvice(cause, reasoner.backend, reasoner.sandbox)
+    // The status is the app's, so it is in the app's language.
+    if (advice?.lasting)
+      this.deps.onReasoner?.(
+        localized(text).lastAt(
+          advice.text,
+          formatTime(Date.now(), config.timezone)
+        )
+      )
+    // ⚠️ on the mention, and what it means to the asker alone; the error
+    // itself stays in the log and the run history.
+    await this.fail(
+      messenger,
+      mention,
+      failureReply(cause, reasoner.backend, {
+        own: this.deps.ownMentions,
+        timeoutMs: config.reasoner.timeoutMs,
+        locale: config.notesLocale,
+      })
+    )
+  }
+
+  /**
+   * Settles a request once answering it ends. Kept for the next start, its
+   * marks and its record stay; otherwise they go, and it counts as handled.
+   * Its folder goes either way.
+   */
+  private async settle(job: Answering, kept: boolean): Promise<void> {
+    const { messenger, taken } = job
+    this.running.delete(job.cutOff)
+    await job.stopSlow()
+    if (kept) {
+      // The marks stay, and the attempt it did not get to finish does not
+      // count.
+      this.note(job, { attempts: taken.attempts })
+    } else {
+      await Promise.all(
+        job.marks.map((mark) => messenger.unmark?.(taken.mention, mark))
+      )
+      this.forget(taken.key)
+      this.requests.handled += 1
+    }
+    await rm(job.dir, { recursive: true, force: true })
+    this.requests.active -= 1
+    this.deps.onActivity?.({ ...this.requests })
+  }
+
+  /** Keeps the restart record of a request being answered up to date */
+  private note(job: Answering, patch: Partial<InflightEntry>): void {
+    job.entry = { ...job.entry, ...patch }
+    this.record(job.entry)
   }
 
   private forget(key: string): void {

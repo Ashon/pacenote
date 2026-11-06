@@ -1,3 +1,4 @@
+import { homePath } from '@/lib/format'
 import type { SettingsView } from '@src/settings/fields'
 import { stepToFix, type SetupRecord } from '@src/settings/setup'
 import type { SupervisorState } from '@src/runtime/types'
@@ -397,7 +398,6 @@ function PathText({ path }: { path: string }) {
 }
 
 /** A folder in your home as you would type it: ~/.pacenote */
-const homePath = (dir: string) => dir.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
 /** You, the one who may ask: by the name Slack showed, or your member ID */
 function Person({ name, id }: { name?: string; id?: string }) {

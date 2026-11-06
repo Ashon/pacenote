@@ -1,10 +1,8 @@
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { EventEmitter } from 'node:events'
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
-import path from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
-import { readJson, writeJson } from '../json-file.js'
+import { Adding } from './adding.js'
 import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import {
   accept,
@@ -16,6 +14,14 @@ import {
   type MacChannel,
   type MacHello,
 } from './channel.js'
+import {
+  claimWords,
+  heardLately,
+  holdsBack,
+  peersOf,
+  type LinkSeen,
+} from './claims.js'
+import { devicesMessage, mergeDevices, type DevicesMessage } from './devices.js'
 import {
   claim,
   claimReason,
@@ -29,6 +35,18 @@ import {
   privateAddress,
   tailnetAddresses,
 } from './network.js'
+import { MacsStore, type MacsFile } from './store.js'
+import {
+  BLOCKED_MS,
+  CLAIM_COOLDOWN_MS,
+  CLAIM_WAIT_MS,
+  dialEvery,
+  HANDSHAKE_MS,
+  HEARTBEAT_MS,
+  SEEN_SAVE_MS,
+  STALLED_MS,
+  TICK_MS,
+} from './timing.js'
 import {
   away,
   inUse,
@@ -36,15 +54,14 @@ import {
   type Lease,
   type AddingView,
   type DeviceKind,
-  type DeviceRecord,
-  type DeviceView,
   type MacState,
-  type MacStatus,
   type MacsView,
   type MacUse,
-  type MacView,
   type SetupPayload,
 } from './types.js'
+import { macsView, myStatus } from './view.js'
+
+export { GROUP_FILE, MACS_FILE } from './store.js'
 
 /**
  * Your Macs, from this one: finds the others with the same key on your network
@@ -62,88 +79,19 @@ import {
  * Until you turn on Settings > Devices (Follow the Mac you're using, or Find
  * your other Macs) or Add a device, it does nothing and Pace answers here, as
  * on a Mac of its own.
+ *
+ * What it keeps on disk is in store.ts, Add a device's state in adding.ts,
+ * what Settings > Devices shows in view.ts, and when it holds back a claim in
+ * claims.ts; this class holds the sockets and the clock.
  */
 
-export const MACS_FILE = 'macs.json'
-/**
- * The key Add a device made or brought (base64), kept apart from macs.json and
- * readable by you alone, as settings.json's secrets are
- */
-export const GROUP_FILE = 'macs-key'
-
-interface MacsFile {
-  version: 1
-  /** This Mac, for the others */
-  id: string
-  follow: boolean
-  /** Added by hand, for Macs on another network (Tailscale) */
-  addresses: string[]
-  /** Macs you stopped following to */
-  ignored: string[]
-  /** The latest lease this Mac heard of, so a restart knows who answers */
-  lease?: Lease
-  /** The other Macs, as last heard from */
-  known: Record<string, { name: string; lastSeen: string; address?: string }>
-  /** Your devices (DeviceRecord), paired here or with your other Macs */
-  devices: Record<string, DeviceRecord>
-  /** Devices you removed, and when: no Mac of yours lets them in again */
-  removed: Record<string, string>
-}
-
-const HEARTBEAT_MS = 5_000
-/** A Mac not heard from for this long is out of reach */
-const SILENT_MS = 15_000
-const DIAL_MS = 10_000
-/**
- * A Mac that holds the lease but has not opened its Slack connection for this
- * long is passed over, so some Mac answers
- */
-const STALLED_MS = 60_000
-/**
- * A Mac that just claimed the lease waits this long before it claims again
- * by itself (Answer here aside), so two Macs whose rules disagree for a moment
- * never take it back and forth
- */
-const CLAIM_COOLDOWN_MS = 15_000
-/**
- * Unreachable this long, as macOS answers while Local Network access is off,
- * before Settings > Devices says so: the first time, macOS is still asking
- */
-const BLOCKED_MS = 30_000
-/** How often to dial again while the network turns this Mac away */
-const REDIAL_MS = 2_000
-/**
- * Just started, how long this Mac waits to hear from the one that answered
- * before taking over from it
- */
-const STARTUP_MS = 15_000
 const MAX_MESSAGE = 16 * 1024 * 1024
-/** How long Add a device waits for the new Mac */
-const ADDING_MS = 10 * 60_000
-/** Setup just finished: how long the new Mac waits to hear the others */
-const CLAIM_WAIT_MS = 30_000
 
 /** What Macs say to each other over their channel */
 type MacMessage = { t: 'state'; state: MacState }
 
-/**
- * Your devices, as one Mac tells the others when it links to them and when
- * one is paired or removed. Pacenote before 0.6.14 leaves it alone.
- */
-interface DevicesMessage {
-  t: 'devices'
-  devices: Record<string, DeviceRecord>
-  removed: Record<string, string>
-}
-
-interface Link {
+interface Link extends LinkSeen {
   channel: MacChannel
-  state?: MacState
-  heardAt: number
-  /** Since when it has said its Slack connection is not open */
-  closedSince?: number
-  /** Where it was reached */
-  address?: string
   /** The target it was dialed as */
   target?: string
 }
@@ -196,7 +144,7 @@ export class Macs extends EventEmitter<{
   /** Anything another Mac says besides its state (todo-sync.ts) */
   message: [peer: string, message: unknown]
 }> {
-  private file: MacsFile
+  private readonly store: MacsStore
   private readonly links = new Map<string, Link>()
   private readonly targets = new Map<string, Target>()
   private readonly dialing = new Set<string>()
@@ -205,8 +153,6 @@ export class Macs extends EventEmitter<{
   private bonjour?: Bonjour
   /** The key the network side was opened with */
   private netKey?: Buffer
-  /** The key Add a device made or brought (GROUP_FILE) */
-  private group?: Buffer
   private timer?: NodeJS.Timeout
   private startedAt = 0
   private stopped = false
@@ -232,18 +178,7 @@ export class Macs extends EventEmitter<{
   /** The Macs heard from since this one started */
   private readonly heardSinceStart = new Set<string>()
   /** Add a device, while it waits or until you close what it says */
-  private adding?: {
-    until: number
-    timer?: NodeJS.Timeout
-    advert?: Bonjour
-    request?: {
-      name: string
-      code: string
-      channel: MacChannel
-      device?: DeviceKind
-    }
-    result?: AddingView['result']
-  }
+  private readonly adding = new Adding()
   /** Set up just now from another Mac: this one takes over once it can */
   private claimSince?: number
   private readonly now: () => number
@@ -251,8 +186,7 @@ export class Macs extends EventEmitter<{
   constructor(private readonly options: MacsOptions) {
     super()
     this.now = options.now ?? Date.now
-    this.file = this.read()
-    this.group = this.readGroup()
+    this.store = new MacsStore(options.dataDir, options.log)
   }
 
   /** This Mac's id */
@@ -276,7 +210,7 @@ export class Macs extends EventEmitter<{
     await this.network()
     this.timer = setInterval(
       () => void this.tick(),
-      this.options.tickMs ?? 2_000
+      this.options.tickMs ?? TICK_MS
     )
     this.timer.unref?.()
   }
@@ -290,105 +224,31 @@ export class Macs extends EventEmitter<{
 
   view(): MacsView {
     const now = this.now()
-    const lease = this.file.lease
     const pace = this.options.pace()
-    const adding = this.adding
-    const me: MacView = {
-      id: this.id,
-      name: this.options.name,
-      here: true,
-      status: this.myStatus(pace.answering),
-      away: away(this.options.use()),
-      asleep: false,
-      notReady: !pace.ready,
-      reasoner: pace.reasoner,
-    }
-    const others: MacView[] = []
-    const ids = new Set([
-      ...Object.keys(this.file.known),
-      ...[...this.links.values()].flatMap((link) =>
-        link.state && !link.channel.peer.device ? [link.state.id] : []
-      ),
-    ])
-    for (const id of ids) {
-      if (id === this.id) continue
-      const link = this.links.get(id)
-      const state = link?.state
-      const known = this.file.known[id]
-      const reachable = Boolean(link && now - link.heardAt < SILENT_MS)
-      let status: MacStatus = 'out-of-reach'
-      if (reachable && state)
-        status =
-          lease?.holder === id
-            ? state.answering
-              ? 'answering'
-              : 'moving'
-            : state.answering
-              ? 'moving'
-              : 'standing-by'
-      others.push({
-        id,
-        name: state?.name ?? known?.name ?? id,
-        here: false,
-        status,
-        away: state ? away(state.use) : false,
-        asleep: state?.use.asleep ?? false,
-        notReady: state ? !state.ready : false,
-        lastSeen: known?.lastSeen,
-        reasoner: state?.reasoner,
-        address: link?.address ?? known?.address,
-        ...(reachable && state?.collecting && { collecting: state.collecting }),
-      })
-    }
-    return {
-      paceFollows: Boolean(this.options.appToken()),
+    return macsView({
+      now,
+      me: {
+        id: this.id,
+        name: this.options.name,
+        use: this.options.use(),
+        pace,
+        status: myStatus({
+          follows: this.paceFollows(),
+          id: this.id,
+          holder: this.file.lease?.holder,
+          here: this.here,
+          answering: pace.answering,
+        }),
+      },
+      file: this.file,
+      links: this.links,
+      ownApp: Boolean(this.options.appToken()),
       paired: Boolean(this.key()),
-      follow: this.file.follow,
-      macs: [
-        me,
-        ...others.filter((mac) => !this.file.ignored.includes(mac.id)),
-      ],
-      ...(this.paceFollows() && lease ? { holder: lease.holder } : {}),
-      addresses: this.file.addresses,
+      follows: this.paceFollows(),
       blocked: this.blocked,
       moved: this.moved,
-      ...(adding && {
-        adding: {
-          until: new Date(adding.until).toISOString(),
-          ...(adding.request && {
-            request: {
-              name: adding.request.name,
-              code: adding.request.code,
-              ...(adding.request.device && { device: adding.request.device }),
-            },
-          }),
-          ...(adding.result && { result: adding.result }),
-        },
-      }),
-      devices: this.devices(now),
-    }
-  }
-
-  /** Your devices, those linked to this Mac first */
-  private devices(now: number): DeviceView[] {
-    return Object.entries(this.file.devices)
-      .map(([id, record]) => {
-        const link = this.links.get(id)
-        const connected = Boolean(
-          link?.channel.peer.device && now - link.heardAt < SILENT_MS
-        )
-        return {
-          id,
-          ...record,
-          connected,
-          ...(link && { address: link.address }),
-        }
-      })
-      .sort(
-        (a, b) =>
-          Number(b.connected) - Number(a.connected) ||
-          (b.lastSeen ?? b.pairedAt).localeCompare(a.lastSeen ?? a.pairedAt)
-      )
+      adding: this.adding.view(),
+    })
   }
 
   /**
@@ -443,14 +303,12 @@ export class Macs extends EventEmitter<{
    * key yet, it makes the key your Macs will know each other by.
    */
   async startAdding(): Promise<boolean> {
-    if (!this.key()) this.setGroup(randomBytes(32))
-    this.clearAdding()
+    if (!this.key()) this.store.setGroup(randomBytes(32))
+    this.adding.clear()
     if (!this.file.follow) await this.setFollow(true)
     // On already, with the key just made: the network side opens with it
     else await this.tick()
     if (!this.server) return false
-    const timer = setTimeout(() => this.endAdding('expired'), ADDING_MS)
-    timer.unref?.()
     const advert =
       this.options.bonjour === false
         ? undefined
@@ -464,7 +322,11 @@ export class Macs extends EventEmitter<{
             log: this.options.log,
           })
     advert?.start()
-    this.adding = { until: this.now() + ADDING_MS, timer, advert }
+    this.adding.start({
+      now: this.now(),
+      expired: () => this.endAdding('expired'),
+      advert,
+    })
     this.options.log('Macs: waiting for a new Mac to set up from this one')
     this.emitIfChanged()
     return true
@@ -472,7 +334,7 @@ export class Macs extends EventEmitter<{
 
   /** Stop: no new Mac is waited for any longer */
   stopAdding(): void {
-    this.clearAdding()
+    this.adding.clear()
     this.emitIfChanged()
   }
 
@@ -481,9 +343,9 @@ export class Macs extends EventEmitter<{
    * Macs know each other by
    */
   allowAdding(): void {
-    const request = this.adding?.request
+    const request = this.adding.request
     const key = this.key()
-    if (!request || this.adding?.result || !key) return
+    if (!request || !key) return
     // A device: a key of its own and your Macs' group, nothing else
     if (request.device) {
       const id = request.channel.peer.id
@@ -526,23 +388,23 @@ export class Macs extends EventEmitter<{
     if (key.length !== 32) return false
     // Your Slack app's own key already: nothing to keep apart from it
     const token = this.options.appToken()
-    if (!this.group && token && macsKey(token).equals(key)) return true
-    this.setGroup(key)
+    if (!this.store.group && token && macsKey(token).equals(key)) return true
+    this.store.setGroup(key)
     await this.tick()
     return true
   }
 
   /** Not this one: the numbers differ, or it is not your Mac */
   declineAdding(): void {
-    const request = this.adding?.request
-    if (!request || this.adding?.result) return
+    const request = this.adding.request
+    if (!request) return
     request.channel.send({ t: 'setup-declined' })
     this.endAdding('declined', request.name)
   }
 
   /** What Add a device said is read: it goes away */
   closeAdding(): void {
-    if (this.adding?.result) this.clearAdding()
+    if (this.adding.ended) this.adding.clear()
     this.emitIfChanged()
   }
 
@@ -602,12 +464,21 @@ export class Macs extends EventEmitter<{
     void this.tick()
   }
 
+  /** macs.json, as this Mac keeps it */
+  private get file(): MacsFile {
+    return this.store.file
+  }
+
+  private save(patch: Partial<MacsFile>): void {
+    this.store.save(patch)
+  }
+
   /**
    * The key your Macs know each other by: the one Add a device made or brought,
    * else your own Slack app's
    */
   private key(): Buffer | undefined {
-    if (this.group) return this.group
+    if (this.store.group) return this.store.group
     const token = this.options.appToken()
     return token ? macsKey(token) : undefined
   }
@@ -662,38 +533,16 @@ export class Macs extends EventEmitter<{
     }
   }
 
-  private myStatus(answering: boolean): MacStatus {
-    if (!this.paceFollows()) return 'answering'
-    const holder = this.file.lease?.holder
-    if (holder === undefined || holder === this.id)
-      return answering ? 'answering' : 'moving'
-    return this.here ? 'moving' : 'standing-by'
-  }
-
   /** The others as the rules see them: those of the same Slack app */
   private peers(): PeerSeen[] {
-    const now = this.now()
-    return [...this.links.values()].flatMap((link) =>
-      link.state &&
-      !this.file.ignored.includes(link.state.id) &&
-      this.sameApp(link.state)
-        ? [
-            {
-              id: link.state.id,
-              use: link.state.use,
-              ready: link.state.ready,
-              answering: link.state.answering,
-              reachable: now - link.heardAt < SILENT_MS,
-              // Holding the lease, it could not open its connection
-              stalled:
-                this.file.lease?.holder === link.state.id &&
-                link.closedSince !== undefined &&
-                now - link.closedSince >=
-                  (this.options.stalledMs ?? STALLED_MS),
-            },
-          ]
-        : []
-    )
+    return peersOf({
+      links: this.links.values(),
+      ignored: this.file.ignored,
+      holder: this.file.lease?.holder,
+      sameApp: (state) => this.sameApp(state),
+      now: this.now(),
+      stalledMs: this.options.stalledMs ?? STALLED_MS,
+    })
   }
 
   /**
@@ -710,19 +559,21 @@ export class Macs extends EventEmitter<{
       lease,
       peers,
     })
-    // Just started, the Mac that answered may not have been found yet
-    const waiting =
-      reason === 'holder-gone' &&
-      lease !== undefined &&
-      this.file.known[lease.holder] !== undefined &&
-      !this.heardSinceStart.has(lease.holder) &&
-      this.now() - this.startedAt < STARTUP_MS
-    const cooling =
-      reason !== 'asked' &&
-      this.claimedAt !== undefined &&
-      this.now() - this.claimedAt <
-        (this.options.cooldownMs ?? CLAIM_COOLDOWN_MS)
-    if (take && reason && !waiting && !cooling) this.take(reason)
+    if (
+      take &&
+      reason &&
+      !holdsBack({
+        reason,
+        lease,
+        known: this.file.known,
+        heardSinceStart: this.heardSinceStart,
+        startedAt: this.startedAt,
+        claimedAt: this.claimedAt,
+        now: this.now(),
+        cooldownMs: this.options.cooldownMs ?? CLAIM_COOLDOWN_MS,
+      })
+    )
+      this.take(reason)
     return shouldAnswer({
       me: { id: this.id },
       lease: this.file.lease,
@@ -742,15 +593,7 @@ export class Macs extends EventEmitter<{
     const from = previous && this.file.known[previous.holder]?.name
     if (from) this.moved = { from, at: new Date(this.now()).toISOString() }
     this.options.log(
-      `Macs: Pace answers on this Mac now (${
-        {
-          none: 'no Mac answered',
-          'holder-gone': `${from ?? 'the Mac that answered'} is out of reach`,
-          'holder-asleep': `${from} went to sleep`,
-          'holder-away': `${from} was left and this Mac is in use`,
-          asked: 'you asked',
-        }[reason]
-      })`
+      `Macs: Pace answers on this Mac now (${claimWords(reason, from)})`
     )
     this.broadcast()
   }
@@ -782,14 +625,9 @@ export class Macs extends EventEmitter<{
     }
     const now = this.now()
     for (const link of this.links.values())
-      if (now - link.heardAt >= SILENT_MS) link.channel.close()
+      if (!heardLately(link, now)) link.channel.close()
     if (this.linkable()) {
-      const every =
-        this.unreachableSince !== undefined &&
-        now - this.unreachableSince < 60_000
-          ? REDIAL_MS
-          : DIAL_MS
-      if (now - this.lastDial >= every) {
+      if (now - this.lastDial >= dialEvery(this.unreachableSince, now)) {
         this.lastDial = now
         for (const [key, target] of this.targets)
           void this.dialTarget(key, target)
@@ -898,7 +736,7 @@ export class Macs extends EventEmitter<{
   }
 
   private async disconnect(): Promise<void> {
-    this.clearAdding()
+    this.adding.clear()
     this.bonjour?.stop()
     this.bonjour = undefined
     for (const link of this.links.values()) link.channel.close()
@@ -935,8 +773,7 @@ export class Macs extends EventEmitter<{
       // A new Mac setting up from this one, only while Add a device waits
       const setup = (req.url ?? '').startsWith('/setup')
       const key = this.netKey
-      if (setup ? !this.adding || this.adding.result : !key)
-        return socket.destroy()
+      if (setup ? !this.adding.waiting : !key) return socket.destroy()
       wss.handleUpgrade(req, socket, head, (ws) => {
         if (setup) return this.setupConnection(ws)
         accept(ws, {
@@ -969,14 +806,20 @@ export class Macs extends EventEmitter<{
 
   /** A new Mac asking to set up from this one, while Add a device waits */
   private setupConnection(ws: WebSocket): void {
-    const adding = this.adding
-    if (!adding || adding.result || adding.request) return ws.close()
+    const run = this.adding.free()
+    if (!run) return ws.close()
     setupAccept(ws, { me: this.hello() })
       .then(({ channel, code }) => {
-        if (this.adding !== adding || adding.request || adding.result)
-          return channel.close()
         const { name, device } = channel.peer
-        adding.request = { name, code, channel, ...(device && { device }) }
+        if (
+          !this.adding.ask(run, {
+            name,
+            code,
+            channel,
+            ...(device && { device }),
+          })
+        )
+          return channel.close()
         channel.on('message', (message) => {
           const { t, error } = (message ?? {}) as { t?: string; error?: string }
           if (t === 'setup-done') {
@@ -988,9 +831,7 @@ export class Macs extends EventEmitter<{
             )
         })
         channel.on('close', () => {
-          if (adding.request?.channel !== channel || adding.result) return
-          adding.request = undefined
-          this.emitIfChanged()
+          if (this.adding.left(run, channel)) this.emitIfChanged()
         })
         this.options.log(`Macs: ${name} asks to set up from this Mac`)
         this.emitIfChanged()
@@ -1004,24 +845,7 @@ export class Macs extends EventEmitter<{
     name?: string,
     device?: DeviceKind
   ): void {
-    const adding = this.adding
-    if (!adding || adding.result) return
-    if (kind === 'expired') adding.request?.channel.send({ t: 'setup-expired' })
-    this.clearAdding()
-    this.adding = {
-      until: adding.until,
-      result: { kind, ...(name ? { name } : {}), ...(device && { device }) },
-    }
-    this.emitIfChanged()
-  }
-
-  private clearAdding(): void {
-    const adding = this.adding
-    if (!adding) return
-    adding.advert?.stop()
-    clearTimeout(adding.timer)
-    adding.request?.channel.close()
-    this.adding = undefined
+    if (this.adding.end(kind, name, device)) this.emitIfChanged()
   }
 
   private hello(): MacHello {
@@ -1037,7 +861,7 @@ export class Macs extends EventEmitter<{
     this.dialing.add(key)
     const host = target.host.includes(':') ? `[${target.host}]` : target.host
     const ws = new WebSocket(`ws://${host}:${target.port}/`, {
-      handshakeTimeout: 5_000,
+      handshakeTimeout: HANDSHAKE_MS,
       maxPayload: MAX_MESSAGE,
     })
     try {
@@ -1095,21 +919,13 @@ export class Macs extends EventEmitter<{
     )
     channel.send({ t: 'state', state: this.state() } satisfies MacMessage)
     if (device) this.seenDevice(id)
-    else channel.send(this.devicesMessage())
+    else channel.send(devicesMessage(this.file))
     this.emit('linked', id)
-  }
-
-  private devicesMessage(): DevicesMessage {
-    return {
-      t: 'devices',
-      devices: this.file.devices,
-      removed: this.file.removed,
-    }
   }
 
   /** Tells your other Macs of your devices: one paired, seen or removed */
   private tellDevices(): void {
-    const message = this.devicesMessage()
+    const message = devicesMessage(this.file)
     for (const link of this.links.values())
       if (!link.channel.peer.device) link.channel.send(message)
   }
@@ -1119,30 +935,10 @@ export class Macs extends EventEmitter<{
    * removed on any Mac is removed on all, and its channel here closes
    */
   private heardDevices(message: Partial<DevicesMessage>): void {
-    const removed = { ...this.file.removed }
-    for (const [id, at] of Object.entries(message.removed ?? {}))
-      if (typeof at === 'string' && (!removed[id] || at < removed[id]!))
-        removed[id] = at
-    const devices: Record<string, DeviceRecord> = {}
-    for (const [id, record] of Object.entries({
-      ...(message.devices ?? {}),
-      ...this.file.devices,
-    })) {
-      if (removed[id]) continue
-      const theirs = message.devices?.[id]
-      const mine = this.file.devices[id]
-      // The later sighting wins: the Mac it is linked to says it last
-      const seen = (r?: DeviceRecord) => r?.lastSeen ?? r?.pairedAt ?? ''
-      devices[id] =
-        theirs && mine ? (seen(theirs) > seen(mine) ? theirs : mine) : record
-    }
-    if (
-      JSON.stringify(devices) === JSON.stringify(this.file.devices) &&
-      JSON.stringify(removed) === JSON.stringify(this.file.removed)
-    )
-      return
-    this.save({ devices, removed })
-    for (const id of Object.keys(removed))
+    const merged = mergeDevices(this.file, message)
+    if (!merged) return
+    this.save(merged)
+    for (const id of Object.keys(merged.removed))
       if (this.links.get(id)?.channel.peer.device)
         this.links.get(id)?.channel.close()
     this.emitIfChanged()
@@ -1152,7 +948,7 @@ export class Macs extends EventEmitter<{
   private seenDevice(id: string): void {
     const record = this.file.devices[id]
     const savedAt = this.seenAt.get(id) ?? 0
-    if (!record || this.now() - savedAt < 60_000) return
+    if (!record || this.now() - savedAt < SEEN_SAVE_MS) return
     this.seenAt.set(id, this.now())
     this.save({
       devices: {
@@ -1195,7 +991,7 @@ export class Macs extends EventEmitter<{
     if (
       known?.name !== state.name ||
       (link.address && known.address !== link.address) ||
-      this.now() - savedAt >= 60_000
+      this.now() - savedAt >= SEEN_SAVE_MS
     ) {
       this.seenAt.set(state.id, this.now())
       this.save({
@@ -1214,71 +1010,5 @@ export class Macs extends EventEmitter<{
     // A later lease from another Mac: tell the rest at once
     if (this.file.lease !== before) this.broadcast()
     void this.tick()
-  }
-
-  private read(): MacsFile {
-    const file = readJson<Partial<MacsFile>>(
-      path.join(this.options.dataDir, MACS_FILE),
-      {}
-    )
-    const value: MacsFile = {
-      version: 1,
-      id: typeof file.id === 'string' && file.id ? file.id : randomUUID(),
-      // Off until you turn it on: then this Mac looks on your network, and
-      // macOS asks once whether it may
-      follow: file.follow === true,
-      addresses: Array.isArray(file.addresses) ? file.addresses : [],
-      ignored: Array.isArray(file.ignored) ? file.ignored : [],
-      ...(file.lease ? { lease: file.lease } : {}),
-      known: file.known ?? {},
-      devices: file.devices ?? {},
-      removed: file.removed ?? {},
-    }
-    if (value.id !== file.id) this.write(value)
-    return value
-  }
-
-  private readGroup(): Buffer | undefined {
-    try {
-      const key = Buffer.from(
-        readFileSync(
-          path.join(this.options.dataDir, GROUP_FILE),
-          'utf8'
-        ).trim(),
-        'base64'
-      )
-      return key.length === 32 ? key : undefined
-    } catch {
-      return undefined
-    }
-  }
-
-  /** Keeps the key your Macs know each other by, for you alone to read */
-  private setGroup(key: Buffer): void {
-    const file = path.join(this.options.dataDir, GROUP_FILE)
-    try {
-      writeFileSync(file, `${key.toString('base64')}\n`, { mode: 0o600 })
-      chmodSync(file, 0o600)
-    } catch (err) {
-      this.options.log(
-        `Macs: could not save ${GROUP_FILE}: ${(err as Error).message}`
-      )
-    }
-    this.group = key
-  }
-
-  private save(patch: Partial<MacsFile>): void {
-    this.file = { ...this.file, ...patch }
-    this.write(this.file)
-  }
-
-  private write(value: MacsFile): void {
-    try {
-      writeJson(path.join(this.options.dataDir, MACS_FILE), value)
-    } catch (err) {
-      this.options.log(
-        `Macs: could not save ${MACS_FILE}: ${(err as Error).message}`
-      )
-    }
   }
 }

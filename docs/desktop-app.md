@@ -281,6 +281,11 @@ Other:
 
 - The query API is served only inside the app at `pacenote://app/api/*`, with no open port. Bot control uses preload IPC only.
   The dev server (`apps/web` Vite) listens only on 127.0.0.1 and attaches the same query API read-only.
+- The screens reach the app through one bridge, `window.pacenoteDesktop`, typed once in `src/desktop-bridge.ts`
+  (`DesktopBridge`). `apps/desktop/src/preload.ts` builds it with `satisfies DesktopBridge`, so a call missing there fails
+  the desktop typecheck; `tests/bridge-channels.test.ts` checks that every channel it calls has a handler in the main
+  process. The phone and iPad app builds its own bridge from the same type, and the asks a device may make are listed in
+  `src/macs/asks.ts`, typed against it.
 - macOS opens `pacenote://` links in the app (`CFBundleURLTypes`, written by `package-mac.mjs`). The only one it takes is
   `pacenote://hub/connect?url=<hub>`, the team hub installer's way back and what pacenote.dev's join page opens for a
   teammate's share link ([Team hub](team-hub.md)), for an address a hub can have: it opens Settings > Messengers (or

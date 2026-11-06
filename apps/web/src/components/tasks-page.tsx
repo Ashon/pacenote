@@ -1,65 +1,48 @@
-import { newTokens } from '@history/usage'
-import { localized } from '@src/i18n/locale'
-import type { MacsView } from '@src/macs/types'
-import { looksLikeOf } from '@src/tasks/filled'
-import { CLI_NAMES, type OwnCli } from '@src/tasks/own-ai'
 import { stagesOf } from '@src/tasks/stage'
-import { sortForTab, tabOf, type TodoTab } from '@src/tasks/tabs'
-import type { TasksLive } from '@src/tasks/types'
-import type { CollectionRecord, TaskView, TasksCollect } from '@src/tasks/types'
-import {
-  ArrowRightLeft,
-  ChevronDown,
-  ChevronRight,
-  LoaderCircle,
-  Plus,
-  RefreshCw,
-  Settings,
-  Sparkles,
-  SquareTerminal,
-} from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import type * as React from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  type ListEntry,
-  Placeholder,
-  Swap,
-  useListMotion,
-  usePresence,
-} from '@/components/ui/motion'
-import { SkeletonText, SkeletonWord } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  formatHourMinute,
-  formatRelative,
-  formatShortDay,
-  formatTokens,
-} from '@/lib/format'
-import { clearFound, openAiSheet, useAiSheet } from '@/lib/ai-sheet'
-import { useSupervisor } from '@/lib/desktop'
+import { tabOf } from '@src/tasks/tabs'
+import { useEffect, useState } from 'react'
+import { Placeholder, Swap } from '@/components/ui/motion'
+import { SkeletonWord } from '@/components/ui/skeleton'
+import { formatRelative } from '@/lib/format'
+import { clearFound, useAiSheet } from '@/lib/ai-sheet'
 import { useText } from '@/lib/i18n'
 import {
   taskHash,
-  useCollect,
   useDecide,
-  useLanding,
   useStage,
   useTasks,
   useTasksLive,
 } from '@/lib/tasks'
 import { todayLines } from '@/lib/today'
+import {
+  declinedFrom,
+  leaveOutOffer,
+  ROWS_AT_ONCE,
+  rowFacts,
+  skeletonRows,
+  todoList,
+  type Tab,
+} from '@/lib/todo-list'
 import { macNamed, useMacs } from '@/lib/macs'
+import { shortcutKeyHeld } from '@/lib/platform'
 import { readStored, writeStored } from '@/lib/storage'
-import { cn, go } from '@/lib/utils'
+import { go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
-import { switchLine } from './own-ai-status'
-import { PaceSpinner } from './pace-spinner'
 import { NewTask } from './new-task'
-import { closedBy, TaskRow } from './task-row'
+import { TaskRow } from './task-row'
 import { Page } from './page'
 import { StartCard } from './start-card'
+import { RecentCollections } from './tasks-collections'
+import { CollectButton, NewTaskButton, StatusLine } from './tasks-header'
+import {
+  NewTasks,
+  ShowMore,
+  stepThrough,
+  TaskList,
+  TaskRowsSkeleton,
+  TaskTabs,
+} from './tasks-list'
+import { FoundNotice, LeaveOutOffer, Setup, TodoFirst } from './tasks-notices'
 import { text } from './tasks-page.text'
 import { lastToday, Today, TodaySkeleton } from './today'
 import {
@@ -69,32 +52,15 @@ import {
   YourWorkSkeleton,
 } from './your-work'
 
-type Tab = TodoTab | 'collections'
-
-/** How many rows a long list shows at first, and Show more adds each time */
-const ROWS_AT_ONCE = 10
-
-/** Cmd-N here, Ctrl-N elsewhere: New task */
-const isMac = /Mac/.test(navigator.platform)
-
 /** The leave-out offers you turned down, per channel, in this browser */
 const OFFERS_KEY = 'pacenote.tasks.leave-out-declined'
 
-function declinedOffers(): string[] {
-  try {
-    return JSON.parse(readStored(OFFERS_KEY) ?? '[]') as string[]
-  } catch {
-    return []
-  }
-}
+const declinedOffers = () => declinedFrom(readStored(OFFERS_KEY))
 
 /** How many open tasks there were last time: the skeleton's rows */
 const ROWS_KEY = 'pacenote.tasks.rows'
 
-function lastRows(): number {
-  const rows = Number(readStored(ROWS_KEY))
-  return rows > 0 ? Math.min(rows, 8) : 3
-}
+const lastRows = () => skeletonRows(readStored(ROWS_KEY))
 
 /**
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): the
@@ -107,7 +73,7 @@ function lastRows(): number {
  * The list moves only for what you do: a settled task leaves its tab
  * (settle), and tasks that come in while you look, from a collection or an AI
  * tool, wait behind a notice that shows them (arrive), so the rows you are
- * reading stay put.
+ * reading stay put. What each tab lists is worked out in lib/todo-list.ts.
  */
 export function TasksPage({
   openId,
@@ -149,16 +115,6 @@ export function TasksPage({
   const ids = data?.tasks.map((task) => task.id) ?? []
   if (data && !seen) setSeen(new Set(ids))
   const showAll = () => setSeen(new Set(ids))
-  // Each open task's stage: started, waiting (src/tasks/stage.ts)
-  const stages = stagesOf(data, live?.working)
-  const tabIn = (task: TaskView) => tabOf(task, stages[task.id])
-  // The open task your AI says one you added looks like, until you say
-  const sameAs = (task: TaskView) => {
-    const like = looksLikeOf(task)
-    return like
-      ? data?.tasks.find((each) => each.id === like && each.status === 'open')
-      : undefined
-  }
 
   // A task opened from a link shows under its own tab.
   useEffect(() => {
@@ -181,7 +137,7 @@ export function TasksPage({
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== 'n' || event.shiftKey || event.altKey)
         return
-      if (!(isMac ? event.metaKey : event.ctrlKey)) return
+      if (!shortcutKeyHeld(event)) return
       event.preventDefault()
       setAdding(true)
     }
@@ -238,73 +194,23 @@ export function TasksPage({
 
   // No AI set up for Pacenote's own work: where one would help, it says so
   const noAi = data.aiSet === false
-  const open = data.tasks.filter((task) => tabIn(task) === 'open')
-  // Open, but waiting on someone else
-  const onOthers = data.tasks.filter((task) => tabIn(task) === 'waiting')
-  writeStored(ROWS_KEY, String(open.length))
+  const list = todoList(data, {
+    tab,
+    openId,
+    held,
+    seen,
+    doneRows,
+    live: live?.working,
+  })
+  const { stages, counts, shown, rows, arrived } = list
+  writeStored(ROWS_KEY, String(counts.open))
   rememberYourWork(data.collectedAt ? you : undefined)
-  const maybe = data.tasks.filter((task) => task.status === 'maybe')
-  const kept = (task: TaskView) =>
-    task.id === openId && held?.id === openId && held.tab === tab
-  const listed = data.tasks.filter((task) => tabIn(task) === tab || kept(task))
-  // In progress first; waiting, the longest first; the latest settled first
-  if (tab !== 'collections') sortForTab(listed, tab, stages)
-  // New tasks wait unless there is nothing in the list for them to move
-  const isNew = (task: TaskView) =>
-    seen !== undefined && !seen.has(task.id) && task.id !== openId
-  const waiting = listed.some((task) => !isNew(task))
-    ? listed.filter(isNew)
-    : []
-  const shown = listed.filter((task) => !waiting.includes(task))
-  if (seen && shown.some((task) => !seen.has(task.id)))
-    setSeen(new Set([...seen, ...shown.map((task) => task.id)]))
-  // Done lists as many as you asked for, down to the task open in it
-  const rows =
-    tab === 'done'
-      ? Math.max(doneRows, shown.findIndex((task) => task.id === openId) + 1)
-      : shown.length
+  if (list.seenNow) setSeen(list.seenNow)
   const note =
-    tab === 'maybe'
-      ? t.maybeNote
-      : tab === 'waiting'
-        ? t.waitingNote
-        : tab === 'done' && data.dismissRate !== undefined
-          ? t.dismissRate(Math.round(data.dismissRate * 100))
-          : undefined
-
-  // Up and down step through the tasks (the open one follows); Esc closes it.
-  const onKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
-    const target = event.target as HTMLElement
-    // Keys in a dialog or menu over the list, or while typing, are theirs.
-    if (!event.currentTarget.contains(target)) return
-    if (target.closest('textarea, input, select')) return
-    // Not the rows on their way out
-    const titles = [
-      ...event.currentTarget.querySelectorAll<HTMLElement>(
-        '[data-task-row]:not([inert]) [data-task-title]'
-      ),
-    ]
-    const rowOf = (element: Element) =>
-      element.closest<HTMLElement>('[data-task-row]')?.dataset.taskRow
-    if (event.key === 'Escape' && openId) {
-      event.preventDefault()
-      titles.find((title) => rowOf(title) === openId)?.focus()
-      go('#/tasks')
-      return
-    }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-    const at = titles.findIndex((title) => rowOf(title) === rowOf(target))
-    const next = titles[at + (event.key === 'ArrowDown' ? 1 : -1)]
-    if (at < 0 || !next) return
-    event.preventDefault()
-    next.focus()
-    const id = rowOf(next)
-    if (openId && id) go(taskHash(id))
-  }
-  const offer =
-    data.leaveOut && !declined.includes(data.leaveOut.conversation)
-      ? data.leaveOut
-      : undefined
+    list.note?.says === 'dismissRate'
+      ? t.dismissRate(list.note.percent)
+      : list.note && t[list.note.says]
+  const offer = leaveOutOffer(data.leaveOut, declined)
 
   const decline = (conversation: string) => {
     const next = [...declined, conversation]
@@ -316,10 +222,10 @@ export function TasksPage({
     <Page
       title={t.title}
       meta={t.meta(
-        open.length,
+        counts.open,
         data.collectedAt && formatRelative(data.collectedAt),
         data.collect.last?.mac && macNamed(macs, data.collect.last.mac),
-        onOthers.length
+        counts.waiting
       )}
       action={
         <>
@@ -355,21 +261,10 @@ export function TasksPage({
       />
       <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3 text-copy">
-          <span className="flex-1">
-            {t.leaveOutOffer(offer.count, offer.label)}
-          </span>
-          <Button size="xs" onClick={() => void bridge.leaveOut(offer.label)}>
-            {t.leaveOut}
-          </Button>
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => decline(offer.conversation)}
-          >
-            {t.notNow}
-          </Button>
-        </div>
+        <LeaveOutOffer
+          offer={offer}
+          onNotNow={() => decline(offer.conversation)}
+        />
       )}
 
       {adding && (
@@ -393,11 +288,7 @@ export function TasksPage({
           setDoneRows(ROWS_AT_ONCE)
           showAll()
         }}
-        counts={{
-          open: open.length,
-          waiting: onOthers.length,
-          maybe: maybe.length,
-        }}
+        counts={counts}
       />
 
       {/* Another tab's list takes this one's place (swap) */}
@@ -412,13 +303,13 @@ export function TasksPage({
           ) : (
             <>
               <NewTasks
-                count={waiting.length}
+                count={arrived.length}
                 onShow={() => {
                   showAll()
                   // Settled just now, they go first: the rows you were
                   // reading stay listed below them
-                  if (tab === 'done') setDoneRows(rows + waiting.length)
-                  setRevealed(waiting[0]?.id)
+                  if (tab === 'done') setDoneRows(rows + arrived.length)
+                  setRevealed(arrived[0]?.id)
                 }}
               />
               {note && (
@@ -426,80 +317,53 @@ export function TasksPage({
               )}
               <TaskList
                 tasks={shown.slice(0, rows)}
-                onKeyDown={onKeyDown}
+                onKeyDown={stepThrough(openId)}
                 revealed={revealed}
-                row={(task, motion) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    motion={motion}
-                    cli={data.settings.cli}
-                    tools={data.settings.tools}
-                    opensIn={data.settings.opensIn}
-                    working={data.working?.[task.id]}
-                    live={live?.working[task.id]}
-                    stage={stages[task.id]}
-                    onStage={(stage) => void setStage(task.id, stage)}
-                    proposal={data.proposals?.[task.id]}
-                    area={data.areas?.[task.id]}
-                    askGroup={
-                      task.status === 'maybe' &&
-                      task.group &&
-                      !data.groups?.yours.includes(task.group) &&
-                      !data.groups?.notYours.includes(task.group)
-                        ? task.group
-                        : undefined
-                    }
-                    follows={
-                      task.follows
-                        ? data.tasks.find((each) => each.id === task.follows)
-                            ?.title
-                        : undefined
-                    }
-                    followsTask={
-                      task.follows
-                        ? data.tasks.find((each) => each.id === task.follows)
-                        : undefined
-                    }
-                    filling={
-                      data.filling?.includes(task.id)
-                        ? CLI_NAMES[data.ai.chosen]
-                        : undefined
-                    }
-                    looksLike={sameAs(task)}
-                    onSame={() => {
-                      const same = sameAs(task)
-                      if (!same) return
-                      void decide(task.id, { status: 'dismissed' })
-                      go(taskHash(same.id))
-                    }}
-                    open={task.id === openId}
-                    gone={tabIn(task) !== tab}
-                    logEntry={task.id === openId ? logEntry : undefined}
-                    onToggle={() =>
-                      go(task.id === openId ? '#/tasks' : taskHash(task.id))
-                    }
-                    onDecide={(decision) => void decide(task.id, decision)}
-                  />
-                )}
+                row={(task, motion) => {
+                  const facts = rowFacts(data, task)
+                  return (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      motion={motion}
+                      cli={data.settings.cli}
+                      tools={data.settings.tools}
+                      opensIn={data.settings.opensIn}
+                      working={data.working?.[task.id]}
+                      live={live?.working[task.id]}
+                      stage={stages[task.id]}
+                      onStage={(stage) => void setStage(task.id, stage)}
+                      proposal={data.proposals?.[task.id]}
+                      area={data.areas?.[task.id]}
+                      askGroup={facts.askGroup}
+                      follows={facts.follows?.title}
+                      followsTask={facts.follows}
+                      filling={facts.filling}
+                      looksLike={facts.looksLike}
+                      onSame={() => {
+                        const same = facts.looksLike
+                        if (!same) return
+                        void decide(task.id, { status: 'dismissed' })
+                        go(taskHash(same.id))
+                      }}
+                      open={task.id === openId}
+                      gone={tabOf(task, stages[task.id]) !== tab}
+                      logEntry={task.id === openId ? logEntry : undefined}
+                      onToggle={() =>
+                        go(task.id === openId ? '#/tasks' : taskHash(task.id))
+                      }
+                      onDecide={(decision) => void decide(task.id, decision)}
+                    />
+                  )
+                }}
               />
               <ShowMore
                 hidden={shown.length - rows}
                 onShow={() => setDoneRows(rows + ROWS_AT_ONCE)}
               />
-              {shown.length === 0 && (
+              {list.empty && (
                 <p className="border-t border-border py-8 text-copy text-muted-foreground">
-                  {tab === 'open'
-                    ? data.collectedAt
-                      ? t.nothingOpen
-                      : noAi
-                        ? t.nothingYetNoAi
-                        : t.nothingYet
-                    : tab === 'waiting'
-                      ? t.noWaiting
-                      : tab === 'maybe'
-                        ? t.noMaybes
-                        : t.nothingSettled}
+                  {t[list.empty]}
                 </p>
               )}
             </>
@@ -507,653 +371,5 @@ export function TasksPage({
         </Swap>
       </Placeholder>
     </Page>
-  )
-}
-
-/**
- * Open, Waiting (once a task waits on someone), Maybe and Done, with their
- * counts once the tasks are in, and the collections that found them
- */
-function TaskTabs({
-  tab,
-  onTab,
-  counts,
-}: {
-  tab: Tab
-  onTab: (tab: Tab) => void
-  counts?: { open: number; waiting: number; maybe: number }
-}) {
-  const t = useText(text)
-  return (
-    <Tabs value={tab} onValueChange={(value) => onTab(value as Tab)}>
-      <TabsList className="mt-5">
-        <TabsTrigger value="open">
-          {t.tabOpen} {counts ? counts.open : <SkeletonWord />}
-        </TabsTrigger>
-        {(counts?.waiting || tab === 'waiting') && (
-          <TabsTrigger value="waiting">
-            {t.tabWaiting} {counts?.waiting ?? 0}
-          </TabsTrigger>
-        )}
-        <TabsTrigger value="maybe">
-          {t.tabMaybe} {counts ? counts.maybe : <SkeletonWord />}
-        </TabsTrigger>
-        <TabsTrigger value="done">{t.tabDone}</TabsTrigger>
-        <TabsTrigger value="collections">{t.tabCollections}</TabsTrigger>
-      </TabsList>
-    </Tabs>
-  )
-}
-
-/** Widths for skeleton rows, so they do not read as one block */
-const TITLE_WIDTHS = ['62%', '48%', '56%', '42%']
-const META_WIDTHS = ['38%', '30%', '44%', '34%']
-
-/**
- * The list's place while the tasks come: rows as tall as a task's row (its
- * title, and its line of who, where and when with a chip on it)
- */
-function TaskRowsSkeleton({ count }: { count: number }) {
-  return (
-    <ul className="mt-3">
-      {Array.from({ length: count }, (_, i) => (
-        <li key={i} className="border-t border-border py-3.5">
-          <div className="pl-6">
-            <SkeletonText
-              className="text-copy leading-snug"
-              width={TITLE_WIDTHS[i % TITLE_WIDTHS.length]}
-            />
-            {/* the meta line, as tall as its chips: 17px and 1px each side */}
-            <SkeletonText
-              className="mt-1 text-meta leading-[1.1875rem]"
-              width={META_WIDTHS[i % META_WIDTHS.length]}
-            />
-            {/* a narrow window's buttons, under the title (task-row.tsx) */}
-            <div
-              aria-hidden="true"
-              className="mt-2.5 hidden h-7 @max-[44rem]:block"
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-/**
- * A tab's rows. A task that leaves the tab, settled, is pushed aside and the
- * rows below close up (settle); one that comes in unfolds (arrive).
- */
-function TaskList({
-  tasks,
-  revealed,
-  onKeyDown,
-  row,
-}: {
-  tasks: TaskView[]
-  /** A task just shown: it is brought into view */
-  revealed?: string
-  onKeyDown: (event: React.KeyboardEvent<HTMLUListElement>) => void
-  row: (task: TaskView, motion: ListEntry<TaskView>) => React.ReactNode
-}) {
-  const { ref, entries } = useListMotion(tasks, (task) => task.id)
-  useEffect(() => {
-    if (!revealed) return
-    ref.current
-      ?.querySelector(`[data-task-row="${CSS.escape(revealed)}"]`)
-      ?.scrollIntoView({ block: 'nearest' })
-  }, [revealed, ref])
-  return (
-    <ul ref={ref} className="mt-3" onKeyDown={onKeyDown}>
-      {entries.map((entry) => row(entry.item, entry))}
-    </ul>
-  )
-}
-
-/** The rows a long list leaves out, ROWS_AT_ONCE more on each click */
-function ShowMore({ hidden, onShow }: { hidden: number; onShow: () => void }) {
-  const t = useText(text)
-  if (hidden <= 0) return null
-  return (
-    <div className="border-t border-border pt-2">
-      <Button
-        size="sm"
-        variant="ghost"
-        // Its chevron under the rows' own
-        className="-ml-2 text-muted-foreground"
-        onClick={onShow}
-      >
-        <ChevronDown />
-        {t.showMore(Math.min(hidden, ROWS_AT_ONCE))}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Tasks that came in while you were looking, from a collection or an AI tool:
- * a notice on the tabs' line, clear of the rows, that shows them where they
- * belong. It slides in from above (pop) and stays in view as you scroll.
- */
-function NewTasks({ count, onShow }: { count: number; onShow: () => void }) {
-  const t = useText(text)
-  const notice = usePresence<HTMLButtonElement>(count > 0)
-  // Leaving, it still says how many it showed
-  const said = useRef(count)
-  if (count > 0) said.current = count
-  return (
-    <div
-      aria-live="polite"
-      // On the tabs' line above it; stuck, 12px below the top
-      className="sticky top-[42px] z-10 flex h-0 justify-center"
-    >
-      {notice.mounted && (
-        <button
-          ref={notice.ref}
-          type="button"
-          data-state={notice.state}
-          data-side="bottom"
-          onClick={onShow}
-          className="motion-pop -mt-[30px] h-7 rounded-full bg-primary px-3 text-meta font-semibold text-primary-foreground shadow-float outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          {t.newTasks(said.current)}
-        </button>
-      )}
-    </div>
-  )
-}
-
-/**
- * Collect now, or Stop while a collection runs. While another of your Macs
- * collects, it waits for that one.
- */
-function CollectButton({
-  running,
-  elsewhere,
-  noAi = false,
-}: {
-  running: boolean
-  /** Another of your Macs collecting now */
-  elsewhere?: string
-  /** No AI set up yet: it opens Let your AI help instead */
-  noAi?: boolean
-}) {
-  const t = useText(text)
-  const { collect, stop } = useCollect()
-  if (noAi && !running && !elsewhere)
-    return (
-      <Button size="sm" variant="outline" onClick={() => openAiSheet()}>
-        <Sparkles />
-        {t.findWithAi}
-      </Button>
-    )
-  if (elsewhere && !running)
-    return (
-      <Button size="sm" variant="secondary" disabled>
-        <LoaderCircle className="animate-spin" />
-        {t.collectingOn(elsewhere)}
-      </Button>
-    )
-  if (running)
-    return (
-      <div className="flex items-center gap-1">
-        {/* The status line under the title shows Pace at work. */}
-        <Button size="sm" variant="secondary" disabled>
-          {t.collecting}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => void stop()}>
-          {t.stop}
-        </Button>
-      </div>
-    )
-  return (
-    <Button size="sm" onClick={() => void collect()}>
-      <RefreshCw />
-      {t.collectNow}
-    </Button>
-  )
-}
-
-/**
- * What Let your AI help's first look added, once it closed on Todo (the
- * task-first canvas's "처음 시작", O3): the tasks you added stay as they were
- */
-function FoundNotice({
-  by,
-  added,
-  maybe,
-  onMaybes,
-}: {
-  by: string
-  added: number
-  maybe: number
-  onMaybes: () => void
-}) {
-  const t = useText(text)
-  return (
-    <section
-      role="status"
-      aria-label={t.foundTitle}
-      className="mt-5 flex items-center gap-3 rounded-xl bg-card-accent py-2.5 pr-2.5 pl-4"
-    >
-      <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
-      <p className="min-w-0 flex-1 text-copy">{t.foundBy(by, added, maybe)}</p>
-      {maybe > 0 && (
-        <Button size="xs" variant="ghost" onClick={onMaybes}>
-          {t.lookAtMaybes}
-        </Button>
-      )}
-      <Button size="xs" variant="outline" onClick={clearFound}>
-        {t.foundRight}
-      </Button>
-    </section>
-  )
-}
-
-/**
- * Told once, to someone who used Pace before the window opened on Todo: Pace's
- * screens are still there, and Overview can stay the first screen
- */
-function TodoFirst() {
-  const t = useText(text)
-  const supervisor = useSupervisor()
-  const landing = useLanding()
-  // Pace in use: set up, not off (a Pacenote for Todo alone has nothing new)
-  const used = supervisor && !supervisor.off && supervisor.phase !== 'setup'
-  if (!used || !landing.data || landing.data.told) return null
-  return (
-    <section
-      aria-label={t.todoFirst}
-      className="mt-5 flex items-center gap-3 rounded-xl bg-card-accent px-4 py-3"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="text-section">{t.todoFirst}</p>
-        <p className="text-meta text-muted-foreground">{t.todoFirstBody}</p>
-      </div>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={() =>
-          void landing
-            .set({ landing: 'overview', told: true })
-            .then(() => go('#/'))
-        }
-      >
-        {t.openOnOverview}
-      </Button>
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={() => void landing.set({ told: true })}
-      >
-        {t.gotIt}
-      </Button>
-    </section>
-  )
-}
-
-/** New task, beside Collect now: opens (and closes) the form, as Cmd-N does */
-function NewTaskButton({
-  pressed = false,
-  onClick,
-}: {
-  pressed?: boolean
-  onClick?: () => void
-}) {
-  const t = useText(text)
-  return (
-    <Button
-      size="sm"
-      variant="outline"
-      aria-pressed={pressed}
-      aria-keyshortcuts={isMac ? 'Meta+N' : 'Control+N'}
-      onClick={onClick}
-    >
-      <Plus />
-      {t.newTask}
-    </Button>
-  )
-}
-
-/** What an AI tool is doing with your tasks, or just did, in a sentence */
-function liveLine(
-  live: TasksLive | null | undefined,
-  titleOf: (id: string) => string | undefined
-): { key: string; text: string; active: boolean } | undefined {
-  if (!live) return undefined
-  const t = localized(text)
-  if (live.collecting) {
-    const { by, since, added } = live.collecting
-    return {
-      key: `collect:${since}`,
-      active: true,
-      text: t.liveCollecting(closedBy(by) ?? t.anAiTool, added),
-    }
-  }
-  const event = live.latest
-  if (!event) return undefined
-  const title = event.task ? titleOf(event.task) : undefined
-  const tool = closedBy(event.by) ?? t.anAiTool
-  const line =
-    event.kind === 'look'
-      ? t.liveLook(tool, title)
-      : event.kind === 'update'
-        ? t.liveUpdate(tool, title)
-        : event.kind === 'close'
-          ? t.liveClose(tool, title)
-          : event.kind === 'wrap-up'
-            ? t.liveWrapUp(tool, title)
-            : event.kind === 'follow-up'
-              ? t.liveFollowUp(tool, title)
-              : event.kind === 'add' && event.finished !== false
-                ? event.added
-                  ? t.liveAdded(tool, event.added)
-                  : t.liveNothing(tool)
-                : undefined
-  if (!line) return undefined
-  return {
-    key: `${event.kind}:${event.task ?? ''}:${event.at}`,
-    active: event.kind === 'look',
-    text: line,
-  }
-}
-
-/**
- * The line under the title: a collection the app runs, or what an AI tool is
- * doing with your tasks over MCP as it does it, or how the app's last
- * collection ended. Each line gives way to the next (swap).
- */
-function StatusLine({
-  collect,
-  macs,
-  live,
-  titleOf,
-}: {
-  collect: TasksCollect
-  macs: MacsView | undefined
-  live: TasksLive | null | undefined
-  titleOf: (id: string) => string | undefined
-}) {
-  const line = collect.running ? undefined : liveLine(live, titleOf)
-  return (
-    <Swap id={collect.running ? 'collect' : (line?.key ?? 'last')}>
-      {line ? (
-        <p className="mt-1 flex items-center gap-2 text-copy text-muted-foreground">
-          {/* In the spinner's place: the tool at work, or done */}
-          <span className="flex size-6 shrink-0 items-center justify-center">
-            {line.active ? (
-              <span className="size-1.5 animate-pulse-dot rounded-full bg-status-running" />
-            ) : (
-              <SquareTerminal aria-hidden="true" className="size-3.5" />
-            )}
-          </span>
-          <span className={cn('min-w-0', line.active && 'text-shimmer')}>
-            {line.text}
-          </span>
-        </p>
-      ) : (
-        <CollectStatus collect={collect} macs={macs} />
-      )}
-    </Swap>
-  )
-}
-
-/**
- * What the running collection is doing, or how the last one ended, and which
- * AI did it when the one chosen could not. Signed out, it offers that CLI's
- * sign-in in your terminal. When the work goes to the other AI mid-run, only
- * the words swap: Pace's mark keeps looking.
- */
-function CollectStatus({
-  collect,
-  macs,
-}: {
-  collect: TasksCollect
-  macs: MacsView | undefined
-}) {
-  const t = useText(text)
-  const { running, last, elsewhere } = collect
-  // Why the terminal did not open, for the collection it was opened for
-  const [signIn, setSignIn] = useState<{ at: string; error: string }>()
-  const name = (cli: OwnCli | undefined) => (cli ? CLI_NAMES[cli] : t.yourAi)
-  let status: string | undefined
-  let spent: string | undefined
-  if (running)
-    status = running.reads
-      ? t.reading(name(running.by), running.reads)
-      : t.starting(name(running.by))
-  else if (elsewhere) status = t.elsewhere(elsewhere.name)
-  else if (last?.ok) {
-    status = t.collected(
-      last.added,
-      last.maybe,
-      last.mac && macNamed(macs, last.mac),
-      last.skipped
-    )
-    if (last.usage)
-      spent = t.spent(
-        formatTokens(newTokens(last.usage)),
-        last.reads ?? 0,
-        last.by && CLI_NAMES[last.by]
-      )
-  }
-  if (!status && !last) return null
-  const switched = running ? running.switched : last?.switched
-  // Who to sign in again: the CLI that ran, or the one it took over from
-  const signOut: OwnCli | undefined = running
-    ? undefined
-    : last && !last.ok && last.signedOut
-      ? last.by
-      : last?.switched?.unable === 'auth'
-        ? last.switched.from
-        : undefined
-  // Pace's mark looks around while a collection runs and eases into the logo
-  // beside its result.
-  return (
-    <div data-collect-status>
-      <div
-        className={cn(
-          'mt-1 flex items-center gap-2 text-copy',
-          last && !last.ok && !running
-            ? 'text-status-interrupted'
-            : 'text-muted-foreground'
-        )}
-      >
-        <PaceSpinner
-          active={Boolean(running || elsewhere)}
-          className="size-6"
-        />
-        <Swap
-          id={running ? `run:${running.by ?? ''}` : 'last'}
-          className={cn('min-w-0', running && 'text-shimmer')}
-        >
-          {status ??
-            (last && !last.ok
-              ? signIn?.at === last.at
-                ? signIn.error
-                : last.error
-              : null)}
-          {spent && <span className="text-foreground/80"> {spent}</span>}
-        </Swap>
-        {signOut && last && (
-          <Button
-            size="xs"
-            variant="outline"
-            className="text-foreground"
-            onClick={async () => {
-              const opened = await window.pacenoteDesktop?.tasks.signIn(signOut)
-              if (opened?.error) setSignIn({ at: last.at, error: opened.error })
-            }}
-          >
-            <SquareTerminal aria-hidden="true" />
-            {t.signIn(CLI_NAMES[signOut])}
-          </Button>
-        )}
-      </div>
-      {switched && (
-        <Swap id={`switch:${switched.from}:${running ? 'run' : 'last'}`}>
-          <p
-            data-switch
-            className="flex items-center gap-2 pl-8 text-meta text-muted-foreground"
-          >
-            <ArrowRightLeft aria-hidden="true" className="size-3 shrink-0" />
-            <span className="min-w-0">
-              {running
-                ? t.tookOver(switchLine(switched), name(running.by))
-                : last?.ok
-                  ? t.collectedInstead(switchLine(switched), name(last.by))
-                  : t.couldNotEither(switchLine(switched), name(last?.by))}
-            </span>
-          </p>
-        </Swap>
-      )}
-    </div>
-  )
-}
-
-/**
- * The collections the app ran in the last 7 days, the latest first: when, how
- * each ended, and the new tokens it spent (the Overview has them per day). A
- * row opens the collection's run in Runs; the old log's rows have none.
- */
-function RecentCollections({
-  collections,
-}: {
-  collections: CollectionRecord[]
-}) {
-  const t = useText(text)
-  const [rows, setRows] = useState(ROWS_AT_ONCE)
-  if (!collections.length)
-    return (
-      <p className="mt-3 border-t border-border py-8 text-copy text-muted-foreground">
-        {t.noCollections}
-      </p>
-    )
-  const spent = collections.map((entry) =>
-    entry.usage ? newTokens(entry.usage) : 0
-  )
-  const max = Math.max(1, ...spent)
-  const total = spent.reduce((sum, value) => sum + value, 0)
-  return (
-    <>
-      <p className="mt-3 text-meta text-muted-foreground">
-        {t.recentSummary(collections.length, formatTokens(total))}
-      </p>
-      <ul className="mt-3 text-body">
-        {collections.slice(0, rows).map((entry, index) => (
-          <li key={entry.startedAt} className="border-t border-border">
-            <CollectionRow entry={entry}>
-              <span className="font-medium tabular-nums">
-                {formatShortDay(entry.startedAt)}{' '}
-                {formatHourMinute(entry.startedAt)}
-              </span>
-              <span>
-                <Badge variant="outline">{t.trigger[entry.trigger]}</Badge>
-              </span>
-              <span
-                title={collectionNote(entry)}
-                className={cn(
-                  'truncate text-meta',
-                  entry.ok ? 'text-muted-foreground' : 'text-status-interrupted'
-                )}
-              >
-                {collectionNote(entry)}
-              </span>
-              <span className="flex items-center justify-end gap-2.5 text-meta">
-                <span className="h-1.5 w-16 overflow-hidden rounded-full bg-well">
-                  {spent[index]! > 0 && (
-                    <span
-                      className="block h-full min-w-1.5 rounded-full bg-chart-4"
-                      style={{ width: `${(spent[index]! / max) * 100}%` }}
-                    />
-                  )}
-                </span>
-                <span className="w-16 text-right font-medium tabular-nums">
-                  {spent[index]
-                    ? t.newTokens(formatTokens(spent[index]!))
-                    : '-'}
-                </span>
-              </span>
-            </CollectionRow>
-          </li>
-        ))}
-      </ul>
-      <ShowMore
-        hidden={collections.length - rows}
-        onShow={() => setRows(rows + ROWS_AT_ONCE)}
-      />
-    </>
-  )
-}
-
-const ROW =
-  'grid grid-cols-[7.25rem_6.75rem_minmax(0,1fr)_11rem_1rem] items-center gap-x-4 py-2.5'
-
-/** A collection's row: a link to its run when it has one */
-function CollectionRow({
-  entry,
-  children,
-}: {
-  entry: CollectionRecord
-  children: React.ReactNode
-}) {
-  const t = useText(text)
-  // Another Mac's run is in that Mac's history
-  if (!entry.runId || entry.mac)
-    return (
-      <div className={ROW}>
-        {children}
-        <span />
-      </div>
-    )
-  return (
-    <a
-      href={`#/runs/${entry.runId}`}
-      title={t.openRun}
-      className={cn(
-        ROW,
-        'group -mx-2 rounded-lg px-2 transition-colors hover:bg-selected/50'
-      )}
-    >
-      {children}
-      <ChevronRight className="size-4 text-muted-foreground/50 group-hover:text-foreground" />
-    </a>
-  )
-}
-
-/** "23 lookups · 2 tasks, 1 Maybe", or why it stopped */
-function collectionNote(entry: CollectionRecord): string {
-  if (!entry.ok) return entry.error
-  return localized(text).note(entry.reads ?? 0, entry.added, entry.maybe)
-}
-
-/** How tasks are collected, and what it takes, before they are turned on */
-function Setup() {
-  const t = useText(text)
-  return (
-    <div className="mt-2">
-      <p className="text-copy text-muted-foreground">{t.setup}</p>
-      <div className="mt-6 grid gap-4 @min-[44rem]:grid-cols-3">
-        {[
-          [t.needsTitle, t.needs],
-          [t.readTitle, t.read],
-          [t.howTitle, t.how],
-        ].map(([title, body]) => (
-          <section
-            key={title}
-            className="rounded-xl border border-border px-4 py-3.5"
-          >
-            <h2 className="text-section">{title}</h2>
-            <p className="mt-1.5 text-copy leading-relaxed text-muted-foreground">
-              {body}
-            </p>
-          </section>
-        ))}
-      </div>
-      <Button className="mt-6" onClick={() => go('#/settings/tasks')}>
-        <Settings />
-        {t.turnOn}
-      </Button>
-    </div>
   )
 }

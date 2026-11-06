@@ -11,6 +11,7 @@ import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
 import { openAiSheet } from '@/lib/ai-sheet'
 import { desktopValue, useDesktopValue } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
+import { isMac, shortcutKeyHeld } from '@/lib/platform'
 import { useTasksPush } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { BotPage } from './components/bot-page'
@@ -140,8 +141,6 @@ const DETAIL_MIN_WIDTH = 440
 /** The content surface's margin to the window's right edge */
 const SURFACE_MARGIN = 12
 
-const isMac = /Mac/.test(navigator.platform)
-
 export default function App() {
   const [route, go] = useRoute()
   const [q, setQ] = useState('')
@@ -167,11 +166,7 @@ export default function App() {
   // Cmd+B shows or hides the sidebar's labels, as in most macOS apps.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key.toLowerCase() === 'b' &&
-        (isMac ? e.metaKey : e.ctrlKey) &&
-        !e.shiftKey
-      ) {
+      if (e.key.toLowerCase() === 'b' && shortcutKeyHeld(e) && !e.shiftKey) {
         e.preventDefault()
         setCollapsed(!collapsed)
       }

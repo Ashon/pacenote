@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/ui/inline-error'
 import { useText } from '@/lib/i18n'
 import { REPO_FOLDERS_KEY, REPO_ROWS_KEY, useRepoRows } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -117,11 +118,7 @@ export function RepoFolders() {
           ))}
         </ul>
       )}
-      {error && (
-        <p role="alert" className="mt-2 text-meta text-status-failed">
-          {error}
-        </p>
-      )}
+      <InlineError error={error} className="mt-2 text-meta" />
     </div>
   )
 }

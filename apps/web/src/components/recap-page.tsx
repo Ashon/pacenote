@@ -21,6 +21,7 @@ import { CLI_NAMES, cliOrder, isOwnCli, type OwnCli } from '@src/tasks/own-ai'
 import { Fragment, useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/ui/inline-error'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,7 @@ import {
 } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatHourMinute, formatRelative, formatShortDay } from '@/lib/format'
+import { useCopy } from '@/lib/clipboard'
 import { useText } from '@/lib/i18n'
 import { readStored, writeStored } from '@/lib/storage'
 import {
@@ -229,11 +231,7 @@ export function RecapPage({
               </p>
             )}
             {alone?.line}
-            {error && (
-              <p role="alert" className="mt-3 text-copy text-status-failed">
-                {error}
-              </p>
-            )}
+            <InlineError error={error} className="mt-3" />
             {/* Another period takes this one's place; until its recap is
                 counted, its skeleton holds the place */}
             <Swap id={`${period}:${periodKey ?? 'now'}`}>
@@ -261,12 +259,8 @@ export function RecapPage({
 
 function CopyButton({ view }: { view: RecapView }) {
   const t = useText(text)
-  const [copied, setCopied] = useState(false)
-  const copy = async (format: CopyFormat) => {
-    await navigator.clipboard.writeText(recapText(view, format))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1_500)
-  }
+  const { copied, copy: copyText } = useCopy(1_500)
+  const copy = (format: CopyFormat) => copyText(recapText(view, format))
   // Each way to copy it: its name, and what it gives
   const formats: [CopyFormat, string, string][] = [
     [
@@ -281,8 +275,8 @@ function CopyButton({ view }: { view: RecapView }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant="outline">
-          {copied ? <Check className="text-primary" /> : <Copy />}
-          {copied ? t.copied : t.copyAs[view.period]}
+          {copied === 'yes' ? <Check className="text-primary" /> : <Copy />}
+          {copied === 'yes' ? t.copied : t.copyAs[view.period]}
           <ChevronDown />
         </Button>
       </DropdownMenuTrigger>

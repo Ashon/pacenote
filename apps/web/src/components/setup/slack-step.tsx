@@ -6,6 +6,7 @@ import { ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { InlineError } from '@/components/ui/inline-error'
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Swap } from '@/components/ui/motion'
@@ -993,11 +994,7 @@ function ItsMe({
           )}
         </Swap>
       </div>
-      {error && (
-        <p role="alert" className="text-body text-status-failed">
-          {error}
-        </p>
-      )}
+      <InlineError error={error} className="text-body" />
       {waited && <Hint>{t.itsMeHint}</Hint>}
       <p className="text-body text-muted-foreground">{t.whileOpen}</p>
     </StepFrame>

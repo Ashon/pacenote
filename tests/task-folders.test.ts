@@ -20,11 +20,8 @@ import {
   suggestFolders,
   yourRepos,
 } from '../src/tasks/folders.js'
-import {
-  collectPrompt,
-  registerTaskTools,
-  taskRules,
-} from '../src/tasks/mcp.js'
+import { registerTaskTools } from '../src/tasks/mcp.js'
+import { collectPrompt, taskRules } from '../src/tasks/prompts.js'
 import type { TaskView } from '../src/tasks/types.js'
 
 const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pacenote-folders-')))

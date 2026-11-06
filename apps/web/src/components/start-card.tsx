@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button'
 import { lastReached, openAiSheet, REACHED_KEY } from '@/lib/ai-sheet'
 import { botControl } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
+import { isMac } from '@/lib/platform'
 import { useSetup } from '@/lib/setup'
 import { writeStored } from '@/lib/storage'
 import { go } from '@/lib/utils'
 import { text } from './start-card.text'
-
-const isMac = /Mac/.test(navigator.platform)
 
 /**
  * Todo's start card (the task-first canvas's "처음 시작", O1): a new install

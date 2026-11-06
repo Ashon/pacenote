@@ -1,3 +1,4 @@
+import { homePath } from '@/lib/format'
 import { Check, Plus, RotateCw, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -24,8 +25,6 @@ const PATHS: ReadonlySet<FoundKey> = new Set(['OPS_FS_ROOT', 'OPS_SSH_KEY'])
 
 /** How many names show before "N more" */
 const SHOWN = 8
-
-const short = (file: string) => file.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
 
 /**
  * Under a Tools setting: the names this Mac has for it, to pick instead of
@@ -147,7 +146,7 @@ function NameChip({
         )}
       />
       <span className={cn('truncate', path && 'font-mono')}>
-        {path ? short(name.value) : name.value}
+        {path ? homePath(name.value) : name.value}
       </span>
       {(name.from === 'home' || (name.hosts?.length ?? 0) > 1) && (
         <span className="text-caption text-muted-foreground tabular-nums">

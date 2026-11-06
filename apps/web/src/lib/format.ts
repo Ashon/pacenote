@@ -146,3 +146,7 @@ export function stepDuration(
 ): number | undefined {
   return finishedAt ? Date.parse(finishedAt) - Date.parse(at) : undefined
 }
+
+/** A path under your home folder, as ~/… */
+export const homePath = (file: string): string =>
+  file.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')
