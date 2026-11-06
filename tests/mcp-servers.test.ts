@@ -12,7 +12,15 @@ import path from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest'
 import { z } from 'zod'
 import { systemPrompt } from '../src/mention/prompt.js'
 import {
@@ -173,11 +181,13 @@ const draft = (more: Partial<McpServerDraft> = {}): McpServerDraft => ({
 })
 
 describe('the MCP servers you add for Pace', () => {
+  // A new server for each test: what it saw and the headers it was sent are
+  // that test's alone
   let upstream: Awaited<ReturnType<typeof startUpstream>>
-  beforeAll(async () => {
+  beforeEach(async () => {
     upstream = await startUpstream()
   })
-  afterAll(() => upstream.close())
+  afterEach(() => upstream.close())
 
   async function withDoor<T>(
     file: string,

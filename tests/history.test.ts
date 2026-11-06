@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { lastMessage, splitToolName } from '../src/history/events.js'
 import { handleLocalApi } from '../src/local-api.js'
 import { dayOf, isSafeArtifactName, runIdFor } from '../src/history/layout.js'
@@ -162,8 +162,14 @@ describe('claude events', () => {
 describe('run history', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'pacenote-history-'))
   afterAll(() => rmSync(root, { recursive: true, force: true }))
-  const store = new HistoryStore(root)
-  const reader = new HistoryReader(root)
+  // Each test's own history, with its reader open all along
+  let store: HistoryStore
+  let reader: HistoryReader
+  beforeEach(() => {
+    const dir = mkdtempSync(path.join(root, 'runs-'))
+    store = new HistoryStore(dir)
+    reader = new HistoryReader(dir)
+  })
   const init = {
     origin: {
       messenger: 'slack' as const,
@@ -244,6 +250,11 @@ describe('run history', () => {
   })
 
   it('marks runs left running as interrupted, except those being resumed', () => {
+    // Two runs that finished earlier that day
+    store
+      .start(init, new Date(2026, 9, 8, 14, 0, 0))
+      .finish('succeeded', {}, new Date(2026, 9, 8, 14, 0, 12))
+    store.start(init, new Date(2026, 9, 8, 15, 0, 0)).finish('succeeded')
     const keep = store.start(init, new Date(2026, 9, 8, 16, 0, 0))
     const stale = store.start(init, new Date(2026, 9, 8, 16, 0, 1))
     expect(store.interruptStale(new Set([keep.id]))).toBe(1)
@@ -260,6 +271,8 @@ describe('run history', () => {
     const cached = () => [
       ...(reader as unknown as { cache: Map<string, unknown> }).cache.keys(),
     ]
+    // A run of the day, kept, and one past the retention period
+    store.start(init, new Date(2026, 9, 8, 14, 0, 0)).finish('succeeded')
     store.start(init, new Date(2026, 7, 1, 9, 0, 0))
     reader.list()
     expect(cached().some((file) => file.includes('2026-08-01'))).toBe(true)

@@ -90,7 +90,9 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
     mcpServerNames: ['ops'],
     complete,
   }
-  const history = new HistoryStore(path.join(root, 'history'))
+  // Each setup's own history and record of runs under way
+  const dir = mkdtempSync(path.join(root, 'mention-'))
+  const history = new HistoryStore(path.join(dir, 'history'))
   const log = createLogger('error')
   const messenger = new SlackMessenger({
     client,
@@ -111,7 +113,7 @@ function setup(complete: (request: ReasonRequest) => Promise<string>) {
     reasoner,
     log,
     extractPdfText: async () => '',
-    inflight: new InflightStore(path.join(root, 'inflight.json')),
+    inflight: new InflightStore(path.join(dir, 'inflight.json')),
     history,
   })
   return {

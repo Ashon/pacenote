@@ -140,33 +140,54 @@ describe('the folders you worked in lately', () => {
 })
 
 describe('a task’s folder', () => {
-  const home = path.join(root, 'suggest')
-  const data = path.join(home, '.pacenote')
-  mkdirSync(data, { recursive: true })
-  const payments = checkout(
-    path.join(home, 'git', 'payments'),
-    'git@github.com:Ashon/payments.git'
-  )
-  const worktree = checkout(
-    path.join(home, 'work', 'payments-hotfix'),
-    'https://github.com/Ashon/payments.git'
-  )
-  const found = checkout(
-    path.join(home, 'git', 'github', 'payments'),
-    'https://github.com/Ashon/payments'
-  )
-  const ledger = checkout(
-    path.join(home, 'git', 'ledger'),
-    'git@github.com:Ashon/ledger.git'
-  )
-  const notes = path.join(home, 'notes')
-  mkdirSync(notes, { recursive: true })
-  claudeSession(home, notes, HOUR)
-  claudeSession(home, ledger, 2 * HOUR)
-  claudeSession(home, worktree, 3 * HOUR)
-  codexSession(home, payments, 4 * HOUR)
+  /**
+   * A home of its own for a test: checkouts of payments (one a worktree, one
+   * never worked in) and of ledger, and notes, no checkout, worked in last
+   */
+  function suggestHome() {
+    const home = mkdtempSync(path.join(root, 'suggest-'))
+    const data = path.join(home, '.pacenote')
+    mkdirSync(data, { recursive: true })
+    const payments = checkout(
+      path.join(home, 'git', 'payments'),
+      'git@github.com:Ashon/payments.git'
+    )
+    const worktree = checkout(
+      path.join(home, 'work', 'payments-hotfix'),
+      'https://github.com/Ashon/payments.git'
+    )
+    const found = checkout(
+      path.join(home, 'git', 'github', 'payments'),
+      'https://github.com/Ashon/payments'
+    )
+    const ledger = checkout(
+      path.join(home, 'git', 'ledger'),
+      'git@github.com:Ashon/ledger.git'
+    )
+    const notes = path.join(home, 'notes')
+    mkdirSync(notes, { recursive: true })
+    claudeSession(home, notes, HOUR)
+    claudeSession(home, ledger, 2 * HOUR)
+    claudeSession(home, worktree, 3 * HOUR)
+    codexSession(home, payments, 4 * HOUR)
+    return { home, data, payments, worktree, found, ledger, notes }
+  }
+
+  /**
+   * More of the repositories you work in: a checkout whose remote is a folder
+   * on a server, worked in lately, and a folder remembered for Acme/billing
+   */
+  function workElsewhere(home: string, data: string) {
+    const away = checkout(
+      path.join(home, 'git', 'mirror'),
+      '/srv/git/mirror.git'
+    )
+    claudeSession(home, away, HOUR)
+    saveRepo(data, 'Acme/billing', path.join(home, 'git', 'billing'))
+  }
 
   it('for a repository: its folder, then its checkouts you worked in, then the ones found', async () => {
+    const { home, data, payments, worktree, found } = suggestHome()
     saveRepo(data, 'Ashon/payments', payments)
     const folders = await suggestFolders(task({ repo: 'ashon/payments' }), {
       home,
@@ -182,6 +203,7 @@ describe('a task’s folder', () => {
   })
 
   it('for a task with none: the folders you worked in, the ones it names first', async () => {
+    const { home, data, payments, worktree, ledger, notes } = suggestHome()
     const suggest = (fields: Partial<TaskView>) =>
       suggestFolders(task(fields), { home, dataDir: data }).then((folders) =>
         folders.map((f) => f.path)
@@ -213,12 +235,8 @@ describe('a task’s folder', () => {
   })
 
   it('names the repositories you work in, never their folders', async () => {
-    const away = checkout(
-      path.join(home, 'git', 'mirror'),
-      '/srv/git/mirror.git'
-    )
-    claudeSession(home, away, HOUR)
-    saveRepo(data, 'Acme/billing', path.join(home, 'git', 'billing'))
+    const { home, data } = suggestHome()
+    workElsewhere(home, data)
     expect(await yourRepos(data, home)).toEqual([
       'Acme/billing',
       'Ashon/ledger',
@@ -229,6 +247,8 @@ describe('a task’s folder', () => {
   })
 
   it('lists each repository with where its code tasks open', async () => {
+    const { home, data, worktree, ledger } = suggestHome()
+    workElsewhere(home, data)
     const rows = await repoFolderRows(data, home, [
       'Ashon/payments',
       'ashon/payments',
@@ -250,6 +270,8 @@ describe('a task’s folder', () => {
   })
 
   it('gives a collection the repositories, to tell what a thread means', async () => {
+    const { home, data } = suggestHome()
+    workElsewhere(home, data)
     const server = new McpServer({ name: 'pacenote', version: 'test' })
     registerTaskTools(server, {
       dataDir: data,

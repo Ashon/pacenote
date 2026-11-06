@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   CollectionEvents,
   recordCollection,
@@ -52,10 +52,17 @@ const toolResult = (id: string, text: string) =>
 describe('task collections as runs', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'pacenote-collection-runs-'))
   afterAll(() => rmSync(root, { recursive: true, force: true }))
-  const store = new HistoryStore(root)
-  const reader = new HistoryReader(root)
+  // Each test's own history
+  let store: HistoryStore
+  let reader: HistoryReader
+  beforeEach(() => {
+    const dir = mkdtempSync(path.join(root, 'runs-'))
+    store = new HistoryStore(dir)
+    reader = new HistoryReader(dir)
+  })
 
-  it('keeps a collection beside the answers, each saying what it was', async () => {
+  /** An answer to a mention, then a collection that found tasks */
+  function answerThenCollect() {
     store
       .start(
         { origin, request: 'check web-01', backend },
@@ -71,6 +78,11 @@ describe('task collections as runs', () => {
       { reads: 41, found: { added: 2, maybe: 1, skipped: 1 } },
       new Date(2026, 9, 11, 10, 0, 25)
     )
+    return collection
+  }
+
+  it('keeps a collection beside the answers, each saying what it was', async () => {
+    const collection = answerThenCollect()
 
     expect(reader.list().map((run) => run.kind)).toEqual([
       'collection',
@@ -155,6 +167,7 @@ describe('task collections as runs', () => {
   })
 
   it('keeps collections out of the run history MCP', async () => {
+    answerThenCollect()
     const server = createHistoryServer({
       reader,
       enabled: () => true,

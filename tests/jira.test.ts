@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   adfToText,
   JiraClient,
@@ -208,14 +208,20 @@ describe('JiraClient', () => {
     return new Response('{}', { status: 500 })
   }) as typeof fetch
 
+  // A new client for each test: nothing sent, no writes counted, the clock at 0
   let now = 0
-  const client = new JiraClient({
-    baseUrl: 'https://jira.example.com/',
-    email: 'me@example.com',
-    token: 'ATATTtest',
-    projects: PROJECTS,
-    fetchImpl,
-    now: () => now,
+  let client: JiraClient
+  beforeEach(() => {
+    calls.length = 0
+    now = 0
+    client = new JiraClient({
+      baseUrl: 'https://jira.example.com/',
+      email: 'me@example.com',
+      token: 'ATATTtest',
+      projects: PROJECTS,
+      fetchImpl,
+      now: () => now,
+    })
   })
 
   it('searches with scoped JQL and uses the token only for Basic auth', async () => {
@@ -274,6 +280,7 @@ describe('JiraClient', () => {
   })
 
   it('adds comments and limits writes to 20 per hour', async () => {
+    await client.createIssue({ project: 'PROJ', summary: 'Investigate' })
     expect(await client.addComment('PROJ-1', 'Confirmed')).toBe(
       'Added a comment to PROJ-1. https://jira.example.com/browse/PROJ-1?focusedCommentId=100'
     )

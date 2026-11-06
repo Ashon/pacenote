@@ -207,7 +207,9 @@ describe('private folders', () => {
   })
 
   it('writes the settings file for this account alone, whatever it was', () => {
-    const file = path.join(root, 'private', 'mine.json')
+    // A folder of its own, not the one the test above makes
+    const dir = mkdtempSync(path.join(root, 'private-'))
+    const file = path.join(dir, 'mine.json')
     writeFileSync(file, '{}\n', { mode: 0o644 })
     chmodSync(file, 0o644)
     writeSettingsFile(file, '{ "tasks": { "enabled": true } }\n')
