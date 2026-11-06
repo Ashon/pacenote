@@ -26,7 +26,8 @@ import { formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { text } from './hub-admin.text'
-import { CardHeader, Chip, Row, Segmented } from './settings-parts'
+import { Segmented } from '@/components/ui/segmented'
+import { CardHeader, Chip, Row } from './settings-parts'
 
 /** How often the members' Macs and requests are asked again */
 const REFRESH_MS = 15_000

@@ -1,7 +1,8 @@
-// Turns the end-to-end coverage summary (pnpm test:e2e:coverage) into what CI
-// shows:
-// - coverage/e2e/badge.json: a shields.io endpoint badge, published to the
-//   badges branch on pushes to main
+// Turns a coverage summary into what CI shows: the end-to-end one
+// (pnpm test:e2e:coverage, coverage/e2e, the default) or the unit one
+// (pnpm test:coverage, coverage/unit, given as the argument).
+// - badge.json beside it: a shields.io endpoint badge; the end-to-end one is
+//   published to the badges branch on pushes to main
 // - stdout: a Markdown table per folder, for the job summary
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -12,6 +13,7 @@ const summary = JSON.parse(
   readFileSync(path.join(dir, 'coverage-summary.json'), 'utf8')
 )
 const root = process.cwd()
+const unit = path.basename(dir) === 'unit'
 
 const color = (pct) =>
   pct >= 90
@@ -31,7 +33,7 @@ writeFileSync(
   path.join(dir, 'badge.json'),
   `${JSON.stringify({
     schemaVersion: 1,
-    label: 'e2e coverage',
+    label: unit ? 'unit coverage' : 'e2e coverage',
     message: `${total.lines.pct.toFixed(1)}%`,
     color: color(total.lines.pct),
   })}\n`
@@ -63,7 +65,9 @@ const rows = [...folders.entries()]
   )
 process.stdout.write(
   [
-    '### End-to-end coverage (bot and team hub)',
+    unit
+      ? '### Unit coverage (bot, team hub, desktop app, screen)'
+      : '### End-to-end coverage (bot and team hub)',
     '',
     '| Folder | Lines | Branches | Functions |',
     '| --- | --- | --- | --- |',

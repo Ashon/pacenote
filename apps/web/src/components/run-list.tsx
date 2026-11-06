@@ -9,6 +9,7 @@ import { useDeferredValue, useState } from 'react'
 import type * as React from 'react'
 import { Placeholder } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Segmented } from '@/components/ui/segmented'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { useRuns } from '@/lib/api'
 import {
@@ -92,25 +93,17 @@ export function RunList({
       {/* What kind of job on top, the state as a select under it */}
       {!filters && (
         <div className="space-y-2 px-3 pt-4 pb-2">
-          <div role="radiogroup" className="flex rounded-lg bg-muted p-0.5">
-            {KINDS.map((filter) => (
-              <button
-                key={filter ?? 'all'}
-                type="button"
-                role="radio"
-                aria-checked={kind === filter}
-                onClick={() => pick(filter, status)}
-                className={cn(
-                  'h-6 flex-auto rounded-md px-1.5 text-meta font-medium whitespace-nowrap transition-colors',
-                  kind === filter
-                    ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {t.kinds[filter ?? 'all']}
-              </button>
-            ))}
-          </div>
+          <Segmented<RunKind | 'all'>
+            stretch
+            value={kind ?? 'all'}
+            options={KINDS.map((filter) => ({
+              value: filter ?? 'all',
+              label: t.kinds[filter ?? 'all'],
+            }))}
+            onChange={(value) =>
+              pick(value === 'all' ? undefined : value, status)
+            }
+          />
           <label className="flex h-7 w-fit items-center gap-1.5 rounded-lg bg-muted px-2.5 text-meta text-muted-foreground">
             {t.status}
             <select

@@ -29,7 +29,8 @@ import type {
   McpServerIssue,
   McpServerView,
 } from '@src/settings/mcp-servers'
-import { CardHeader, Row, Switch } from './settings-parts'
+import { Switch } from '@/components/ui/switch'
+import { CardHeader, Row } from './settings-parts'
 import { text } from './mcp-servers-card.text'
 import { Access } from './tools-parts'
 

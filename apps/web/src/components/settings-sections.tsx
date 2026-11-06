@@ -39,11 +39,11 @@ import {
   Row,
   sectionInfo,
   SubHeading,
-  Switch,
   ThemePicker,
   UpdatesCard,
   type Section,
 } from './settings-parts'
+import { Switch } from '@/components/ui/switch'
 import { ToolsSection } from './tools-section'
 
 /**

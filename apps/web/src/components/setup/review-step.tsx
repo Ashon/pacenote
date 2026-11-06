@@ -5,6 +5,7 @@ import { LoaderCircle, Lock } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { useSupervisor } from '@/lib/desktop'
 import { useText } from '@/lib/i18n'
 import {
@@ -14,7 +15,6 @@ import {
   type SetupStep,
   type useSandboxSetup,
 } from '@/lib/setup'
-import { cn } from '@/lib/utils'
 import { Chip, Problem, StepFrame } from './parts'
 import { text } from './review-step.text'
 import { preparingProblem, SandboxLogin } from './runtime-step'
@@ -351,25 +351,12 @@ export function ReviewStep({
           <Row label={t.diagrams}>
             <span className="flex flex-1 items-center gap-3">
               <span className="flex-1">{t.diagramsWhat}</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={diagramsOn}
-                aria-label={t.diagrams}
+              <Switch
+                checked={diagramsOn}
+                onChange={setDiagrams}
                 disabled={busy}
-                onClick={() => setDiagrams(!diagramsOn)}
-                className={cn(
-                  'relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50',
-                  diagramsOn ? 'bg-primary' : 'bg-input'
-                )}
-              >
-                <span
-                  className={cn(
-                    'absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform',
-                    diagramsOn && 'translate-x-4'
-                  )}
-                />
-              </button>
+                label={t.diagrams}
+              />
             </span>
           </Row>
         )}

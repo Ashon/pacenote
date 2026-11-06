@@ -22,7 +22,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,7 +31,9 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
+import { Segmented } from '@/components/ui/segmented'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
+import { FieldLabel, Switch } from '@/components/ui/switch'
 import { remoteMac } from '@/lib/desktop'
 import { formatRelative } from '@/lib/format'
 import {
@@ -1023,13 +1025,16 @@ export function Row({
   below?: React.ReactNode
   children: React.ReactNode
 }) {
+  const labelId = useId()
   return (
     <div
       data-setting={setting}
       className="flex items-start gap-4 px-4 py-3 @max-[36rem]/content:flex-col @max-[36rem]/content:gap-2"
     >
       <div className="min-w-0 flex-1 @max-[36rem]/content:w-full">
-        <div className="text-row">{label}</div>
+        <div id={labelId} className="text-row">
+          {label}
+        </div>
         {help && (
           <p className="mt-0.5 text-meta text-muted-foreground">{help}</p>
         )}
@@ -1037,7 +1042,8 @@ export function Row({
         {below}
       </div>
       <div className="flex min-h-7 max-w-full shrink-0 items-center">
-        {children}
+        {/* A switch or a choice here is named by the row's label */}
+        <FieldLabel.Provider value={labelId}>{children}</FieldLabel.Provider>
       </div>
     </div>
   )
@@ -1186,53 +1192,6 @@ export function LanguagePicker() {
 }
 
 /**
- * A few short options side by side: the theme, the language, and the settings
- * that pick one of two or three (where work runs, which terminal)
- */
-export function Segmented({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string
-  /**
-   * lang: an option written in a language of its own (a language's name);
-   * icon: one shown before its label
-   */
-  options: { value: string; label: string; lang?: string; icon?: LucideIcon }[]
-  onChange: (value: string) => void
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="flex rounded-lg bg-muted p-0.5"
-    >
-      {options.map(({ icon: Icon, ...option }) => (
-        <button
-          key={option.value}
-          type="button"
-          lang={option.lang}
-          role="radio"
-          aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'flex h-6 items-center gap-1.5 rounded-md px-2.5 text-meta font-medium whitespace-nowrap transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
-            value === option.value
-              ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          {Icon && <Icon className="size-3.5" />}
-          {option.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-/**
  * Help: diagnostics to paste into a bug report. The secrets are taken out in
  * the app; the logs can still name channels and people, so it says to read it
  * first.
@@ -1319,37 +1278,6 @@ export function UpdatesCard({ update }: { update: UpdateState | undefined }) {
         </Row>
       </div>
     </section>
-  )
-}
-
-export function Switch({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean
-  onChange: (value: boolean) => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        'relative h-5 w-9 rounded-full transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none disabled:opacity-50',
-        checked ? 'bg-primary' : 'bg-input'
-      )}
-    >
-      <span
-        className={cn(
-          'absolute top-0.5 left-0.5 size-4 rounded-full bg-background shadow transition-transform',
-          checked && 'translate-x-4'
-        )}
-      />
-    </button>
   )
 }
 

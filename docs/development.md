@@ -1,8 +1,9 @@
 # Development
 
 ```sh
-pnpm check          # typecheck (bot, UI, app) + lint + format:check + test
-pnpm test
+pnpm check          # typecheck (bot, UI, app) + lint + format:check + test:coverage
+pnpm test           # unit tests (tests/) and the screen's component tests
+pnpm test:coverage  # the same, with their coverage (coverage/unit/index.html), failing below its floors
 pnpm test:e2e       # end-to-end: the bot and the hub against a fake Slack, claude and codex (about 15 s)
 pnpm test:e2e:coverage  # the same, with the bot's and the hub's coverage (coverage/e2e/index.html)
 pnpm test:e2e:app   # end-to-end through the desktop app's window (builds first; opens a window)
@@ -15,6 +16,22 @@ Prettier formats the code (`.prettierrc`: no semicolons, single quotes, 80 colum
 (`eslint.config.js`), with an 80-column limit that also holds for comments; strings, template literals, regexes and
 URLs may run longer. `pnpm format` rewrites; `pnpm lint` and `pnpm format:check` verify, and both are part of
 `pnpm check`.
+
+## Unit and component tests
+
+`vitest.config.ts` runs two projects. `unit` is `tests/*.test.ts` in Node: the bot, the hub, the desktop app's main
+process and the screen's plain helpers, each against fakes (a clock, a Slack client, a child process) rather than the
+real thing. `web` is the screen's components, `apps/web/src/**/*.test.tsx` beside the component they test, rendered
+in happy-dom with Testing Library from the web app's own packages; both resolve the screen's aliases (`@/`,
+`@src/`, `@history/`, `@runtime/`), so a test loads any of its modules.
+
+A component test finds what it checks the way someone using the screen would, by role and name
+(`getByRole('switch', { name: 'Diagrams' })`), not by class or test id. Shared controls live in `components/ui`
+(the switch and the row of segments among them), and `tests/web-controls.test.ts` fails when a screen draws its own.
+
+`pnpm test:coverage` measures the coverage of `src`, `apps/desktop/src` and `apps/web/src` with V8, and fails below
+the floors in `vitest.config.ts`. Raise them as tests are added; never lower them to pass. CI puts this coverage per
+folder in the job summary too.
 
 ## End-to-end tests
 
@@ -46,7 +63,7 @@ sandbox jobs and the desktop app's own code (the history reader, the connection 
 since this suite does not run them in those processes; a process killed on purpose (the crash test) leaves no coverage. The report is in `coverage/e2e/` (`index.html`, `lcov.info`).
 
 CI (`.github/workflows/ci.yml`) runs `pnpm check` and `pnpm test:e2e:coverage` on every push to main and pull
-request, puts the coverage per folder in the job summary, and keeps the report as the `e2e-coverage` artifact. On
+request, puts both coverages per folder in the job summary, and keeps the report as the `e2e-coverage` artifact. On
 main it also updates the coverage badge above (the `badges` branch). The app test runs on a macOS runner when the
 workflow is started by hand.
 

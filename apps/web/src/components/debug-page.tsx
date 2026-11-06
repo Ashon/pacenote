@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Segmented } from '@/components/ui/segmented'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -172,7 +173,12 @@ function SpinnerBench() {
         >
           {t.fps(fps, longest)}
         </span>
-        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
+        <Segmented
+          className="w-fit"
+          options={SPEEDS}
+          value={speed}
+          onChange={setSpeed}
+        />
         <Button
           size="sm"
           variant="outline"
@@ -294,7 +300,12 @@ function SettleBench() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-section">{t.settle}</h2>
-        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
+        <Segmented
+          className="w-fit"
+          options={SPEEDS}
+          value={speed}
+          onChange={setSpeed}
+        />
       </div>
       <p className="text-meta text-muted-foreground">{t.settleNote}</p>
       <div className="flex flex-wrap items-center gap-2">
@@ -392,7 +403,8 @@ function MarkBench() {
       <p className="text-meta text-muted-foreground">{t.markNote}</p>
       <div className="grid gap-x-8 gap-y-3 text-meta text-muted-foreground sm:grid-cols-[auto_1fr]">
         <span className="self-center">Pace</span>
-        <Choice
+        <Segmented
+          className="w-fit"
           options={names(MARK_STATES).map((name) => ({
             value: name,
             label: states[name],
@@ -401,7 +413,12 @@ function MarkBench() {
           onChange={setPace}
         />
         <span className="self-center">{t.requestsInProgress}</span>
-        <Choice options={counts(0, 1, 3)} value={active} onChange={setActive} />
+        <Segmented
+          className="w-fit"
+          options={counts(0, 1, 3)}
+          value={active}
+          onChange={setActive}
+        />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-8 border-y border-border py-6">
         <div className="flex items-start gap-4">
@@ -499,9 +516,15 @@ function StatusBench() {
           ))}
         </select>
         <span className="self-center">{t.requestsInProgress}</span>
-        <Choice options={counts(0, 1, 3)} value={active} onChange={setActive} />
+        <Segmented
+          className="w-fit"
+          options={counts(0, 1, 3)}
+          value={active}
+          onChange={setActive}
+        />
         <span className="self-center">{t.taskCollection}</span>
-        <Choice
+        <Segmented
+          className="w-fit"
           options={(['off', 'starting', 'reading'] as const).map((value) => ({
             value,
             label: t.collect[value],
@@ -510,9 +533,15 @@ function StatusBench() {
           onChange={setCollect}
         />
         <span className="self-center">{t.checkIssues}</span>
-        <Choice options={counts(0, 1, 2)} value={issues} onChange={setIssues} />
+        <Segmented
+          className="w-fit"
+          options={counts(0, 1, 2)}
+          value={issues}
+          onChange={setIssues}
+        />
         <span className="self-center">{t.width}</span>
-        <Choice
+        <Segmented
+          className="w-fit"
           options={WIDTHS.map((w) => ({
             value: w,
             label: w ? `${w} px` : t.page,
@@ -571,12 +600,18 @@ function MotionBench() {
     <section className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-section">{t.motion}</h2>
-        <Choice options={SPEEDS} value={speed} onChange={setSpeed} />
+        <Segmented
+          className="w-fit"
+          options={SPEEDS}
+          value={speed}
+          onChange={setSpeed}
+        />
       </div>
       <p className="text-meta text-muted-foreground">{t.motionNote}</p>
       <div className="grid gap-x-10 gap-y-8 @min-[44rem]:grid-cols-2">
         <Bench title="swap" note={t.swapNote}>
-          <Choice
+          <Segmented
+            className="w-fit"
             options={SCREENS.map((name) => ({
               value: name,
               label: t.screens[name],
@@ -805,39 +840,6 @@ function Bench({
       <h3 className="text-body font-semibold">{title}</h3>
       <p className="mb-3 text-meta text-muted-foreground">{note}</p>
       {children}
-    </div>
-  )
-}
-
-/** One of a few values, as a row of segments */
-function Choice<T extends string | number>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[]
-  value: T
-  onChange: (value: T) => void
-}) {
-  return (
-    <div role="radiogroup" className="flex w-fit rounded-lg bg-muted p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'h-6 rounded-md px-2.5 text-meta font-medium tabular-nums transition-colors',
-            value === option.value
-              ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
     </div>
   )
 }

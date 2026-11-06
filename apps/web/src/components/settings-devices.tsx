@@ -28,7 +28,8 @@ import { localized } from '@src/i18n/locale'
 import type { AddingView, DeviceView, MacView } from '@src/macs/types'
 import { FromMacBody } from './setup/from-mac'
 import { text } from './settings-page.text'
-import { CardHeader, Row, SectionSkeleton, Switch } from './settings-parts'
+import { Switch } from '@/components/ui/switch'
+import { CardHeader, Row, SectionSkeleton } from './settings-parts'
 
 /**
  * Settings > Devices: Pace answers on the Mac you're using. Pacenote on your
