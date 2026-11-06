@@ -154,9 +154,13 @@ export function setStage(
 /** The tasks for the screen, read from the data folder */
 export function tasksView(
   dataDir: string,
-  excluded: readonly string[] = []
+  excluded: readonly string[] = [],
+  now?: number
 ): TasksView {
-  return buildView(readTasks(dataDir), readDecisions(dataDir), { excluded })
+  return buildView(readTasks(dataDir), readDecisions(dataDir), {
+    excluded,
+    now,
+  })
 }
 
 /**

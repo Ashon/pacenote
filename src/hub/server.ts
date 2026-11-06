@@ -96,6 +96,8 @@ interface HubOptions {
   /** The language of the hub's notes in Slack (HUB_NOTES_LANGUAGE). English */
   notesLocale?: Locale
   log: Logger
+  /** The clock, for the tests (upload links and the people kept expire) */
+  now?: () => number
 }
 
 const MAX_API_BODY = 2 * 1024 * 1024
@@ -131,7 +133,10 @@ export class HubServer {
   private readonly names = new Map<string, string>()
   private people?: { at: number; list: SlackPerson[] }
 
+  private readonly now: () => number
+
   constructor(private readonly options: HubOptions) {
+    this.now = options.now ?? Date.now
     this.http = createServer((req, res) => {
       this.handle(req, res).catch((err: unknown) => {
         if (err instanceof BodyTooLargeError) {
@@ -255,7 +260,7 @@ export class HubServer {
       const name = await slack.userName(user).catch(() => user)
       access.ask({
         user: { id: user, name },
-        at: new Date().toISOString(),
+        at: new Date(this.now()).toISOString(),
         channel: event.channel,
         threadTs: event.thread_ts,
         code: code ?? undefined,
@@ -560,8 +565,8 @@ export class HubServer {
   private async findPeople(q: string): Promise<HubPerson[]> {
     const words = q.trim().toLowerCase()
     if (!words) return []
-    if (!this.people || this.people.at < Date.now() - PEOPLE_TTL_MS)
-      this.people = { at: Date.now(), list: await this.options.slack.people() }
+    if (!this.people || this.people.at < this.now() - PEOPLE_TTL_MS)
+      this.people = { at: this.now(), list: await this.options.slack.people() }
     const { access } = this.options
     return this.people.list
       .filter(
@@ -674,7 +679,7 @@ export class HubServer {
     if (
       !upload ||
       upload.desktopId !== desktop.id ||
-      upload.expiresAt < Date.now()
+      upload.expiresAt < this.now()
     )
       return json(res, 403, { ok: false, error: 'upload_not_granted' })
     this.uploads.delete(key)
@@ -696,10 +701,10 @@ export class HubServer {
     this.uploads.set(key, {
       desktopId,
       url,
-      expiresAt: Date.now() + UPLOAD_TTL_MS,
+      expiresAt: this.now() + UPLOAD_TTL_MS,
     })
     for (const [k, v] of this.uploads)
-      if (v.expiresAt < Date.now()) this.uploads.delete(k)
+      if (v.expiresAt < this.now()) this.uploads.delete(k)
     return `${this.publicUrl(req)}${HUB_PATHS.upload}?key=${key}`
   }
 

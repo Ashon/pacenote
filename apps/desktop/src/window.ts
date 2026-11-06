@@ -2,6 +2,12 @@ import { BrowserWindow, nativeTheme, shell, type WebContents } from 'electron'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { Logger } from '../../../src/logger.js'
 import { ScreenLoader, unavailablePage } from './screen.js'
+import {
+  closeAction,
+  CrashBudget,
+  isScreenUrl,
+  opensInBrowser,
+} from './window-rules.js'
 
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
@@ -164,9 +170,13 @@ export class MainWindow {
     // so a close there leaves full screen first and hides once it has: shown
     // again, the window is back in its own size, as a Mac app's window is.
     window.on('close', (event) => {
-      if (this.options.quitting()) return
+      const action = closeAction({
+        quitting: this.options.quitting(),
+        fullScreen: window.isFullScreen(),
+      })
+      if (action === 'close') return
       event.preventDefault()
-      if (window.isFullScreen()) {
+      if (action === 'leave-full-screen') {
         this.hideOnLeave = true
         window.setFullScreen(false)
         return
@@ -175,16 +185,13 @@ export class MainWindow {
     })
     // A window whose process ended is blank: it loads again, unless that
     // keeps happening.
-    const gone: number[] = []
+    const crashes = new CrashBudget()
     window.webContents.on('render-process-gone', (_event, details) => {
       log.error(
         `The window's process ended (${details.reason}, exit code ${details.exitCode})`
       )
       if (details.reason === 'clean-exit' || this.options.quitting()) return
-      const now = Date.now()
-      gone.push(now)
-      while (gone.length && now - gone[0]! > 60_000) gone.shift()
-      if (gone.length > 3) {
+      if (!crashes.reload()) {
         log.error('Not reloading the window: its process keeps ending.')
         return
       }
@@ -194,7 +201,7 @@ export class MainWindow {
     window.on('responsive', () => log.info('The window responds again.'))
     // External addresses such as Slack links open in the default browser.
     window.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https:\/\//.test(url)) void shell.openExternal(url)
+      if (opensInBrowser(url)) void shell.openExternal(url)
       return { action: 'deny' }
     })
     const screenUrl = webDevUrl ?? 'pacenote://app/'
@@ -227,11 +234,7 @@ export class MainWindow {
         screen.retryNow()
         return
       }
-      if (
-        !url.startsWith('pacenote://app/') &&
-        !(webDevUrl && url.startsWith(webDevUrl))
-      )
-        event.preventDefault()
+      if (!isScreenUrl(url, webDevUrl)) event.preventDefault()
     })
     // The screen failing later, such as reloaded while an upgrade swaps its
     // files, is loaded again the same way, on the screen it was on. One

@@ -1,0 +1,1269 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'node:http'
+import path from 'node:path'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { serveStatelessMcp } from '../mcp-http.js'
+import { ProcessExitError, runProcess } from '../sandbox/process.js'
+import {
+  CHECK_NAMES,
+  CHECKS,
+  buildCheckCommand,
+  type CheckName,
+} from './checks.js'
+import {
+  filterRgOutput,
+  listDir,
+  MAX_READ_LINES,
+  readText,
+  resolveInRoot,
+  rgFilterArgs,
+  rgSearchArgs,
+} from './fs.js'
+import { GitWorkspaces } from './git.js'
+import { GitHubReader } from './github.js'
+import { loadHostMap } from './hosts.js'
+import { JiraClient } from './jira.js'
+import {
+  describeArgs,
+  eventsArgs,
+  getArgs,
+  logsArgs,
+  MAX_LOG_LINES,
+  topArgs,
+} from './k8s.js'
+import { redactSecrets } from './redact.js'
+import { splitList } from '../settings/list.js'
+
+/**
+ * Ops check relay (ops-broker). An MCP (Streamable HTTP) server in a VM of its
+ * own, reachable only through the door Pace relays into each reasoner VM. SSH
+ * keys, kubeconfig, and the work directory exist only in this VM; the reasoner
+ * only requests predefined lookups.
+ * - host_*: read-only host checks on inventory hosts (SSH)
+ * - k8s_*: kubectl lookups with a read-only ServiceAccount
+ * - fs_*: read-only browsing of the work directory (secret files excluded)
+ * - ws_*: code edits and draft PR creation in a separate workspace created from
+ *   the remote default branch
+ * - gh_*: read-only lookups of GitHub repositories and PRs in allowed orgs (the
+ *   token exists only in this VM)
+ * - jira_*: Jira issue lookups in allowed projects, plus issue creation and
+ *   comments on request (the token exists only in this VM)
+ * Features with empty settings or an empty mounted file do not register their
+ * tools, nor do those TOOLS leaves out: the connections whose Read is off in
+ * Settings > Tools, and the writes whose Write is off.
+ */
+const Env = z.object({
+  BROKER_PORT: z.coerce.number().int().positive().default(8080),
+  /**
+   * A unix socket to listen on instead of the port: in the built-in VM
+   * sandbox, pacenote-vm relays it out to Pace and into each reasoner VM.
+   */
+  BROKER_SOCKET: z.string().optional(),
+  /**
+   * In the built-in VM sandbox the broker's VM has no network device: ssh
+   * reaches hosts through this command (proxy-connect.mjs %h %p), and the
+   * other tools and fetch through HTTPS_PROXY.
+   */
+  SSH_PROXY_COMMAND: z.string().optional(),
+  /**
+   * 1 where only Pace's doors reach the broker (the built-in VM sandbox): it
+   * then logs who is asking from their x-pacenote-* headers. Elsewhere the
+   * reasoner could write them itself, so they are ignored.
+   */
+  TRUST_REQUESTER: z.enum(['0', '1']).default('0'),
+  HOSTS_FILE: z.string().default('/etc/ops/hosts.json'),
+  SSH_KEY_FILE: z.string().default('/run/secrets/ssh-key'),
+  KNOWN_HOSTS_FILE: z.string().default('/run/secrets/known_hosts'),
+  SSH_USER: z.string().default(''),
+  ALLOWED_CIDR: z.string().default(''),
+  KUBECONFIG_FILE: z.string().default('/run/secrets/kubeconfig'),
+  FS_ROOT: z.string().default('/workspace'),
+  WORK_ROOT: z.string().default('/work'),
+  GH_TOKEN: z.string().optional(),
+  GIT_AUTHOR_NAME: z.string().optional(),
+  GIT_AUTHOR_EMAIL: z.string().optional(),
+  GIT_ALLOWED_OWNERS: z.string().default(''),
+  GIT_TIMEOUT_SEC: z.coerce.number().int().positive().default(300),
+  JIRA_URL: z.string().default(''),
+  JIRA_EMAIL: z.string().default(''),
+  JIRA_TOKEN: z.string().optional(),
+  JIRA_PROJECTS: z.string().default(''),
+  COMMAND_TIMEOUT_SEC: z.coerce.number().int().positive().default(30),
+  OUTPUT_LIMIT: z.coerce.number().int().positive().default(24_000),
+  MAX_CONCURRENT: z.coerce.number().int().positive().default(4),
+  /**
+   * What it may offer, by connection (src/settings/tools.ts brokerTools):
+   * files, github, jira, k8s, ssh, and github-write, jira-write for their
+   * writes. Pace always says; left out, everything set up is offered.
+   */
+  TOOLS: z.string().optional(),
+})
+/**
+ * The broker, from its settings (the VM's environment). Nothing listens until
+ * start; handle answers one request, so a test can serve it on its own. Each
+ * line of its audit log goes to log (standard output in the VM).
+ */
+export function createBroker(
+  vars: NodeJS.ProcessEnv = process.env,
+  { log = console.log }: { log?: (line: string) => void } = {}
+) {
+  const env = Env.parse(vars)
+
+  /** Whether TOOLS lets the broker offer a group of tools */
+  const offered = (() => {
+    if (env.TOOLS === undefined) return () => true
+    const groups = new Set(splitList(env.TOOLS))
+    return (group: string) => groups.has(group)
+  })()
+
+  /** The way out, when the broker has one other than a network of its own */
+  const PROXY_ENV: NodeJS.ProcessEnv = Object.fromEntries(
+    [
+      'HTTPS_PROXY',
+      'HTTP_PROXY',
+      'NO_PROXY',
+      'https_proxy',
+      'http_proxy',
+      'no_proxy',
+    ]
+      .filter((name) => vars[name])
+      .map((name) => [name, vars[name]])
+  )
+
+  const SSH_DIR = '/tmp/ssh'
+  const KEY = `${SSH_DIR}/id`
+  const KNOWN_HOSTS = `${SSH_DIR}/known_hosts`
+
+  /** Who is asking, for the request being handled (TRUST_REQUESTER) */
+  const asking = new AsyncLocalStorage<Record<string, string> | undefined>()
+
+  /** Who is asking, from the headers Pace's door sets */
+  function requesterOf(
+    req: IncomingMessage
+  ): Record<string, string> | undefined {
+    if (env.TRUST_REQUESTER !== '1') return undefined
+    const by: Record<string, string> = {}
+    for (const key of ['user', 'conversation', 'label', 'thread', 'run']) {
+      const value = req.headers[`x-pacenote-${key}`]
+      if (typeof value !== 'string') continue
+      try {
+        by[key] = decodeURIComponent(value).slice(0, 200)
+      } catch {
+        // Not what a door writes
+      }
+    }
+    return Object.keys(by).length ? by : undefined
+  }
+
+  function audit(entry: Record<string, unknown>): void {
+    const by = asking.getStore()
+    log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        ...entry,
+        ...(by && { by }),
+      })
+    )
+  }
+
+  // ------------------------------------------------------------------
+  // Per-feature setup
+
+  /** Unconfigured mounts arrive as an empty file or an empty directory. */
+  function nonEmptyFile(file: string): boolean {
+    try {
+      const stat = statSync(file)
+      return stat.isFile() && stat.size > 0
+    } catch {
+      return false
+    }
+  }
+
+  function nonEmptyDir(dir: string): boolean {
+    try {
+      return statSync(dir).isDirectory() && readdirSync(dir).length > 0
+    } catch {
+      return false
+    }
+  }
+
+  const sshEnabled =
+    Boolean(env.SSH_USER && env.ALLOWED_CIDR) &&
+    nonEmptyFile(env.HOSTS_FILE) &&
+    nonEmptyFile(env.SSH_KEY_FILE)
+  const hosts = sshEnabled
+    ? loadHostMap(env.HOSTS_FILE, env.ALLOWED_CIDR)
+    : new Map<string, string>()
+  if (hosts.size > 0) {
+    // The mounted key may have the wrong owner/permissions, so copy it to tmpfs
+    // and set it to 600.
+    mkdirSync(SSH_DIR, { recursive: true, mode: 0o700 })
+    copyFileSync(env.SSH_KEY_FILE, KEY)
+    chmodSync(KEY, 0o600)
+    if (nonEmptyFile(env.KNOWN_HOSTS_FILE))
+      copyFileSync(env.KNOWN_HOSTS_FILE, KNOWN_HOSTS)
+  }
+
+  const k8sEnabled = nonEmptyFile(env.KUBECONFIG_FILE)
+  let clusters: string[] = []
+  const fsEnabled = nonEmptyDir(env.FS_ROOT)
+  /** Allowed owners shared by PR creation (ws_*) and GitHub lookups (gh_*) */
+  const allowedOwners = splitList(env.GIT_ALLOWED_OWNERS)
+
+  const git =
+    fsEnabled &&
+    allowedOwners.length > 0 &&
+    env.GH_TOKEN &&
+    env.GIT_AUTHOR_NAME &&
+    env.GIT_AUTHOR_EMAIL
+      ? new GitWorkspaces({
+          localRoot: env.FS_ROOT,
+          workRoot: env.WORK_ROOT,
+          token: env.GH_TOKEN,
+          authorName: env.GIT_AUTHOR_NAME,
+          authorEmail: env.GIT_AUTHOR_EMAIL,
+          allowedOwners,
+          timeoutMs: env.GIT_TIMEOUT_SEC * 1000,
+          proxyEnv: PROXY_ENV,
+        })
+      : undefined
+
+  const github =
+    env.GH_TOKEN && allowedOwners.length > 0
+      ? new GitHubReader({ token: env.GH_TOKEN, allowedOwners })
+      : undefined
+
+  const jiraProjects = splitList(env.JIRA_PROJECTS).map((project) =>
+    project.toUpperCase()
+  )
+  const jira =
+    env.JIRA_URL && env.JIRA_EMAIL && env.JIRA_TOKEN && jiraProjects.length > 0
+      ? new JiraClient({
+          baseUrl: env.JIRA_URL,
+          email: env.JIRA_EMAIL,
+          token: env.JIRA_TOKEN,
+          projects: jiraProjects,
+        })
+      : undefined
+
+  // ------------------------------------------------------------------ Shared
+  // execution
+
+  let running = 0
+
+  /**
+   * Environment variables for external commands (ssh, kubectl, rg). The broker
+   * environment holds credentials such as GH_TOKEN and JIRA_TOKEN, so it is not
+   * passed down; only the way out is.
+   */
+  const TOOL_ENV: NodeJS.ProcessEnv = {
+    PATH: vars.PATH,
+    HOME: '/tmp',
+    ...PROXY_ENV,
+  }
+
+  /**
+   * Runs an external command. A nonzero exit is also returned as a result, and
+   * the output has secrets redacted and is truncated.
+   */
+  async function exec(
+    tool: string,
+    command: string,
+    args: string[],
+    meta: Record<string, unknown>
+  ): Promise<string> {
+    if (running >= env.MAX_CONCURRENT)
+      throw new Error('Too many concurrent requests. Try again shortly.')
+    running += 1
+    const started = Date.now()
+    let exitCode: number | null = 0
+    let output: string
+    try {
+      const result = await runProcess(command, args, {
+        cwd: '/tmp',
+        timeoutMs: env.COMMAND_TIMEOUT_SEC * 1000,
+        env: TOOL_ENV,
+      })
+      output = result.stdout + result.stderr
+    } catch (err) {
+      if (!(err instanceof ProcessExitError)) {
+        audit({ tool, ...meta, error: (err as Error).message })
+        audited.add(err as object)
+        throw err
+      }
+      exitCode = err.code
+      output = err.stdout + err.stderr
+    } finally {
+      running -= 1
+    }
+    const ms = Date.now() - started
+    audit({ tool, ...meta, exit: exitCode, ms, bytes: output.length })
+    return `(exit ${exitCode}, ${ms}ms)\n${finish(output)}`
+  }
+
+  function finish(output: string): string {
+    const clean = redactSecrets(output)
+    return clean.length > env.OUTPUT_LIMIT
+      ? `${clean.slice(0, env.OUTPUT_LIMIT)}\n... (output truncated, ${clean.length} characters total)`
+      : clean
+  }
+
+  const KUBECONFIG = ['--kubeconfig', env.KUBECONFIG_FILE]
+  const kubectl = (
+    tool: string,
+    args: string[],
+    meta: Record<string, unknown>
+  ) => exec(tool, 'kubectl', [...KUBECONFIG, ...args], meta)
+
+  /** The named fields of a tool's input, in that order, for its audit line */
+  const pick = <T extends object, K extends keyof T>(a: T, ...keys: K[]) =>
+    Object.fromEntries(keys.map((key) => [key, a[key]]))
+
+  type ToolResult = {
+    content: { type: 'text'; text: string }[]
+    isError?: boolean
+  }
+  /** Failures already in the audit log, so respond does not log them twice */
+  const audited = new WeakSet<object>()
+
+  /**
+   * A tool's answer, or its failure as an error result. A call turned away
+   * before it ran anything (a path outside the root, too many at once) is
+   * audited here, so the log shows what was refused as well as what ran.
+   */
+  async function respond(
+    tool: string,
+    run: () => Promise<string>
+  ): Promise<ToolResult> {
+    try {
+      return { content: [{ type: 'text', text: await run() }] }
+    } catch (err) {
+      const message = (err as Error).message
+      if (!audited.has(err as object))
+        audit({ tool, refused: message.slice(0, 300) })
+      return { content: [{ type: 'text', text: message }], isError: true }
+    }
+  }
+
+  /**
+   * respond, logging how long the tool took or why it failed. Its output is
+   * redacted and truncated (finish) and its size logged, unless asIs.
+   */
+  function logged(
+    tool: string,
+    meta: Record<string, unknown>,
+    run: () => Promise<string>,
+    asIs = false
+  ): Promise<ToolResult> {
+    return respond(tool, async () => {
+      const started = Date.now()
+      try {
+        const output = await run()
+        const result = asIs ? output : finish(output)
+        audit({
+          tool,
+          ...meta,
+          ms: Date.now() - started,
+          ...(!asIs && { bytes: result.length }),
+        })
+        return result
+      } catch (err) {
+        audit({ tool, ...meta, error: (err as Error).message.slice(0, 300) })
+        audited.add(err as object)
+        throw err
+      }
+    })
+  }
+  /** Lines a search or a file list shows before it says how many more */
+  const SHOWN_LINES = 201
+
+  const readOnly = { readOnlyHint: true, openWorldHint: false }
+  /** Reads beyond this VM: GitHub, Jira */
+  const readsOut = { readOnlyHint: true, openWorldHint: true }
+  const writes = {
+    readOnlyHint: false,
+    destructiveHint: false,
+    openWorldHint: false,
+  }
+  const writesOut = { ...writes, openWorldHint: true }
+
+  // ------------------------------------------------------------------ Tool
+  // registration
+
+  function registerHostTools(server: McpServer): void {
+    server.registerTool(
+      'host_list',
+      {
+        description:
+          'Lists host names and addresses available for checks (only inventory hosts within the allowed CIDR range).',
+        annotations: readOnly,
+      },
+      async () =>
+        respond(
+          'host_list',
+          async () =>
+            [...hosts].map(([name, ip]) => `${name} ${ip}`).join('\n') ||
+            '(none)'
+        )
+    )
+
+    server.registerTool(
+      'host_check',
+      {
+        description: [
+          'Runs a predefined read-only check on a host over SSH. Arbitrary commands cannot be run.',
+          'check types:',
+          ...CHECK_NAMES.map(
+            (name) => `- ${name}: ${CHECKS[name].description}`
+          ),
+        ].join('\n'),
+        inputSchema: {
+          host: z
+            .string()
+            .describe('Host name (a name from host_list, e.g. web-01)'),
+          check: z.enum(CHECK_NAMES).describe('Check type'),
+          lines: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            .describe('Number of lines for dmesg/journal'),
+          unit: z
+            .string()
+            .optional()
+            .describe('systemd unit name for service/journal'),
+          vendor: z
+            .string()
+            .optional()
+            .describe(
+              'PCI vendor ID for pci_devices (4 hex digits, e.g. 10de)'
+            ),
+        },
+        annotations: readOnly,
+      },
+      async ({ host, check, lines, unit, vendor }) =>
+        respond('host_check', async () => {
+          const ip = hosts.get(host)
+          if (!ip)
+            throw new Error(
+              `Host is not allowed: ${host} (see host_list for the list)`
+            )
+          const command = buildCheckCommand(check as CheckName, {
+            lines,
+            unit,
+            vendor,
+          })
+          const sshArgs = [
+            '-F',
+            '/dev/null',
+            ...[
+              'BatchMode=yes',
+              'ConnectTimeout=8',
+              'IdentitiesOnly=yes',
+              'StrictHostKeyChecking=accept-new',
+              `UserKnownHostsFile=${KNOWN_HOSTS}`,
+              ...(env.SSH_PROXY_COMMAND
+                ? [`ProxyCommand=${env.SSH_PROXY_COMMAND}`]
+                : []),
+            ].flatMap((option) => ['-o', option]),
+            '-i',
+            KEY,
+            '-l',
+            env.SSH_USER,
+            ip,
+            command,
+          ]
+          const result = await exec('host_check', 'ssh', sshArgs, {
+            host,
+            ip,
+            check,
+            lines,
+            unit,
+            vendor,
+          })
+          return `$ ${command}  (host ${host})\n${result}`
+        })
+    )
+  }
+
+  function registerK8sTools(server: McpServer): void {
+    const cluster = z
+      .string()
+      .describe(`Cluster context (${clusters.join(', ')})`)
+    const ns = z.string().optional().describe('Namespace')
+    /** A kubectl lookup: its arguments from the input, and the fields logged */
+    const lookup =
+      <A extends object>(
+        tool: string,
+        args: (a: A, clusters: readonly string[]) => string[],
+        ...keys: (keyof A)[]
+      ) =>
+      (a: A) =>
+        respond(tool, () => kubectl(tool, args(a, clusters), pick(a, ...keys)))
+
+    server.registerTool(
+      'k8s_get',
+      {
+        description:
+          'Looks up resources with kubectl get. Access is read-only and secrets cannot be viewed. Default output is wide.',
+        inputSchema: {
+          cluster,
+          kind: z
+            .string()
+            .describe(
+              'Resource kind (e.g. pods, nodes, deployments, services)'
+            ),
+          namespace: ns,
+          name: z.string().optional().describe('Resource name'),
+          selector: z
+            .string()
+            .optional()
+            .describe('Label selector (e.g. app=nginx)'),
+          all_namespaces: z.boolean().optional().describe('All namespaces'),
+          output: z.enum(['wide', 'yaml']).optional(),
+        },
+        annotations: readOnly,
+      },
+      async (a) =>
+        respond('k8s_get', () =>
+          kubectl(
+            'k8s_get',
+            getArgs({ ...a, allNamespaces: a.all_namespaces }, clusters),
+            pick(a, 'cluster', 'kind', 'namespace', 'name')
+          )
+        )
+    )
+
+    server.registerTool(
+      'k8s_describe',
+      {
+        description:
+          'Shows resource details and recent events with kubectl describe.',
+        inputSchema: {
+          cluster,
+          kind: z.string(),
+          name: z.string(),
+          namespace: ns,
+        },
+        annotations: readOnly,
+      },
+      lookup(
+        'k8s_describe',
+        describeArgs,
+        'cluster',
+        'kind',
+        'namespace',
+        'name'
+      )
+    )
+
+    server.registerTool(
+      'k8s_logs',
+      {
+        description: `Last N lines of pod logs (default 200, max ${MAX_LOG_LINES}).`,
+        inputSchema: {
+          cluster,
+          namespace: z.string(),
+          pod: z.string(),
+          container: z.string().optional(),
+          tail: z.number().int().min(1).max(MAX_LOG_LINES).optional(),
+          since: z.string().optional().describe('e.g. 30m, 2h'),
+          previous: z
+            .boolean()
+            .optional()
+            .describe('Logs of the previously terminated container'),
+        },
+        annotations: readOnly,
+      },
+      lookup(
+        'k8s_logs',
+        logsArgs,
+        'cluster',
+        'namespace',
+        'pod',
+        'container',
+        'tail'
+      )
+    )
+
+    server.registerTool(
+      'k8s_events',
+      {
+        description:
+          'Shows events in chronological order. Omit namespace for all namespaces.',
+        inputSchema: { cluster, namespace: ns },
+        annotations: readOnly,
+      },
+      lookup('k8s_events', eventsArgs, 'cluster', 'namespace')
+    )
+
+    server.registerTool(
+      'k8s_top',
+      {
+        description: 'CPU/memory usage of nodes or pods (metrics-server).',
+        inputSchema: {
+          cluster,
+          target: z.enum(['nodes', 'pods']),
+          namespace: ns,
+        },
+        annotations: readOnly,
+      },
+      lookup('k8s_top', topArgs, 'cluster', 'target', 'namespace')
+    )
+  }
+
+  /**
+   * Searching the whole root is too slow on the mount, so the scope must be at
+   * least one repository.
+   */
+  function requireScope(requested: string): string {
+    const scoped = requested
+      .trim()
+      .replace(/^\.?\/+/, '')
+      .replace(/\/+$/, '')
+    if (!scoped || scoped === '.') {
+      throw new Error(
+        'Narrow path to a repository or a directory inside one (e.g. my-repo, my-repo/docs).'
+      )
+    }
+    return scoped
+  }
+
+  function registerFsTools(server: McpServer): void {
+    const root = env.FS_ROOT
+    const rel = z
+      .string()
+      .describe('Path relative to the work root (e.g. my-repo/docs)')
+
+    server.registerTool(
+      'fs_list',
+      {
+        description:
+          'Lists the work directory. The top level holds repository directories. Read-only; secret files are hidden.',
+        inputSchema: { path: rel.optional() },
+        annotations: readOnly,
+      },
+      async ({ path }) =>
+        respond('fs_list', async () => {
+          audit({ tool: 'fs_list', path })
+          return listDir(root, path ?? '.')
+        })
+    )
+
+    server.registerTool(
+      'fs_read',
+      {
+        description: `Reads a text file with line numbers. Up to ${MAX_READ_LINES} lines at a time.`,
+        inputSchema: {
+          path: rel,
+          offset: z
+            .number()
+            .int()
+            .min(1)
+            .optional()
+            .describe('Starting line (1-based)'),
+          limit: z.number().int().min(1).max(MAX_READ_LINES).optional(),
+        },
+        annotations: readOnly,
+      },
+      async ({ path, offset, limit }) =>
+        respond('fs_read', async () => {
+          audit({ tool: 'fs_read', path, offset, limit })
+          return finish(await readText(root, path, offset, limit))
+        })
+    )
+
+    server.registerTool(
+      'fs_search',
+      {
+        description:
+          'Searches file contents with ripgrep. Follows .gitignore and the secret file deny rules. Results are capped at 200 lines.',
+        inputSchema: {
+          pattern: z
+            .string()
+            .min(1)
+            .max(200)
+            .describe('Regular expression (ripgrep syntax)'),
+          path: rel.describe(
+            'Subpath to search (a repository or deeper, e.g. my-repo)'
+          ),
+          glob: z
+            .string()
+            .max(100)
+            .optional()
+            .describe('File name filter (e.g. *.yaml)'),
+          fixed_strings: z
+            .boolean()
+            .optional()
+            .describe('Search for a literal string instead of a regex'),
+        },
+        annotations: readOnly,
+      },
+      async ({ pattern, path, glob, fixed_strings }) =>
+        respond('fs_search', async () => {
+          const target = await resolveInRoot(root, requireScope(path))
+          const args = rgSearchArgs(pattern, target, {
+            glob,
+            fixedStrings: fixed_strings,
+            limits: ['--max-filesize', '1M', '--max-columns', '300'],
+          })
+          const output = await exec('fs_search', 'rg', args, {
+            pattern,
+            path,
+            glob,
+          })
+          const lines = filterRgOutput(output, root).split('\n')
+          const shown = lines.slice(0, SHOWN_LINES).join('\n')
+          return lines.length > SHOWN_LINES
+            ? `${shown}\n... (${lines.length - SHOWN_LINES} more ${lines.length - SHOWN_LINES === 1 ? 'line' : 'lines'}, narrow with path/glob)`
+            : shown
+        })
+    )
+
+    server.registerTool(
+      'fs_find',
+      {
+        description: 'Finds files by file name glob (e.g. **/*.yaml).',
+        inputSchema: {
+          glob: z.string().min(1).max(100),
+          path: rel.describe('Subpath to search (a repository or deeper)'),
+        },
+        annotations: readOnly,
+      },
+      async ({ glob, path }) =>
+        respond('fs_find', async () => {
+          const target = await resolveInRoot(root, requireScope(path))
+          const args = [
+            '--files',
+            '--color',
+            'never',
+            ...rgFilterArgs(glob),
+            target,
+          ]
+          const output = await exec('fs_find', 'rg', args, { glob, path })
+          const lines = filterRgOutput(output, root).split('\n')
+          return lines.length > SHOWN_LINES
+            ? `${lines.slice(0, SHOWN_LINES).join('\n')}\n... (${lines.length - SHOWN_LINES} more)`
+            : lines.join('\n')
+        })
+    )
+  }
+
+  function registerWorkspaceTools(
+    server: McpServer,
+    workspaces: GitWorkspaces
+  ): void {
+    const ws = z.string().describe('Workspace id returned by ws_prepare')
+    const file = z.string().describe('Path relative to the workspace')
+    // Their output goes back as it is: only the time is logged.
+    const loggedAsIs = (
+      tool: string,
+      meta: Record<string, unknown>,
+      run: () => Promise<string>
+    ) => logged(tool, meta, run, true)
+
+    server.registerTool(
+      'ws_prepare',
+      {
+        description: [
+          'Creates a workspace for code changes. Finds the GitHub remote from the local repository name (a top-level directory in fs_list)',
+          "and creates a new pacenote/ branch from the remote default branch (or base). The user's local working tree is not changed.",
+        ].join(' '),
+        inputSchema: {
+          repo: z
+            .string()
+            .describe('Local repository directory name (e.g. my-repo)'),
+          base: z
+            .string()
+            .optional()
+            .describe('Base branch. Defaults to the remote default branch'),
+        },
+        annotations: writesOut,
+      },
+      async ({ repo, base }) =>
+        loggedAsIs('ws_prepare', { repo, base }, async () => {
+          const w = await workspaces.prepare(repo, base)
+          return `ws=${w.id} repo=${w.slug.owner}/${w.slug.repo} branch=${w.branch} base=${w.base}`
+        })
+    )
+
+    server.registerTool(
+      'ws_list',
+      {
+        description: 'Lists a directory in the workspace.',
+        inputSchema: { ws, path: file.optional() },
+        annotations: readOnly,
+      },
+      async (a) =>
+        loggedAsIs('ws_list', a, () =>
+          listDir(workspaces.get(a.ws).dir, a.path ?? '.')
+        )
+    )
+
+    server.registerTool(
+      'ws_read',
+      {
+        description: `Reads a workspace file with line numbers. Up to ${MAX_READ_LINES} lines at a time.`,
+        inputSchema: {
+          ws,
+          path: file,
+          offset: z.number().int().min(1).optional(),
+          limit: z.number().int().min(1).max(MAX_READ_LINES).optional(),
+        },
+        annotations: readOnly,
+      },
+      async (a) =>
+        loggedAsIs('ws_read', { ws: a.ws, path: a.path }, async () =>
+          finish(
+            await readText(workspaces.get(a.ws).dir, a.path, a.offset, a.limit)
+          )
+        )
+    )
+
+    server.registerTool(
+      'ws_search',
+      {
+        description: 'Searches file contents in the workspace with ripgrep.',
+        inputSchema: {
+          ws,
+          pattern: z.string().min(1).max(200),
+          path: file.optional(),
+          glob: z.string().max(100).optional(),
+          fixed_strings: z.boolean().optional(),
+        },
+        annotations: readOnly,
+      },
+      async (a) =>
+        respond('ws_search', async () => {
+          const dir = workspaces.get(a.ws).dir
+          const target = await resolveInRoot(dir, a.path ?? '.')
+          const args = rgSearchArgs(a.pattern, target, {
+            glob: a.glob,
+            fixedStrings: a.fixed_strings,
+          })
+          const output = await exec('ws_search', 'rg', args, {
+            ws: a.ws,
+            pattern: a.pattern,
+          })
+          return filterRgOutput(output, dir)
+            .split('\n')
+            .slice(0, SHOWN_LINES)
+            .join('\n')
+        })
+    )
+
+    server.registerTool(
+      'ws_write',
+      {
+        description:
+          'Writes a new file in the workspace or overwrites a whole file. Use ws_edit to change only part of a file.',
+        inputSchema: { ws, path: file, content: z.string() },
+        annotations: writes,
+      },
+      async (a) =>
+        loggedAsIs(
+          'ws_write',
+          { ws: a.ws, path: a.path, bytes: a.content.length },
+          () => workspaces.write(a.ws, a.path, a.content)
+        )
+    )
+
+    server.registerTool(
+      'ws_edit',
+      {
+        description:
+          'Replaces old_string with new_string exactly in a file. old_string must appear exactly once in the file (unless replace_all).',
+        inputSchema: {
+          ws,
+          path: file,
+          old_string: z.string().min(1),
+          new_string: z.string(),
+          replace_all: z.boolean().optional(),
+        },
+        annotations: writes,
+      },
+      async (a) =>
+        loggedAsIs('ws_edit', { ws: a.ws, path: a.path }, () =>
+          workspaces.edit(
+            a.ws,
+            a.path,
+            a.old_string,
+            a.new_string,
+            a.replace_all
+          )
+        )
+    )
+
+    server.registerTool(
+      'ws_delete',
+      {
+        description: 'Deletes a file from the workspace.',
+        inputSchema: { ws, path: file },
+        annotations: { ...writes, destructiveHint: true },
+      },
+      async (a) =>
+        loggedAsIs('ws_delete', a, () => workspaces.remove(a.ws, a.path))
+    )
+
+    server.registerTool(
+      'ws_diff',
+      {
+        description:
+          'Shows the workspace changes (git diff). Always review them before creating a PR.',
+        inputSchema: { ws },
+        annotations: readOnly,
+      },
+      async (a) =>
+        loggedAsIs('ws_diff', a, async () =>
+          finish(await workspaces.diff(a.ws))
+        )
+    )
+
+    server.registerTool(
+      'ws_create_pr',
+      {
+        description: [
+          'Commits the changes, pushes them to the pacenote/ branch, and opens a draft PR.',
+          "Use only when the user asked for a PR. The title follows the repository's commit message convention (e.g. feat: ..., fix: ...).",
+          'Changes that touch protected paths (such as .github/workflows) or contain secrets are rejected.',
+        ].join(' '),
+        inputSchema: {
+          ws,
+          title: z.string().min(1).max(200),
+          body: z
+            .string()
+            .max(10_000)
+            .describe(
+              'Why the change was made, what changed, and how to verify it'
+            ),
+        },
+        annotations: writesOut,
+      },
+      async (a) =>
+        loggedAsIs('ws_create_pr', { ws: a.ws, title: a.title }, () =>
+          workspaces.createPullRequest(a.ws, a.title, a.body)
+        )
+    )
+  }
+
+  function registerGitHubTools(server: McpServer, reader: GitHubReader): void {
+    const owners = reader.owners.join(', ')
+    const repo = z
+      .string()
+      .describe(
+        `Repository. Accepts owner/repo, repo (looked up in the allowed orgs), or a GitHub URL. Orgs available for lookup: ${owners}`
+      )
+    const limit = z.number().int().min(1).max(50).optional()
+    server.registerTool(
+      'gh_repo_search',
+      {
+        description: `Finds GitHub repositories by name and description. Searches only within the orgs (${owners}). Use this first when unsure of a repository name.`,
+        inputSchema: {
+          query: z
+            .string()
+            .min(1)
+            .describe('Search query (GitHub search syntax)'),
+          limit,
+        },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('gh_repo_search', a, () => reader.searchRepos(a.query, a.limit))
+    )
+
+    server.registerTool(
+      'gh_pr_list',
+      {
+        description:
+          "Lists a repository's PRs, newest first (number, title, author, state, branch, dates, labels).",
+        inputSchema: {
+          repo,
+          state: z
+            .enum(['open', 'closed', 'all'])
+            .optional()
+            .describe('Default open'),
+          limit,
+        },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('gh_pr_list', a, () =>
+          reader.listPulls(a.repo, a.state ?? 'open', a.limit)
+        )
+    )
+
+    server.registerTool(
+      'gh_pr_search',
+      {
+        description: [
+          'Searches PRs across repositories using GitHub search syntax.',
+          '(e.g. is:open repo:owner/a repo:owner/b, is:open author:someone, review-requested:someone)',
+          `Without repo: or org:, searches all of the orgs (${owners}).`,
+        ].join(' '),
+        inputSchema: { query: z.string().min(1), limit },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('gh_pr_search', a, () => reader.searchPulls(a.query, a.limit))
+    )
+
+    server.registerTool(
+      'gh_pr_view',
+      {
+        description:
+          'Shows PR details: state, author, branch, change size, labels, review requests and review results, CI checks, body, and changed files.',
+        inputSchema: {
+          repo,
+          number: z
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe(
+              'PR number (omit if repo is owner/repo#number or a PR URL)'
+            ),
+        },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('gh_pr_view', a, () => reader.viewPull(a.repo, a.number))
+    )
+
+    server.registerTool(
+      'gh_pr_diff',
+      {
+        description:
+          "Shows a PR's changes (unified diff). Long output is truncated, so for large PRs pick files with path.",
+        inputSchema: {
+          repo,
+          number: z.number().int().positive().optional(),
+          path: z
+            .string()
+            .optional()
+            .describe('Show only changes to this file (path prefix)'),
+        },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('gh_pr_diff', a, () => reader.pullDiff(a.repo, a.number, a.path))
+    )
+  }
+
+  function registerJiraTools(
+    server: McpServer,
+    client: JiraClient,
+    writes: boolean
+  ): void {
+    const projects = client.projects.join(', ')
+    const key = z
+      .string()
+      .describe(`Issue key (e.g. ${client.projects[0]}-123) or issue URL`)
+    server.registerTool(
+      'jira_search',
+      {
+        description: [
+          `Searches Jira issues with JQL. Results are restricted to the allowed projects (${projects}).`,
+          '(e.g. assignee = currentUser() AND statusCategory != Done, text ~ "keyword", updated >= -7d ORDER BY priority DESC)',
+        ].join(' '),
+        inputSchema: {
+          jql: z
+            .string()
+            .min(1)
+            .max(1000)
+            .describe('JQL. The project condition is added automatically'),
+          limit: z.number().int().min(1).max(50).optional(),
+        },
+        annotations: readsOut,
+      },
+      async (a) => logged('jira_search', a, () => client.search(a.jql, a.limit))
+    )
+
+    server.registerTool(
+      'jira_issue',
+      {
+        description:
+          'Shows Jira issue details: type, status, assignee, description, subtasks, linked issues, recent comments, and link.',
+        inputSchema: {
+          key,
+          comments: z
+            .number()
+            .int()
+            .min(0)
+            .max(50)
+            .optional()
+            .describe('Number of recent comments to show (default 10)'),
+        },
+        annotations: readsOut,
+      },
+      async (a) =>
+        logged('jira_issue', a, () => client.viewIssue(a.key, a.comments))
+    )
+    if (!writes) return
+
+    server.registerTool(
+      'jira_create_issue',
+      {
+        description: [
+          `Creates a Jira issue. Issues can be created only in the allowed projects (${projects}) and are recorded under the token owner's account.`,
+          'Use only when the user asked for an issue to be created. Check for similar issues with jira_search first.',
+          'If the type is omitted, Task is used. Status changes are not supported.',
+        ].join(' '),
+        inputSchema: {
+          project: z.string().describe(`Project key (${projects})`),
+          summary: z.string().min(1).max(255).describe('Summary'),
+          description: z
+            .string()
+            .max(20_000)
+            .optional()
+            .describe(
+              'Description. Blank lines separate paragraphs, and lines starting with - become list items'
+            ),
+          issue_type: z
+            .string()
+            .optional()
+            .describe('Issue type name (e.g. Task, Bug, Story, Sub-task)'),
+          labels: z.array(z.string().max(50)).max(10).optional(),
+          parent: z
+            .string()
+            .optional()
+            .describe(
+              'Parent issue key (when creating a subtask or an issue under an epic)'
+            ),
+        },
+        annotations: writesOut,
+      },
+      async (a) =>
+        logged(
+          'jira_create_issue',
+          {
+            project: a.project,
+            summary: a.summary.slice(0, 100),
+            type: a.issue_type,
+            parent: a.parent,
+          },
+          () =>
+            client.createIssue({
+              project: a.project,
+              summary: a.summary,
+              description: a.description,
+              issueType: a.issue_type,
+              labels: a.labels,
+              parent: a.parent,
+            })
+        )
+    )
+
+    server.registerTool(
+      'jira_add_comment',
+      {
+        description:
+          "Adds a comment to a Jira issue. Use only when the user asked for a comment. The comment is posted under the token owner's account.",
+        inputSchema: {
+          key,
+          body: z
+            .string()
+            .min(1)
+            .max(20_000)
+            .describe('Comment body. Blank lines separate paragraphs'),
+        },
+        annotations: writesOut,
+      },
+      async (a) =>
+        logged('jira_add_comment', { key: a.key, bytes: a.body.length }, () =>
+          client.addComment(a.key, a.body)
+        )
+    )
+  }
+
+  function createMcpServer(): McpServer {
+    const server = new McpServer({ name: 'ops-broker', version: '0.3.0' })
+    if (hosts.size > 0 && offered('ssh')) registerHostTools(server)
+    if (k8sEnabled && clusters.length > 0 && offered('k8s'))
+      registerK8sTools(server)
+    if (fsEnabled && offered('files')) registerFsTools(server)
+    if (git && offered('github-write')) registerWorkspaceTools(server, git)
+    if (github && offered('github')) registerGitHubTools(server, github)
+    if (jira && offered('jira'))
+      registerJiraTools(server, jira, offered('jira-write'))
+    return server
+  }
+
+  // ------------------------------------------------------------------ HTTP
+
+  async function handle(
+    req: IncomingMessage,
+    res: ServerResponse
+  ): Promise<void> {
+    if (req.url === '/healthz') {
+      res
+        .writeHead(200)
+        .end(
+          `ok hosts=${hosts.size} k8s=[${clusters.join(',')}] fs=${fsEnabled ? env.FS_ROOT : 'off'} git=${git ? 'on' : 'off'} github=${github ? allowedOwners.join('|') : 'off'} jira=${jira ? jiraProjects.join('|') : 'off'} tools=${env.TOOLS ?? 'all'}`
+        )
+      return
+    }
+    if (req.url !== '/mcp') {
+      res.writeHead(404).end()
+      return
+    }
+    await serveStatelessMcp(req, res, createMcpServer, {
+      around: (run) => asking.run(requesterOf(req), run),
+    })
+  }
+
+  async function start(): Promise<void> {
+    if (k8sEnabled) {
+      const { stdout } = await runProcess(
+        'kubectl',
+        [...KUBECONFIG, 'config', 'get-contexts', '-o', 'name'],
+        { cwd: '/tmp', timeoutMs: 10_000, env: TOOL_ENV }
+      )
+      clusters = stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    }
+    const server = createServer((req, res) => {
+      handle(req, res).catch((err: unknown) => {
+        audit({ error: (err as Error).message })
+        if (!res.headersSent) res.writeHead(500).end()
+      })
+    })
+    if (env.BROKER_SOCKET) {
+      mkdirSync(path.dirname(env.BROKER_SOCKET), { recursive: true })
+      rmSync(env.BROKER_SOCKET, { force: true })
+    }
+    server.listen(env.BROKER_SOCKET ?? env.BROKER_PORT, () => {
+      audit({
+        event: 'start',
+        port: env.BROKER_SOCKET ?? env.BROKER_PORT,
+        sshHosts: hosts.size,
+        k8sClusters: clusters,
+        fsRoot: fsEnabled ? env.FS_ROOT : null,
+        git: git
+          ? { workRoot: env.WORK_ROOT, owners: env.GIT_ALLOWED_OWNERS }
+          : null,
+        jira: jira ? { url: env.JIRA_URL, projects: jiraProjects } : null,
+        tools: env.TOOLS ?? 'all',
+      })
+    })
+  }
+
+  return { createMcpServer, handle, start }
+}
+
+export type Broker = ReturnType<typeof createBroker>

@@ -44,6 +44,7 @@ import { readTasksSettings } from './tasks/settings.js'
 import { ANSWER_HERE } from './macs/types.js'
 import { envLocale, localized, setLocale } from './i18n/locale.js'
 import { text } from './index.text.js'
+import { StatusProblems } from './runtime/problems.js'
 
 /**
  * The channel to the desktop app when it runs the bot as an Electron
@@ -139,19 +140,18 @@ async function main(): Promise<void> {
   })
   started.connection = connection
   const { messenger, bot } = connection
-  /**
-   * Problems fixed for this process's life (diagram rendering); the sandbox's
-   * come from sandboxHealth, and images built by another version from
-   * imageHealth
-   */
-  const problems: string[] = []
-  /** Why the reasoner cannot answer, until it answers again */
-  let reasonerProblem: string | undefined
-
   const sandbox: Sandbox = config.reasoner.vm
     ? new VmSandbox(config.reasoner.vm, log.child('sandbox'))
     : new HostSandbox(config.reasoner.commands)
   started.sandbox = sandbox
+  // On this Mac, the CLI itself is what to check: installed, signed in, and
+  // recent enough, before a mention fails on it.
+  const problems = new StatusProblems({
+    checked: sandbox.kind === 'host' ? 'reasoner' : 'sandbox',
+    sandbox: () => sandboxHealth.current,
+    images: () => imageHealth.current,
+    changed: (all) => status.update({ problems: all }),
+  })
   const version = process.env.PACENOTE_VERSION ?? 'dev'
   // Pace's own tools, for the reasoner in the VM: the Todo, work and recaps of
   // the person it answers, and its earlier answers in the channel; and the MCP
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
     for (const problem of rendererProblems) {
       if (config.render.asked) {
         log.warn(`Diagram rendering disabled: ${problem}`)
-        problems.push(localized(text).diagramsOff(problem))
+        problems.add(localized(text).diagramsOff(problem))
       } else {
         log.info(`Diagrams stay off for now: ${problem}`)
         renderLimits.push(localized(text).diagramsWait)
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
         sandboxDir: defaultSandboxDir(),
         images,
       }),
-    () => status.update({ problems: allProblems() }),
+    () => problems.changed(),
     log,
     'Sandbox images'
   )
@@ -235,18 +235,6 @@ async function main(): Promise<void> {
   // the host. The check repeats while the bot runs, and right away when the
   // desktop app finishes a sandbox job, so the status (and the status bar)
   // follows a setup that finishes later.
-  // On this Mac, the CLI itself is what to check: installed, signed in, and
-  // recent enough, before a mention fails on it.
-  const checked = sandbox.kind === 'host' ? 'reasoner' : 'sandbox'
-  const allProblems = () => {
-    const t = localized(text)
-    return [
-      ...sandboxHealth.current.map((problem) => t.problem(checked, problem)),
-      ...(reasonerProblem ? [t.problem('reasoner', reasonerProblem)] : []),
-      ...imageHealth.current,
-      ...problems,
-    ]
-  }
   const sandboxHealth = new SandboxHealth(
     sandbox.kind === 'host'
       ? () =>
@@ -255,10 +243,10 @@ async function main(): Promise<void> {
             config.reasoner.commands[reasoner.backend]
           )
       : () => sandbox.verify(),
-    () => status.update({ problems: allProblems() }),
+    () => problems.changed(),
     log,
     // What the log calls it
-    checked === 'reasoner' ? 'Reasoner' : 'Sandbox'
+    sandbox.kind === 'host' ? 'Reasoner' : 'Sandbox'
   )
   await sandboxHealth.check()
   await imageHealth.check()
@@ -302,9 +290,7 @@ async function main(): Promise<void> {
       // An answer that went through settles what the check said before.
       if (!problem && sandboxHealth.current.length > 0)
         void sandboxHealth.check()
-      if (problem === reasonerProblem) return
-      reasonerProblem = problem
-      status.update({ problems: allProblems() })
+      problems.setReasoner(problem)
     },
   })
   started.responder = responder
@@ -315,7 +301,7 @@ async function main(): Promise<void> {
     mcp: reasoner.mcpServerNames,
     diagrams: renderer !== undefined,
     history: history !== undefined,
-    problems: allProblems(),
+    problems: problems.all(),
     limits: [...connection.limits(), ...renderLimits],
   })
   // In the sandbox, a CLI with no sign-in there yet shows in the status at
@@ -323,19 +309,21 @@ async function main(): Promise<void> {
   // only when a mention fails on them.
   const auth = config.reasoner.auth
   if (sandbox.isolated && !auth?.login && !auth?.env) {
-    reasonerProblem = localized(text).atStartup(
-      `${failureAdvice('auth', reasoner.backend, sandbox.kind)?.text}`
+    problems.setReasoner(
+      localized(text).atStartup(
+        `${failureAdvice('auth', reasoner.backend, sandbox.kind)?.text}`
+      )
     )
-    status.update({ problems: allProblems() })
   } else if (sandbox.isolated && reasoner.backend === 'claude')
     void checkClaudeCredential(
       claudeCredential(config.reasoner.auth?.env ?? {})
     ).then((state) => {
-      if (state !== 'rejected' || reasonerProblem) return
-      reasonerProblem = localized(text).atStartup(
-        `${failureAdvice('auth', 'claude', sandbox.kind)?.text}`
+      if (state !== 'rejected' || problems.reasoner) return
+      problems.setReasoner(
+        localized(text).atStartup(
+          `${failureAdvice('auth', 'claude', sandbox.kind)?.text}`
+        )
       )
-      status.update({ problems: allProblems() })
     })
   // Another of your Macs answers: start with the Slack connection closed
   const standby =

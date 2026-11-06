@@ -103,6 +103,7 @@ import { BundleWatch } from './bundle-watch.js'
 import { markQuit, QUIT_MARK_FILE, quitWithin } from './quit-mark.js'
 import { createScreenFiles } from './screen.js'
 import { TrayMenu, truncateLabel } from './tray.js'
+import { desktopFlags, type DesktopFlags } from './flags.js'
 import { MainWindow } from './window.js'
 import type { Desktop } from './ipc/context.js'
 import { Ipc } from './ipc/gate.js'
@@ -143,15 +144,16 @@ process.env.PACENOTE_VM_BIN ??= paths.vmBin
 process.env.PACENOTE_SANDBOX_DIR ??= paths.sandboxDir
 // End-to-end tests put a copy of the UI in its place
 // (PACENOTE_DESKTOP_WEB_DIST).
-const webDistDir = process.env.PACENOTE_DESKTOP_WEB_DIST || paths.webDist
+const flags = desktopFlags(process.env, { packaged: app.isPackaged })
+const webDistDir = flags.webDist ?? paths.webDist
 /**
  * The settings file lives outside the repository. (PACENOTE_HOME, default
  * ~/.pacenote)
  */
 const settingsFile = settingsFilePath()
-const webDevUrl = app.isPackaged ? undefined : process.env.PACENOTE_WEB_DEV_URL
+const webDevUrl = flags.webDevUrl
 /** Saves the window as a PNG and quits. (for checking builds) */
-const captureFile = process.env.PACENOTE_DESKTOP_CAPTURE
+const captureFile = flags.capture?.file
 // Settings, run history and logs stay with this account: other accounts on
 // this Mac cannot list or read them.
 securePrivateDir(path.dirname(settingsFile))
@@ -217,7 +219,7 @@ if (moved.error)
  */
 const bundleInfo = app.isPackaged
   ? path.join(path.dirname(path.dirname(process.execPath)), 'Info.plist')
-  : process.env.PACENOTE_DESKTOP_BUNDLE_INFO
+  : flags.bundleInfo
 const bundleWatch = bundleInfo
   ? new BundleWatch({
       file: bundleInfo,
@@ -234,7 +236,7 @@ function relaunch(why: string): void {
   if (restarting) return
   restarting = true
   log.info(why)
-  if (process.env.PACENOTE_DESKTOP_NO_RELAUNCH !== '1') app.relaunch()
+  if (!flags.noRelaunch) app.relaunch()
 }
 /** Opens the version on disk once this copy is gone */
 function restartInto(version: string): void {
@@ -273,8 +275,7 @@ const collectionRuns = (days: number) =>
  * history. Screen captures leave the bot alone. (PACENOTE_DESKTOP_BOT=on
  * manages it during captures too)
  */
-const botSetting = process.env.PACENOTE_DESKTOP_BOT
-const manageBot = botSetting === 'on' || (botSetting !== 'off' && !captureFile)
+const manageBot = flags.bot === 'on' || (flags.bot !== 'off' && !captureFile)
 
 /**
  * Runs from the repository are "Pacenote Dev": their own name and user data
@@ -289,15 +290,13 @@ app.setName(appName)
 // data folder of their own, so they do not hit the running app's
 // single-instance lock.
 const userData =
-  process.env.PACENOTE_DESKTOP_USER_DATA ||
+  flags.userData ??
   (captureFile ? path.join(tmpdir(), 'pacenote-desktop-capture') : undefined)
 if (userData) app.setPath('userData', userData)
 else if (!app.isPackaged)
   app.setPath('userData', path.join(app.getPath('appData'), appName))
 // UI theme: system (default), light, dark
-const themeSource = process.env.PACENOTE_DESKTOP_THEME
-if (themeSource === 'light' || themeSource === 'dark')
-  nativeTheme.themeSource = themeSource
+if (flags.theme) nativeTheme.themeSource = flags.theme
 
 let isQuitting = false
 /** Stops telling the window about task files changing on disk */
@@ -314,11 +313,11 @@ const mainWindow = new MainWindow({
   restarting: () => restarting || (bundleWatch?.check() ?? false),
   passing: () => bundleWatch?.swapping() ?? false,
   reopen: () => relaunch('Opened while quitting; opening again once gone'),
-  capture: captureFile
+  capture: flags.capture
     ? {
-        width: Number(process.env.PACENOTE_DESKTOP_CAPTURE_WIDTH),
-        height: Number(process.env.PACENOTE_DESKTOP_CAPTURE_HEIGHT),
-        save: (window) => capture(window, captureFile),
+        width: flags.capture.width,
+        height: flags.capture.height,
+        save: (window) => capture(window, flags.capture!),
       }
     : undefined,
   log,
@@ -632,7 +631,7 @@ if (supervisor) {
       return values.HUB_URL ? undefined : values.SLACK_APP_TOKEN || undefined
     },
     // End-to-end tests name their two Macs
-    name: process.env.PACENOTE_MACS_NAME || macName(),
+    name: flags.macs.name ?? macName(),
     version: app.getVersion(),
     use: () => macUse?.current() ?? { idle: 0, locked: false, asleep: false },
     pace: () => {
@@ -662,10 +661,8 @@ if (supervisor) {
       return { values, ...(me ? { me } : {}) }
     },
     log: (message) => log.info(message),
-    bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
-    ...(process.env.PACENOTE_MACS_PORT
-      ? { port: Number(process.env.PACENOTE_MACS_PORT) }
-      : {}),
+    bonjour: flags.macs.bonjour,
+    ...(flags.macs.port ? { port: flags.macs.port } : {}),
   })
   macs.on('change', () => {
     mainWindow.send('pacenote:macs:changed', macs?.view())
@@ -676,7 +673,7 @@ if (supervisor) {
   fromMac = new SetupFromMac({
     me: () => ({
       id: thisMac.id,
-      name: process.env.PACENOTE_MACS_NAME || macName(),
+      name: flags.macs.name ?? macName(),
     }),
     // What your other Mac sent, as this Mac's setup takes it (FromMacMode):
     // Pace's its Slack app, who Pace answers and how Todo collects; Todo's
@@ -733,7 +730,7 @@ if (supervisor) {
       thisMac.claimWhenReady()
     },
     log: (message) => log.info(message),
-    bonjour: process.env.PACENOTE_MACS_BONJOUR !== 'off',
+    bonjour: flags.macs.bonjour,
   })
   fromMac.on('change', (state) =>
     mainWindow.send('pacenote:setup:mac-changed', state)
@@ -844,11 +841,9 @@ function tellTroubles(troubles: readonly Trouble[], botRunning: boolean): void {
  * test server with PACENOTE_DESKTOP_UPDATE_URL.
  * PACENOTE_DESKTOP_UPDATE_CHECK=off turns it off.
  */
-const updateUrl = process.env.PACENOTE_DESKTOP_UPDATE_URL
+const updateUrl = flags.updates.url
 const updates =
-  process.env.PACENOTE_DESKTOP_UPDATE_CHECK !== 'off' &&
-  !captureFile &&
-  (app.isPackaged || updateUrl)
+  flags.updates.check && !captureFile && (app.isPackaged || updateUrl)
     ? new UpdateCheck({
         current: app.getVersion(),
         url: updateUrl,
@@ -1139,13 +1134,15 @@ function registerIpc(): void {
   })
 }
 
-async function capture(window: BrowserWindow, file: string): Promise<void> {
-  const hash = process.env.PACENOTE_DESKTOP_CAPTURE_HASH
+async function capture(
+  window: BrowserWindow,
+  { file, hash, delayMs }: NonNullable<DesktopFlags['capture']>
+): Promise<void> {
   if (hash)
     await window.webContents.executeJavaScript(
       `location.hash = ${JSON.stringify(hash)}`
     )
-  await sleep(Number(process.env.PACENOTE_DESKTOP_CAPTURE_DELAY) || 2_500)
+  await sleep(delayMs)
   const image = await window.webContents.capturePage()
   writeFileSync(file, image.toPNG())
   isQuitting = true
@@ -1235,7 +1232,7 @@ if (!app.requestSingleInstanceLock()) {
         macUse = new MacUseWatch(
           powerMonitor,
           () => macs?.refresh(),
-          process.env.PACENOTE_MACS_USE_FILE
+          flags.macs.useFile
         )
         await macs
           .start()

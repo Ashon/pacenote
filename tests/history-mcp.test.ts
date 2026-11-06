@@ -6,7 +6,12 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createHistoryServer } from '../src/history/mcp.js'
 import { HistoryReader } from '../src/history/reader.js'
+import { localHistoryServer } from '../src/history/local-server.js'
 import { HistoryStore } from '../src/history/recorder.js'
+import {
+  settingsText,
+  writeSettingsFile,
+} from '../src/settings/settings-file.js'
 
 const AT = '2026-10-08T05:00:00.000Z'
 
@@ -169,5 +174,40 @@ describe('run history MCP server', () => {
     expect(off.text).toContain(
       'Settings > History & logs > Share with AI tools'
     )
+  })
+})
+
+describe('the history server an AI tool launches', () => {
+  const home = mkdtempSync(path.join(tmpdir(), 'pacenote-history-local-'))
+  afterAll(() => rmSync(home, { recursive: true, force: true }))
+
+  async function connected(env: NodeJS.ProcessEnv) {
+    const settingsFile = path.join(home, 'settings.json')
+    writeSettingsFile(settingsFile, settingsText({ HISTORY_SHARE: 'off' }))
+    const server = await localHistoryServer({
+      env,
+      cwd: home,
+      home,
+      settingsFile,
+    })
+    const client = new Client({ name: 'test', version: '1' })
+    const [a, b] = InMemoryTransport.createLinkedPair()
+    await Promise.all([server.connect(a), client.connect(b)])
+    const result = await client.callTool({ name: 'recent_runs', arguments: {} })
+    await client.close()
+    return { settingsFile, result }
+  }
+
+  it('follows the settings file while the environment says nothing', async () => {
+    const { result } = await connected({})
+    expect(result.isError).toBe(true)
+  })
+
+  it('lets a value set at launch win over the settings file', async () => {
+    const { result } = await connected({
+      HISTORY_SHARE: 'on',
+      PACENOTE_DATA_DIR: path.join(home, 'data'),
+    })
+    expect(result.isError).toBeFalsy()
   })
 })
