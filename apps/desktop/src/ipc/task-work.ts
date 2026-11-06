@@ -15,7 +15,12 @@ import {
 } from '../../../../src/tasks/context.js'
 import { repoFolder, saveRepo } from '../../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../../src/tasks/store.js'
-import type { Proposal, WorkEntry } from '../../../../src/tasks/types.js'
+import {
+  WORK_TOOL_CLIENTS,
+  workToolOf,
+  type Proposal,
+  type WorkEntry,
+} from '../../../../src/tasks/types.js'
 import {
   addWork,
   changeWork,
@@ -155,8 +160,7 @@ export function registerTaskWorkIpc(
           lastActiveAt: sessions.sessionNow(s).lastActiveAt,
         })),
       folder: task.repo ? repoFolder(dataDir, task.repo) : undefined,
-      cli:
-        env().TASKS_CLI === 'codex' ? ('codex' as const) : ('claude' as const),
+      cli: workToolOf(env().TASKS_CLI) ?? 'claude',
     }
   }
   /** A session in a task's work log, or one suggested for it */
@@ -186,7 +190,7 @@ export function registerTaskWorkIpc(
     if (answer === 'close') {
       // Done in its session; how it ended is the wrap-up, not a note too
       closeTask(dataDir, id, 'resolved', new Date(), {
-        by: proposal.tool === 'claude' ? 'claude-code' : 'codex',
+        by: WORK_TOOL_CLIENTS[proposal.tool],
         wrapUp: proposal.summary,
       })
       answered(id, (p) => ({ ...p, answer: 'closed' }))
@@ -222,7 +226,7 @@ export function registerTaskWorkIpc(
         handoff(),
         detail.task,
         detail.context,
-        tool === 'codex' ? 'codex' : 'claude',
+        workToolOf(tool) ?? detail.cli,
         folder
       )
       addWork(dataDir, entry)

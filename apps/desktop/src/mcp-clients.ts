@@ -336,11 +336,14 @@ export function probeMcp(
       })
     )
     child.stdin.on('error', () => undefined)
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8')
+    // Decoded as a stream, so a character cut across two reads stays whole.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk
     })
-    child.stdout.on('data', (chunk: Buffer) => {
-      const lines = (stdout + chunk.toString('utf8')).split('\n')
+    child.stdout.on('data', (chunk: string) => {
+      const lines = (stdout + chunk).split('\n')
       stdout = lines.pop() ?? ''
       for (const line of lines) {
         let message: {

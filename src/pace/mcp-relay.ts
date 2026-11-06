@@ -5,13 +5,13 @@ import {
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js'
+import { serveStatelessMcp } from '../mcp-http.js'
 import { errorResult } from '../mcp-tools.js'
 import type { McpServerRef } from '../reasoners/types.js'
 import type { Requester } from '../sandbox/runtime.js'
@@ -20,7 +20,6 @@ import {
   readMcpServers,
   type McpServerSetting,
 } from '../settings/mcp-servers.js'
-import { readBody } from './tools.js'
 
 /**
  * The MCP servers you added in Settings > Tools, for the reasoner in the
@@ -249,12 +248,12 @@ export function serveYourServers(options: YourServersOptions): OwnTools {
       res.writeHead(404, { 'Content-Length': '0' }).end()
       return
     }
-    if (req.method !== 'POST') {
-      // Stateless: no SSE stream or session to end
-      res.writeHead(405, { Allow: 'POST', 'Content-Length': '0' }).end()
-      return
-    }
     const forOwner = isOwner(options, requester)
+    await serveStatelessMcp(req, res, () => relayFor(server, forOwner))
+  }
+
+  /** One request's server for one of your servers, as the owner may use it */
+  function relayFor(server: McpServerSetting, forOwner: boolean): Server {
     const relay = new Server(
       { name: server.name, version: options.version },
       { capabilities: { tools: {} } }
@@ -281,15 +280,7 @@ export function serveYourServers(options: YourServersOptions): OwnTools {
         )
       }
     })
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    })
-    res.on('close', () => {
-      void transport.close()
-      void relay.close()
-    })
-    await relay.connect(transport)
-    await transport.handleRequest(req, res, await readBody(req))
+    return relay
   }
 }
 

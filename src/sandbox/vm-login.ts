@@ -231,14 +231,17 @@ export class VmLogin {
         this.child = child
         let output = ''
         let prompted = false
-        const read = (chunk: Buffer) => {
-          output += chunk.toString('utf8')
+        const read = (chunk: string) => {
+          output += chunk
           if (prompted) return
           const prompt = parseLoginPrompt(cli, output)
           if (!prompt) return
           prompted = true
           onPrompt(prompt)
         }
+        // Decoded as a stream, so a character cut across two reads stays whole.
+        child.stdout.setEncoding('utf8')
+        child.stderr.setEncoding('utf8')
         child.stdout.on('data', read)
         child.stderr.on('data', read)
         const timer = setTimeout(() => child.kill('SIGTERM'), LOGIN_TIMEOUT_MS)

@@ -16,7 +16,12 @@ import { checkHub, HubClient, newHubToken } from '../src/hub/client.js'
 import { isHubUrl } from '../src/hub/address.js'
 import { loadHubConfig } from '../src/hub/config.js'
 import { createLogger } from '../src/logger.js'
-import { normalizeCode, Pairings, PAIRING_TTL_MS } from '../src/hub/pairing.js'
+import {
+  MAX_PENDING_PAIRINGS,
+  normalizeCode,
+  Pairings,
+  PAIRING_TTL_MS,
+} from '../src/hub/pairing.js'
 import { fileIdOf, Grants } from '../src/hub/policy.js'
 import { slackFilesOrigin } from '../src/messengers/slack/api.js'
 import { HUB_CLOSE, type HubMessage, PING, PONG } from '../src/hub/protocol.js'
@@ -39,7 +44,7 @@ describe('hub pairing', () => {
     let now = 1_000
     const pairings = new Pairings(() => now)
     const token = randomBytes(32).toString('hex')
-    const { pairingId, code } = pairings.start(sha256(token), 'work laptop')
+    const { pairingId, code } = pairings.start(sha256(token), 'work laptop')!
     expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)
     expect(pairings.status(pairingId)).toEqual({ status: 'pending' })
 
@@ -60,10 +65,26 @@ describe('hub pairing', () => {
     })
     expect(pairings.status(pairingId)).toEqual({ status: 'expired' })
 
-    const late = pairings.start(sha256(token), 'x')
+    const late = pairings.start(sha256(token), 'x')!
     now += PAIRING_TTL_MS + 1
     expect(pairings.bind(late.code, alice)).toEqual({ result: 'unknown' })
     expect(normalizeCode('abcd2345')).toBe('ABCD-2345')
+  })
+
+  it('keeps no more than its limit of pairings waiting, with no sign-in', () => {
+    let now = 1_000
+    const pairings = new Pairings(() => now)
+    const started = Array.from({ length: MAX_PENDING_PAIRINGS }, (_, i) =>
+      pairings.start(sha256(`token ${i}`), `Mac ${i}`)
+    )
+    expect(started.every(Boolean)).toBe(true)
+    expect(pairings.start(sha256('one more'), 'one more')).toBeUndefined()
+    // One done makes room, and so does the wait running out
+    pairings.cancel(started[0]!.pairingId)
+    expect(pairings.start(sha256('one more'), 'one more')).toBeDefined()
+    expect(pairings.start(sha256('and another'), 'x')).toBeUndefined()
+    now += PAIRING_TTL_MS + 1
+    expect(pairings.start(sha256('and another'), 'x')).toBeDefined()
   })
 })
 

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { desktopValue, useDesktopValue, useSandbox } from './desktop'
 import type { FromMacMode, FromMacState } from '@src/macs/types'
 import { localized } from '@src/i18n/locale'
+import { vmReadiness } from '@src/sandbox/vm-ready'
 import { text } from './setup.text'
 
 export { SETUP_STEPS, type SetupStep }
@@ -106,9 +107,7 @@ export function useSandboxSetup(options: { renderer: boolean }) {
   })
   const vm = sandbox.status?.vm
   /** Ready to answer: the reasoner's image built from this Pacenote's recipe */
-  const ready = Boolean(
-    vm && !vm.unsupported && vm.kernel && vm.image && !vm.outdated?.length
-  )
+  const ready = vm ? vmReadiness(vm) === 'ready' : false
   return {
     ...sandbox,
     job,

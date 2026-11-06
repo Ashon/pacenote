@@ -7,6 +7,7 @@ import {
 } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { type WebSocket, WebSocketServer } from 'ws'
+import { BodyTooLargeError, readBody, sendJson } from '../http.js'
 import { localized, type Locale } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
 import type { AccessRequest, HubAccess } from './access.js'
@@ -133,6 +134,19 @@ export class HubServer {
   constructor(private readonly options: HubOptions) {
     this.http = createServer((req, res) => {
       this.handle(req, res).catch((err: unknown) => {
+        if (err instanceof BodyTooLargeError) {
+          if (!res.headersSent)
+            json(
+              res,
+              413,
+              { ok: false, error: 'too_large' },
+              {
+                Connection: 'close',
+              }
+            )
+          else res.end()
+          return
+        }
         options.log.error(`Request failed: ${req.method} ${req.url}`, err)
         if (!res.headersSent) json(res, 500, { ok: false, error: 'hub_error' })
         else res.end()
@@ -301,7 +315,9 @@ export class HubServer {
         String(body?.label ?? '').slice(0, 100) || 'Pacenote desktop'
       if (!HEX64.test(tokenHash))
         return json(res, 400, { error: 'invalid_request' })
-      return json(res, 200, pairings.start(tokenHash, label))
+      const started = pairings.start(tokenHash, label)
+      if (!started) return json(res, 429, { error: 'too_many_pairings' })
+      return json(res, 200, started)
     }
     if (req.method === 'GET' && url.pathname === HUB_PATHS.pairStatus) {
       const pairingId = url.searchParams.get('pairingId') ?? ''
@@ -770,29 +786,7 @@ function send(ws: WebSocket, message: HubMessage): void {
   ws.send(JSON.stringify(message))
 }
 
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(JSON.stringify(body))
-}
-
-function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    let size = 0
-    req.on('data', (chunk: Buffer) => {
-      size += chunk.length
-      if (size > limit) {
-        reject(new Error('Request body too large'))
-        req.destroy()
-        return
-      }
-      chunks.push(chunk)
-    })
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
-  })
-}
+const json = sendJson
 
 async function readJson(
   req: IncomingMessage

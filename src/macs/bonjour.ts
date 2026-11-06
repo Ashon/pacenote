@@ -107,8 +107,9 @@ export class Bonjour {
     const browser = this.run(['-B', this.service, 'local.'])
     this.children.push(browser)
     let rest = ''
-    browser.stdout?.on('data', (chunk: Buffer) => {
-      const lines = (rest + chunk.toString()).split('\n')
+    browser.stdout?.setEncoding('utf8')
+    browser.stdout?.on('data', (chunk: string) => {
+      const lines = (rest + chunk).split('\n')
       rest = lines.pop() ?? ''
       for (const line of lines) {
         const event = browseLine(line)
@@ -134,8 +135,9 @@ export class Bonjour {
     const result = await new Promise<ReturnType<typeof resolved>>((settle) => {
       let output = ''
       const timer = setTimeout(() => settle(undefined), RESOLVE_MS)
-      child.stdout?.on('data', (chunk: Buffer) => {
-        output += chunk.toString()
+      child.stdout?.setEncoding('utf8')
+      child.stdout?.on('data', (chunk: string) => {
+        output += chunk
         const found = resolved(output)
         if (found) {
           clearTimeout(timer)

@@ -1,7 +1,6 @@
 import { homedir } from 'node:os'
 import type { Logger } from '../../../src/logger.js'
 import {
-  FILLED_BY,
   fillInput,
   fillPrompt,
   fillsFrom,
@@ -10,6 +9,7 @@ import {
   type FillAsk,
 } from '../../../src/tasks/fill.js'
 import type { OwnCli } from '../../../src/tasks/own-ai.js'
+import { WORK_TOOL_CLIENTS } from '../../../src/tasks/types.js'
 import { allTaskViews } from '../../../src/tasks/store.js'
 import { fillInTask } from '../../../src/tasks/write.js'
 import { countYou } from '../../../src/you/store.js'
@@ -140,7 +140,7 @@ export class Filler {
       if (!fill) continue
       const result = fillInTask(dataDir, ask.id, fill, {
         repoGuessed: ask.repoGuessed,
-        by: FILLED_BY[ran.by],
+        by: WORK_TOOL_CLIENTS[ran.by],
       })
       if (result && 'refused' in result)
         log.info(`Left ${ask.id} as it is: ${result.refused}`)

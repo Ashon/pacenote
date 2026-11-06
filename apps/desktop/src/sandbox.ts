@@ -135,15 +135,17 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
       pendingEmit = undefined
       this.emit('job', { ...job, output: [...job.output] })
     }
-    const capture = (chunk: Buffer) => {
+    const capture = (chunk: string) => {
       const lines = chunk
-        .toString()
         .split(/\r?\n/)
         .map((line) => redactLogLine(line.replace(ANSI_ESCAPE, '')))
         .filter((line) => line.trim())
       job.output = [...job.output, ...lines].slice(-OUTPUT_LINES)
       pendingEmit ??= setTimeout(flush, 200)
     }
+    // Decoded as a stream, so a character cut across two reads stays whole.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
     child.stdout.on('data', capture)
     child.stderr.on('data', capture)
     child.on('error', (err) => {

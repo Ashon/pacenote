@@ -324,12 +324,15 @@ export class BotSupervisor extends EventEmitter<{ change: [SupervisorState] }> {
       retryAt: undefined,
     })
 
-    const capture = (chunk: Buffer) => {
-      const lines = chunk.toString().split('\n').filter(Boolean)
+    const capture = (chunk: string) => {
+      const lines = chunk.split('\n').filter(Boolean)
       this.set({
         output: [...this.state.output, ...lines].slice(-OUTPUT_LINES),
       })
     }
+    // Decoded as a stream, so a character cut across two reads stays whole.
+    child.stdout?.setEncoding('utf8')
+    child.stderr?.setEncoding('utf8')
     child.stdout?.on('data', capture)
     child.stderr?.on('data', capture)
     child.once('spawn', () => this.set({ pid: child.pid }))

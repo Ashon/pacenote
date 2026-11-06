@@ -27,6 +27,7 @@ import { botControl, useSupervisor, type useSandbox } from '@/lib/desktop'
 import { formatDuration, formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { vmReadiness } from '@src/sandbox/vm-ready'
 import { text } from './sandbox-panel.text'
 
 type Sandbox = ReturnType<typeof useSandbox>
@@ -123,11 +124,11 @@ export function VmFooter({ sandbox }: { sandbox: Sandbox }) {
         </span>
       </span>
     )
-  const set = vm.kernel && vm.initfs && Boolean(vm.image)
   // Images built for another version of Pacenote still run; the setup builds
   // them anew.
-  const outdated = set && (vm.outdated ?? []).length > 0
-  const ready = set && !outdated
+  const readiness = vmReadiness(vm)
+  const outdated = readiness === 'outdated'
+  const ready = readiness === 'ready'
   const busy = job?.state === 'running' && job.kind === 'vm'
   return (
     <>

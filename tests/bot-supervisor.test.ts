@@ -9,6 +9,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settingsText } from '../src/settings/settings-file.js'
 
@@ -20,8 +21,9 @@ let holdSpawn = false
 
 class FakeChild extends EventEmitter {
   pid?: number
-  stdout = new EventEmitter()
-  stderr = new EventEmitter()
+  // Streams, as utilityProcess's are: the supervisor decodes them as UTF-8
+  stdout = new PassThrough()
+  stderr = new PassThrough()
   // Like utilityProcess: before it spawned, there is nothing to signal.
   kill = vi.fn(() => {
     if (this.pid === undefined) return false

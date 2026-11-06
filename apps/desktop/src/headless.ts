@@ -413,8 +413,11 @@ export function runHeadless(options: {
       done({ timedOut: true })
     }, options.timeoutMs)
     child.on('error', (error) => done({ spawnError: error }))
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()))
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString()))
+    // Decoded as a stream, so a character cut across two reads stays whole.
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => (stdout += chunk))
+    child.stderr.on('data', (chunk: string) => (stderr += chunk))
     child.on('close', () => done())
     child.stdin.on('error', () => undefined)
     child.stdin.end(options.input)

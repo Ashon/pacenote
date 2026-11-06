@@ -307,7 +307,12 @@ describe('the ops broker in its own VM', () => {
     const kubeconfigFile = path.join(dir, 'kubeconfig')
     writeFileSync(
       hostsFile,
-      JSON.stringify({ 'web-01': '10.0.0.5', 'db-01': '10.0.0.6' })
+      // One added by hand past the allowed range, which the broker drops too
+      JSON.stringify({
+        'web-01': '10.0.0.5',
+        'db-01': '10.0.0.6',
+        'mail-01': '192.168.7.9',
+      })
     )
     writeFileSync(
       kubeconfigFile,
@@ -326,6 +331,7 @@ describe('the ops broker in its own VM', () => {
         ...brokerDestinations({
           hostsFile,
           kubeconfigFile,
+          allowedCidr: '10.0.0.0/24',
           ssh: true,
           k8s: true,
           github: true,
@@ -349,7 +355,19 @@ describe('the ops broker in its own VM', () => {
       ...brokerDestinations({
         hostsFile,
         kubeconfigFile,
+        allowedCidr: '10.0.0.0/24',
         ssh: false,
+        k8s: false,
+        github: false,
+      }),
+    ]).toEqual([])
+    // With no allowed range the broker takes no SSH host, so none opens
+    expect([
+      ...brokerDestinations({
+        hostsFile,
+        kubeconfigFile,
+        allowedCidr: '',
+        ssh: true,
         k8s: false,
         github: false,
       }),
@@ -359,6 +377,7 @@ describe('the ops broker in its own VM', () => {
       ...brokerDestinations({
         hostsFile,
         kubeconfigFile,
+        allowedCidr: '10.0.0.0/24',
         ssh: false,
         k8s: true,
         github: false,

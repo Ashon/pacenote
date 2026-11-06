@@ -1,9 +1,8 @@
-import type { IncomingMessage } from 'node:http'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import type { HistoryReader } from '../history/reader.js'
+import { serveStatelessMcp } from '../mcp-http.js'
 import {
   errorResult,
   jsonResult,
@@ -327,28 +326,8 @@ export function serveOwnTools(options: OwnToolsOptions): OwnTools {
       res.writeHead(404, { 'Content-Length': '0' }).end()
       return
     }
-    if (req.method !== 'POST') {
-      // Stateless: no SSE stream or session to end
-      res.writeHead(405, { Allow: 'POST', 'Content-Length': '0' }).end()
-      return
-    }
-    const server = createOwnToolsServer(options, requester)
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    })
-    res.on('close', () => {
-      void transport.close()
-      void server.close()
-    })
-    await server.connect(transport)
-    await transport.handleRequest(req, res, await readBody(req))
+    await serveStatelessMcp(req, res, () =>
+      createOwnToolsServer(options, requester)
+    )
   }
-}
-
-/** A request's JSON body, read whole */
-export async function readBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(chunk as Buffer)
-  const text = Buffer.concat(chunks).toString('utf8')
-  return text ? JSON.parse(text) : undefined
 }

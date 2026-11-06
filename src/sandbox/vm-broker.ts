@@ -5,6 +5,7 @@ import type net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { Logger } from '../logger.js'
+import { loadHostMap } from '../broker/hosts.js'
 import { EgressProxy } from './egress.js'
 import { brokerExpected, loadBrokerEnv } from './env.js'
 import { prepareBrokerFiles } from './prepare.js'
@@ -50,13 +51,16 @@ const SSH_PROXY_COMMAND = 'node /usr/local/lib/pacenote/proxy-connect.mjs %h %p'
 
 /**
  * Where the broker's VM may connect, as host:port, for the connections in
- * use: the SSH hosts in hosts.json on 22, each kubeconfig cluster's API
- * server, GitHub and the Jira site. Nothing else, and never this Mac
- * (EgressProxy).
+ * use: the SSH hosts in hosts.json on 22 (within the allowed range, as the
+ * broker reads them: an address edited in by hand past it opens nothing),
+ * each kubeconfig cluster's API server, GitHub and the Jira site. Nothing
+ * else, and never this Mac (EgressProxy).
  */
 export function brokerDestinations(input: {
   hostsFile: string
   kubeconfigFile: string
+  /** OPS_SSH_ALLOWED_CIDR: the SSH hosts the broker takes */
+  allowedCidr: string
   ssh: boolean
   k8s: boolean
   github: boolean
@@ -82,11 +86,14 @@ export function brokerDestinations(input: {
       // Not a URL: nothing to open
     }
   }
-  if (input.ssh) {
-    const hosts = read(input.hostsFile)
-    if (hosts && typeof hosts === 'object')
-      for (const address of Object.values(hosts))
-        if (typeof address === 'string') out.add(`${address.toLowerCase()}:22`)
+  if (input.ssh && input.allowedCidr) {
+    let hosts = new Map<string, string>()
+    try {
+      hosts = loadHostMap(input.hostsFile, input.allowedCidr)
+    } catch {
+      // No hosts.json yet, or not JSON: no SSH host to reach
+    }
+    for (const address of hosts.values()) out.add(`${address.toLowerCase()}:22`)
   }
   if (input.k8s) {
     const kubeconfig = read(input.kubeconfigFile) as
@@ -232,6 +239,7 @@ export class VmBroker {
     const destinations = brokerDestinations({
       hostsFile,
       kubeconfigFile,
+      allowedCidr: expected.allowedCidr,
       ssh: tools.has('ssh'),
       k8s: tools.has('k8s'),
       github: tools.has('github'),

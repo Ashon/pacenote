@@ -634,8 +634,11 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
             )
           : finish(error.message)
       )
-      child.stderr?.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString('utf8')
+      // Decoded as a stream, so a character cut across two reads stays whole.
+      child.stdout?.setEncoding('utf8')
+      child.stderr?.setEncoding('utf8')
+      child.stderr?.on('data', (chunk: string) => {
+        stderr += chunk
       })
       const read = (line: string) => {
         const before = stream.reads
@@ -650,8 +653,8 @@ export class TaskCollector extends EventEmitter<{ change: [TasksCollect] }> {
             running: { ...running, reads: stream.reads },
           })
       }
-      child.stdout?.on('data', (chunk: Buffer) => {
-        const lines = (buffer + chunk.toString('utf8')).split('\n')
+      child.stdout?.on('data', (chunk: string) => {
+        const lines = (buffer + chunk).split('\n')
         buffer = lines.pop() ?? ''
         for (const line of lines) read(line)
       })

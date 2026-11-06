@@ -51,6 +51,7 @@ import {
 } from './settings-sections'
 import { FOUND_KEYS } from '@src/settings/found'
 import { connectionStates } from '@src/settings/tools'
+import { vmReadiness, type VmReadiness } from '@src/sandbox/vm-ready'
 import {
   AppsHere,
   type ChoiceExtras,
@@ -389,21 +390,19 @@ export function SettingsPage() {
   const slackReady = hubMode
     ? isSet('HUB_URL') && isSet('HUB_TOKEN')
     : isSet('SLACK_APP_TOKEN') && isSet('SLACK_BOT_TOKEN')
+  /** The built-in sandbox's hint: a step to take, an update, or none */
+  const vmHint = (readiness: VmReadiness | undefined): Hint | undefined =>
+    readiness === 'outdated'
+      ? { tone: 'warn', text: t.hintUpdate }
+      : readiness && readiness !== 'ready'
+        ? { tone: 'warn', text: t.hintSetUp }
+        : undefined
   const hints: Partial<Record<Section, Hint>> = {
     // Short enough to sit beside "Messengers"; the Slack heading says what is
     // missing.
     messengers: slackReady ? undefined : { tone: 'warn', text: t.hintSetUp },
     sandbox: builtIn
-      ? vmStatus &&
-        (vmStatus.unsupported ||
-          !vmStatus.helper.ok ||
-          !vmStatus.kernel ||
-          !vmStatus.initfs ||
-          !vmStatus.image)
-        ? { tone: 'warn', text: t.hintSetUp }
-        : (vmStatus?.outdated ?? []).length > 0
-          ? { tone: 'warn', text: t.hintUpdate }
-          : undefined
+      ? vmHint(vmStatus && vmReadiness(vmStatus))
       : { tone: 'muted', text: t.hintOff },
     ops: !opsOn
       ? { tone: 'muted', text: t.hintOff }

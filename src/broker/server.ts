@@ -14,8 +14,8 @@ import {
 } from 'node:http'
 import path from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
+import { serveStatelessMcp } from '../mcp-http.js'
 import { ProcessExitError, runProcess } from '../sandbox/process.js'
 import {
   CHECK_NAMES,
@@ -1149,13 +1149,6 @@ function createMcpServer(): McpServer {
 
 // ------------------------------------------------------------------ HTTP
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(chunk as Buffer)
-  const text = Buffer.concat(chunks).toString('utf8')
-  return text ? JSON.parse(text) : undefined
-}
-
 async function handle(
   req: IncomingMessage,
   res: ServerResponse
@@ -1172,25 +1165,9 @@ async function handle(
     res.writeHead(404).end()
     return
   }
-  if (req.method !== 'POST') {
-    // Stateless mode, so SSE stream and session termination requests are not
-    // accepted.
-    res.writeHead(405, { Allow: 'POST' }).end()
-    return
-  }
-  const server = createMcpServer()
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
+  await serveStatelessMcp(req, res, createMcpServer, {
+    around: (run) => asking.run(requesterOf(req), run),
   })
-  res.on('close', () => {
-    void transport.close()
-    void server.close()
-  })
-  await server.connect(transport)
-  const body = await readBody(req)
-  await asking.run(requesterOf(req), () =>
-    transport.handleRequest(req, res, body)
-  )
 }
 
 async function start(): Promise<void> {

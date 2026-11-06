@@ -319,8 +319,27 @@ export interface TasksCollect {
   elsewhere?: { name: string; since: string }
 }
 
-/** Where a task's work went on: Claude Code, Codex or opencode on this Mac */
-export type WorkTool = 'claude' | 'codex' | 'opencode'
+/** Where a task's work goes on: Claude Code, Codex or opencode on this Mac */
+export const WORK_TOOLS = ['claude', 'codex', 'opencode'] as const
+export type WorkTool = (typeof WORK_TOOLS)[number]
+
+/**
+ * The tool a value names (from the screen, a device or a setting), or none:
+ * a value is never taken for another tool
+ */
+export function workToolOf(value: unknown): WorkTool | undefined {
+  return WORK_TOOLS.find((tool) => tool === value)
+}
+
+/**
+ * How a task's update or closing names a tool: the CLI, as its MCP client is
+ * named
+ */
+export const WORK_TOOL_CLIENTS: Record<WorkTool, string> = {
+  claude: 'claude-code',
+  codex: 'codex',
+  opencode: 'opencode',
+}
 
 /**
  * How a session you started yourself was known as a task's work: it used

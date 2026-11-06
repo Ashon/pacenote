@@ -10,6 +10,7 @@ import {
   outputOf,
   plainCommand,
   plainInvocation,
+  runHeadless,
   writeOpencodeConfig,
 } from '../apps/desktop/src/headless.js'
 import { writeRecap } from '../apps/desktop/src/recap-writer.js'
@@ -352,5 +353,28 @@ describe("Pacenote's own work on opencode", () => {
         throw new Error('opencode executable not found')
       })
     ).toEqual({ installed: false, signedIn: false })
+  })
+})
+
+describe('reading what a CLI prints', () => {
+  it('keeps a character whole when it comes in two reads', async () => {
+    // "답" is three bytes: the first two come, then the last, a moment later
+    const script = [
+      'process.stdout.write(Buffer.from([0xeb, 0x8b]))',
+      'process.stderr.write(Buffer.from([0xec, 0x98]))',
+      'setTimeout(() => {',
+      '  process.stdout.write(Buffer.from([0xb5]))',
+      '  process.stderr.write(Buffer.from([0xa4]))',
+      '}, 100)',
+    ].join('\n')
+    const exit = await runHeadless({
+      command: [process.execPath, ['-e', script]],
+      input: '',
+      cwd: root,
+      toolPath: process.env.PATH ?? '',
+      timeoutMs: 10_000,
+    })
+    expect(exit.stdout).toBe('답')
+    expect(exit.stderr).toBe('오')
   })
 })

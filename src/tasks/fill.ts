@@ -320,13 +320,6 @@ export function fillsFrom(
   return fills
 }
 
-/** What a filled task's update names: the CLI, as an MCP client is named */
-export const FILLED_BY: Record<'claude' | 'codex' | 'opencode', string> = {
-  claude: 'claude-code',
-  codex: 'codex',
-  opencode: 'opencode',
-}
-
 // ---------------------------------------------------------------------------
 // The repositories' state on this Mac
 

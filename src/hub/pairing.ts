@@ -5,6 +5,11 @@ import type { HubUser, PairStartResponse, PairStatus } from './protocol.js'
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 /** How long a member has to send the code in Slack and confirm it in the app */
 export const PAIRING_TTL_MS = 10 * 60_000
+/**
+ * The most pairings waiting at once. Starting one needs no sign-in, so the
+ * table has an end: past it, a new one waits until one is done or expires.
+ */
+export const MAX_PENDING_PAIRINGS = 100
 
 interface Pending {
   pairingId: string
@@ -37,8 +42,10 @@ export class Pairings {
 
   constructor(private readonly now: () => number = Date.now) {}
 
-  start(tokenHash: string, label: string): PairStartResponse {
+  /** A new pairing's code, or none while MAX_PENDING_PAIRINGS wait */
+  start(tokenHash: string, label: string): PairStartResponse | undefined {
     this.prune()
+    if (this.pending.size >= MAX_PENDING_PAIRINGS) return undefined
     let code: string
     do {
       code = normalizeCode(

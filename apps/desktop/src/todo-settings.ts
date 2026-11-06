@@ -2,7 +2,11 @@ import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { listOf } from '../../../src/tasks/settings.js'
-import type { WorkTool } from '../../../src/tasks/types.js'
+import {
+  WORK_TOOLS,
+  workToolOf,
+  type WorkTool,
+} from '../../../src/tasks/types.js'
 import type { OpenIn } from './handoff.js'
 import type { Desktop } from './ipc/context.js'
 
@@ -11,8 +15,6 @@ import type { Desktop } from './ipc/context.js'
  * Claude app and the Codex app are on this Mac: sessions can open in them
  * (Open sessions in); tests list them in PACENOTE_HANDOFF_APPS.
  */
-const WORK_TOOLS: WorkTool[] = ['claude', 'codex', 'opencode']
-
 export type TodoSettings = ReturnType<typeof todoSettings>
 
 export function todoSettings(
@@ -40,10 +42,7 @@ export function todoSettings(
       names: listOf(env.TASKS_NAMES),
       groups: listOf(env.TASKS_GROUPS),
       /** Where code tasks continue */
-      cli:
-        env.TASKS_CLI === 'codex' || env.TASKS_CLI === 'opencode'
-          ? env.TASKS_CLI
-          : ('claude' as const),
+      cli: workToolOf(env.TASKS_CLI) ?? 'claude',
       /** The tools a code task can continue in here */
       tools: WORK_TOOLS.filter(
         (tool) => tool !== 'opencode' || onPath(cliBins().opencode)
