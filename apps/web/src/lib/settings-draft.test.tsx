@@ -108,8 +108,9 @@ describe("a field's values", () => {
       'UTC'
     )
     expect(draftValue(draft({}), saved, 'TIMEZONE')).toBe('Asia/Seoul')
+    // Emptied, it is the default: this machine's time zone
     expect(draftValue(draft({ TIMEZONE: '' }), saved, 'TIMEZONE')).toBe(
-      'Asia/Seoul'
+      field('TIMEZONE').default
     )
     expect(draftValue(draft({}), saved, 'REASONER_TIMEOUT_SEC')).toBe('900')
     expect(draftValue(draft({}), saved, 'REASONER_MODEL')).toBe('')
