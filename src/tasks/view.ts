@@ -7,6 +7,7 @@ import type {
   TaskView,
   TasksView,
 } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * Your tasks as the screens show them, from tasks.json and your decisions,
@@ -14,7 +15,6 @@ import type {
  * and the phone and iPad app's, from what your Mac sends it.
  */
 
-const DAY = 24 * 60 * 60_000
 /** An open task this old is shown faded */
 const FADE_AFTER_MS = 7 * DAY
 /** An open task this old is dropped */

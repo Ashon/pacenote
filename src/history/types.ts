@@ -19,7 +19,13 @@ import { text } from './types.text.js'
  */
 export const RUN_RECORD_VERSION = 3
 
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'interrupted'
+export const RUN_STATUSES = [
+  'running',
+  'succeeded',
+  'failed',
+  'interrupted',
+] as const
+export type RunStatus = (typeof RUN_STATUSES)[number]
 
 export type StepStatus = 'running' | 'completed' | 'failed'
 

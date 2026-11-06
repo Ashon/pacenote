@@ -1,5 +1,6 @@
 import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs'
 import path from 'node:path'
+import type { LogLineLevel } from '../log-level.js'
 import { LOG_FILE } from './status.js'
 import type { LogLine } from './types.js'
 
@@ -23,10 +24,15 @@ interface LogQuery {
   /** Scope prefix (e.g. pacenote:socket) */
   scope?: string
   /** Only this level and above */
-  minLevel?: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
+  minLevel?: LogLineLevel
 }
 
-const ORDER = { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 } as const
+const ORDER: Record<LogLineLevel, number> = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+}
 const TAIL_BYTES = 512 * 1024
 
 /**

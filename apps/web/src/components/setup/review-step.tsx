@@ -18,6 +18,7 @@ import {
 import { Chip, Problem, StepFrame } from './parts'
 import { text } from './review-step.text'
 import { preparingProblem, SandboxLogin } from './runtime-step'
+import { reasonerOf } from '@src/reasoners/ids'
 
 const SERVICE = { claude: 'Claude', codex: 'ChatGPT' } as const
 
@@ -53,7 +54,7 @@ export function ReviewStep({
 }) {
   const t = useText(text)
   const values = settings.view?.values
-  const backend = values?.REASONER === 'codex' ? 'codex' : 'claude'
+  const backend = reasonerOf(values?.REASONER)
   const vm = values?.REASONER_SANDBOX === 'vm'
   const hub = values?.SLACK_CONNECTION === 'hub'
   const [diagrams, setDiagrams] = useState<boolean>()

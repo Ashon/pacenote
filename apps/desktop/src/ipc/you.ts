@@ -33,6 +33,8 @@ import { refusalOf } from '../own-ai.js'
 import { writeRecap } from '../recap-writer.js'
 import type { Desktop } from './context.js'
 import type { Ipc } from './gate.js'
+import { DAY } from '../../../../src/time.js'
+import { SingleFlight } from '../../../../src/single-flight.js'
 
 /**
  * You and Recap: where you contribute and what you did in a day, a week or a
@@ -48,18 +50,15 @@ export function registerYouIpc(ipc: Ipc, desktop: Desktop): void {
   const YOU_EVERY_MS = 60_000
   // Worded in the app's language, so a count in another one is counted again
   let you: { view: YouView; at: number; locale: Locale } | undefined
-  let counting: Promise<YouView> | undefined
+  const counting = new SingleFlight<YouView>()
   const countYouNow = (): Promise<YouView> => {
-    counting ??= (async () => {
+    return counting.run(async () => {
       await checkAccounts(dataDir, desktop.toolPath()).catch(() => undefined)
       const locale = getLocale()
       const view = await countYou({ dataDir, home: homedir(), keep: true })
       you = { view, at: Date.now(), locale }
       return view
-    })().finally(() => {
-      counting = undefined
     })
-    return counting
   }
   ipc.handle('pacenote:you:get', null, () => {
     if (!you || you.locale !== getLocale()) return countYouNow()
@@ -69,7 +68,7 @@ export function registerYouIpc(ipc: Ipc, desktop: Desktop): void {
   const fixYou = async (change: (file: YouFile) => YouFile) => {
     changeYou(dataDir, change)
     // A count under way may have read the areas before the fix.
-    await counting?.catch(() => undefined)
+    await counting.running?.catch(() => undefined)
     return countYouNow()
   }
   const short = (value: unknown) =>
@@ -102,9 +101,7 @@ export function registerYouIpc(ipc: Ipc, desktop: Desktop): void {
   const recapRuns = (since: Date) =>
     reader
       .list({ kind: 'mention', limit: 1000 })
-      .filter(
-        (run) => Date.parse(run.startedAt) >= since.getTime() - 86_400_000
-      )
+      .filter((run) => Date.parse(run.startedAt) >= since.getTime() - DAY)
       .map((run) => ({
         at: run.startedAt,
         label: run.conversationLabel,

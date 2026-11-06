@@ -1,12 +1,6 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { replaceFile } from '../json-file.js'
 import { localized } from '../i18n/locale.js'
 import { text } from './allowlist.text.js'
 import type { AllowlistIssue } from './types.js'
@@ -117,6 +111,5 @@ export function ensureAllowlistFile(file: string, template: string): void {
 
 export function writeAllowlistFile(file: string, text: string): void {
   mkdirSync(path.dirname(file), { recursive: true })
-  writeFileSync(`${file}.tmp`, text)
-  renameSync(`${file}.tmp`, file)
+  replaceFile(file, text)
 }

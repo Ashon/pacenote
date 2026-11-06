@@ -25,6 +25,7 @@ import {
   type RunRecord,
   type RunStatus,
 } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * Max steps recorded per run. Past it, later steps are dropped with a single
@@ -151,9 +152,7 @@ export class HistoryStore {
   /** Deletes day directories past the retention period. 0 deletes nothing. */
   prune(retentionDays: number, now = new Date()): number {
     if (retentionDays <= 0) return 0
-    const cutoff = dayDirFor(
-      new Date(now.getTime() - retentionDays * 86_400_000)
-    )
+    const cutoff = dayDirFor(new Date(now.getTime() - retentionDays * DAY))
     let removed = 0
     for (const day of dayDirs(this.root)) {
       if (day >= cutoff) continue

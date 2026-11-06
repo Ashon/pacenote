@@ -10,10 +10,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { applyEdits, modify } from 'jsonc-parser'
 import { afterAll, describe, expect, it } from 'vitest'
+import type { CommandResult } from '../apps/desktop/src/command.js'
 import {
   McpClients,
   probeMcp,
-  type CommandResult,
   type ProbeResult,
 } from '../apps/desktop/src/mcp-clients.js'
 import {

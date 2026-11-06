@@ -158,14 +158,6 @@ export function loadBrokerEnv(env: NodeJS.ProcessEnv): BrokerEnv {
   )
 }
 
-/** Comma-separated list to array */
-export function splitList(value: string | undefined): string[] {
-  return (value ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
 /**
  * Empty placeholder an unset mount points to instead. Created when the broker
  * starts. (src/sandbox/prepare.ts) (runtimeDir must match brokerRuntimeDir())

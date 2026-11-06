@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { listOf } from '../../../src/tasks/settings.js'
+import { splitList } from '../../../src/settings/list.js'
 import {
   WORK_TOOLS,
   workToolOf,
@@ -31,16 +31,16 @@ export function todoSettings(
   const hasApp = (tool: WorkTool) =>
     process.env.PACENOTE_HANDOFF_APPS === undefined
       ? Boolean(app.getApplicationNameForProtocol(`${tool}://`))
-      : listOf(process.env.PACENOTE_HANDOFF_APPS).includes(tool)
+      : splitList(process.env.PACENOTE_HANDOFF_APPS).includes(tool)
   const current = () => {
     const env = settings.effectiveEnv()
     const inApp = env.TASKS_OPEN_IN === 'app'
     return {
       on: env.TASKS === 'on',
       dms: env.TASKS_DMS === 'on',
-      exclude: listOf(env.TASKS_EXCLUDE_CHANNELS),
-      names: listOf(env.TASKS_NAMES),
-      groups: listOf(env.TASKS_GROUPS),
+      exclude: splitList(env.TASKS_EXCLUDE_CHANNELS),
+      names: splitList(env.TASKS_NAMES),
+      groups: splitList(env.TASKS_GROUPS),
       /** Where code tasks continue */
       cli: workToolOf(env.TASKS_CLI) ?? 'claude',
       /** The tools a code task can continue in here */

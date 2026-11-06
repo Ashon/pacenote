@@ -25,14 +25,14 @@ import {
   type RunSummary,
 } from './types.js'
 import { addUsage, NO_USAGE, runUsage, type TokenUsage } from './usage.js'
+import { DAY } from '../time.js'
 
 /**
  * The first day folder a run started at or after a time can be in: its folder
  * is the day where it started, which time zones (and clocks) put a day or two
  * either side of the day here
  */
-const firstDayFrom = (from: number) =>
-  dayDirFor(new Date(from - 3 * 86_400_000))
+const firstDayFrom = (from: number) => dayDirFor(new Date(from - 3 * DAY))
 
 /**
  * Reads run history. Used by the desktop app. Uses the cache when a file has
@@ -172,7 +172,7 @@ export class HistoryReader {
       interrupted: 0,
     }
     const days = Array.from({ length: 14 }, (_, i) =>
-      dayDirFor(new Date(now.getTime() - (13 - i) * 86_400_000))
+      dayDirFor(new Date(now.getTime() - (13 - i) * DAY))
     )
     const daily = new Map(days.map((day) => [day, { runs: 0, failed: 0 }]))
     const tokenDays = new Map(

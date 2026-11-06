@@ -16,11 +16,12 @@ import { recordActivity } from '../tasks/activity.js'
 import { openTasks, recapSummary, workSummary } from '../tasks/mcp.js'
 import type { TasksSettings } from '../tasks/settings.js'
 import { allTaskViews } from '../tasks/store.js'
-import type { TaskView } from '../tasks/types.js'
+import { TASK_ACTIONS, type TaskView } from '../tasks/types.js'
 import { addThreadTasks, closeTask, isDm } from '../tasks/write.js'
 import type { Audience } from '../you/areas.js'
 import { readYou } from '../you/store.js'
 import { getLocale, LANGUAGE_FOR_AI } from '../i18n/locale.js'
+import { OWN_TOOLS_PATH } from '../sandbox/door.js'
 
 /**
  * Pace's own tools: what Pacenote keeps for the person Pace answers (their
@@ -181,7 +182,7 @@ function createOwnToolsServer(
                   'Who in the thread asked it of them, by name; leave it out for their own'
                 ),
               due: z.string().optional().describe('A due hint in words'),
-              action: z.enum(['code', 'reply', 'other']).optional(),
+              action: z.enum(TASK_ACTIONS).optional(),
               repo: repoField(),
               summary: z
                 .string()
@@ -322,7 +323,7 @@ function createOwnToolsServer(
  */
 export function serveOwnTools(options: OwnToolsOptions): OwnTools {
   return async (req, res, requester) => {
-    if (req.url !== '/pace/mcp') {
+    if (req.url !== OWN_TOOLS_PATH) {
       res.writeHead(404, { 'Content-Length': '0' }).end()
       return
     }

@@ -40,6 +40,7 @@ import { ConcurrencyLimiter } from './limiter.js'
 import { systemPrompt, userPrompt } from './prompt.js'
 import { text } from './responder.text.js'
 import { recordAttachments, recordOutputs } from './run-record.js'
+import { CLI_NAMES } from '../tasks/own-ai.js'
 
 /** Run queue limit. Beyond it, the bot replies that it is busy. */
 const MAX_QUEUE = 10
@@ -63,9 +64,7 @@ export function aiNote(
   backend: Reasoner['backend'],
   locale: Locale = 'en'
 ): string {
-  return localized(text, locale).aiNote(
-    backend === 'codex' ? 'Codex' : 'Claude Code'
-  )
+  return localized(text, locale).aiNote(CLI_NAMES[backend])
 }
 
 /** The requests being answered and answered so far (bot status file) */

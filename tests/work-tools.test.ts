@@ -4,6 +4,7 @@ import {
   WORK_TOOLS,
   workToolOf,
 } from '../src/tasks/types.js'
+import { reasonerOf } from '../src/reasoners/ids.js'
 
 describe('the tools a task continues in', () => {
   it('takes each tool by its own name and no other', () => {
@@ -20,5 +21,13 @@ describe('the tools a task continues in', () => {
       'codex',
       'opencode',
     ])
+  })
+})
+
+describe('the reasoner a setting names', () => {
+  it('is Codex only when it says codex, and Claude Code otherwise', () => {
+    expect(reasonerOf('codex')).toBe('codex')
+    for (const value of ['claude', '', 'Codex', undefined])
+      expect(reasonerOf(value)).toBe('claude')
   })
 })

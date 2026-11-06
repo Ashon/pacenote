@@ -10,6 +10,7 @@ import type {
   TasksView,
 } from './types.js'
 import { buildView, viewOf } from './view.js'
+import { DAY } from '../time.js'
 
 /**
  * The files behind your tasks:
@@ -35,7 +36,6 @@ export const TAKEN_BACK_FILE = 'tasks-taken-back.json'
  */
 export const STAGES_FILE = 'tasks-stages.json'
 
-const DAY = 24 * 60 * 60_000
 /**
  * Tasks stay in tasks.json this long after they were found, so a task's
  * detail can show the earlier ones it follows on; the list shows only the
@@ -44,7 +44,7 @@ const DAY = 24 * 60 * 60_000
 export const HISTORY_MS = 104 * DAY
 
 // Re-exported for the modules that import them from here
-export { buildView, readJson, viewOf, writeJson }
+export { buildView, viewOf }
 
 export function readTasks(dataDir: string): TasksFile {
   const file = readJson<Partial<TasksFile>>(path.join(dataDir, TASKS_FILE), {})

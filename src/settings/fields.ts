@@ -1,3 +1,4 @@
+import { LOG_LEVELS } from '../log-level.js'
 import type { MessengerId } from '../messengers/ids.js'
 import { systemTimeZone } from '../messengers/text.js'
 import {
@@ -988,7 +989,7 @@ export const SETTING_FIELDS: SettingField[] = [
     label: 'Log level',
     help: 'At debug, detailed Socket Mode client logs are also written.',
     type: 'select',
-    options: ['debug', 'info', 'warn', 'error'].map((value) => ({
+    options: LOG_LEVELS.map((value) => ({
       value,
       label: value,
     })),

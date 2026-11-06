@@ -9,7 +9,9 @@ import path from 'node:path'
 import { inspect } from 'node:util'
 import { redactSecrets } from './broker/redact.js'
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+import type { LogLevel } from './log-level.js'
+
+export type { LogLevel }
 
 const LEVELS: Record<LogLevel, number> = {
   debug: 10,

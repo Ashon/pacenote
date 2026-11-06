@@ -53,6 +53,7 @@ import type { TaskSessions } from '../task-sessions.js'
 import type { TodoSettings } from '../todo-settings.js'
 import type { Desktop } from './context.js'
 import { orError, type Ipc } from './gate.js'
+import { reasonerOf } from '../../../../src/reasoners/ids.js'
 
 /**
  * A task's detail and the work on it: what came before it, its work log,
@@ -95,7 +96,7 @@ export function registerTaskWorkIpc(
   // your terminal
   ipc.handle('pacenote:tasks:sign-in', undefined, (cli) =>
     orError(async () => {
-      await signInCli(handoff(), cli === 'codex' ? 'codex' : 'claude')
+      await signInCli(handoff(), reasonerOf(cli))
       return {}
     })
   )

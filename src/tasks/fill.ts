@@ -1,13 +1,12 @@
-import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { promisify } from 'node:util'
+import { gitIn } from '../git.js'
 import { redactSecrets } from '../broker/redact.js'
 import { areaChoices, wordsOf } from '../you/guess.js'
 import { taskArea } from '../you/task-area.js'
 import type { AreaView } from '../you/types.js'
 import { folderRepo, recentFolders, repoFolder } from './folders.js'
 import { ADDED_BY_YOU } from './sources.js'
-import type { TaskAction, TaskView } from './types.js'
+import { TASK_ACTIONS, type TaskAction, type TaskView } from './types.js'
 import type { TaskFill } from './write.js'
 
 /**
@@ -22,8 +21,6 @@ import type { TaskFill } from './write.js'
  * repository you have, a task that is open, a name or a date its title says.
  * The desktop app runs it (apps/desktop/src/filler.ts).
  */
-
-const run = promisify(execFile)
 
 /** A task to fill in, as it was added */
 export interface FillAsk {
@@ -241,8 +238,6 @@ export function fillPrompt(input: FillInput): string {
   )
 }
 
-const ACTIONS: readonly TaskAction[] = ['code', 'reply', 'other']
-
 /** A name or date its title says itself, as a word of its own */
 const inTitle = (title: string, words: string): boolean => {
   const said = words.trim().toLowerCase()
@@ -298,7 +293,7 @@ export function fillsFrom(
       ? repos.find((r) => r.toLowerCase() === repo.toLowerCase())
       : undefined
     if (known && !task.repoPicked) fill.repo = known
-    if (ACTIONS.includes(value.action as TaskAction))
+    if (TASK_ACTIONS.includes(value.action as TaskAction))
       fill.action = value.action as TaskAction
     const summary = said(value.summary, 600)
     if (summary && summary.length >= 12) fill.summary = redactSecrets(summary)
@@ -323,16 +318,7 @@ export function fillsFrom(
 // ---------------------------------------------------------------------------
 // The repositories' state on this Mac
 
-async function git(
-  folder: string,
-  args: string[]
-): Promise<string | undefined> {
-  try {
-    return (await run('git', ['-C', folder, ...args], { timeout: 5000 })).stdout
-  } catch {
-    return undefined
-  }
-}
+const git = (folder: string, args: string[]) => gitIn(folder, args)
 
 /**
  * The repository's checkout on this Mac: the folder remembered for it, or a

@@ -1,11 +1,5 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs'
-import path from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { writeJson } from '../json-file.js'
 import type { HubAccessRule, HubUser } from './protocol.js'
 
 /** Someone on the hub's list of members, and who put them there */
@@ -225,11 +219,6 @@ export class HubAccess {
 
   private save(): void {
     if (!this.file) return
-    mkdirSync(path.dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, `${JSON.stringify(this.data, null, 2)}\n`, {
-      mode: 0o600,
-    })
-    renameSync(tmp, this.file)
+    writeJson(this.file, this.data, 0o600)
   }
 }

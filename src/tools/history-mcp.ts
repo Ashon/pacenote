@@ -1,9 +1,8 @@
 import { homedir } from 'node:os'
-import path from 'node:path'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createHistoryServer } from '../history/mcp.js'
 import { HistoryReader } from '../history/reader.js'
-import { defaultHome } from '../settings/home.js'
+import { dataDirFor } from '../settings/home.js'
 import { loadSettings } from '../settings/load-settings.js'
 import { settingsFilePath } from '../settings/paths.js'
 import { readSettingsValues } from '../settings/settings-file.js'
@@ -30,7 +29,7 @@ const launched = process.env.HISTORY_SHARE
 const settingsFile = settingsFilePath()
 loadSettings()
 
-const data = dataDir(process.env.PACENOTE_DATA_DIR)
+const data = dataDirFor(process.env.PACENOTE_DATA_DIR)
 // The AI tool runs the server in the folder it works in: its repository's
 // open tasks go into the instructions.
 const repo = await folderRepo(process.cwd())
@@ -48,13 +47,3 @@ const server = createHistoryServer({
   },
 })
 await server.connect(new StdioServerTransport())
-
-/** Same as the desktop app: the configured folder, or the home */
-function dataDir(value: string | undefined): string {
-  if (!value) return defaultHome()
-  return path.resolve(
-    value === '~' || value.startsWith('~/')
-      ? path.join(homedir(), value.slice(1))
-      : value
-  )
-}

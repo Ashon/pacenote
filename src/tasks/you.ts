@@ -1,6 +1,7 @@
 import type { TasksSettings } from './settings.js'
 import { readTasks, withTasksLock, writeTasks } from './store.js'
 import type { SlackYou, TasksFile } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * Who you are in Slack, so a collection can tell what is asked of you and
@@ -11,7 +12,6 @@ import type { SlackYou, TasksFile } from './types.js'
  * tasks.json; Pacenote holds no Slack token for this.
  */
 
-const DAY = 24 * 60 * 60_000
 /** A collection looks you up again after this long */
 export const LOOK_AGAIN_MS = 30 * DAY
 

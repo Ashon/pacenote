@@ -1,6 +1,7 @@
 import { localized } from '../../i18n/locale.js'
 import { slackApiBase } from './api.js'
 import { text } from './check.text.js'
+import { splitList } from '../../settings/list.js'
 
 /**
  * With OPTIONAL_BOT_SCOPES, must match oauth_config.scopes.bot in
@@ -119,10 +120,7 @@ export async function checkSlackTokens(
         detail: `${String(body.user)} (${String(body.user_id)}) @ ${String(body.team)}`,
         team: String(body.team),
       })
-      const granted = (headers.get('x-oauth-scopes') ?? '')
-        .split(',')
-        .map((scope) => scope.trim())
-        .filter(Boolean)
+      const granted = splitList(headers.get('x-oauth-scopes'))
       const missing = missingScopes(REQUIRED_BOT_SCOPES, granted)
       const optional = missingScopes(OPTIONAL_BOT_SCOPES, granted)
       items.push({

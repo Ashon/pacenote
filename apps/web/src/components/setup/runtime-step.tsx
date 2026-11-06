@@ -11,6 +11,7 @@ import type { SetupPart } from '@src/sandbox/vm-progress'
 import { SandboxSignIn } from '../sandbox-sign-in'
 import { ChoiceCard, Chip, Note, Problem, StepFrame } from './parts'
 import { text } from './runtime-step.text'
+import { reasonerOf } from '@src/reasoners/ids'
 
 type Runtime = 'vm' | 'none'
 
@@ -57,8 +58,7 @@ export function RuntimeStep({
 }) {
   const t = useText(text)
   const unsupported = detected?.sandbox.unsupported
-  const backend =
-    settings.view?.values.REASONER === 'codex' ? 'codex' : 'claude'
+  const backend = reasonerOf(settings.view?.values.REASONER)
   const saved = settings.view?.values.REASONER_SANDBOX
   const [chosen, setChosen] = useState<Runtime>()
   const runtime: Runtime = unsupported

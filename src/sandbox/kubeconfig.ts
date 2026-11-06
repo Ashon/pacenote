@@ -2,7 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { runProcess } from './process.js'
 import { brokerRuntimeDir } from '../settings/paths.js'
-import { splitList, type BrokerEnv } from './env.js'
+import type { BrokerEnv } from './env.js'
+import { splitList } from '../settings/list.js'
 
 interface KubeConfigView {
   contexts?: { name: string; context: { cluster: string } }[]

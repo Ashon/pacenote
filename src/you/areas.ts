@@ -12,6 +12,7 @@ import type {
   AreaView,
   YouFile,
 } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * Where you contribute, found in your work with no model asked: each
@@ -23,7 +24,6 @@ import type {
  * apart what you shaped. What is going on in each is counted again each time.
  */
 
-const DAY = 86_400_000
 /** How far back your work is read: 8 weeks */
 export const WINDOW_MS = 56 * DAY
 /** What lately and roles count */

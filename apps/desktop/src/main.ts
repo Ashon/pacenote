@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -28,7 +28,7 @@ import {
 import type { BotStatus, LoginItemState } from '../../../src/runtime/types.js'
 import { secretValues } from '../../../src/settings/fields.js'
 import {
-  defaultHome,
+  dataDirFor,
   securePrivateDir,
   securePrivateFile,
 } from '../../../src/settings/home.js'
@@ -120,6 +120,7 @@ import { todoSettings } from './todo-settings.js'
 import { setupProblem } from './bot-readiness.js'
 import { hostEnv } from '../../../src/sandbox/host.js'
 import { signedIn } from '../../../src/sandbox/vm-login.js'
+import { DAY } from '../../../src/time.js'
 
 /**
  * Pacenote desktop app. Runs and manages Pace (the bot) (Slack Socket Mode) as
@@ -266,7 +267,7 @@ const history = new HistoryStore(dataDir)
 history.interruptStale(new Set(), new Date(), 'collection')
 /** The last days' collection runs, newest first */
 const collectionRuns = (days: number) =>
-  reader.collections(new Date(Date.now() - days * 86_400_000))
+  reader.collections(new Date(Date.now() - days * DAY))
 /**
  * With PACENOTE_DESKTOP_BOT=off the app does not manage the bot and only shows
  * history. Screen captures leave the bot alone. (PACENOTE_DESKTOP_BOT=on
@@ -780,12 +781,7 @@ function resolveDataDir(): string {
       // A file that cannot be read leaves the default.
     }
   }
-  if (!value) return defaultHome()
-  return path.resolve(
-    value === '~' || value.startsWith('~/')
-      ? path.join(homedir(), value.slice(1))
-      : value
-  )
+  return dataDirFor(value)
 }
 
 const errorText = (error: unknown) =>

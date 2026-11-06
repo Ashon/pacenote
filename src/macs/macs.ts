@@ -4,7 +4,7 @@ import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import path from 'node:path'
 import { WebSocket, WebSocketServer } from 'ws'
-import { readJson, writeJson } from '../tasks/store.js'
+import { readJson, writeJson } from '../json-file.js'
 import { Bonjour, SETUP_SERVICE } from './bonjour.js'
 import {
   accept,

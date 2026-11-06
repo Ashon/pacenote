@@ -25,7 +25,14 @@ import {
   readTasks,
   tasksView,
 } from './store.js'
-import type { RelatedRun, TaskActivity, TasksView, TaskView } from './types.js'
+import {
+  TASK_ACTIONS,
+  TASK_CONFIDENCES,
+  type RelatedRun,
+  type TaskActivity,
+  type TasksView,
+  type TaskView,
+} from './types.js'
 import { readWork } from './work.js'
 import { LANGUAGE_FOR_AI, type Locale } from '../i18n/locale.js'
 import { userLocale } from '../i18n/user.js'
@@ -414,10 +421,10 @@ export function registerTaskTools(
                 .optional()
                 .describe('When the message was posted (ISO 8601)'),
               due: z.string().optional().describe('A due hint in words'),
-              confidence: z.enum(['sure', 'maybe']).optional(),
+              confidence: z.enum(TASK_CONFIDENCES).optional(),
               reason: z.string().optional().describe('Why it is a task'),
               action: z
-                .enum(['code', 'reply', 'other'])
+                .enum(TASK_ACTIONS)
                 .optional()
                 .describe('What doing it takes: code, reply or other'),
               repo: repoField(),
@@ -504,7 +511,7 @@ export function registerTaskTools(
           .describe(
             `What it is about and what is known so far, in two or three sentences, ${inTheirs}`
           ),
-        action: z.enum(['code', 'reply', 'other']).optional(),
+        action: z.enum(TASK_ACTIONS).optional(),
         repo: repoField(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
@@ -558,13 +565,13 @@ export function registerTaskTools(
           .string()
           .optional()
           .describe('The thread in two or three sentences, as it is now'),
-        action: z.enum(['code', 'reply', 'other']).optional(),
+        action: z.enum(TASK_ACTIONS).optional(),
         repo: z
           .string()
           .nullable()
           .optional()
           .describe('The repository it is about, as owner/name'),
-        confidence: z.enum(['sure', 'maybe']).optional(),
+        confidence: z.enum(TASK_CONFIDENCES).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },

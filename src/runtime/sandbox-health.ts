@@ -1,6 +1,7 @@
 import { localized } from '../i18n/locale.js'
 import type { Logger } from '../logger.js'
 import { text } from './sandbox-health.text.js'
+import { SingleFlight } from '../single-flight.js'
 
 /**
  * The message the desktop app sends the bot (utilityProcess) when a sandbox job
@@ -16,7 +17,7 @@ export const RECHECK_SANDBOX = 'recheck-sandbox'
  */
 export class SandboxHealth {
   private problems: string[] = []
-  private running?: Promise<void>
+  private readonly checking = new SingleFlight<void>()
   private timer?: NodeJS.Timeout
 
   /**
@@ -39,10 +40,7 @@ export class SandboxHealth {
    * twice.
    */
   check(): Promise<void> {
-    this.running ??= this.run().finally(() => {
-      this.running = undefined
-    })
-    return this.running
+    return this.checking.run(() => this.run())
   }
 
   /** Checks again every intervalMs, without keeping the process alive. */

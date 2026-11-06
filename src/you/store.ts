@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import type { Locale } from '../i18n/locale.js'
-import { allTaskViews, readJson, readTasks, writeJson } from '../tasks/store.js'
+import { allTaskViews, readTasks } from '../tasks/store.js'
+import { readJson, writeJson } from '../json-file.js'
 import { readWork } from '../tasks/work.js'
 import {
   areasFor,
@@ -15,6 +16,7 @@ import {
 } from './areas.js'
 import { sessionMarks } from './sessions.js'
 import type { YouFile, YouView } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * you.json: your areas as you shaped them, when you looked at them, and who
@@ -108,7 +110,6 @@ export async function countYou(options: {
 }
 
 const run = promisify(execFile)
-const DAY = 86_400_000
 
 /**
  * Who you are on GitHub (gh, as signed in) and in git (its global email),

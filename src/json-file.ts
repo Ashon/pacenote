@@ -1,4 +1,10 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 
 /** A JSON file's value, or fallback when it is missing or not JSON */
@@ -35,7 +41,17 @@ export function writeJsonIfChanged(file: string, value: unknown): void {
 
 function write(file: string, text: string, mode?: number): void {
   mkdirSync(path.dirname(file), { recursive: true })
+  replaceFile(file, text, mode)
+}
+
+/**
+ * Writes a file through a temporary one beside it, so a reader never sees it
+ * half written. With a mode (0o600 for a file holding secrets), the file gets
+ * it, whatever an earlier attempt left. Its folder must exist.
+ */
+export function replaceFile(file: string, text: string, mode?: number): void {
   const tmp = `${file}.tmp`
+  rmSync(tmp, { force: true })
   writeFileSync(tmp, text, mode === undefined ? undefined : { mode })
   renameSync(tmp, file)
 }

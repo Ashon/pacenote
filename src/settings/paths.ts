@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { defaultHome } from './home.js'
+import { defaultHome, expandHome } from './home.js'
 
 /**
  * Pacenote settings location outside the repository. Holds the settings file
@@ -16,9 +16,7 @@ export function pacenoteHome(
 ): string {
   const value = env.PACENOTE_HOME?.trim()
   if (!value) return defaultHome(home)
-  return value === '~' || value.startsWith('~/')
-    ? path.join(home, value.slice(1))
-    : path.resolve(value)
+  return path.resolve(expandHome(value, home))
 }
 
 /** A path in the Pacenote folder, for an environment and a home */

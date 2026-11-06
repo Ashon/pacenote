@@ -3,18 +3,18 @@ import { FILLED_SHOWN_MS, isFillUpdate, standingFill } from '@src/tasks/filled'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import { ADDED_BY_YOU, sourceOf } from '@src/tasks/sources'
 import type { StageRecord, TaskStage } from '@src/tasks/stage'
-import type {
-  DismissReason,
-  FolderCheck,
-  Proposal,
-  RelatedRun,
-  RelatedTask,
-  SessionItem,
-  TaskDecision,
-  TaskDetail,
-  TaskUpdate,
-  TaskView,
-  WorkTool,
+import {
+  DISMISS_REASONS,
+  type FolderCheck,
+  type Proposal,
+  type RelatedRun,
+  type RelatedTask,
+  type SessionItem,
+  type TaskDecision,
+  type TaskDetail,
+  type TaskUpdate,
+  type TaskView,
+  type WorkTool,
 } from '@src/tasks/types'
 import type { MacsView } from '@src/macs/types'
 import type { TaskArea } from '@src/you/types'
@@ -104,12 +104,6 @@ import { text } from './task-row.text'
 /** A Codex session from the Codex app continues there; others in a terminal */
 const resumesInApp = (session: Session) =>
   !!session.app && session.tool === 'codex'
-
-const DISMISS_REASONS: DismissReason[] = [
-  'not-mine',
-  'done-already',
-  'not-worth-it',
-]
 
 /**
  * The AI tool that closed a task, or is at work on your tasks, by its MCP

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { configFingerprint } from '../src/config.js'
+import { settingsAuthor } from '../src/sandbox/author.js'
 import {
   checkAllowlist,
   domainProblem,
@@ -292,5 +293,21 @@ describe('sandbox status', () => {
       'git config --global user.email',
     ])
     expect(most).toBe(4)
+  })
+})
+
+describe('the git author set in the settings', () => {
+  it('is trimmed, and a blank one leaves the global config to fill it in', () => {
+    expect(
+      settingsAuthor({
+        OPS_GIT_AUTHOR_NAME: ' Ada ',
+        OPS_GIT_AUTHOR_EMAIL: 'ada@example.com',
+      })
+    ).toEqual({ name: 'Ada', email: 'ada@example.com' })
+    // The broker once sent "  " as the author while the status said settings
+    expect(settingsAuthor({ OPS_GIT_AUTHOR_NAME: '  ' })).toEqual({
+      name: undefined,
+      email: undefined,
+    })
   })
 })

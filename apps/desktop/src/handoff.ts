@@ -32,6 +32,8 @@ import type {
 } from '../../../src/tasks/types.js'
 import { text } from './handoff.text.js'
 import { textOf } from './session-index.js'
+import { DAY } from '../../../src/time.js'
+import { CLI_NAMES } from '../../../src/tasks/own-ai.js'
 
 /**
  * Continuing a task where its work happens: Claude Code or Codex opened in a
@@ -209,7 +211,7 @@ function handoffDir(dataDir: string, now: number): string {
   for (const name of readdirSync(dir)) {
     const file = path.join(dir, name)
     try {
-      if (now - statSync(file).mtimeMs > 7 * 86_400_000) rmSync(file)
+      if (now - statSync(file).mtimeMs > 7 * DAY) rmSync(file)
     } catch {
       // Gone already
     }
@@ -487,7 +489,7 @@ export async function resumeSession(
 export function signInScript(bin: string, tool: WorkTool = 'claude'): string {
   return [
     '#!/bin/zsh -l',
-    `# Written by Pacenote to sign ${tool === 'codex' ? 'Codex' : 'Claude Code'} in again; safe to delete.`,
+    `# Written by Pacenote to sign ${CLI_NAMES[tool]} in again; safe to delete.`,
     `${shellQuote(bin)} ${tool === 'codex' ? 'login' : 'auth login'} && echo ${shellQuote(localized(text).signedIn)}`,
     '',
   ].join('\n')

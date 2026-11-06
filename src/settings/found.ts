@@ -1,3 +1,4 @@
+import { splitList } from './list.js'
 /**
  * Names Settings > Tools offers to pick instead of typing them: what the
  * desktop app finds on this Mac for each connection (apps/desktop/src/found.ts
@@ -52,13 +53,6 @@ const CASELESS: ReadonlySet<FoundKey> = new Set(['OPS_GIT_ALLOWED_OWNERS'])
 
 export const isFoundKey = (key: string): key is FoundKey =>
   (FOUND_KEYS as readonly string[]).includes(key)
-
-/** A list setting's items, as the broker splits it (src/sandbox/env.ts) */
-const splitList = (value: string) =>
-  value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
 
 const same = (key: FoundKey, a: string, b: string) =>
   CASELESS.has(key) ? a.toLowerCase() === b.toLowerCase() : a === b

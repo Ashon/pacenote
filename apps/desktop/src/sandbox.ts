@@ -26,6 +26,7 @@ import {
 import { readSettingsValues } from '../../../src/settings/settings-file.js'
 import { allowlistPath } from '../../../src/settings/paths.js'
 import { text } from './sandbox.text.js'
+import { reasonerOf } from '../../../src/reasoners/ids.js'
 
 const OUTPUT_LINES = 400
 /** Terminal color codes (in the jobs' output) */
@@ -86,10 +87,7 @@ export class SandboxService extends EventEmitter<{ job: [SandboxJob] }> {
       ...readSettingsValues(this.options.settingsFile),
       ...this.options.env,
     }
-    const issues = checkAllowlist(
-      raw as string[],
-      values.REASONER === 'codex' ? 'codex' : 'claude'
-    )
+    const issues = checkAllowlist(raw as string[], reasonerOf(values.REASONER))
     if (issues.length > 0) return issues
     const file = allowlistPath(this.options.env)
     ensureAllowlistFile(

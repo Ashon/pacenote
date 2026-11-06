@@ -4,6 +4,8 @@ import http from 'node:http'
 import type net from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { settingsAuthor } from './author.js'
+import { PACE_PREFIX } from './door.js'
 import type { Logger } from '../logger.js'
 import { loadHostMap } from '../broker/hosts.js'
 import { EgressProxy } from './egress.js'
@@ -134,15 +136,12 @@ export type OwnTools = (
   requester: Requester | undefined
 ) => Promise<void>
 
-/** Where a door serves Pace's own tools; anything else goes to the broker */
-const OWN_TOOLS_PATH = '/pace/'
-
 /**
  * A door for one run: a socket of its own that passes each request on to the
  * broker, with who is asking in REQUESTER_HEADERS, and drops any such header
  * the reasoner sent itself. Each reasoner VM gets its run's door, never the
  * broker's own socket, so what the broker logs about who asked comes from
- * Pace. Requests under OWN_TOOLS_PATH go to Pace's own tools instead, here on
+ * Pace. Requests under PACE_PREFIX go to Pace's own tools instead, here on
  * this Mac. Without a broker, only those answer.
  */
 export async function openBrokerDoor(
@@ -153,7 +152,7 @@ export async function openBrokerDoor(
 ): Promise<{ socket: string; close(): Promise<void> }> {
   const connections = new Set<net.Socket>()
   const server = http.createServer((req, res) => {
-    if (ownTools && req.url?.startsWith(OWN_TOOLS_PATH)) {
+    if (ownTools && req.url?.startsWith(PACE_PREFIX)) {
       ownTools(req, res, requester).catch(() => {
         if (!res.headersSent) res.writeHead(500, { 'Content-Length': '0' })
         res.end()
@@ -317,12 +316,13 @@ export class VmBroker {
         () => ''
       )
     const github = expected.tools.includes('github')
+    const author = settingsAuthor(env)
     // Together, and without holding up the bot meanwhile
     const [token, name, email] = await Promise.all([
       github ? env.GH_TOKEN || capture('gh', ['auth', 'token']) : '',
-      env.OPS_GIT_AUTHOR_NAME ||
+      author.name ??
         (github ? capture('git', ['config', '--global', 'user.name']) : ''),
-      env.OPS_GIT_AUTHOR_EMAIL ||
+      author.email ??
         (github ? capture('git', ['config', '--global', 'user.email']) : ''),
     ])
     const values: Record<string, string> = {

@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { settingsAuthor } from './author.js'
 import { configFingerprint, sandboxSetting } from '../config.js'
 import { localized } from '../i18n/locale.js'
 import { readBotStatus } from '../runtime/status.js'
@@ -24,6 +25,7 @@ import { signedIn } from './vm-login.js'
 import { VM_BROKER_IMAGE, VM_IMAGE, VM_RENDERER_IMAGE } from './vm-images.js'
 import type { PendingApply, SandboxCheck, SandboxStatus } from './types.js'
 import { text } from './status.text.js'
+import { reasonerOf } from '../reasoners/ids.js'
 
 /** Settings Pace has not picked up: they changed after it started */
 export function computePending(bot?: {
@@ -66,13 +68,12 @@ async function sandboxAuthor(
 ): Promise<{ name: string; email: string; source: 'settings' | 'global' }> {
   const fromGlobal = async (key: string) =>
     (await run('git', ['config', '--global', key])).stdout.trim()
+  const author = settingsAuthor(values)
   const [name, email] = await Promise.all([
-    values.OPS_GIT_AUTHOR_NAME?.trim() || fromGlobal('user.name'),
-    values.OPS_GIT_AUTHOR_EMAIL?.trim() || fromGlobal('user.email'),
+    author.name ?? fromGlobal('user.name'),
+    author.email ?? fromGlobal('user.email'),
   ])
-  const fromSettings = Boolean(
-    values.OPS_GIT_AUTHOR_NAME?.trim() || values.OPS_GIT_AUTHOR_EMAIL?.trim()
-  )
+  const fromSettings = Boolean(author.name || author.email)
   return {
     name,
     email,
@@ -113,7 +114,7 @@ export async function collectSandboxStatus(options: {
     ...readSettingsValues(options.settingsFile),
     ...options.env,
   }
-  const reasoner = values.REASONER === 'codex' ? 'codex' : 'claude'
+  const reasoner = reasonerOf(values.REASONER)
   const isolated = sandboxSetting(values.REASONER_SANDBOX) === 'vm'
   const opsOn = values.OPS_TOOLS === 'on'
   // The allowlist lives under PACENOTE_HOME. If it does not exist yet (the

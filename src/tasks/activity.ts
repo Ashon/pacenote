@@ -1,12 +1,6 @@
-import {
-  appendFileSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
+import { replaceFile } from '../json-file.js'
 import type { TaskActivity, TasksLive } from './types.js'
 
 /**
@@ -35,9 +29,7 @@ export function recordActivity(dataDir: string, event: TaskActivity): void {
     appendFileSync(file, `${JSON.stringify(event)}\n`)
     if (statSync(file).size > TRIM_BYTES) {
       const lines = readFileSync(file, 'utf8').trimEnd().split('\n')
-      const tmp = `${file}.tmp`
-      writeFileSync(tmp, `${lines.slice(-KEEP_LINES).join('\n')}\n`)
-      renameSync(tmp, file)
+      replaceFile(file, `${lines.slice(-KEEP_LINES).join('\n')}\n`)
     }
   } catch {
     // The live view misses one step; the tasks themselves are written.

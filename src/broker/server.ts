@@ -45,6 +45,7 @@ import {
   topArgs,
 } from './k8s.js'
 import { redactSecrets } from './redact.js'
+import { splitList } from '../settings/list.js'
 
 /**
  * Ops check relay (ops-broker). An MCP (Streamable HTTP) server in a VM of its
@@ -115,7 +116,7 @@ const env = Env.parse(process.env)
 /** Whether TOOLS lets the broker offer a group of tools */
 const offered = (() => {
   if (env.TOOLS === undefined) return () => true
-  const groups = new Set(env.TOOLS.split(',').map((group) => group.trim()))
+  const groups = new Set(splitList(env.TOOLS))
   return (group: string) => groups.has(group)
 })()
 
@@ -209,9 +210,7 @@ const k8sEnabled = nonEmptyFile(env.KUBECONFIG_FILE)
 let clusters: string[] = []
 const fsEnabled = nonEmptyDir(env.FS_ROOT)
 /** Allowed owners shared by PR creation (ws_*) and GitHub lookups (gh_*) */
-const allowedOwners = env.GIT_ALLOWED_OWNERS.split(',')
-  .map((owner) => owner.trim())
-  .filter(Boolean)
+const allowedOwners = splitList(env.GIT_ALLOWED_OWNERS)
 
 const git =
   fsEnabled &&
@@ -236,9 +235,9 @@ const github =
     ? new GitHubReader({ token: env.GH_TOKEN, allowedOwners })
     : undefined
 
-const jiraProjects = env.JIRA_PROJECTS.split(',')
-  .map((project) => project.trim().toUpperCase())
-  .filter(Boolean)
+const jiraProjects = splitList(env.JIRA_PROJECTS).map((project) =>
+  project.toUpperCase()
+)
 const jira =
   env.JIRA_URL && env.JIRA_EMAIL && env.JIRA_TOKEN && jiraProjects.length > 0
     ? new JiraClient({

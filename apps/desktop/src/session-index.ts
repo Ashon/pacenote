@@ -3,6 +3,8 @@ import path from 'node:path'
 import { setImmediate } from 'node:timers/promises'
 import { codexLogs } from '../../../src/tasks/folders.js'
 import type { WorkTool } from '../../../src/tasks/types.js'
+import { DAY } from '../../../src/time.js'
+import { SingleFlight } from '../../../src/single-flight.js'
 
 /**
  * The Claude Code and Codex sessions on this Mac, from their own logs, as
@@ -13,7 +15,7 @@ import type { WorkTool } from '../../../src/tasks/types.js'
  */
 
 /** How far back sessions are kept: the last two weeks' */
-const SESSION_WINDOW_MS = 14 * 86_400_000
+const SESSION_WINDOW_MS = 14 * DAY
 
 /** What you typed in a session, at most this many, each cut this short */
 const PROMPTS = 300
@@ -195,16 +197,13 @@ export class SessionIndex {
   private readonly files = new Map<string, FileState>()
   /** The sessions by id, the first read of each; made again once one changes */
   private byId?: Map<string, SessionSummary>
-  private refreshing?: Promise<void>
+  private readonly refreshing = new SingleFlight<void>()
 
   constructor(private readonly options: { home: string; windowMs?: number }) {}
 
   /** Reads what the logs gained since last time; one refresh at a time */
   refresh(now = Date.now()): Promise<void> {
-    this.refreshing ??= this.read(now).finally(() => {
-      this.refreshing = undefined
-    })
-    return this.refreshing
+    return this.refreshing.run(() => this.read(now))
   }
 
   /** The sessions read, each once it has its id and folder */

@@ -5,6 +5,7 @@ import {
   localized,
 } from '../../../../src/i18n/locale.js'
 import { text } from './format.text.js'
+import { DAY } from '../../../../src/time.js'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -31,7 +32,7 @@ export function daysAgo(iso: string, now = new Date()): number {
   const d = new Date(iso)
   const day = (x: Date) =>
     new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  return Math.round((day(now) - day(d)) / 86_400_000)
+  return Math.round((day(now) - day(d)) / DAY)
 }
 
 const dateFormats = new Map<string, Intl.DateTimeFormat>()
@@ -107,7 +108,7 @@ export function formatWait(ms: number): string {
   if (min < 60) return t.waitMinutes(Math.max(1, min))
   const hours = Math.round(ms / 3_600_000)
   if (hours < 24) return t.waitHours(hours)
-  return t.waitDays(Number((ms / 86_400_000).toFixed(1)))
+  return t.waitDays(Number((ms / DAY).toFixed(1)))
 }
 
 export const formatNumber = (n: number) =>

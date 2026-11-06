@@ -10,7 +10,8 @@ import {
   type Refusal,
   type Switch,
 } from '../../../src/tasks/own-ai.js'
-import { readJson, writeJson } from '../../../src/tasks/store.js'
+import { readJson, writeJson } from '../../../src/json-file.js'
+import { MINUTE } from '../../../src/time.js'
 
 /**
  * Pacenote's own work on this Mac: Collect now, the looks done judge, Recap's
@@ -30,7 +31,6 @@ interface Ran<R> {
 }
 
 const FILE = 'own-ai.json'
-const MINUTE = 60_000
 /** How long a CLI rests at its limit when its error does not say */
 const LIMIT_REST_MS = 60 * MINUTE
 /** and when it is overloaded */

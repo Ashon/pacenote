@@ -1,6 +1,7 @@
 import { getLocale, localized, type Locale } from '../i18n/locale.js'
 import { failureCause } from '../mention/failure.js'
 import { text } from './own-ai.text.js'
+import { MINUTE } from '../time.js'
 
 /**
  * Pacenote's own work on this Mac (Collect now, the looks done judge, Recap's
@@ -67,7 +68,6 @@ export function unableFrom(error: string): Unable | undefined {
   return undefined
 }
 
-const MINUTE = 60_000
 const UNITS: Record<string, number> = {
   s: 1000,
   m: MINUTE,

@@ -7,6 +7,7 @@ import { handleLocalApi } from '../../../src/local-api.js'
 import { getLocale, localized } from '../../../src/i18n/locale.js'
 import type { Logger } from '../../../src/logger.js'
 import { text } from './screen.text.js'
+import { SingleFlight } from '../../../src/single-flight.js'
 
 /** The screen's own content security policy, on every html it answers with */
 const CSP = [
@@ -107,7 +108,7 @@ const DELAYS_MS = [250, 500, 1_000, 2_000, 5_000, 10_000, 30_000]
 export class ScreenLoader {
   /** The window shows why the screen is not there */
   unavailable = false
-  private loading?: Promise<void>
+  private readonly loading = new SingleFlight<void>()
   private wake?: () => void
 
   constructor(
@@ -137,10 +138,7 @@ export class ScreenLoader {
 
   /** Loads the screen, or joins the load under way */
   load(): Promise<void> {
-    this.loading ??= this.run().finally(() => {
-      this.loading = undefined
-    })
-    return this.loading
+    return this.loading.run(() => this.run())
   }
 
   /** Tries again now instead of after the wait ("Try again") */

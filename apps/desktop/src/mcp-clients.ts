@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { localized } from '../../../src/i18n/locale.js'
@@ -18,17 +18,8 @@ import {
   opencodeWithout,
   parseOpencodeConfig,
 } from '../../../src/history/opencode-config.js'
+import { runCommand, type CommandResult, type RunCommand } from './command.js'
 import { text } from './mcp-clients.text.js'
-
-export interface CommandResult {
-  code: number | null
-  stdout: string
-  stderr: string
-  /** The command is not on the PATH */
-  missing?: boolean
-}
-
-type RunCommand = (command: string, args: string[]) => Promise<CommandResult>
 
 export type ProbeResult =
   { ok: true; tools: string[] } | { ok: false; error: string }
@@ -88,7 +79,13 @@ export class McpClients {
   ) {
     const env = () => ({ ...process.env, PATH: options.toolPath() })
     this.run =
-      options.run ?? ((command, args) => runCommand(command, args, env()))
+      options.run ??
+      ((command, args) =>
+        runCommand(command, args, {
+          env: env(),
+          cwd: homedir(),
+          timeoutMs: COMMAND_TIMEOUT_MS,
+        }))
     this.probe = options.probe ?? ((launch) => probeMcp(launch, { env: env() }))
   }
 
@@ -271,29 +268,6 @@ function firstLine(result: CommandResult): string {
     .map((line) => line.replace(/^error:\s*/i, '').trim())
     .filter(Boolean)
   return lines[0] ?? localized(text).exited(result.code)
-}
-
-function runCommand(
-  command: string,
-  args: string[],
-  env: NodeJS.ProcessEnv
-): Promise<CommandResult> {
-  return new Promise((resolve) => {
-    execFile(
-      command,
-      args,
-      { env, cwd: homedir(), timeout: COMMAND_TIMEOUT_MS, maxBuffer: 1 << 20 },
-      (error, stdout, stderr) => {
-        const code = (error as NodeJS.ErrnoException | null)?.code
-        resolve({
-          code: error ? (typeof code === 'number' ? code : 1) : 0,
-          stdout,
-          stderr,
-          missing: code === 'ENOENT',
-        })
-      }
-    )
-  })
 }
 
 /**

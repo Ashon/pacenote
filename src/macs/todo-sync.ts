@@ -5,7 +5,6 @@ import { COLLECTIONS_FILE, readCollections } from '../tasks/collections.js'
 import {
   DECISIONS_FILE,
   readDecisions,
-  readJson,
   readStages,
   readTakenBack,
   readTasks,
@@ -13,9 +12,9 @@ import {
   TAKEN_BACK_FILE,
   TASKS_FILE,
   withTasksLock,
-  writeJson,
   writeTasks,
 } from '../tasks/store.js'
+import { readJson, writeJson } from '../json-file.js'
 import { cleanStages, type StageRecords } from '../tasks/stage.js'
 import type {
   CollectionRecord,

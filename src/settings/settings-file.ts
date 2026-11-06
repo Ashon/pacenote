@@ -1,17 +1,12 @@
-import {
-  chmodSync,
-  existsSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
+import { chmodSync, existsSync, readFileSync, renameSync } from 'node:fs'
 import path from 'node:path'
+import { replaceFile } from '../json-file.js'
 import { localized } from '../i18n/locale.js'
 import { migrateEnvValues, readEnvFile, readEnvValues } from './env-file.js'
 import { SETTING_FIELDS, type SettingField } from './fields.js'
 import { text as words } from './settings-file.text.js'
 import { connectionStates, lookupIn } from './tools.js'
+import { splitList } from './list.js'
 
 /**
  * The settings file, settings.json: Pacenote's settings as one object, grouped
@@ -103,10 +98,7 @@ function asJson(place: Place, value: string): unknown {
     case 'number':
       return /^-?\d+(\.\d+)?$/.test(value) ? Number(value) : value
     case 'list':
-      return value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
+      return splitList(value)
     case 'text':
       return value
   }
@@ -219,9 +211,7 @@ export function readSettingsText(file: string): string {
  * Slack tokens and logins.
  */
 export function writeSettingsFile(file: string, text: string): void {
-  rmSync(`${file}.tmp`, { force: true })
-  writeFileSync(`${file}.tmp`, text, { mode: 0o600 })
-  renameSync(`${file}.tmp`, file)
+  replaceFile(file, text, 0o600)
 }
 
 /**

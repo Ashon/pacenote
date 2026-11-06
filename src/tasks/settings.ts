@@ -1,4 +1,5 @@
 import { readSettingsValues } from '../settings/settings-file.js'
+import { splitList } from '../settings/list.js'
 
 export interface TasksSettings {
   /** AI tools may add tasks through Pacenote's MCP server (TASKS) */
@@ -28,15 +29,8 @@ export function readTasksSettings(
   return {
     on: value('TASKS') === 'on',
     dms: value('TASKS_DMS') === 'on',
-    exclude: listOf(value('TASKS_EXCLUDE_CHANNELS')),
-    names: listOf(value('TASKS_NAMES')),
-    groups: listOf(value('TASKS_GROUPS')),
+    exclude: splitList(value('TASKS_EXCLUDE_CHANNELS')),
+    names: splitList(value('TASKS_NAMES')),
+    groups: splitList(value('TASKS_GROUPS')),
   }
 }
-
-/** A list setting's entries: comma-separated in the environment */
-export const listOf = (value: string | undefined): string[] =>
-  (value ?? '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)

@@ -1,8 +1,9 @@
-import { execFile } from 'node:child_process'
 import { lookup } from 'node:dns/promises'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
+import { expandHome } from '../../../src/settings/home.js'
+import { runCommand, type RunCommand } from './command.js'
 import {
   byCount,
   githubOwner,
@@ -15,16 +16,6 @@ import {
   type FoundOnMac,
   type SshHost,
 } from '../../../src/settings/found.js'
-
-interface CommandResult {
-  code: number
-  stdout: string
-  stderr: string
-  /** The command is not on the PATH */
-  missing?: boolean
-}
-
-type RunCommand = (command: string, args: string[]) => Promise<CommandResult>
 
 /** Folders in your home that often hold repositories, for the work folder */
 const HOME_FOLDERS = [
@@ -78,8 +69,8 @@ export class FoundHere {
       options.run ??
       ((command, args) =>
         runCommand(command, args, {
-          ...process.env,
-          PATH: options.toolPath(),
+          env: { ...process.env, PATH: options.toolPath() },
+          timeoutMs: COMMAND_TIMEOUT_MS,
         }))
     this.home = options.home ?? homedir()
     this.resolve = options.resolve ?? resolveIpv4
@@ -278,10 +269,12 @@ export class FoundHere {
   }
 
   private expand(file: string, relativeTo: string): string | undefined {
-    if (file === '~' || file.startsWith('~/'))
-      return path.join(this.home, file.slice(1))
-    if (file.startsWith('~')) return undefined
-    return path.isAbsolute(file) ? file : path.join(relativeTo, file)
+    // ~name is someone else's home
+    if (/^~[^/]/.test(file)) return undefined
+    const expanded = expandHome(file, this.home)
+    return path.isAbsolute(expanded)
+      ? expanded
+      : path.join(relativeTo, expanded)
   }
 
   /** Folders in your home with repositories in them, most first */
@@ -387,27 +380,4 @@ async function resolveIpv4(name: string): Promise<string | undefined> {
     .then((result) => result.address)
     .catch(() => undefined)
   return Promise.race([found, timeout])
-}
-
-function runCommand(
-  command: string,
-  args: string[],
-  env: NodeJS.ProcessEnv
-): Promise<CommandResult> {
-  return new Promise((resolve) => {
-    execFile(
-      command,
-      args,
-      { env, timeout: COMMAND_TIMEOUT_MS, maxBuffer: 1 << 20 },
-      (error, stdout, stderr) => {
-        const code = (error as NodeJS.ErrnoException | null)?.code
-        resolve({
-          code: error ? (typeof code === 'number' ? code : 1) : 0,
-          stdout,
-          stderr,
-          missing: code === 'ENOENT',
-        })
-      }
-    )
-  })
 }

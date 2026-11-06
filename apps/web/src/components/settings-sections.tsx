@@ -45,6 +45,8 @@ import {
 } from './settings-parts'
 import { Switch } from '@/components/ui/switch'
 import { ToolsSection } from './tools-section'
+import { splitList } from '@src/settings/list'
+import { reasonerOf } from '@src/reasoners/ids'
 
 /**
  * What each Settings section shows: the page (settings-page.tsx) holds the
@@ -224,7 +226,7 @@ export function SandboxSection({ ctx }: { ctx: SettingsCtx }) {
               <LoginChecks sandbox={sandbox} />
               <SandboxSignIn
                 className="border-t border-border bg-well/60 px-4 py-3"
-                cli={valueOf('REASONER') === 'codex' ? 'codex' : 'claude'}
+                cli={reasonerOf(valueOf('REASONER'))}
                 signedIn={Boolean(sandbox.status?.signedIn)}
                 ready={Boolean(
                   sandbox.status?.vm?.kernel && sandbox.status.vm.image
@@ -291,12 +293,7 @@ export function TasksSection({ ctx }: { ctx: SettingsCtx }) {
           <>
             <SlackYou
               owners={
-                hubMode
-                  ? []
-                  : valueOf('MENTION_ALLOWED_USERS')
-                      .split(',')
-                      .map((id) => id.trim())
-                      .filter(Boolean)
+                hubMode ? [] : splitList(valueOf('MENTION_ALLOWED_USERS'))
               }
             />
             <McpConnections about={t.mcpTasks} />

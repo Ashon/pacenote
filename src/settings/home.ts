@@ -7,6 +7,24 @@ export function defaultHome(home = homedir()): string {
   return path.join(home, '.pacenote')
 }
 
+/** A path written with ~ for the home folder (~ or ~/...), written out */
+export function expandHome(file: string, home = homedir()): string {
+  return file === '~' || file.startsWith('~/')
+    ? path.join(home, file.slice(1))
+    : file
+}
+
+/**
+ * The run history's folder: PACENOTE_DATA_DIR as set (~ for the home), or the
+ * default home
+ */
+export function dataDirFor(
+  value: string | undefined,
+  home = homedir()
+): string {
+  return value ? path.resolve(expandHome(value, home)) : defaultHome(home)
+}
+
 /**
  * Data folders that may hold a running bot's status file (bot.json): this one
  * and the default home, so a bot with its own PACENOTE_DATA_DIR and one in

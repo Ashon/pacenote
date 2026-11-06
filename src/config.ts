@@ -7,7 +7,8 @@ import { isSecureOrLocalUrl, slackApiBase } from './messengers/slack/api.js'
 import { isHubUrl } from './hub/address.js'
 import { isTimeZone, systemTimeZone } from './messengers/text.js'
 import { getLocale, localized, LOCALES, type Locale } from './i18n/locale.js'
-import { defaultHome } from './settings/home.js'
+import { dataDirFor, expandHome } from './settings/home.js'
+import { LOG_LEVELS, type LogLevel } from './log-level.js'
 import { hostDeniedReads } from './reasoners/reads.js'
 import { readCodexDefaults } from './reasoners/codex.js'
 import { REASONER_IDS, type ReasonerId } from './reasoners/ids.js'
@@ -34,10 +35,12 @@ import { SETTING_FIELDS } from './settings/fields.js'
 import { allowlistPath, pacenoteHome, vmRootPath } from './settings/paths.js'
 import { settingName } from './settings/settings-file.js'
 import { text } from './config.text.js'
+import { splitList } from './settings/list.js'
+import { BROKER_PATH, DOOR_URL, OWN_TOOLS_PATH } from './sandbox/door.js'
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5'
 /** Pace's own tools in a reasoner VM, through the run's door (vm-broker.ts) */
-const OWN_TOOLS_URL = 'http://127.0.0.1:8080/pace/mcp'
+const OWN_TOOLS_URL = `${DOOR_URL}${OWN_TOOLS_PATH}`
 
 /**
  * REASONER_SANDBOX as Pace reads it: docker, the sandbox Pacenote had before
@@ -59,15 +62,7 @@ const says = (rule: keyof (typeof text)['en']['rules']) => ({
 /** zod's own messages in the language of the moment, for safeParse */
 const inLanguage = () => ({ error: localized(text).zodIssue })
 
-const csv = z
-  .string()
-  .optional()
-  .transform((value) =>
-    (value ?? '')
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-  )
+const csv = z.string().optional().transform(splitList)
 
 /** Comma-separated list of Slack user IDs. (U..., W...) */
 const userIds = csv.pipe(
@@ -245,7 +240,7 @@ export const EnvSchema = z.object({
   /** opencode's provider/model for it; empty: opencode's own default */
   TASKS_AI_OPENCODE_MODEL: z.string().optional(),
 
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
 })
 
 export interface Config {
@@ -324,7 +319,7 @@ export interface Config {
   history?: {
     retentionDays: number
   }
-  logLevel: 'debug' | 'info' | 'warn' | 'error'
+  logLevel: LogLevel
 }
 
 /** Treats entries left empty, like "KEY=", as unset. */
@@ -480,9 +475,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (slack.kind === 'app' && owners.length > 1)
     throw new SettingError('MENTION_ALLOWED_USERS', t.oneMember)
 
-  const dataDir = e.PACENOTE_DATA_DIR
-    ? path.resolve(expandHome(e.PACENOTE_DATA_DIR))
-    : defaultHome()
+  const dataDir = dataDirFor(e.PACENOTE_DATA_DIR)
   const vmBin = defaultVmBin(env)
   const vmRoot = vmRootPath(env)
 
@@ -565,12 +558,6 @@ function isDirectory(dir: string): boolean {
   return path.isAbsolute(dir) && existsSync(dir) && statSync(dir).isDirectory()
 }
 
-function expandHome(file: string): string {
-  return file === '~' || file.startsWith('~/')
-    ? path.join(homedir(), file.slice(1))
-    : file
-}
-
 type Env = z.infer<typeof EnvSchema>
 
 function buildReasonerConfig(
@@ -602,7 +589,7 @@ function buildReasonerConfig(
       throw new SettingError('OPS_TOOLS', localized(text).opsNeedSandbox)
     }
     // The broker is relayed into each VM at this address (vm-broker.ts).
-    base.mcpServers = [{ name: 'ops', url: 'http://127.0.0.1:8080/mcp' }]
+    base.mcpServers = [{ name: 'ops', url: `${DOOR_URL}${BROKER_PATH}` }]
   }
   // codex does not load the user's config.toml, on this Mac or in the sandbox
   // (its MCP servers and sandbox settings stay out of answers), so the model

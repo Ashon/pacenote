@@ -10,14 +10,15 @@ import {
   readTasks,
   STAGES_FILE,
   withTasksLock,
-  writeJson,
   writeTasks,
 } from './store.js'
-import type {
-  DismissReason,
-  Task,
-  TaskDecision,
-  TaskDecisions,
+import { writeJson } from '../json-file.js'
+import {
+  DISMISS_REASONS,
+  type DismissReason,
+  type Task,
+  type TaskDecision,
+  type TaskDecisions,
 } from './types.js'
 
 /**
@@ -70,11 +71,6 @@ export const HAND_OVER_MAX = 500
 
 /** A local task's id as Pacenote makes one, here or on a device */
 const LOCAL_ID = /^local:[0-9a-f]{12}$/
-const REASONS: readonly DismissReason[] = [
-  'not-mine',
-  'done-already',
-  'not-worth-it',
-]
 
 /** A time that makes sense: not after now; now otherwise */
 const timeOf = (value: unknown, now: Date): string => {
@@ -187,7 +183,7 @@ function decisionOf(value: unknown, now: Date): TaskDecision | undefined {
   return {
     status,
     ...(status === 'dismissed' &&
-      REASONS.includes(reason as DismissReason) && {
+      DISMISS_REASONS.includes(reason as DismissReason) && {
         reason: reason as DismissReason,
       }),
     at: timeOf(at, now),

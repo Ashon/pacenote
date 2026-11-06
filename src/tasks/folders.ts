@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import {
   closeSync,
   existsSync,
@@ -10,12 +9,13 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { promisify } from 'node:util'
+import { gitIn } from '../git.js'
 import { dayDirFor } from '../history/layout.js'
 import { localized } from '../i18n/locale.js'
 import { text } from './folders.text.js'
-import { readJson, writeJson } from './store.js'
+import { readJson, writeJson } from '../json-file.js'
 import type { FolderCheck, RepoFolderRow, TaskView } from './types.js'
+import { DAY } from '../time.js'
 
 /**
  * Where a task's work happens on this Mac: each repository's folder, chosen
@@ -25,8 +25,6 @@ import type { FolderCheck, RepoFolderRow, TaskView } from './types.js'
  * task's folder from these; a collection is given the repositories' names,
  * never their folders.
  */
-
-const run = promisify(execFile)
 
 /** Each repository's folder on this Mac (tasks-repos.json, the app's) */
 const REPOS_FILE = 'tasks-repos.json'
@@ -101,16 +99,7 @@ export async function checkFolder(
   }
 }
 
-async function git(
-  folder: string,
-  args: string[]
-): Promise<string | undefined> {
-  try {
-    return (await run('git', ['-C', folder, ...args], { timeout: 5000 })).stdout
-  } catch {
-    return undefined
-  }
-}
+const git = (folder: string, args: string[]) => gitIn(folder, args)
 
 /** Where checkouts usually are, under the home folder */
 const ROOTS = [
@@ -190,8 +179,6 @@ export function head(file: string, bytes = 256 * 1024): string {
     closeSync(fd)
   }
 }
-
-const DAY = 86_400_000
 
 /** Codex's session logs since a time: ~/.codex/sessions/YYYY/MM/DD/*.jsonl */
 export function codexLogs(

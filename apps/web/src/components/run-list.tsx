@@ -1,5 +1,6 @@
 import {
   collectionTitle,
+  RUN_STATUSES,
   type RunKind,
   type RunStatus,
   type RunSummary,
@@ -28,13 +29,7 @@ import { StatusMark } from './status'
 const KINDS: (RunKind | undefined)[] = [undefined, 'mention', 'collection']
 
 /** The states to filter by, all first */
-const FILTERS: (RunStatus | undefined)[] = [
-  undefined,
-  'running',
-  'succeeded',
-  'failed',
-  'interrupted',
-]
+const FILTERS: (RunStatus | undefined)[] = [undefined, ...RUN_STATUSES]
 
 /** Groups runs by day. (the list is newest first) */
 function groupByDay(runs: RunSummary[]) {

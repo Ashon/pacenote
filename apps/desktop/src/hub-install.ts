@@ -5,6 +5,7 @@ import { HUB_PATHS, type HubInstallState } from '../../../src/hub/protocol.js'
 import { localized } from '../../../src/i18n/locale.js'
 import type { SettingsStore } from './settings.js'
 import { text } from './hub-pairing.text.js'
+import { splitList } from '../../../src/settings/list.js'
 
 const ID = /^[UW][A-Z0-9]+$/
 
@@ -55,10 +56,9 @@ export class HubInstall {
       .replace(/\/+$/, '')
     if (!isHubUrl(url))
       throw new Error(/^http:\/\//.test(url) ? t.useHttps : t.enterAddress)
-    const allow = String(given.allow ?? '')
-      .split(',')
-      .map((id) => id.trim().toUpperCase())
-      .filter(Boolean)
+    const allow = splitList(String(given.allow ?? '')).map((id) =>
+      id.toUpperCase()
+    )
     if (allow.some((id) => !ID.test(id))) throw new Error(t.memberIds)
     const lang = given.lang === 'ko' ? 'ko' : 'en'
     // You, as Pace answers you now: your own Slack app's member ID
@@ -66,9 +66,8 @@ export class HubInstall {
     const member =
       values.SLACK_CONNECTION === 'hub'
         ? undefined
-        : (values.MENTION_ALLOWED_USERS ?? '')
-            .split(',')
-            .map((id) => id.trim().toUpperCase())
+        : splitList(values.MENTION_ALLOWED_USERS)
+            .map((id) => id.toUpperCase())
             .find((id) => ID.test(id))
     const switches = given.switchHere === true && Boolean(member)
     const made = switches ? newHubToken() : undefined

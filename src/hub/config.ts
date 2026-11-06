@@ -1,17 +1,13 @@
 import { z } from 'zod'
 import { LOCALES, type Locale } from '../i18n/locale.js'
 import { isSecureOrLocalUrl, slackApiBase } from '../messengers/slack/api.js'
-import type { LogLevel } from '../logger.js'
+import { LOG_LEVELS, type LogLevel } from '../log-level.js'
+import { splitList } from '../settings/list.js'
 
 const userIds = z
   .string()
   .optional()
-  .transform((value) =>
-    (value ?? '')
-      .split(',')
-      .map((id) => id.trim().toUpperCase())
-      .filter(Boolean)
-  )
+  .transform((value) => splitList(value).map((id) => id.toUpperCase()))
   .pipe(
     z.array(
       z
@@ -74,7 +70,7 @@ const HubEnvSchema = z.object({
       'Must be a Slack user ID and a token hash, U...:<64 hex>'
     )
     .optional(),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
 })
 
 interface HubConfig {

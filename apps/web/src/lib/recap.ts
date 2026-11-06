@@ -8,6 +8,7 @@ import { localized } from '@src/i18n/locale'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { dateFormat } from './format'
 import { text } from './recap.text'
+import { DAY } from '@src/time'
 
 /** A period's recap from the desktop app; the current one without a key */
 export function useRecap(period: RecapPeriod, key?: string) {
@@ -48,7 +49,7 @@ const monthDay = { month: 'short', day: 'numeric' } as const
 
 /** The day before a period ends: its last day */
 const lastDay = (view: RecapView) =>
-  new Date(Date.parse(view.end) - 86_400_000).toISOString()
+  new Date(Date.parse(view.end) - DAY).toISOString()
 
 /** What a recap is of, as its title says it */
 export function recapTitle(view: RecapView): string {

@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { HistoryReader } from './history/reader.js'
-import type { RunStatus } from './history/types.js'
+import { RUN_STATUSES, type RunStatus } from './history/types.js'
+import { lineLevelOf } from './log-level.js'
 import { tailLogs } from './runtime/logs.js'
 import { readBotStatus } from './runtime/status.js'
 
@@ -17,12 +18,7 @@ import { readBotStatus } from './runtime/status.js'
  *   GET /api/bot             bot status (bot.json + whether the pid is alive)
  *   GET /api/bot/logs?lines=&scope=&level=    the tail of logs/bot.log
  */
-const STATUSES = new Set<RunStatus>([
-  'running',
-  'succeeded',
-  'failed',
-  'interrupted',
-])
+const STATUSES = new Set<RunStatus>(RUN_STATUSES)
 
 const IMAGE_TYPES: Record<string, string> = {
   '.png': 'image/png',
@@ -43,8 +39,6 @@ const json = (body: unknown, status = 200) =>
 
 const notFound = () => json({ error: 'not found' }, 404)
 
-const LOG_LEVELS = new Set(['DEBUG', 'INFO', 'WARN', 'ERROR'] as const)
-
 export async function handleLocalApi(
   reader: HistoryReader,
   method: string,
@@ -63,15 +57,11 @@ export async function handleLocalApi(
   if (parts[0] === 'bot') {
     if (parts.length === 1) return json(readBotStatus(reader.root))
     if (parts.length === 2 && parts[1] === 'logs') {
-      const level = url.searchParams.get('level')?.toUpperCase()
       return json(
         tailLogs(reader.root, {
           lines: Number(url.searchParams.get('lines') ?? '') || undefined,
           scope: url.searchParams.get('scope') || undefined,
-          minLevel:
-            level && LOG_LEVELS.has(level as never)
-              ? (level as 'DEBUG' | 'INFO' | 'WARN' | 'ERROR')
-              : undefined,
+          minLevel: lineLevelOf(url.searchParams.get('level')),
         })
       )
     }

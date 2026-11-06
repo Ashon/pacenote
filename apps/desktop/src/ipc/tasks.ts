@@ -24,10 +24,11 @@ import {
   tasksView,
 } from '../../../../src/tasks/store.js'
 import { taskTrend } from '../../../../src/tasks/trend.js'
-import type {
-  CollectionRecord,
-  TaskDecision,
-  TasksCollect,
+import {
+  DISMISS_REASONS,
+  type CollectionRecord,
+  type TaskDecision,
+  type TasksCollect,
 } from '../../../../src/tasks/types.js'
 import {
   answerSuggestion,
@@ -304,8 +305,7 @@ function taskDecision(value: unknown): Omit<TaskDecision, 'at'> | undefined {
   const { status, reason } = (value ?? {}) as Partial<TaskDecision>
   if (status !== 'done' && status !== 'dismissed' && status !== 'kept')
     return undefined
-  const reasons = ['not-mine', 'done-already', 'not-worth-it']
-  return status === 'dismissed' && reason && reasons.includes(reason)
+  return status === 'dismissed' && reason && DISMISS_REASONS.includes(reason)
     ? { status, reason }
     : { status }
 }

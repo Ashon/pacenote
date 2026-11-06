@@ -25,7 +25,9 @@ import {
 } from '../src/settings/settings-file.js'
 import {
   botLockDirs,
+  dataDirFor,
   defaultHome,
+  expandHome,
   securePrivateDir,
   securePrivateFile,
 } from '../src/settings/home.js'
@@ -45,6 +47,22 @@ describe('where Pacenote keeps settings and data', () => {
     expect(pacenoteHome({ PACENOTE_HOME: '/srv/pacenote' }, '/home/me')).toBe(
       '/srv/pacenote'
     )
+  })
+
+  it('writes out ~ as the home folder, and only on its own or before /', () => {
+    expect(expandHome('~', '/home/me')).toBe('/home/me')
+    expect(expandHome('~/work', '/home/me')).toBe('/home/me/work')
+    // Someone else's home, and a name that only starts with ~, stay as written
+    expect(expandHome('~bob/work', '/home/me')).toBe('~bob/work')
+    expect(expandHome('/srv/~x', '/home/me')).toBe('/srv/~x')
+  })
+
+  it('keeps the run history in PACENOTE_DATA_DIR, or the default home', () => {
+    expect(dataDirFor(undefined, '/home/me')).toBe('/home/me/.pacenote')
+    expect(dataDirFor('', '/home/me')).toBe('/home/me/.pacenote')
+    expect(dataDirFor('~/data', '/home/me')).toBe('/home/me/data')
+    expect(dataDirFor('/srv/data/', '/home/me')).toBe('/srv/data')
+    expect(dataDirFor('data', '/home/me')).toBe(path.resolve('data'))
   })
 
   it('passes compose the resolved home', () => {

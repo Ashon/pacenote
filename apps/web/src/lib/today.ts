@@ -1,6 +1,7 @@
 // Relative imports, so the tests (and the root's typecheck) can load it
 import type { TaskStage } from '../../../../src/tasks/stage.js'
 import type { TaskView, WorkTool } from '../../../../src/tasks/types.js'
+import { DAY } from '../../../../src/time.js'
 
 /**
  * Todo's Today: what waits on you, what to pick up, what waits on someone
@@ -78,5 +79,5 @@ export function daysSince(iso: string, now = Date.now()): number {
     const date = new Date(ms)
     return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
   }
-  return Math.max(0, Math.round((day(now) - day(Date.parse(iso))) / 86_400_000))
+  return Math.max(0, Math.round((day(now) - day(Date.parse(iso))) / DAY))
 }

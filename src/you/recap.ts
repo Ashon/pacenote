@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process'
 import path from 'node:path'
-import { promisify } from 'node:util'
+import { gitIn } from '../git.js'
 import { dayDirFor } from '../history/layout.js'
 import {
   getLocale,
@@ -10,7 +9,8 @@ import {
 } from '../i18n/locale.js'
 import { outcomeFacts, outcomeWords } from '../tasks/context.js'
 import { readRepos } from '../tasks/folders.js'
-import { allTaskViews, readJson, writeJson } from '../tasks/store.js'
+import { allTaskViews } from '../tasks/store.js'
+import { readJson, writeJson } from '../json-file.js'
 import type { TaskView, WorkEntry } from '../tasks/types.js'
 import { readWork } from '../tasks/work.js'
 import {
@@ -38,6 +38,7 @@ import type {
   TaskArea,
   Written,
 } from './types.js'
+import { DAY } from '../time.js'
 
 export type {
   RecapArea,
@@ -61,7 +62,6 @@ export type {
 
 export const RECAP_PERIODS: readonly RecapPeriod[] = ['day', 'week', 'month']
 
-const DAY = 86_400_000
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** The Monday a week (as ISO counts weeks) starts on, at midnight */
@@ -144,19 +144,8 @@ export interface Commit {
   subject: string
 }
 
-const run = promisify(execFile)
-
-async function git(folder: string, args: string[]) {
-  try {
-    const { stdout } = await run('git', ['-C', folder, ...args], {
-      timeout: 15_000,
-      maxBuffer: 8 * 1024 * 1024,
-    })
-    return stdout
-  } catch {
-    return undefined
-  }
-}
+const git = (folder: string, args: string[]) =>
+  gitIn(folder, args, { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 })
 
 /** A few folders of each repository are enough: worktrees share commits */
 const FOLDERS_PER_REPO = 3

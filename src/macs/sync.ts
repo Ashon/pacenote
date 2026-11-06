@@ -8,6 +8,7 @@ import type {
   WorkFile,
 } from '../tasks/types.js'
 import type { AreaRecord, YouFile } from '../you/types.js'
+import { DAY } from '../time.js'
 
 /**
  * Your Todo, the same on each of your Macs: how what one Mac has meets what
@@ -322,7 +323,7 @@ export function mergeCollections(
   now = Date.now(),
   days = 7
 ): CollectionRecord[] {
-  const since = now - days * 86_400_000
+  const since = now - days * DAY
   return [
     ...kept.filter((row) => row.mac !== peer),
     ...remote

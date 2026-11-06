@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { promisify } from 'node:util'
+import { gitIn } from '../../../src/git.js'
 import { remoteRepo } from '../../../src/tasks/folders.js'
 import type {
   SessionSuggestion,
@@ -36,14 +35,9 @@ export interface RepoOf {
   defaultBranch?: string
 }
 
-const run = promisify(execFile)
-
 async function lookUp(cwd: string): Promise<RepoOf | undefined> {
-  const git = (...args: string[]) =>
-    run('git', ['-C', cwd, ...args], { timeout: 5_000 }).then(
-      ({ stdout }) => stdout.trim() || undefined,
-      () => undefined
-    )
+  const git = async (...args: string[]) =>
+    (await gitIn(cwd, args))?.trim() || undefined
   const id = await git(
     'rev-parse',
     '--path-format=absolute',

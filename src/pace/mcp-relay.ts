@@ -20,6 +20,7 @@ import {
   readMcpServers,
   type McpServerSetting,
 } from '../settings/mcp-servers.js'
+import { DOOR_URL, SERVERS_PATH } from '../sandbox/door.js'
 
 /**
  * The MCP servers you added in Settings > Tools, for the reasoner in the
@@ -38,9 +39,6 @@ export interface YourServersOptions {
   version: string
 }
 
-/** Where the door serves your servers (vm-broker.ts) */
-export const SERVERS_PATH = '/pace/servers/'
-const DOOR = 'http://127.0.0.1:8080'
 /** How long a connection stays open after its last request */
 const IDLE_MS = 2 * 60_000
 const CONNECT_MS = 15_000
@@ -57,7 +55,7 @@ export function yourServerRefs(servers: McpServerSetting[]): McpServerRef[] {
     .filter((server) => server.read || server.write)
     .map((server) => ({
       name: server.name,
-      url: `${DOOR}${SERVERS_PATH}${server.name}/mcp`,
+      url: `${DOOR_URL}${SERVERS_PATH}${server.name}/mcp`,
     }))
 }
 

@@ -16,13 +16,15 @@ import type { TaskOrigin } from './sources.js'
 export type TaskKind = 'asked' | 'promised'
 
 /** maybe: a guess the reasoner is not sure about, kept out of the list */
-export type TaskConfidence = 'sure' | 'maybe'
+export const TASK_CONFIDENCES = ['sure', 'maybe'] as const
+export type TaskConfidence = (typeof TASK_CONFIDENCES)[number]
 
 /**
  * What doing it takes, as the collection judged it: code (a change or a look
  * in a repository), reply (an answer in the thread), or other
  */
-export type TaskAction = 'code' | 'reply' | 'other'
+export const TASK_ACTIONS = ['code', 'reply', 'other'] as const
+export type TaskAction = (typeof TASK_ACTIONS)[number]
 
 export interface TaskSource {
   /**
@@ -170,7 +172,12 @@ export interface TasksFile {
 }
 
 /** Why a task was dismissed, when you say */
-export type DismissReason = 'not-mine' | 'done-already' | 'not-worth-it'
+export const DISMISS_REASONS = [
+  'not-mine',
+  'done-already',
+  'not-worth-it',
+] as const
+export type DismissReason = (typeof DISMISS_REASONS)[number]
 
 export interface TaskDecision {
   /** kept: a Maybe you moved into the list */

@@ -1,6 +1,7 @@
 import path from 'node:path'
 import type { TokenUsage } from '../history/usage.js'
-import { readJson, writeJson } from '../tasks/store.js'
+import { readJson, writeJson } from '../json-file.js'
+import { DAY } from '../time.js'
 
 /**
  * What Write it up spent, for the Overview's tokens per day: one entry per
@@ -9,7 +10,7 @@ import { readJson, writeJson } from '../tasks/store.js'
  * the Overview reads the last 14.
  */
 export const RECAPS_FILE = 'recaps.json'
-const KEEP_MS = 90 * 86_400_000
+const KEEP_MS = 90 * DAY
 
 export interface RecapSpend {
   at: string
