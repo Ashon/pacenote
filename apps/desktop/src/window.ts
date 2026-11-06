@@ -16,6 +16,8 @@ const errorText = (error: unknown) =>
 export class MainWindow {
   private window: BrowserWindow | undefined
   private screen: ScreenLoader | undefined
+  /** Closed in full screen: it hides once it has left full screen */
+  private hideOnLeave = false
 
   constructor(
     private readonly options: {
@@ -90,6 +92,8 @@ export class MainWindow {
       this.options.reopen()
       return
     }
+    // Shown again while it leaves full screen to close: it stays.
+    this.hideOnLeave = false
     const window = this.window
     if (!window) {
       void this.open(route).catch((error: unknown) =>
@@ -143,18 +147,31 @@ export class MainWindow {
       },
     })
     this.window = window
+    this.hideOnLeave = false
     if (!capture) window.once('ready-to-show', () => window.show())
     // Full screen hides the traffic lights, so the title bar stops keeping
     // room for them.
-    const fullScreen = (on: boolean) => () =>
+    const fullScreen = (on: boolean) =>
       window.webContents.send('pacenote:window:full-screen-changed', on)
-    window.on('enter-full-screen', fullScreen(true))
-    window.on('leave-full-screen', fullScreen(false))
+    window.on('enter-full-screen', () => fullScreen(true))
+    window.on('leave-full-screen', () => {
+      fullScreen(false)
+      if (!this.hideOnLeave) return
+      this.hideOnLeave = false
+      if (!this.options.quitting()) window.hide()
+    })
+    // A window hidden in full screen leaves its space on screen, all black,
+    // so a close there leaves full screen first and hides once it has: shown
+    // again, the window is back in its own size, as a Mac app's window is.
     window.on('close', (event) => {
-      if (!this.options.quitting()) {
-        event.preventDefault()
-        window.hide()
+      if (this.options.quitting()) return
+      event.preventDefault()
+      if (window.isFullScreen()) {
+        this.hideOnLeave = true
+        window.setFullScreen(false)
+        return
       }
+      window.hide()
     })
     // A window whose process ended is blank: it loads again, unless that
     // keeps happening.

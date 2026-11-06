@@ -160,6 +160,7 @@ Bot management:
 - If a bot is already running from a terminal (`pnpm dev` and so on), the app leaves it alone and only shows its status and logs as "Running in terminal".
   When the terminal bot stops, the app takes over. (It starts the bot right away if automatic start is on)
 - Closing the window hides the app in the tray and the bot keeps running. Quit from the tray menu or with Cmd+Q.
+  Closed in full screen, the window leaves full screen first, so no black space stays, and opens again in its own size.
 - With `PACENOTE_DESKTOP_BOT=off`, the app does not manage the bot and only shows history.
 
 Settings:

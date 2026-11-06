@@ -1869,6 +1869,56 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     await kept.getByText('Ashon/payments').first().waitFor()
   }, 180_000)
 
+  it('closes from full screen by leaving it first, so no black screen stays, and shows again in its own size', async () => {
+    world = await World.create([])
+    await launch(world)
+    const state = () =>
+      app!.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0]!
+        return {
+          visible: window.isVisible(),
+          fullScreen: window.isFullScreen(),
+        }
+      })
+    await eventually(
+      'the window on screen',
+      async () => (await state()).visible
+    )
+    // Full screen as the window tells it, without taking the screen (a locked
+    // Mac takes no window to full screen): leaving it takes a moment, as the
+    // animation does. Hiding notes whether the window was in full screen.
+    type Seen = { hiddenInFullScreen?: boolean }
+    await app!.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!
+      let on = true
+      window.isFullScreen = () => on
+      window.setFullScreen = (flag) => {
+        setTimeout(() => {
+          on = flag
+          window.emit(flag ? 'enter-full-screen' : 'leave-full-screen')
+        }, 300)
+      }
+      const hide = window.hide.bind(window)
+      window.hide = () => {
+        ;(globalThis as Seen).hiddenInFullScreen = on
+        hide()
+      }
+      window.emit('enter-full-screen')
+    })
+    await app!.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]!.close()
+    )
+    await eventually('hidden', async () => !(await state()).visible)
+    // Hidden in full screen, its space would stay on screen, all black.
+    expect(
+      await app!.evaluate(() => (globalThis as Seen).hiddenInFullScreen)
+    ).toBe(false)
+    expect(await state()).toEqual({ visible: false, fullScreen: false })
+    // The Dock icon shows it again, in its own size.
+    await app!.evaluate((electron) => electron.app.emit('activate'))
+    await eventually('shown again', async () => (await state()).visible)
+    expect(await state()).toEqual({ visible: true, fullScreen: false })
+  })
   it("keeps a task's title wide in a narrow window, with its buttons under it", async () => {
     world = await World.create([])
     const { home } = world
