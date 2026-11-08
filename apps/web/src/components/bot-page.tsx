@@ -68,11 +68,10 @@ export function BotPage() {
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <h1
-                data-page-title
-                className="flex items-center gap-2 text-title"
-              >
-                Pace
+              {/* A phone moves the title to its bar and hides it here; the
+                  state stays, as the line next to the mark */}
+              <h1 className="flex items-center gap-2 text-title">
+                <span data-page-title>Pace</span>
                 <span className={cn('text-row', TONE_CLASS[tone].text)}>
                   {known ? label : <SkeletonWord width="5rem" />}
                 </span>

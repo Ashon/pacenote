@@ -89,7 +89,7 @@ export {
 } from './lib/format'
 export { daysSince, todayLines } from './lib/today'
 export type { TodayLine } from './lib/today'
-export { recapText, type CopyFormat } from './lib/recap'
+export { recapText, type CopyFormat, useRecap } from './lib/recap'
 export { ACCENTS, ThemeProvider, useTheme } from './lib/theme'
 export type { Accent, ThemeMode } from './lib/theme'
 export { useSupervisor } from './lib/desktop'

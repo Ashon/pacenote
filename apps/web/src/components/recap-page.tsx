@@ -63,7 +63,10 @@ const PERIODS: RecapPeriod[] = ['day', 'week', 'month']
 
 /** What a device with no Mac says in its recap, in its own words */
 export interface RecapAlone {
-  /** Under the periods: what a Mac would add, and the ways to one */
+  /**
+   * After the recap, as Todo has it after its list: what a Mac would add, and
+   * the ways to one
+   */
   line: React.ReactNode
   /** At its foot, what it was counted from: "From 3 tasks done on this iPad" */
   from: (done: number) => string
@@ -174,13 +177,19 @@ export function RecapPage({
         ) : (
           <>
             <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t border-border pt-4">
+              {/* Narrow, across its row, as a phone's other segments are */}
               <Tabs
                 value={period}
                 onValueChange={(value) => choose(value as RecapPeriod)}
+                className="@max-md:w-full"
               >
-                <TabsList aria-label={t.recapOf}>
+                <TabsList aria-label={t.recapOf} className="@max-md:w-full">
                   {PERIODS.map((value) => (
-                    <TabsTrigger key={value} value={value}>
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="@max-md:flex-1"
+                    >
                       {t.periods[value]}
                     </TabsTrigger>
                   ))}
@@ -235,7 +244,6 @@ export function RecapPage({
                 <span className="min-w-0">{t.copyWithoutAi}</span>
               </p>
             )}
-            {alone?.line}
             <InlineError error={error} className="mt-3" />
             {/* Another period takes this one's place; until its recap is
                 counted, its skeleton holds the place */}
@@ -255,6 +263,7 @@ export function RecapPage({
                 )}
               </Placeholder>
             </Swap>
+            {view && alone?.line}
           </>
         )}
       </div>
