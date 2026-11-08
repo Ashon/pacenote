@@ -227,7 +227,8 @@
   --primary-ink: #3ccb96;
   --secondary: oklch(0.25 0.02 172);
   --secondary-foreground: oklch(0.9 0.015 165);
-  --muted: oklch(0.225 0.014 175);
+  /* Below the card, as light's is: pills and segment tracks sit in it */
+  --muted: oklch(0.17 0.012 175);
   --muted-foreground: oklch(0.71 0.025 168);
   --accent: oklch(0.275 0.04 168);
   --accent-foreground: oklch(0.94 0.03 165);

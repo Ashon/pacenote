@@ -186,7 +186,10 @@ export function RecapPage({
                   ))}
                 </TabsList>
               </Tabs>
-              <div className="flex items-center gap-0.5">
+              {/* Narrow, the arrows hold the ends of their own row and the
+                  dates go under the title whole, so neither moves or breaks
+                  with the period's words */}
+              <div className="flex items-center gap-0.5 @max-md:w-full">
                 <Button
                   size="icon-sm"
                   variant="ghost"
@@ -196,14 +199,16 @@ export function RecapPage({
                 >
                   <ChevronLeft />
                 </Button>
-                <span className="px-1.5 text-section whitespace-nowrap">
-                  {view ? recapTitle(view) : <SkeletonWord width="8rem" />}
-                </span>
-                {view && recapWhen(view) && (
-                  <span className="text-meta text-muted-foreground">
-                    {recapWhen(view)}
+                <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 px-1.5 @max-md:flex-1 @max-md:flex-col @max-md:items-center @max-md:text-center">
+                  <span className="text-section whitespace-nowrap">
+                    {view ? recapTitle(view) : <SkeletonWord width="8rem" />}
                   </span>
-                )}
+                  {view && recapWhen(view) && (
+                    <span className="text-meta whitespace-nowrap text-muted-foreground">
+                      {recapWhen(view)}
+                    </span>
+                  )}
+                </span>
                 <Button
                   size="icon-sm"
                   variant="ghost"

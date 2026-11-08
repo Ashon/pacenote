@@ -181,7 +181,9 @@ function RunHeader({ run }: { run: RunRecord }) {
   return (
     <header className="border-b bg-card/90 px-8 pt-6 pb-0 backdrop-blur">
       <div className="mx-auto max-w-3xl">
-        <div className="flex items-center gap-2 text-meta text-muted-foreground">
+        {/* Narrow, where it was asked and when take a line of their own
+            rather than being cut to a "#…" */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-meta text-muted-foreground">
           <StatusBadge status={run.status} />
           <Badge variant="secondary">
             <AtSign />

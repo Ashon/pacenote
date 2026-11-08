@@ -533,7 +533,9 @@ const LogPanel = memo(function LogPanel() {
       <div className="flex shrink-0 items-center gap-2 border-b px-10 py-2.5">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5">
           <span className="text-row">{t.logs}</span>
-          <div className="ml-2 flex gap-1">
+          {/* Narrow, the views slide sideways rather than breaking a name
+              over two lines */}
+          <div className="ml-2 flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none]">
             {LOG_VIEWS.map((item) => (
               <button
                 key={item}
@@ -541,7 +543,7 @@ const LogPanel = memo(function LogPanel() {
                 data-size="chip"
                 onClick={() => setView(item)}
                 className={cn(
-                  'h-6 rounded-full px-2.5 text-meta font-medium transition-colors',
+                  'h-6 shrink-0 rounded-full px-2.5 text-meta font-medium whitespace-nowrap transition-colors',
                   view === item
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
