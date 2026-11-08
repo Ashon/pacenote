@@ -158,8 +158,10 @@ export function SettingsNav({
 
 export function SectionTitle({ section }: { section: Section }) {
   const { label, help } = sectionInfo(section)
+  // data-section-title: a device of yours draws it as its other settings'
+  // titles (the app's index.css)
   return (
-    <header>
+    <header data-section-title>
       <h2 className="text-title">{label}</h2>
       <p className="mt-1 text-copy text-muted-foreground">{help}</p>
     </header>

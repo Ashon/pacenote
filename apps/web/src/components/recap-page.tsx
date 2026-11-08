@@ -549,9 +549,10 @@ function DayBody({ view }: { view: RecapView }) {
 }
 
 function AreasBody({ view }: { view: RecapView }) {
+  const line = totalsLine(view)
   return (
     <>
-      <p className="mt-4 text-body text-foreground/80">{totalsLine(view)}</p>
+      {line && <p className="mt-4 text-body text-foreground/80">{line}</p>}
       {view.month && <MonthChanges view={view} />}
       <div className="mt-2">
         {view.areas.map((area) => (
