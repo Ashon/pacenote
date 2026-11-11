@@ -4,13 +4,16 @@ import { filterByCidr, parseAnsibleHosts } from '../broker/hosts.js'
 import { runProcess } from './process.js'
 import { brokerRuntimeDir } from '../settings/paths.js'
 import { unsetMount, type BrokerEnv } from './env.js'
+import { kubeconfigStale, writeKubeconfig } from './kubeconfig.js'
 
 /**
  * Prepares the files to mount outside the repository (brokerRuntimeDir, default
  * ~/.pacenote/ops-broker) before starting ops-broker.
  * - Puts empty files/directories in place of an unset SSH key, known_hosts, and
  *   work directory. The broker treats empty ones as disabled features.
- * - Puts an empty file if kubeconfig is missing. (The kubeconfig job builds it)
+ * - Builds the kubeconfig again when it is not the one the settings ask for
+ *   (other contexts or account, or a cluster still to add), and puts an empty
+ *   file if there is none. (The kubeconfig job builds it on request)
  * - If OPS_SSH_INVENTORY is set, rebuilds hosts.json from the ansible
  *   inventory.
  */
@@ -26,6 +29,12 @@ export async function prepareBrokerFiles(
     if (!existsSync(target)) writeFileSync(target, '')
   }
   const kubeconfig = path.join(runtimeDir, 'kubeconfig')
+  // Saving Kubernetes' settings restarts Pace, which builds it here. A cluster
+  // that cannot be added is left out, never stopping the broker's start.
+  if (env.OPS_K8S_READ !== 'off' && kubeconfigStale(env, processEnv))
+    await writeKubeconfig(env, processEnv, log).catch((err: unknown) =>
+      log(`${kubeconfig}: not built (${(err as Error).message})`)
+    )
   if (!existsSync(kubeconfig)) writeFileSync(kubeconfig, '', { mode: 0o600 })
 
   const output = path.join(runtimeDir, 'hosts.json')

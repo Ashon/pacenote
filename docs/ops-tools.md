@@ -18,7 +18,7 @@ reasoner VM ----------MCP(http, through Pace)-----> ops-broker VM  --ssh OPS_SSH
 | Tool | What it does | Limits |
 | --- | --- | --- |
 | `host_list`, `host_check` | Host checks over SSH: `uptime`, `dmesg`, `memory`, `disk`, `top`, `pci_devices`, `failed_units`, `service`, `journal` | Fixed checks with format-validated arguments only. Hosts are named from the host list only, within `OPS_SSH_ALLOWED_CIDR` |
-| `k8s_get`, `k8s_describe`, `k8s_logs`, `k8s_events`, `k8s_top` | kubectl queries | Enforced on the cluster side by a read-only SA (`sandbox/k8s/pacenote-ro.yaml`, ClusterRole `view` plus cluster-scoped reads). Secrets are blocked by both RBAC and the broker |
+| `k8s_get`, `k8s_describe`, `k8s_logs`, `k8s_events`, `k8s_top` | kubectl queries | Enforced on the cluster side by a read-only SA of Pace's own, never your login (`sandbox/k8s/pacenote-ro.yaml`, ClusterRole `view` plus cluster-scoped reads). Secrets are blocked by both RBAC and the broker |
 | `fs_list`, `fs_find`, `fs_search`, `fs_read` | Work directory reads | Read-only mount. Excludes `.env`, keys, kubeconfig, `*secret*`, `.git`, `.venv` and similar. Rejects paths outside the root and links pointing outside it. Searches must be scoped to a repository or a path inside one |
 | `ws_prepare`, `ws_read`, `ws_search`, `ws_list`, `ws_edit`, `ws_write`, `ws_delete`, `ws_diff`, `ws_create_pr` | Code changes and draft PRs | See "Code changes and PRs" below |
 | `gh_repo_search`, `gh_pr_list`, `gh_pr_search`, `gh_pr_view`, `gh_pr_diff` | GitHub repository search, PR list/search, PR details (reviews, CI checks, changed files), diff | Read-only. Only `OPS_GIT_ALLOWED_OWNERS` orgs. A repository name without an org is looked up in the allowed orgs; if there is none, similar repositories are suggested |
@@ -145,13 +145,34 @@ or gh or kubectl is missing, the setting says so, with Look again for after. You
 | Host checks (`host_*`) | `OPS_SSH_USER`, `OPS_SSH_ALLOWED_CIDR`, `OPS_SSH_KEY` (+ `OPS_SSH_KNOWN_HOSTS`) | Host tools off |
 | Host list | `OPS_SSH_INVENTORY_DIR`, `OPS_SSH_INVENTORY` (ansible inventory) | Write `~/.pacenote/ops-broker/hosts.json` directly |
 
+Kubernetes is set up in three steps under Settings > Tools > Kubernetes
+([guide](https://pacenote.dev/guide/kubernetes/), [`docs/guide/en/kubernetes.md`](guide/en/kubernetes.md)):
+
+1. Pick the contexts (`OPS_K8S_CONTEXTS`).
+2. Each cluster gets the read-only account. Its YAML is `accountManifest` (`src/sandbox/k8s-account.ts`), named after
+   `OPS_K8S_SA` and `OPS_K8S_SA_NAMESPACE`; with the defaults it is `sandbox/k8s/pacenote-ro.yaml`. The step reads
+   the account's token Secret with your kubectl to tell whether the account is there
+   (`apps/desktop/src/k8s-setup.ts`). Where `kubectl auth can-i create clusterrolebindings` says yes, it offers
+   "Make it here" (`kubectl apply`, once you confirm). Otherwise it copies the YAML for the cluster's admin, with a
+   Role and RoleBinding that let the user `kubectl auth whoami` names read the token Secret, so their Pacenote can
+   use the account once it is applied.
+3. When Pace starts and the contexts or the account changed, or a cluster was left out last time, it builds the
+   broker's kubeconfig (`prepareBrokerFiles` → `writeKubeconfig`, `src/sandbox/kubeconfig.ts`): each cluster's server
+   and CA from `kubectl config view --raw --flatten`, and the account's token. Your own credentials never go into
+   it. A cluster whose token it can't read is left out, and why is kept in `~/.pacenote/ops-broker/kubeconfig.json`.
+   The step then asks each cluster with the broker's kubeconfig (`kubectl auth can-i`) whether the account reads,
+   reads secrets or can change things, and warns when it can do more than read.
+
+From the repository, the same by hand:
+
 ```sh
 # 1) Read-only k8s SA: apply sandbox/k8s/pacenote-ro.yaml to every cluster to query
-# 2) Build the broker kubeconfig from the SA tokens (reads the token Secrets with the local admin kubeconfig)
+kubectl --context <context> apply -f sandbox/k8s/pacenote-ro.yaml
+# 2) Build the broker kubeconfig from the SA tokens (Pace also does it when it starts, if it is out of date)
 pnpm k8s:kubeconfig
 # 3) Build the broker's image with the built-in sandbox (with OPS_TOOLS=on), then start Pace
 pnpm bundle && pnpm sandbox:vm
 ```
 
-In the app, "Rebuild kubeconfig" (Settings > Tools > Broker) and "Set up built-in sandbox" do steps 2 and 3. When the
-inventory or an SA token changes, run the matching step and restart Pace.
+In the app, "Set up built-in sandbox" does step 3, and "Rebuild kubeconfig" (Settings > Tools > Broker) builds the
+kubeconfig again for a token changed in a cluster. When the inventory changes, run the matching step and restart Pace.

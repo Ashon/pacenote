@@ -5,7 +5,7 @@ const en = {
   jobs: {
     kubeconfig: {
       label: 'Rebuild kubeconfig',
-      help: "Builds the broker's kubeconfig from the read-only SA token. Used when Pace restarts.",
+      help: "Builds the broker's kubeconfig again from the read-only accounts' tokens. Pace does it itself when it starts after a change; this is for a token changed in a cluster. Used when Pace restarts.",
     },
     vm: {
       label: 'Set up built-in sandbox',
@@ -24,7 +24,7 @@ const ko: typeof en = {
   jobs: {
     kubeconfig: {
       label: 'kubeconfig 다시 만들기',
-      help: '읽기 전용 SA 토큰으로 브로커의 kubeconfig를 만들어요. Pace를 다시 시작하면 적용돼요.',
+      help: '읽기 전용 계정의 토큰으로 브로커의 kubeconfig를 다시 만들어요. 설정을 바꾸면 Pace가 시작할 때 알아서 만들고, 이건 클러스터에서 토큰이 바뀌었을 때 써요. Pace를 다시 시작하면 적용돼요.',
     },
     vm: {
       label: '내장 샌드박스 준비',

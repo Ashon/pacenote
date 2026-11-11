@@ -22,6 +22,11 @@ import type { SlackCheckItem } from './messengers/slack/check.js'
 import type { ServerCheck } from './pace/mcp-relay.js'
 import type { FoundOnMac } from './settings/found.js'
 import type {
+  K8sAccount,
+  K8sConnected,
+  K8sContextCheck,
+} from './sandbox/k8s-account.js'
+import type {
   McpServerCandidate,
   McpServerDraft,
   McpServerIssue,
@@ -195,6 +200,18 @@ export interface DesktopBridge {
      * the owners of workFolder's repositories; fresh looks again
      */
     found(workFolder?: string, fresh?: boolean): Promise<FoundOnMac>
+    /**
+     * Settings > Tools > Kubernetes' steps, with kubectl on this Mac
+     * (apps/desktop/src/k8s-setup.ts)
+     */
+    k8s: {
+      /** Each context's read-only account, and whether you may make it */
+      check(contexts: string[], account: K8sAccount): Promise<K8sContextCheck[]>
+      /** Makes the account in a cluster, then waits for its token */
+      create(context: string, account: K8sAccount): Promise<K8sContextCheck>
+      /** What the broker's kubeconfig can do, asked with its tokens */
+      connected(): Promise<K8sConnected>
+    }
   }
   /** Your tasks (src/tasks) */
   tasks: {

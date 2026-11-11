@@ -45,6 +45,7 @@ import {
   type Section,
 } from './settings-parts'
 import { Switch } from '@/components/ui/switch'
+import { K8sSteps } from './k8s-steps'
 import { ToolsSection } from './tools-section'
 import { splitList } from '@src/settings/list'
 import { reasonerOf } from '@src/reasoners/ids'
@@ -254,6 +255,24 @@ export function SandboxSection({ ctx }: { ctx: SettingsCtx }) {
 export function OpsSection({ ctx }: { ctx: SettingsCtx }) {
   const { valueOf, isSet, changed, issueOf, fieldsOf, card, groups, sandbox } =
     ctx
+  // Kubernetes' steps run kubectl as you: on the Mac itself only
+  const k8s = !ctx.remote && sandbox.available && (
+    <K8sSteps
+      contexts={splitList(valueOf('OPS_K8S_CONTEXTS'))}
+      account={{
+        serviceAccount: valueOf('OPS_K8S_SA'),
+        namespace: valueOf('OPS_K8S_SA_NAMESPACE'),
+      }}
+      pending={K8S_KEYS.some(changed)}
+      ready={
+        valueOf('OPS_TOOLS') === 'on' &&
+        valueOf('REASONER_SANDBOX') === 'vm' &&
+        valueOf('OPS_K8S_READ') !== 'off'
+      }
+      workFolder={valueOf('OPS_FS_ROOT')}
+      sandbox={sandbox}
+    />
+  )
   return (
     <ToolsSection
       valueOf={valueOf}
@@ -268,9 +287,13 @@ export function OpsSection({ ctx }: { ctx: SettingsCtx }) {
       sectionLabel={(id) => sectionInfo(id).label}
       go={ctx.go}
       sandbox={sandbox}
+      extra={{ k8s }}
     />
   )
 }
+
+/** The settings Kubernetes' accounts are made and connected by */
+const K8S_KEYS = ['OPS_K8S_CONTEXTS', 'OPS_K8S_SA', 'OPS_K8S_SA_NAMESPACE']
 
 /** Todo: your own tasks, gathered from Slack by your AI tools */
 export function TasksSection({ ctx }: { ctx: SettingsCtx }) {

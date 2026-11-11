@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { ensureAllowlistFile } from '../sandbox/allowlist.js'
 import { loadBrokerEnv } from '../sandbox/env.js'
 import { writeKubeconfig } from '../sandbox/kubeconfig.js'
+import { splitList } from '../settings/list.js'
 import { defaultVmBin } from '../sandbox/vm.js'
 import { setupVm } from '../sandbox/vm-setup.js'
 import {
@@ -80,9 +81,21 @@ async function main(): Promise<void> {
           )
         break
       }
-      case 'kubeconfig':
-        if (!dryRun) await writeKubeconfig(loadBrokerEnv(env), env, log)
+      case 'kubeconfig': {
+        if (dryRun) break
+        const brokerEnv = loadBrokerEnv(env)
+        if (splitList(brokerEnv.OPS_K8S_CONTEXTS).length === 0)
+          throw new Error(
+            'Set OPS_K8S_CONTEXTS to a comma-separated list of kubeconfig contexts to query.'
+          )
+        const build = await writeKubeconfig(brokerEnv, env, log)
+        // Built for some: the job says it is not done
+        if (build.failed.length > 0)
+          throw new Error(
+            `Not built for ${build.failed.map((each) => each.context).join(', ')}`
+          )
         break
+      }
       case 'vm': {
         const root = vmRootPath(env)
         const bin = defaultVmBin(env)

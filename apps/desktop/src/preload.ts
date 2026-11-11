@@ -83,6 +83,13 @@ const bridge = {
     historyMcp: () => ipcRenderer.invoke('pacenote:settings:history-mcp'),
     found: (workFolder, fresh = false) =>
       ipcRenderer.invoke('pacenote:settings:found', workFolder, fresh),
+    k8s: {
+      check: (contexts, account) =>
+        ipcRenderer.invoke('pacenote:k8s:check', contexts, account),
+      create: (context, account) =>
+        ipcRenderer.invoke('pacenote:k8s:create', context, account),
+      connected: () => ipcRenderer.invoke('pacenote:k8s:connected'),
+    },
   },
   // Your tasks: the list and your decisions (AI tools add them over MCP)
   tasks: {

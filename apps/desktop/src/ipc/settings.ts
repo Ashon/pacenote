@@ -2,6 +2,7 @@ import { shell } from 'electron'
 import { isMcpClientId } from '../../../../src/history/mcp-clients.js'
 import type { FoundHere } from '../found.js'
 import type { HubAdmin } from '../hub-admin.js'
+import type { K8sSetup } from '../k8s-setup.js'
 import type { HubInstall } from '../hub-install.js'
 import type { HubPairing } from '../hub-pairing.js'
 import { mcpLaunch, type McpClients } from '../mcp-clients.js'
@@ -10,8 +11,8 @@ import type { Ipc } from './gate.js'
 
 /**
  * Settings: its values, saved and applied to Pace; the names on this Mac Tools
- * offers to pick; the team hub, paired or installed; and the AI tools
- * Pacenote's MCP server is added to
+ * offers to pick, and its Kubernetes steps; the team hub, paired or
+ * installed; and the AI tools Pacenote's MCP server is added to
  */
 export function registerSettingsIpc(
   ipc: Ipc,
@@ -26,6 +27,7 @@ export function registerSettingsIpc(
     mcpClients,
     historyMcp,
     found,
+    k8s,
   }: {
     settingsFile: string
     /** Restarts or starts Pace on the settings saved; false when it cannot */
@@ -41,6 +43,7 @@ export function registerSettingsIpc(
     /** The history MCP server, as the AI tools launch it */
     historyMcp: string
     found: FoundHere
+    k8s: K8sSetup
   }
 ): void {
   const { dataDir, settings } = desktop
@@ -70,6 +73,22 @@ export function registerSettingsIpc(
         typeof workFolder === 'string' ? workFolder : undefined,
         fresh === true
       )
+  )
+  // Kubernetes' steps run kubectl as you, on this Mac: the window's alone
+  ipc.windowOnly(
+    'pacenote:k8s:check',
+    () => [],
+    (contexts, account) => k8s.check(contexts, account)
+  )
+  ipc.windowOnly(
+    'pacenote:k8s:create',
+    () => ({ context: '', state: 'failed' }),
+    (context, account) => k8s.create(context, account)
+  )
+  ipc.windowOnly(
+    'pacenote:k8s:connected',
+    () => ({ contexts: [] }),
+    () => k8s.connected()
   )
   // Team hub pairing
   ipc.handleOrError('pacenote:hub:pair-start', (url) => hubPairing.start(url))

@@ -219,7 +219,9 @@ Sandbox (the "Sandbox" and "Tools" sections of Settings):
   code Claude's page shows ([Reasoner login](sandbox.md#reasoner-login)). The allowed domains apply from the next
   request.
 - The broker's checks (host list, kubeconfig, gh login, PR author) and "Rebuild kubeconfig" (`k8s:kubeconfig`) are in the
-  Broker card under Tools. The broker's VM starts with Pace, so its settings and files apply when Pace restarts.
+  Broker card under Tools. Kubernetes' own three steps (clusters, each one's read-only account, what Pace reads with)
+  are under its settings ([Tools](ops-tools.md)). The broker's VM starts with Pace, so its settings and files apply
+  when Pace restarts.
   Credential values are not read; only their presence is checked.
 - Allowed domains accept exact host names only (wildcards, IPs, ports and URLs are rejected). Domains the current reasoner CLI needs cannot be removed.
   Internal systems that need a token are connected as broker tools instead of opening their domains.

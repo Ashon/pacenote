@@ -87,6 +87,7 @@ export function ToolsSection({
   sectionLabel,
   go,
   sandbox,
+  extra,
 }: {
   /** A setting as it will be once saved: the draft, the file or its default */
   valueOf: (key: string) => string
@@ -105,6 +106,8 @@ export function ToolsSection({
   sectionLabel: (section: 'sandbox' | 'messengers') => string
   go: (section: 'sandbox' | 'messengers') => void
   sandbox: Sandbox
+  /** What a connection shows under its settings (Kubernetes' steps) */
+  extra?: Partial<Record<ConnectionId, React.ReactNode>>
 }) {
   const t = useText(text)
   const [open, setOpen] = useState<ConnectionId>()
@@ -177,6 +180,7 @@ export function ToolsSection({
                 onOpenChange={(next) => setOpen(next ? each.id : undefined)}
               >
                 {fields(each.id)}
+                {extra?.[each.id]}
               </ConnectionRow>
             )
           })}

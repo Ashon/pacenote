@@ -84,6 +84,7 @@ import { SETUP_KEYS, TODO_SETUP_KEYS } from '../../../src/macs/types.js'
 import { TodoSync } from '../../../src/macs/todo-sync.js'
 import { MacUseWatch, macName } from './macs.js'
 import { FoundHere } from './found.js'
+import { K8sSetup } from './k8s-setup.js'
 import { appMcpLaunch, McpClients, mcpLaunch } from './mcp-clients.js'
 import { recordCollection, TaskCollector } from './task-collector.js'
 import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
@@ -448,6 +449,7 @@ const mcpClients = new McpClients({
 
 /** Names on this Mac that Settings > Tools offers to pick, never typed */
 const foundHere = new FoundHere({ toolPath })
+const k8sSetup = new K8sSetup({ toolPath })
 
 /**
  * Pacenote's own work (Collect now, Looks done, Write it up, reply drafts):
@@ -1096,6 +1098,7 @@ function registerIpc(): void {
     mcpClients,
     historyMcp: paths.historyMcp,
     found: foundHere,
+    k8s: k8sSetup,
   })
   registerSetupIpc(ipc, desktop, { setup, setupClaim, fromMac: () => fromMac })
   registerSandboxIpc(ipc, desktop, {

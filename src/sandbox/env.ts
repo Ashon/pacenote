@@ -100,7 +100,7 @@ export const BrokerEnvSchema = z.object({
    */
   OPS_K8S_CONTEXTS: z
     .string()
-    .regex(listOf('[A-Za-z0-9][A-Za-z0-9._@-]*'), says('k8sContexts'))
+    .regex(listOf('[A-Za-z0-9][A-Za-z0-9._@:/-]*'), says('k8sContexts'))
     .optional(),
   OPS_K8S_SA: z
     .string()

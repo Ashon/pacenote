@@ -288,7 +288,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   OPS_K8S_CONTEXTS: {
     label: 'k8s 컨텍스트',
-    help: '읽기 전용 kubeconfig를 만들 로컬 kubeconfig 컨텍스트예요. 쉼표로 구분해요. 바꾼 뒤에는 kubeconfig를 다시 만드세요.',
+    help: 'Pace가 읽을 클러스터마다 kubeconfig의 컨텍스트를 하나씩, 쉼표로 구분해 적어요. Pace는 시작할 때 클러스터마다 읽기 전용 계정으로 자기 kubeconfig를 만들어요.',
   },
   OPS_K8S_READ: {
     label: '읽기',
@@ -296,7 +296,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   OPS_K8S_SA: {
     label: 'k8s 읽기 전용 계정',
-    help: '각 클러스터의 읽기 전용 ServiceAccount예요. (sandbox/k8s/pacenote-ro.yaml)',
+    help: '각 클러스터의 읽기 전용 ServiceAccount예요. 클러스터에 다른 이름으로 이미 있을 때만 바꾸세요.',
   },
   OPS_K8S_SA_NAMESPACE: {
     label: 'k8s 읽기 전용 계정 네임스페이스',

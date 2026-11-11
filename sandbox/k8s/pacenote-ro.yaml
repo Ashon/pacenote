@@ -1,11 +1,12 @@
-# Example read-only account for Pacenote. Apply it to each cluster to query. (kubectl apply -f)
+# Pacenote's read-only account for one cluster (pacenote/pacenote-ro). Settings > Tools > Kubernetes makes it
+# for you, or copies it for the cluster's admin. By hand: save it as a file and run kubectl apply -f with it.
 #
-# - Namespace-scoped resources are read with the built-in ClusterRole view. (Except secrets)
-# - Cluster-scoped resources such as nodes, namespaces, storage, and metrics are read with pacenote-ro-cluster.
-# - A separate account keeps Pacenote's queries distinct in audit logs and can be revoked on its own.
-#
-# If you change the name or namespace, also change OPS_K8S_SA and OPS_K8S_SA_NAMESPACE in .env.
-# After applying, build the broker kubeconfig with pnpm k8s:kubeconfig.
+# - Namespaced resources are read with the built-in ClusterRole view, which leaves out secrets.
+# - Cluster resources such as nodes, namespaces, storage and metrics are read with pacenote-ro-cluster.
+# - Nothing can be changed. A separate account keeps Pace's lookups apart in the audit log, and
+#   removing it takes two commands:
+#   kubectl delete namespace pacenote
+#   kubectl delete clusterrolebinding,clusterrole -l app=pacenote
 apiVersion: v1
 kind: Namespace
 metadata:

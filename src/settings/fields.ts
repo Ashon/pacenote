@@ -683,7 +683,7 @@ export const SETTING_FIELDS: SettingField[] = [
     list: true,
     group: 'k8s',
     label: 'k8s contexts',
-    help: 'Local kubeconfig contexts to build the read-only kubeconfig from. Comma-separated. Rebuild the kubeconfig after changing them.',
+    help: "Your kubeconfig's contexts, one for each cluster Pace reads, comma-separated. Pace builds its own kubeconfig from them, with each cluster's read-only account, when it starts.",
     type: 'text',
   },
   {
@@ -700,7 +700,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'ops.kubernetes.serviceAccount',
     group: 'k8s',
     label: 'k8s read-only account',
-    help: 'Read-only ServiceAccount in each cluster (sandbox/k8s/pacenote-ro.yaml)',
+    help: 'The read-only ServiceAccount in each cluster. Change it only if your clusters have one by another name already.',
     type: 'text',
     default: 'pacenote-ro',
     advanced: true,

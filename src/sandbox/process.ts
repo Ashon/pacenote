@@ -126,11 +126,13 @@ export function runProcess(
       stderr = (stderr + chunk).slice(-64 * 1024)
     })
     child.on('error', (err) => {
+      const code = (err as NodeJS.ErrnoException).code
       const hint =
-        (err as NodeJS.ErrnoException).code === 'ENOENT'
+        code === 'ENOENT'
           ? `${command} executable not found. Check PATH or the *_BIN setting.`
           : err.message
-      finish(new Error(hint))
+      // The code stays, for callers that tell a missing command apart
+      finish(Object.assign(new Error(hint), { code }))
     })
     // Something it started may still hold its output open, so a stopped process
     // settles when it exits, not when its output closes.

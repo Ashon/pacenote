@@ -62,14 +62,8 @@ let app: ElectronApplication | undefined
  */
 async function siteShot(page: Page, name: string, place?: () => Promise<void>) {
   if (!process.env.E2E_SITE_SHOTS) return
-  const language = async (preference: string, lang: string) => {
-    await page.evaluate(
-      `window.pacenoteDesktop.language.set(${JSON.stringify(preference)})`
-    )
-    await page.waitForFunction(`document.documentElement.lang === '${lang}'`)
-  }
   for (const lang of ['en', 'ko']) {
-    await language(lang, lang)
+    await setLanguage(page, lang, lang)
     // The screen in its new words, settled
     await page.waitForTimeout(600)
     await place?.()
@@ -77,7 +71,28 @@ async function siteShot(page: Page, name: string, place?: () => Promise<void>) {
     mkdirSync(path.dirname(file), { recursive: true })
     await page.screenshot({ path: file })
   }
-  await language('system', 'en')
+  await setLanguage(page, 'system', 'en')
+}
+
+/** The app's language (Settings > General), once the screen has it */
+async function setLanguage(page: Page, preference: string, lang: string) {
+  await page.evaluate(
+    `window.pacenoteDesktop.language.set(${JSON.stringify(preference)})`
+  )
+  await page.waitForFunction(`document.documentElement.lang === '${lang}'`)
+}
+
+/**
+ * Until the motion on screen has finished, for a still picture (the page's
+ * policy runs no strings as functions, so this is evaluated). One cut short
+ * counts as finished.
+ */
+async function settled(page: Page) {
+  await page.evaluate(
+    `Promise.all(document.getAnimations()
+      .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+      .map((a) => a.finished.catch(() => undefined)))`
+  )
 }
 
 afterEach(async (context) => {
@@ -435,17 +450,6 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       github: true,
       jira: false,
     })
-    /**
-     * Until the motion on screen has finished, for a still picture (the
-     * page's policy runs no strings as functions, so this is evaluated)
-     */
-    const settled = () =>
-      page.evaluate(
-        `Promise.all(document.getAnimations()
-          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-          .map((a) => a.finished))`
-      )
-
     await page.evaluate("window.location.hash = '#/settings/tools'")
     await page.getByRole('heading', { name: 'Tools' }).waitFor()
     const summary = page.locator('[data-tools-summary]')
@@ -465,7 +469,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .locator('[data-connection="jira"]')
       .getByText('3 more to fill in')
       .waitFor()
-    await settled()
+    await settled(page)
     await page.screenshot({ path: path.join(REPO, 'test-results/tools.png') })
 
     // GitHub opens in place on its settings and switches.
@@ -487,7 +491,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
     expect(
       await github.getByRole('button').first().textContent()
     ).not.toContain('Write')
-    await settled()
+    await settled(page)
     await page.screenshot({
       path: path.join(REPO, 'test-results/tools-github.png'),
     })
@@ -598,12 +602,7 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
       .first()
       .click()
     await page.locator('[data-setting="OPS_GIT_ALLOWED_OWNERS"]').waitFor()
-    // Until the rows have stopped moving, for a still picture
-    await page.evaluate(
-      `Promise.all(document.getAnimations()
-        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
-        .map((a) => a.finished))`
-    )
+    await settled(page)
     await page.screenshot({
       path: path.join(REPO, 'test-results/tools-found-github.png'),
     })
@@ -623,6 +622,225 @@ describe.runIf(process.env.E2E_APP)('desktop app', () => {
         ? true
         : undefined
     })
+  })
+
+  it("connects Kubernetes in Settings > Tools' three steps: clusters, a read-only account in each, and what Pace reads with", async () => {
+    world = await World.create([])
+    // This Mac's kubectl, on the login shell's PATH: three clusters, prod
+    // with Pace's account, staging where you may make it, shared where only
+    // its admin may. Making it leaves a mark the token reads come back to.
+    const bin = path.join(world.root, 'bin')
+    mkdirSync(bin, { recursive: true })
+    const script = path.join(world.root, 'kubectl.mjs')
+    writeFileSync(
+      script,
+      `import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+const dir = ${JSON.stringify(world.root)}
+const args = process.argv.slice(2)
+const context = args[args.indexOf('--context') + 1]
+const has = (...words) => words.every((word) => args.includes(word))
+const made = (name) => existsSync(dir + '/made-' + name)
+const no = () => {
+  process.stdout.write('no\\n')
+  process.exit(1)
+}
+const fail = (message) => {
+  process.stderr.write(message + '\\n')
+  process.exit(1)
+}
+const clusters = ['prod', 'staging', 'shared']
+if (has('get-contexts')) process.stdout.write(clusters.join('\\n') + '\\n')
+else if (has('view'))
+  process.stdout.write(JSON.stringify({
+    clusters: clusters.map((name, i) => ({
+      name,
+      cluster: { server: 'https://10.0.0.' + (i + 1) + ':6443', 'certificate-authority-data': 'Q0E=' },
+    })),
+    contexts: clusters.map((name) => ({ name, context: { cluster: name, user: 'me' } })),
+    users: [{ name: 'me', user: { token: 'mine' } }],
+  }))
+else if (has('apply')) {
+  readFileSync(0)
+  writeFileSync(dir + '/made-' + context, '')
+  process.stdout.write('namespace/pacenote created\\n')
+} else if (has('secret')) {
+  if (context === 'prod' || made(context)) process.stdout.write('dG9rZW4=')
+  else if (context === 'staging')
+    fail('Error from server (NotFound): namespaces "pacenote" not found')
+  else
+    fail('Error from server (Forbidden): secrets "pacenote-ro-token" is forbidden: User "alice@acme.dev" cannot get resource "secrets"')
+} else if (has('whoami')) process.stdout.write('alice@acme.dev')
+else if (has('can-i', 'clusterrolebindings.rbac.authorization.k8s.io'))
+  context === 'staging' ? process.stdout.write('yes\\n') : no()
+else if (has('can-i', 'list', 'pods')) process.stdout.write('yes\\n')
+else if (has('can-i')) no()
+else fail('unexpected: ' + args.join(' '))
+`
+    )
+    writeFileSync(
+      path.join(bin, 'kubectl'),
+      `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`
+    )
+    chmodSync(path.join(bin, 'kubectl'), 0o755)
+    writeFileSync(
+      path.join(world.root, '.zshrc'),
+      `export PATH="${bin}:$PATH"\n`
+    )
+    // Pace stays stopped, so the kubeconfig is built by its job
+    mkdirSync(world.home, { recursive: true })
+    writeFileSync(
+      path.join(world.home, 'desktop.json'),
+      JSON.stringify({ autoStartBot: false })
+    )
+    const page = await launch(world, {
+      settings: [
+        'REASONER_SANDBOX=vm',
+        `MENTION_ALLOWED_USERS=${world.alice.id}`,
+        'OPS_TOOLS=on',
+      ],
+      env: { SHELL: '/bin/zsh', ZDOTDIR: world.root },
+    })
+    await page.evaluate("window.location.hash = '#/settings/tools'")
+    await page.getByRole('heading', { name: 'Tools' }).waitFor()
+    const k8s = page.locator('[data-connection="k8s"]')
+    const steps = page.locator('[data-k8s-steps]')
+    const account = (name: string) =>
+      steps.locator(`[data-k8s-account]:has(span:text-is("${name}"))`)
+    const staging = account('staging')
+    const shared = account('shared')
+    /** Kubernetes open, at the top: a new language closes it */
+    const top = async () => {
+      if (!(await steps.isVisible()))
+        await k8s.getByRole('button').first().click()
+      await steps.waitFor()
+      await page.evaluate(
+        `document.querySelector('[data-connection="k8s"]').scrollIntoView({ block: 'start' })`
+      )
+    }
+    /**
+     * The steps as they are, in test-results/k8s/<lang>/<name>.png: in
+     * English, and with the site's shots in Korean too. again puts the
+     * screen back as it was, once a new language has closed it.
+     */
+    const still = async (name: string, again: () => Promise<void>) => {
+      const shoot = async (lang: string) => {
+        await again()
+        await page.mouse.move(0, 0)
+        await settled(page)
+        const shot = path.join(REPO, 'test-results/k8s', lang, `${name}.png`)
+        mkdirSync(path.dirname(shot), { recursive: true })
+        await page.screenshot({ path: shot })
+      }
+      await shoot('en')
+      if (!process.env.E2E_SITE_SHOTS) return
+      await setLanguage(page, 'ko', 'ko')
+      await shoot('ko')
+      await setLanguage(page, 'en', 'en')
+      await again()
+    }
+
+    await top()
+    await steps
+      .getByText('Pick their contexts above, from your kubeconfig.')
+      .waitFor()
+    await still('1-start', top)
+
+    // 1. The clusters, picked from your kubeconfig's contexts
+    const found = page.locator('[data-found="OPS_K8S_CONTEXTS"]')
+    for (const name of ['prod', 'staging', 'shared'])
+      await found.getByRole('button', { name }).click()
+    await steps.getByText('3 clusters picked').waitFor()
+    await steps
+      .getByText('Save, and Pace starts again with these accounts.')
+      .waitFor()
+
+    // 2. Each one's account: ready, yours to make, or its admin's
+    await account('prod').getByText('Account ready').waitFor()
+    await staging.getByText('No account yet').waitFor()
+    await shared.getByText("You can't see the account here").waitFor()
+    expect(
+      await shared.getByRole('button', { name: 'Make it here' }).count()
+    ).toBe(0)
+    await shared.getByRole('button', { name: 'For your admin' }).click()
+    await shared
+      .getByText(/It also lets alice@acme\.dev read the account's token/)
+      .waitFor()
+    expect(await shared.locator('pre').textContent()).toContain(
+      'name: "alice@acme.dev"'
+    )
+    await shared.getByRole('button', { name: 'For your admin' }).click()
+
+    await page
+      .locator('footer')
+      .getByRole('button', { name: 'Save', exact: true })
+      .click()
+    const file = path.join(world.home, 'settings.json')
+    await eventually(
+      'the contexts in the file',
+      () => JSON.parse(readFileSync(file, 'utf8')).ops.kubernetes?.contexts
+    )
+    await steps.getByText('Pace connects the next time it starts.').waitFor()
+    await still('2-accounts', async () => {
+      await top()
+      await staging.getByRole('button').first().waitFor()
+    })
+
+    // Made here once you say so
+    await staging.getByRole('button', { name: 'Make it here' }).click()
+    await still('3-make', async () => {
+      await top()
+      if ((await staging.locator('[data-k8s-ask]').count()) === 0)
+        await staging.getByRole('button').first().click()
+      await staging.locator('[data-k8s-ask]').waitFor()
+    })
+    expect(existsSync(path.join(world.root, 'made-staging'))).toBe(false)
+    await staging.getByRole('button', { name: 'Make', exact: true }).click()
+    await staging.getByText('Account ready').waitFor()
+    expect(existsSync(path.join(world.root, 'made-staging'))).toBe(true)
+
+    // What the cluster's admin gets, to apply
+    await still('4-admin', async () => {
+      await top()
+      const toggle = shared.locator('button[aria-expanded]')
+      if ((await toggle.getAttribute('aria-expanded')) !== 'true')
+        await toggle.click()
+      await shared.locator('pre').waitFor()
+      // Where the line is once the connection has opened
+      await settled(page)
+      await page.evaluate(
+        `document.querySelector('[data-k8s-account="shared"]').scrollIntoView({ block: 'center' })`
+      )
+    })
+    await shared.getByRole('button', { name: 'For your admin' }).click()
+
+    // 3. Connected: Pace's own kubeconfig, asked with its tokens
+    await steps.getByRole('button', { name: 'Connect again' }).click()
+    for (const name of ['prod', 'staging']) {
+      const line = steps.locator(`[data-k8s-connected="${name}"]`)
+      await line.getByText('Reads', { exact: true }).waitFor()
+      await line.getByText('No secrets').waitFor()
+      await line.getByText('No changes').waitFor()
+    }
+    await steps
+      .locator('[data-k8s-left="shared"]')
+      .getByText("Left out · You can't see the account here")
+      .waitFor()
+    const kubeconfig = readFileSync(
+      path.join(world.home, 'ops-broker/kubeconfig'),
+      'utf8'
+    )
+    // The accounts' tokens, never yours
+    expect(kubeconfig).toContain('https://10.0.0.2:6443')
+    expect(kubeconfig).not.toContain('mine')
+    expect(kubeconfig).not.toContain('10.0.0.3')
+
+    const place = async () => {
+      await top()
+      await steps.locator('[data-k8s-connected="prod"]').waitFor()
+      await settled(page)
+    }
+    await still('5-connected', place)
+    await siteShot(page, 'tools-k8s', place)
   })
 
   it('installs a team hub from Settings, and Pace switches to it once it answers', async () => {

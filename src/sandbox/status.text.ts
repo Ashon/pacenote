@@ -24,7 +24,8 @@ const en = {
     `None (set ${setting} in Settings, or write hosts.json by hand)`,
   kubeconfig: 'k8s kubeconfig',
   present: 'Present',
-  kubeconfigEmpty: 'Empty (k8s tools off, rebuild kubeconfig needed)',
+  kubeconfigEmpty:
+    "Empty (k8s tools off): no cluster's account is ready yet. See Tools > Kubernetes",
   jira: 'Jira',
   /** settings: the names on the screen of those still empty */
   required: (settings: string[]) => `${settings.join(', ')} required`,
@@ -62,7 +63,8 @@ const ko: typeof en = {
     `없음 (설정에서 ${josa(setting, '을/를')} 정하거나 hosts.json을 직접 작성하세요)`,
   kubeconfig: 'k8s kubeconfig',
   present: '있음',
-  kubeconfigEmpty: '비어 있음 (k8s 도구 꺼짐, kubeconfig를 다시 만들어야 해요)',
+  kubeconfigEmpty:
+    '비어 있음 (k8s 도구 꺼짐): 계정이 준비된 클러스터가 아직 없어요. 도구 > Kubernetes를 보세요',
   jira: 'Jira',
   required: (settings) => `${josa(settings.join(', '), '이/가')} 필요해요`,
   github: 'GitHub 로그인 (gh)',
