@@ -103,7 +103,7 @@ export function registerCollectionTools({
             })),
           // For a task's repo: names only, never where they are
           repos: await yourRepos(options.dataDir, options.home),
-          you: youForCollection(file, settings),
+          you: youForCollection(file, settings, now()),
         }
       })
   )
