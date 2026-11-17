@@ -74,6 +74,7 @@ const SITE = build('site', {
   'v0.6.27': '2026-11-17T06:00:00Z',
   'v0.6.28': '2026-11-17T09:00:00Z',
   'v0.6.29': '2026-11-17T12:00:00Z',
+  'v0.6.30': '2026-11-17T15:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -391,14 +392,15 @@ describe('the news', () => {
         '<a class="news-featured" href="macs-without-slack/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 4)).toEqual([
+      'release v0.6.30/',
       'release v0.6.29/',
       'release v0.6.28/',
       'release v0.6.27/',
-      'release v0.6.26/',
     ])
     expect(rows('news/')).not.toContain('post macs-without-slack/')
     // Notes in Korean from v0.6.11; before, the English page, marked so
-    expect(rows('ko/news/').slice(0, 22)).toEqual([
+    expect(rows('ko/news/').slice(0, 23)).toEqual([
+      'release v0.6.30/',
       'release v0.6.29/',
       'release v0.6.28/',
       'release v0.6.27/',
@@ -423,11 +425,11 @@ describe('the news', () => {
       'release ../../news/v0.6.10/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
-    expect(EVERY).toContain('ko/news/v0.6.29/')
+    expect(EVERY).toContain('ko/news/v0.6.30/')
     expect(read('ko/news/')).toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.30/')
+    expect(EVERY).not.toContain('news/v0.6.31/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -439,19 +441,19 @@ describe('the news', () => {
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
     // The newest eight, the one open among them
     const rail = [
+      '../v0.6.30/',
       '../v0.6.29/',
       '../v0.6.28/',
       '../v0.6.27/',
       '../v0.6.26/',
       '../v0.6.25/',
       '../v0.6.24/',
-      '../v0.6.23/',
       './ *',
     ]
-    expect(recent('news/v0.6.22/').slice(0, 8)).toEqual(rail)
+    expect(recent('news/v0.6.23/').slice(0, 8)).toEqual(rail)
     // The Korean rail, its latest eight as the English one (the Korean list
     // above has the English notes too)
-    expect(recent('ko/news/v0.6.22/')).toEqual(rail)
+    expect(recent('ko/news/v0.6.23/')).toEqual(rail)
   })
 
   it("points the home page's link at the latest news", () => {
@@ -461,9 +463,9 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest news: v0.6.29's notes, newer than the last feature post
-    expect(link('')).toEqual(['news/v0.6.29/', "What's new in v0.6.29"])
-    expect(link('ko/')).toEqual(['news/v0.6.29/', 'v0.6.29에서 달라진 점'])
+    // The latest news: v0.6.30's notes, newer than the last feature post
+    expect(link('')).toEqual(['news/v0.6.30/', "What's new in v0.6.30"])
+    expect(link('ko/')).toEqual(['news/v0.6.30/', 'v0.6.30에서 달라진 점'])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
@@ -485,12 +487,12 @@ describe('the news', () => {
       expect(feed).toContain(
         `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="${lang}">`
       )
-      // The newest twenty: v0.6.12 is the oldest left; share-your-hub, which
-      // came before it, and v0.6.11 are gone
+      // The newest twenty: todo-comes-first, out with v0.6.12, is the oldest
+      // left; v0.6.12 itself and what came before it are gone
       expect(feed).toContain(`<id>${ORIGIN}${dir}news/todo-comes-first/</id>`)
-      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.12/</id>`)
+      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.13/</id>`)
+      expect(feed).not.toContain(`news/v0.6.12/</id>`)
       expect(feed).not.toContain(`news/share-your-hub/</id>`)
-      expect(feed).not.toContain(`news/v0.6.11/</id>`)
     }
   })
 
