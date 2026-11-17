@@ -1,6 +1,5 @@
-import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -66,6 +65,7 @@ import { SandboxService } from './sandbox.js'
 import { UpdateCheck } from './updates.js'
 import { diagnosticsText, tailFile } from './diagnostics.js'
 import { resolveAppPaths } from './app-paths.js'
+import { loginShellPath, toolDirs, withToolDirs } from './tool-path.js'
 import {
   collectionRow,
   latestCollection,
@@ -328,33 +328,17 @@ let toolPathCache: string | undefined
 
 /**
  * An app launched from Finder does not inherit the terminal's PATH (Homebrew,
- * nvm, codex, gh, pnpm).
+ * nvm, codex, gh, pnpm). On top of the login shell's PATH it adds the folders
+ * tool-path.ts lists, where a version manager or an installer puts CLIs.
  */
 function toolPath(): string {
-  if (toolPathCache) return toolPathCache
-  try {
-    const output = execFileSync(
-      process.env.SHELL || '/bin/zsh',
-      ['-ilc', 'printf "\\nPACENOTE_PATH=%s\\n" "$PATH"'],
-      { encoding: 'utf8', timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'] }
-    )
-    const line = output
-      .split('\n')
-      .reverse()
-      .find((l) => l.startsWith('PACENOTE_PATH='))
-    if (line) toolPathCache = line.slice('PACENOTE_PATH='.length)
-  } catch {
-    // Falls back to the default paths below.
-  }
-  toolPathCache ||= [
-    process.env.PATH,
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin',
-  ]
-    .filter(Boolean)
-    .join(path.delimiter)
+  toolPathCache ??= withToolDirs(
+    loginShellPath(process.env.SHELL || '/bin/zsh') ??
+      [process.env.PATH, '/usr/bin', '/bin']
+        .filter(Boolean)
+        .join(path.delimiter),
+    toolDirs(homedir(), process.env.NVM_DIR || undefined)
+  )
   return toolPathCache
 }
 
