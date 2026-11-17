@@ -1728,14 +1728,18 @@ else fail('unexpected: ' + args.join(' '))
     // gap, which is the same at its top and its side
     const shape = await log.evaluate((sheet) => {
       const box = sheet.getBoundingClientRect()
-      const bridge = (
-        window as unknown as { pacenoteDesktop?: { windowCorners?: number } }
-      ).pacenoteDesktop
+      const win = globalThis as unknown as {
+        pacenoteDesktop?: { windowCorners?: number }
+        getComputedStyle: (el: unknown) => { borderTopRightRadius: string }
+        innerWidth: number
+      }
       return {
-        corners: bridge?.windowCorners ?? 0,
-        radius: Number.parseFloat(getComputedStyle(sheet).borderTopRightRadius),
+        corners: win.pacenoteDesktop?.windowCorners ?? 0,
+        radius: Number.parseFloat(
+          win.getComputedStyle(sheet).borderTopRightRadius
+        ),
         top: box.top,
-        side: window.innerWidth - box.right,
+        side: win.innerWidth - box.right,
       }
     })
     expect(shape.corners).toBeGreaterThan(0)
