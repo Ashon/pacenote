@@ -1,6 +1,8 @@
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { TaskDecision, TaskView, WorkTool } from '@src/tasks/types'
 import {
+  AppWindow,
+  ChevronDown,
   CircleCheck,
   CirclePause,
   Clock,
@@ -35,6 +37,8 @@ import { text } from './task-row.text'
 /** Each step under the menu, by its icon */
 function stepIcon(step: RowStep) {
   switch (step.kind) {
+    case 'here':
+      return <Play />
     case 'continue':
       return <SquareTerminal />
     case 'elsewhere':
@@ -57,6 +61,7 @@ export function TaskActions({
   state,
   opensIn,
   drafting,
+  onContinueHere,
   onContinue,
   onDraft,
   onBackToOpen,
@@ -70,6 +75,9 @@ export function TaskActions({
   opensIn?: Record<WorkTool, 'app' | 'terminal'>
   /** A reply is being drafted */
   drafting: boolean
+  /** A new session Pacenote runs, on its page, the task written in (V5) */
+  onContinueHere: () => void
+  /** In a tool's own session: its terminal, or its desktop app */
   onContinue: (tool: WorkTool) => void
   onDraft: () => void
   /** Back to open, from waiting on someone else */
@@ -103,31 +111,54 @@ export function TaskActions({
           <OpenButton s={state.session} size="sm" />
         )}
         {state.continues && (
-          // Each tool it can continue in, by its name, the one set in
-          // Settings first: one control, as an outline button is drawn
+          // Continue goes on here in Pacenote; the tools' own sessions are
+          // under its menu, the one set in Settings first. One control, as
+          // an outline button is drawn
           <span
             role="group"
             aria-label={t.continueWith}
             className="flex h-7 items-center rounded-md border bg-background shadow-xs dark:border-input dark:bg-input/30"
           >
-            {state.tools.map((tool, i) => (
-              <OpensIn
-                key={tool}
-                folder={state.folder}
-                app={opensIn?.[tool] === 'app' ? tool : undefined}
+            <OpensIn folder={state.folder} here>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-full rounded-none rounded-l-[5px]"
+                onClick={onContinueHere}
               >
+                <Play />
+                {t.continueHere}
+              </Button>
+            </OpensIn>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
-                  aria-label={t.continueIn(CLI_NAMES[tool])}
-                  className="h-full rounded-none border-l first:rounded-l-[5px] first:border-l-0 last:rounded-r-[5px] dark:border-input"
-                  onClick={() => onContinue(tool)}
+                  aria-label={t.continueInAnother}
+                  className="h-full w-7 rounded-none rounded-r-[5px] border-l px-0 dark:border-input"
                 >
-                  {i === 0 && <SquareTerminal />}
-                  {CLI_NAMES[tool]}
+                  <ChevronDown />
                 </Button>
-              </OpensIn>
-            ))}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {state.tools.map((tool) => {
+                  const inApp = opensIn?.[tool] === 'app'
+                  return (
+                    <DropdownMenuItem
+                      key={tool}
+                      onSelect={() => onContinue(tool)}
+                    >
+                      {inApp ? <AppWindow /> : <SquareTerminal />}
+                      {t.continueIn(CLI_NAMES[tool])}
+                      <span className="ml-auto pl-6 text-meta text-muted-foreground">
+                        {inApp ? t.app[tool] : t.terminal}
+                      </span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </span>
         )}
         {state.drafts && (

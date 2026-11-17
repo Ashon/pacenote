@@ -909,7 +909,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.openIn',
     group: 'work',
     label: 'Open code tasks in',
-    help: "The button on a code task opens your session here, with the task. Pacenote's own work runs with the AI chosen above.",
+    help: "First in the menu beside a code task's Continue here, which opens your session in it with the task; Continue here itself goes on in Pacenote. Pacenote's own work runs with the AI chosen above.",
     type: 'select',
     segmented: true,
     options: [

@@ -378,7 +378,7 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   },
   TASKS_CLI: {
     label: '코드 작업을 열 곳',
-    help: '코드 작업의 버튼을 누르면 할 일을 담아 여기서 세션을 열어요. Pacenote 자체 작업은 위에서 고른 AI로 실행돼요.',
+    help: "코드 작업의 '여기서 계속' 옆 메뉴 맨 위에 오고, 할 일을 담아 이 도구의 세션을 열어요. '여기서 계속'은 Pacenote에서 바로 이어 가요. Pacenote 자체 작업은 위에서 고른 AI로 실행돼요.",
   },
   TASKS_OPEN_IN: {
     label: '세션을 열 곳',

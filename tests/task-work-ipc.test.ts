@@ -54,6 +54,8 @@ const ipc = {
   handleDenying: (channel: string, _denied: unknown, run: Run) =>
     channels.set(channel, run),
   handleOrError: (channel: string, run: Run) => channels.set(channel, run),
+  windowOnly: (channel: string, _denied: unknown, run: Run) =>
+    channels.set(channel, run),
 } as unknown as Ipc
 
 let cli = 'claude'
@@ -121,5 +123,28 @@ describe('continuing a task from the window', () => {
       await run('slack:nope', { tool: 'claude', folder: '/w' })
     ).toHaveProperty('error')
     expect(opened).toEqual([])
+  })
+})
+
+describe('a new session Pacenote runs for a task', () => {
+  it('drafts its first message with the marker its work takes', async () => {
+    const draft = channels.get('pacenote:tasks:new-session')!
+    const made = (await draft(task!.id)) as {
+      prompt: string
+      marker: string
+      folder?: string
+    }
+    expect(made.marker).toMatch(/^[0-9a-f-]{36}$/)
+    expect(made.prompt).toContain(`[pacenote-task:${made.marker}]`)
+    expect(made.prompt).toContain(`<task id="${task!.id}"`)
+    expect(made.prompt).toContain(`close_task with id ${task!.id}`)
+    // No repository: no folder to open it in yet
+    expect(made.folder).toBeUndefined()
+    // Each draft its own marker; none for a task that is not there
+    expect(((await draft(task!.id)) as { marker: string }).marker).not.toBe(
+      made.marker
+    )
+    expect(await draft('slack:nope')).toBeNull()
+    expect(await draft(undefined)).toBeNull()
   })
 })

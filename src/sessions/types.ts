@@ -147,3 +147,28 @@ export interface SessionTalk {
   /** Why its log could not be read */
   error?: string
 }
+
+/**
+ * A new session Pacenote runs for a task, before you start it (V5): its first
+ * message, which you may change, and the folder it runs in
+ */
+export interface NewSessionDraft {
+  /** The task, what came before it, and how to go about it */
+  prompt: string
+  /** The marker in the prompt: the id its work entry takes */
+  marker: string
+  /** The folder its repository opened in last */
+  folder?: string
+}
+
+/** What starts a new session Pacenote runs (V5) */
+export interface NewSessionStart {
+  /** The open task it is the work of, from Todo's Continue */
+  task?: string
+  folder: string
+  /** Its first message */
+  message: string
+  mode?: SessionMode
+  /** The marker in the message, from its draft */
+  marker?: string
+}

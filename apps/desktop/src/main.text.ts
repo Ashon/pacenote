@@ -57,6 +57,11 @@ const en = {
     'It is open somewhere else, so you type there, or continue in a copy here.',
   sessionOnlyClaude: 'Only Claude Code sessions continue here for now.',
   emptyMessage: 'Type something to send first.',
+  sessionsOff:
+    'Turn on Settings > Todo > Sessions on this Mac to run sessions in Pacenote.',
+  notYourFolder:
+    'Choose a folder of your work: Pacenote does not run sessions in a temporary one.',
+  sessionNotStarted: (why: string) => `Claude Code did not start: ${why}`,
   otherMac: 'your other Mac',
   sessionElsewhere: (mac: string) =>
     `That session is on ${mac}. Start one here instead.`,
@@ -125,6 +130,11 @@ const ko: typeof en = {
     '다른 곳에 열려 있어서 그곳에서 입력해요. 아니면 여기서 복사본으로 이어 가세요.',
   sessionOnlyClaude: '지금은 Claude Code 세션만 여기서 이어 갈 수 있어요.',
   emptyMessage: '먼저 보낼 말을 입력하세요.',
+  sessionsOff:
+    'Pacenote에서 세션을 돌리려면 설정 > 할 일 > 이 Mac의 세션을 켜세요.',
+  notYourFolder:
+    '작업 폴더를 선택하세요. Pacenote는 임시 폴더에서는 세션을 돌리지 않아요.',
+  sessionNotStarted: (why) => `Claude Code가 시작되지 않았어요: ${why}`,
   otherMac: '내 다른 Mac',
   sessionElsewhere: (mac) =>
     `그 세션은 ${mac}에 있어요. 대신 여기서 새로 시작하세요.`,

@@ -28,14 +28,17 @@ export type RowWords = (typeof text)[Locale]
 const WEEK = 7 * 24 * 60 * 60_000
 
 /** A step under the row's menu, by its name */
-export type RowStep = { label: string } & (
-  | { kind: 'continue'; tool: WorkTool }
-  /** Continue in a folder you choose, rather than its repository's */
-  | { kind: 'elsewhere' }
-  | { kind: 'draft' }
-  /** In progress, no longer, or waiting on someone else */
-  | { kind: 'stage'; stage: StageRecord['stage'] }
-)
+export type RowStep = { label: string } &
+  /** A new session Pacenote runs, on its page */
+  (
+    | { kind: 'here' }
+    | { kind: 'continue'; tool: WorkTool }
+    /** Continue in a folder you choose, rather than its repository's */
+    | { kind: 'elsewhere' }
+    | { kind: 'draft' }
+    /** In progress, no longer, or waiting on someone else */
+    | { kind: 'stage'; stage: StageRecord['stage'] }
+  )
 
 /** The task and what the list knows of it, as TaskRow is given them */
 export interface TaskRowInput {
@@ -193,11 +196,14 @@ export function taskRowState(
   const menu: RowStep[] = [
     ...(task.action === 'code' && !opensSession
       ? []
-      : tools.map((tool): RowStep => ({
-          kind: 'continue',
-          tool,
-          label: t.continueIn(CLI_NAMES[tool]),
-        }))),
+      : [
+          { kind: 'here', label: t.continueHere } as const,
+          ...tools.map((tool): RowStep => ({
+            kind: 'continue',
+            tool,
+            label: t.continueIn(CLI_NAMES[tool]),
+          })),
+        ]),
     ...(folder
       ? [{ kind: 'elsewhere', label: t.continueElsewhere } as const]
       : []),

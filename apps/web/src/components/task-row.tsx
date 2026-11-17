@@ -185,6 +185,12 @@ export function TaskRow({
     if (open) row.current?.scrollIntoView({ block: 'nearest' })
   }, [open])
 
+  // A new session Pacenote runs: its page, with the task written in (V5)
+  const continueHere = () => {
+    setError(undefined)
+    setNote(undefined)
+    window.location.hash = `#/sessions/new/${encodeURIComponent(task.id)}`
+  }
   const continueIn = async (tool: WorkTool) => {
     setError(undefined)
     setNote(undefined)
@@ -207,6 +213,7 @@ export function TaskRow({
     setError(failed)
   }
   const runStep = (step: RowStep) => {
+    if (step.kind === 'here') return continueHere()
     if (step.kind === 'continue') return void continueIn(step.tool)
     if (step.kind === 'draft') return void draft()
     if (step.kind === 'stage') return onStage?.(step.stage)
@@ -282,6 +289,7 @@ export function TaskRow({
             state={state}
             opensIn={opensIn}
             drafting={drafting}
+            onContinueHere={continueHere}
             onContinue={(tool) => void continueIn(tool)}
             onDraft={() => void draft()}
             onBackToOpen={() => onStage?.('open')}
@@ -313,7 +321,10 @@ export function TaskRow({
             reply={reply}
             onReply={setReply}
             onDraft={() => void draft()}
-            onStartHere={(tool) => void continueIn(tool)}
+            // Claude Code goes on here in Pacenote, as Continue does
+            onStartHere={(tool) =>
+              tool === 'claude' ? continueHere() : void continueIn(tool)
+            }
             proposal={state.proposal}
             followsTask={state.followsTask}
             fill={state.fill}

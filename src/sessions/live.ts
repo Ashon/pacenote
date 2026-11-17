@@ -177,13 +177,34 @@ export const modeLine = (id: string, mode: SessionMode) =>
     request: { subtype: 'set_permission_mode', mode },
   })
 
+/**
+ * How a session Pacenote runs starts: its own conversation resumed, a copy
+ * of it, or a new one with the id given (V5), its name and how it asks
+ */
+export type HostStart =
+  | { kind: 'resume' }
+  | { kind: 'copy' }
+  | { kind: 'new'; name?: string; mode?: SessionMode }
+
 /** Claude Code's arguments for a session Pacenote runs */
-export function hostArgs(session: string, copy: boolean): string[] {
+export function hostArgs(session: string, start: HostStart): string[] {
   return [
     '-p',
-    '--resume',
-    session,
-    ...(copy ? ['--fork-session'] : []),
+    ...(start.kind === 'new'
+      ? [
+          '--session-id',
+          session,
+          // Its name in Claude Code's lists, as for a terminal's (-n)
+          ...(start.name ? ['--name', start.name] : []),
+          ...(start.mode && start.mode !== 'default'
+            ? ['--permission-mode', start.mode]
+            : []),
+        ]
+      : [
+          '--resume',
+          session,
+          ...(start.kind === 'copy' ? ['--fork-session'] : []),
+        ]),
     '--input-format',
     'stream-json',
     '--output-format',

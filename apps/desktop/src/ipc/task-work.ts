@@ -7,6 +7,7 @@ import {
   type Locale,
 } from '../../../../src/i18n/locale.js'
 import type { Macs } from '../../../../src/macs/macs.js'
+import type { NewSessionDraft } from '../../../../src/sessions/types.js'
 import {
   outcomeOf,
   taskContext,
@@ -35,6 +36,7 @@ import { draftReply } from '../drafter.js'
 import {
   findClaudeSession,
   findCodexSession,
+  handoffPrompt,
   openSession,
   readSessionLog,
   resumeCommand,
@@ -234,6 +236,30 @@ export function registerTaskWorkIpc(
       return { entry, note }
     })
   })
+  /**
+   * A new session Pacenote runs for an open task (V5), before you start it:
+   * its first message, as a terminal's, with the marker its work entry takes,
+   * and the folder its repository opened in last
+   */
+  ipc.windowOnly(
+    'pacenote:tasks:new-session',
+    () => null,
+    (id): NewSessionDraft | null => {
+      if (typeof id !== 'string') return null
+      const detail = taskDetail(id, 'en')
+      if (!detail || detail.task.status !== 'open') return null
+      const marker = randomUUID()
+      return {
+        prompt: handoffPrompt(detail.task, detail.context, {
+          marker,
+          planFirst: env().TASKS_PLAN_FIRST !== 'off',
+          tool: 'claude',
+        }),
+        marker,
+        ...(detail.folder ? { folder: detail.folder } : {}),
+      }
+    }
+  )
   ipc.handle('pacenote:tasks:resume', undefined, async (entryId) => {
     const t = localized(text)
     const entry = sessionEntry(entryId)

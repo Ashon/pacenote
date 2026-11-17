@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
@@ -15,9 +16,14 @@ import { sessionsView } from '../../../../src/sessions/view.js'
 import { SingleFlight } from '../../../../src/single-flight.js'
 import { TOOL_LABEL } from '../../../../src/tasks/context.js'
 import type { SessionItem } from '../../../../src/tasks/types.js'
-import { codexLogs, yourFolder } from '../../../../src/tasks/folders.js'
+import {
+  codexLogs,
+  saveRepo,
+  yourFolder,
+} from '../../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../../src/tasks/store.js'
 import {
+  addWork,
   changeWork,
   linkSession,
   readWork,
@@ -47,6 +53,11 @@ const OPEN_TIMEOUT_MS = 20_000
 const LOGS_KEPT = 4
 /** What you type to a session, at most */
 const MESSAGE_CHARS = 20_000
+/** A new session's first message, at most: a task's, with what came before */
+const FIRST_CHARS = 60_000
+/** A new session's name in Claude Code's lists, at most */
+const NAME_CHARS = 80
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** How much of a turn its page shows: an answer in full, mostly */
 const TURN_CHARS = 12_000
 
@@ -109,6 +120,7 @@ export function registerSessionsIpc(
     const hosted: OpenClaude[] = host.list().map((h) => ({
       session: h.session,
       cwd: h.cwd,
+      ...(h.name ? { name: h.name } : {}),
       busy: h.busy,
       ...(h.asks ? { asks: h.asks } : {}),
       startedAt: h.startedAt,
@@ -322,6 +334,12 @@ export function registerSessionsIpc(
     }
   )
 
+  /** A session Pacenote runs, by its row's id */
+  const hostedOf = (id: unknown) =>
+    typeof id === 'string' && id.startsWith('claude:')
+      ? id.slice('claude:'.length)
+      : undefined
+
   /** The logs read last, kept while they have not changed */
   const logs = new Map<
     string,
@@ -343,6 +361,10 @@ export function registerSessionsIpc(
   const rowOf = async (id: unknown) => {
     if (typeof id !== 'string') return undefined
     if (!shown.has(id)) await viewing.run(read).catch(() => undefined)
+    // One started just now, after the read that was under way began
+    const session = hostedOf(id)
+    if (!shown.has(id) && session && host.has(session))
+      await viewing.run(read).catch(() => undefined)
     return shown.get(id)
   }
 
@@ -449,13 +471,79 @@ export function registerSessionsIpc(
     }
   )
 
-  /** A session Pacenote runs, by its row's id */
-  const hostedOf = (id: unknown) =>
-    typeof id === 'string' && id.startsWith('claude:')
-      ? id.slice('claude:'.length)
-      : undefined
   const done = (result: { error?: string }) =>
     result.error ? { error: localized(text).sessionNotHere } : {}
+
+  /**
+   * Starts a new Claude Code session here (V5), in the folder, with its first
+   * message: for a task, from Todo's Continue, it is the task's work, its
+   * folder kept for its repository, and named after it. Its page's id.
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:start',
+    () => ({ error: localized(text).noSuchSession }),
+    (how) => {
+      const t = localized(text)
+      const {
+        task: taskId,
+        folder,
+        message,
+        mode,
+        marker,
+      } = (how ?? {}) as Record<string, unknown>
+      if (settings.effectiveEnv().TASKS_LINK_SESSIONS !== 'on')
+        return { error: t.sessionsOff }
+      if (
+        typeof folder !== 'string' ||
+        !path.isAbsolute(folder) ||
+        !existsSync(folder) ||
+        !statSync(folder).isDirectory()
+      )
+        return { error: t.chooseFolderFirst }
+      // Listed only where your work is, as any session
+      if (!yours(folder)) return { error: t.notYourFolder }
+      const said = typeof message === 'string' ? message.trim() : ''
+      if (!said) return { error: t.emptyMessage }
+      if (mode !== undefined && !SESSION_MODES.includes(mode as SessionMode))
+        return { error: t.noSuchSession }
+      const task =
+        taskId === undefined
+          ? undefined
+          : allTaskViews(dataDir).find(
+              (each) => each.id === taskId && each.status === 'open'
+            )
+      if (taskId !== undefined && !task) return { error: t.noSuchTask }
+      const session = randomUUID()
+      const started = host.begin(session, folder, said.slice(0, FIRST_CHARS), {
+        ...(task && {
+          name: task.title.replace(/\s+/g, ' ').trim().slice(0, NAME_CHARS),
+        }),
+        ...(mode !== undefined && { mode: mode as SessionMode }),
+      })
+      if (started.error) return { error: t.sessionNotStarted(started.error) }
+      if (task) {
+        if (task.repo) saveRepo(dataDir, task.repo, folder)
+        const work = readWork(dataDir)
+        // The marker its first message carries, when it is one not used yet
+        const id =
+          typeof marker === 'string' &&
+          UUID.test(marker) &&
+          !work.entries.some((entry) => entry.id === marker)
+            ? marker
+            : randomUUID()
+        addWork(dataDir, {
+          kind: 'session',
+          id,
+          task: task.id,
+          tool: 'claude',
+          session,
+          cwd: folder,
+          startedAt: new Date().toISOString(),
+        })
+      }
+      return { id: `claude:${session}` }
+    }
+  )
 
   /** Your answer to what it asks: allow, allow in this session, or deny */
   ipc.windowOnly(

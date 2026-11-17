@@ -144,24 +144,33 @@ A collection is told who you are, so it can tell what is asked of you from what 
 
 ## Continuing a task
 
-**Continue in Claude Code** (or Codex) opens a session in a terminal, in the task's repository on this Mac, with the
+**Continue here** opens a new Claude Code session in Pacenote, on its page under Sessions, with the task's repository on
+this Mac as its folder and the task and what came before it written in as its first message. Change the message, the
+folder or how it asks before it acts, then **Start**: Pacenote runs the installed `claude` there with your own sign-in
+(`claude -p --session-id <id> --name <the task's title>`), the session is the task's work from the start, and its page
+opens in place, to go on as for any session Pacenote runs (see [Sessions on this Mac](#sessions-on-this-mac)). It needs
+"Sessions on this Mac" on, which the page turns on with one button.
+
+The menu beside it, **Continue in another app**, opens the task in a tool's own session instead: Claude Code, Codex or
+opencode, the tool set in **Open code tasks in** (Settings > Todo) first, each saying where it opens. With **Open
+sessions in: Terminal**, the default, it opens a session in a terminal, in the task's repository on this Mac, with the
 task and what came before it as the first prompt. Pacenote names the session, so the task's work log has it from the
 start, and opening it again later (the terminal icon, `claude --resume`, the Claude app) keeps it there.
 
-With **Open sessions in: Desktop app** (Settings > Todo), Continue opens the Claude app's Code tab or the Codex app
+With **Open sessions in: Desktop app** (Settings > Todo), the menu opens the Claude app's Code tab or the Codex app
 instead, in the folder, with the task written in for you to send there. Neither app sends it by itself, and the Claude
 app asks you to confirm the folder first. The work log shows the session as waiting until you send it, then finds it by
 the marker in its first prompt. A Codex session continues in the Codex app; a Claude Code session continues in your
-terminal (`claude --resume`), as the Claude app has no link to continue one. Without the app on this Mac, Continue opens
+terminal (`claude --resume`), as the Claude app has no link to continue one. Without the app on this Mac, the menu opens
 your terminal instead and says so. A link carries a prompt of up to 12,000 characters; a longer one leaves what came
 before to `task_context`.
 
-**Continue in opencode** (Open code tasks in: opencode) opens `opencode --prompt` in your terminal, whatever Open sessions
+**Continue in opencode**, in the menu, opens `opencode --prompt` in your terminal, whatever Open sessions
 in says, as opencode has no app to write the task into. opencode keeps its sessions in its own service rather than in
 files, so while the Todo screen is open Pacenote asks its CLI every 10 seconds or so: `opencode session list` in the
 task's folder finds the session whose first message has the task's marker, and says when it last wrote; `opencode
-session export` reads it for the session's log and for "looks done". It continues with `opencode --session <id>`. A
-task row's menu offers the other tools that are on this Mac, opencode among them once its CLI is on the PATH.
+session export` reads it for the session's log and for "looks done". It continues with `opencode --session <id>`.
+Continue's menu offers the tools that are on this Mac, opencode among them once its CLI is on the PATH.
 
 With "Sessions on this Mac" on (Settings > Todo), the work log also has the sessions you started on your
 own, from Claude Code's and Codex's logs on this Mac (the last 14 days; Claude Code's in the Claude app and IDE
@@ -250,6 +259,9 @@ on, from the switch or from the screen's card, which says what it reads first.
 - **Open somewhere else:** a session open in a terminal, the Claude app or claude.ai is shown as it goes, and you type
   there: two places typing into one session would tangle it. **Continue in a copy here** starts a copy of it in
   Pacenote (`--fork-session`), linked to the same task. A Codex session is shown, and you type in Codex.
+- **A new one:** **New session**, at the top of the screen, starts a Claude Code session in Pacenote in a folder you
+  choose, with a first message of yours. One for a task starts from the task's **Continue here** (see
+  [Continuing a task](#continuing-a-task)).
 - **How long it runs:** a session Pacenote runs keeps running with the window closed, until you end it (**End it
   here**, in the page's menu) or it has had nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks
   first.

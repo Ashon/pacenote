@@ -292,6 +292,17 @@ async function enterSecret(
 const saved = (world: World) =>
   readSettingsValues(path.join(world.home, 'settings.json'))
 
+/**
+ * A tool's own session for a task, from the menu beside its row's Continue
+ * here: the menu item, which says where it opens
+ */
+async function toolInMenu(row: Locator, tool: string) {
+  await row.getByRole('button', { name: 'Continue in another app' }).click()
+  return row
+    .page()
+    .getByRole('menuitem', { name: new RegExp(`^Continue in ${tool}`) })
+}
+
 describe.runIf(process.env.E2E_APP)('desktop app', () => {
   it('sets up Slack from a first run, starts the bot, and shows the answered mention', async () => {
     world = await World.create([
@@ -1600,7 +1611,7 @@ else fail('unexpected: ' + args.join(' '))
     await page.evaluate("window.location.hash = '#/tasks'")
     const row = page.locator(`[data-task-row="${current.id}"]`)
     await row.getByText('Ashon/payments').waitFor()
-    await row.getByRole('button', { name: 'Continue in Claude Code' }).click()
+    await (await toolInMenu(row, 'Claude Code')).click()
 
     // The first time for the repository, its folder is chosen: the checkout
     // under ~/git is found by its remote.
@@ -1723,12 +1734,15 @@ else fail('unexpected: ' + args.join(' '))
     )
     await line('Last time').waitFor()
 
-    // Its repository has a folder now: Continue opens there without asking,
-    // and says where on hover. Another folder is under the row's menu, the
-    // remembered one first, with when you last worked in it.
-    const next = row.getByRole('button', { name: 'Continue in Claude Code' })
-    await next.hover()
-    await page.getByRole('tooltip', { name: `Opens in ${checkout}` }).waitFor()
+    // Its repository has a folder now: Continue here opens there without
+    // asking, and says where on hover. Another folder is under the row's
+    // menu, the remembered one first, with when you last worked in it.
+    await row.getByRole('button', { name: 'Continue here' }).hover()
+    await page
+      .getByRole('tooltip', {
+        name: `Opens a new session here in Pacenote in ${checkout} with the task written in. Start it there.`,
+      })
+      .waitFor()
     await row.getByRole('button', { name: 'More for this task' }).click()
     await page
       .getByRole('menuitem', { name: 'Continue in another folder' })
@@ -2322,19 +2336,14 @@ else fail('unexpected: ' + args.join(' '))
       saved(world!).TASKS_OPEN_IN === 'app' ? true : undefined
     )
 
-    // Todo: Continue says where it opens, on hover.
+    // Todo: the menu beside Continue here says where each tool opens.
     await page.evaluate("window.location.hash = '#/tasks'")
     const row = page.locator(`[data-task-row="${review.id}"]`)
-    const continueButton = row.getByRole('button', {
-      name: 'Continue in Claude Code',
-    })
-    await continueButton.hover()
-    await page
-      .getByRole('tooltip', {
-        name: /^Opens the Claude app's Code tab in .*payments with the task written in\. Send it there to start\.$/,
-      })
-      .waitFor()
-    await continueButton.click()
+    const inClaudeApp = await toolInMenu(row, 'Claude Code')
+    expect(await inClaudeApp.textContent()).toBe(
+      'Continue in Claude CodeClaude app'
+    )
+    await inClaudeApp.click()
 
     // The Claude app's Code tab, in the folder, the task written in
     const claudeLink = await eventually('the Claude app opened', () =>
@@ -2430,7 +2439,7 @@ else fail('unexpected: ' + args.join(' '))
 
     // Codex, from its own button in the row: the Codex app, the same way
     const other = page.locator(`[data-task-row="${flaky.id}"]`)
-    await other.getByRole('button', { name: 'Continue in Codex' }).click()
+    await (await toolInMenu(other, 'Codex')).click()
     const codexLink = await eventually('the Codex app opened', () =>
       openedNow().find((line) => line.startsWith('codex://new?'))
     )
@@ -2504,10 +2513,12 @@ else fail('unexpected: ' + args.join(' '))
       .getByText('Claude app · not on this Mac, so your terminal opens instead')
       .waitFor()
     await page.evaluate("window.location.hash = '#/tasks'")
-    await row.getByRole('button', { name: 'Continue in Claude Code' }).hover()
-    await page.getByRole('tooltip', { name: /^Opens in .*payments$/ }).waitFor()
+    const inTerminal = await toolInMenu(row, 'Claude Code')
+    expect(await inTerminal.textContent()).toBe(
+      'Continue in Claude CodeTerminal'
+    )
     const before = openedNow().filter((line) => line.endsWith('.command'))
-    await row.getByRole('button', { name: 'Continue in Claude Code' }).click()
+    await inTerminal.click()
     const script = await eventually('the terminal opened instead', () =>
       openedNow().find(
         (line) => line.endsWith('.command') && !before.includes(line)
@@ -2635,9 +2646,7 @@ else fail('unexpected: ' + args.join(' '))
 
     // The review continues in Claude Code from Pacenote, on fix/retry.
     const reviewRow = rowOf(review!.id)
-    await reviewRow
-      .getByRole('button', { name: 'Continue in Claude Code' })
-      .click()
+    await (await toolInMenu(reviewRow, 'Claude Code')).click()
     await page.getByText('Where is Ashon/payments on this Mac?').waitFor()
     const openHere = page.getByRole('button', { name: 'Open Claude Code here' })
     await faded(openHere, 'the folder ready to open')
@@ -3384,6 +3393,163 @@ else fail('unexpected: ' + args.join(' '))
     expect(runs[1]!.args).toContain('--fork-session')
     expect(runs[0]!.cwd).toBe(checkout)
   }, 150_000)
+
+  it("starts a task's session in Pacenote from Todo's Continue: the task written in, its folder, then its page", async () => {
+    world = await World.create()
+    const { home, root } = world
+    mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
+    const checkout = realpathSync(path.join(root, 'git', 'payments'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    saveRepo(home, 'Ashon/payments', checkout)
+    const now = Date.now()
+    const [fix] = addTasks(
+      home,
+      [
+        {
+          title: 'Fix the flaky webhook retry test',
+          asked_by: 'hyun',
+          where: '#payments',
+          link: `https://acme.slack.com/archives/C0PAY/p${Math.floor((now - 3_600_000) / 1000)}000200`,
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'hyun says the webhook retry test fails one run in ten.',
+        },
+      ],
+      {
+        settings: { on: true, dms: false, exclude: [] },
+        now: new Date(now - 3_600_000),
+      }
+    ).added as [NonNullable<ReturnType<typeof addTasks>['added'][0]>]
+    // Nothing opens in a terminal or an app: a stand-in keeps what would
+    const opened = path.join(root, 'opened.log')
+    const opener = path.join(root, 'open-link')
+    writeFileSync(opener, `#!/bin/sh\necho "$1" >> "${opened}"\n`)
+    chmodSync(opener, 0o755)
+    // Open sessions in: Pacenote, the default, with Sessions on this Mac on
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: {
+        FAKE_CLAUDE_DIR: world.claudeDir,
+        PACENOTE_HANDOFF_OPENER: opener,
+      },
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const row = page.locator(`[data-task-row="${fix.id}"]`)
+    // Continue here says where, on hover
+    const continueButton = row.getByRole('button', { name: 'Continue here' })
+    await continueButton.hover({ timeout: 30_000 })
+    await page
+      .getByRole('tooltip', {
+        name: /^Opens a new session here in Pacenote in .*payments with the task written in\. Start it there\.$/,
+      })
+      .waitFor()
+    // The tools' own sessions are under the menu beside it, each saying
+    // where (opencode too, when its CLI is on this Mac's PATH)
+    await (await toolInMenu(row, 'Claude Code')).waitFor()
+    expect(
+      (
+        await page
+          .getByRole('menuitem')
+          .evaluateAll((items) => items.map((item) => item.textContent))
+      ).slice(0, 2)
+    ).toEqual(['Continue in Claude CodeTerminal', 'Continue in CodexTerminal'])
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/task-continue-menu.png'),
+    })
+    await page.keyboard.press('Escape')
+    await page.getByRole('menu').waitFor({ state: 'detached' })
+    await continueButton.click()
+
+    // The new session's page: the task, its folder, its first message
+    await page
+      .getByRole('heading', { name: 'Fix the flaky webhook retry test' })
+      .waitFor({ timeout: 30_000 })
+    await page.getByText('Claude Code, here in Pacenote').waitFor()
+    await page.getByText('From your tasks · Ashon/payments').waitFor()
+    expect(await page.locator('[data-folder]').textContent()).toMatch(
+      /payments$/
+    )
+    const first = page.getByRole('textbox', { name: 'First message' })
+    const prompt = await first.inputValue()
+    expect(prompt).toMatch(/\[pacenote-task:[0-9a-f-]{36}\]/)
+    expect(prompt).toContain(
+      `<task id="${fix.id}" action="code" repo="Ashon/payments">`
+    )
+    expect(prompt).toContain(`close_task with id ${fix.id}`)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-new.png'),
+    })
+    // It plans first, and you add a line of your own
+    await page
+      .getByRole('button', { name: /^How it asks before it acts/ })
+      .click()
+    await page.getByRole('menuitem', { name: 'Plan first' }).click()
+    await first.fill(`${prompt}\n\nStart with the retry test.`)
+    await page.getByRole('button', { name: 'Start', exact: true }).click()
+
+    // Its page in its place: Claude Code runs it here, the task's work
+    await page
+      .getByText(
+        'Here is my plan for "Fix the flaky webhook retry test": read the failing test, then fix the retry. Shall I start?'
+      )
+      .waitFor({ timeout: 30_000 })
+    expect(decodeURIComponent(page.url())).toMatch(
+      /#\/sessions\/claude:[0-9a-f-]{36}$/
+    )
+    await page
+      .getByRole('heading', { name: 'Fix the flaky webhook retry test' })
+      .waitFor()
+    await page
+      .getByRole('link', { name: 'Fix the flaky webhook retry test' })
+      .waitFor()
+    await page.getByRole('textbox', { name: 'Message' }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-new-started.png'),
+    })
+    const [run] = world
+      .claudeCalls()
+      .filter((call) => call.args.includes('--permission-prompt-tool'))
+    const session = run!.args[run!.args.indexOf('--session-id') + 1]!
+    expect(page.url()).toContain(session)
+    expect(run!.args).not.toContain('--resume')
+    expect(run!.args[run!.args.indexOf('--name') + 1]).toBe(
+      'Fix the flaky webhook retry test'
+    )
+    expect(run!.args[run!.args.indexOf('--permission-mode') + 1]).toBe('plan')
+    expect(run!.cwd).toBe(checkout)
+
+    // Back on Todo: the task's session is open, so Continue is Open
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await row
+      .getByRole('link', { name: 'Open', exact: true })
+      .waitFor({ timeout: 20_000 })
+    expect(await continueButton.count()).toBe(0)
+
+    // Its log, from the task's work: it goes on on its page, not in a
+    // terminal beside Pacenote
+    await page.evaluate(
+      `window.location.hash = '#/tasks/${encodeURIComponent(fix.id)}'`
+    )
+    await row
+      .locator('div.grid', {
+        has: page.getByText('Your work', { exact: true }),
+      })
+      .getByRole('link', { name: 'Claude Code session' })
+      .click()
+    const log = page.getByRole('dialog', { name: 'Session log' })
+    await log.getByRole('link', { name: 'Continue here' }).click()
+    await page.getByRole('textbox', { name: 'Message' }).waitFor()
+    expect(decodeURIComponent(page.url())).toMatch(
+      new RegExp(`#/sessions/claude:${session}$`)
+    )
+    expect(existsSync(opened)).toBe(false)
+  }, 120_000)
 
   it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {
     const judged = JSON.stringify({

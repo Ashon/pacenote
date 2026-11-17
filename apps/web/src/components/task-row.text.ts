@@ -105,6 +105,9 @@ const en = {
   continueIn: (tool: string) => `Continue in ${tool}`,
   /** The tools a code task continues in, as a group */
   continueWith: 'Continue in',
+  continueHere: 'Continue here',
+  continueInAnother: 'Continue in another app',
+  terminal: 'Terminal',
   continueElsewhere: 'Continue in another folder',
   draftReply: 'Draft a reply',
   inArea: (area: string) => `In ${area}, an area of your work`,
@@ -209,6 +212,10 @@ const en = {
       folder ? ` in ${folder}` : ''
     } with the task written in. Send it there to start.`,
   opensIn: (folder: string) => `Opens in ${folder}`,
+  opensHereInPacenote: (folder?: string) =>
+    `Opens a new session here in Pacenote${
+      folder ? ` in ${folder}` : ''
+    } with the task written in. Start it there.`,
 
   // The folder dialog
   whereIsRepo: (repo: string) => `Where is ${repo} on this Mac?`,
@@ -345,6 +352,9 @@ const ko: typeof en = {
 
   continueIn: (tool) => `${tool}에서 계속`,
   continueWith: '이어서 하기',
+  continueHere: '여기서 계속',
+  continueInAnother: '다른 앱에서 계속',
+  terminal: '터미널',
   continueElsewhere: '다른 폴더에서 계속',
   draftReply: '답장 초안 쓰기',
   inArea: (area) => `내 업무 영역: ${area}`,
@@ -442,6 +452,8 @@ const ko: typeof en = {
       tool === 'claude' ? 'Claude 앱의 Code 탭' : 'Codex 앱'
     }이 열려요. 거기서 보내면 시작해요.`,
   opensIn: (folder) => `${folder}에서 열려요`,
+  opensHereInPacenote: (folder) =>
+    `${folder ? `${folder}에서 ` : ''}할 일을 적어 둔 새 세션이 여기 Pacenote에서 열려요. 거기서 시작하세요.`,
 
   whereIsRepo: (repo) => `이 Mac에서 ${josa(repo, '은/는')} 어디에 있나요?`,
   whereToOpen: '세션을 어디서 열까요?',

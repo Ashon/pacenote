@@ -30,16 +30,23 @@ import { text } from './task-row.text'
 export function OpensIn({
   folder,
   app,
+  here,
   children,
 }: {
   folder: string | undefined
   /** The tool whose desktop app it opens */
   app?: WorkTool
+  /** A new session Pacenote runs, on its page */
+  here?: boolean
   children: React.ReactElement
 }) {
   const t = useText(text)
   const where = folder && homePath(folder)
-  const content = app ? t.opensApp(app, where) : where && t.opensIn(where)
+  const content = here
+    ? t.opensHereInPacenote(where)
+    : app
+      ? t.opensApp(app, where)
+      : where && t.opensIn(where)
   if (!content) return children
   return <Tooltip content={content}>{children}</Tooltip>
 }
@@ -48,6 +55,8 @@ type FolderProps = {
   task: TaskView
   tool: WorkTool
   onOpen: (folder: string) => Promise<string | undefined>
+  /** What its button does, when not opening the tool there */
+  action?: string
 }
 
 /**
@@ -69,7 +78,7 @@ export function FolderDialog({
   )
 }
 
-function FolderChoice({ task, tool, onOpen }: FolderProps) {
+function FolderChoice({ task, tool, onOpen, action }: FolderProps) {
   const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const [found, setFound] = useState<FolderCheck[]>()
@@ -153,8 +162,8 @@ function FolderChoice({ task, tool, onOpen }: FolderProps) {
             setOpening(false)
           }}
         >
-          <SquareTerminal />
-          {t.openHere(CLI_NAMES[tool])}
+          {!action && <SquareTerminal />}
+          {action ?? t.openHere(CLI_NAMES[tool])}
         </Button>
       </div>
     </>

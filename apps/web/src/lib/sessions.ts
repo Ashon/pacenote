@@ -1,4 +1,6 @@
 import type {
+  NewSessionDraft,
+  NewSessionStart,
   SessionMode,
   SessionsView,
   SessionTalk,
@@ -165,5 +167,40 @@ export function useSessionActions(id: string) {
     end: async () => (await after(bridge?.end(id))).error,
     mode: async (mode: SessionMode) =>
       (await after(bridge?.mode(id, mode))).error,
+  }
+}
+
+/**
+ * A new session's draft (V5): for a task, its first message and folder,
+ * asked once for the page (the marker in it stays the same); for none, empty
+ */
+export function useNewSessionDraft(task: string | undefined) {
+  const bridge = window.pacenoteDesktop?.tasks
+  return useQuery({
+    queryKey: ['session-draft', task ?? ''],
+    queryFn: async (): Promise<NewSessionDraft | null> =>
+      task
+        ? ((await bridge?.newSession(task)) ?? null)
+        : { prompt: '', marker: '' },
+    enabled: Boolean(bridge),
+    staleTime: Infinity,
+    gcTime: 0,
+  })
+}
+
+/**
+ * Starts a new session Pacenote runs: its page's id, or what went wrong.
+ * The sessions and the task read again after.
+ */
+export function useStartSession() {
+  const client = useQueryClient()
+  return async (how: NewSessionStart) => {
+    const result = (await window.pacenoteDesktop?.sessions.start(how)) ?? {}
+    await Promise.all(
+      ['sessions', 'tasks', 'task'].map((key) =>
+        client.invalidateQueries({ queryKey: [key] })
+      )
+    )
+    return result
   }
 }

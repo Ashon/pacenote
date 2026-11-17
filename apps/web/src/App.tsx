@@ -32,6 +32,7 @@ import { TasksPage } from './components/tasks-page'
 import { YouPage } from './components/you-page'
 import { SessionPage } from './components/session-page'
 import { SessionsPage } from './components/sessions-page'
+import { NewSessionPage } from './components/session-new'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
 import { AiSheet } from './components/setup/ai-sheet'
@@ -70,6 +71,8 @@ type Route =
       page: 'sessions'
       /** One session's page */
       id?: string
+      /** A new session's page, for the task when one is given */
+      start?: { task?: string }
     }
   | {
       page: 'you'
@@ -91,7 +94,7 @@ type Route =
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
  * the list), #/sessions: the sessions on this Mac, #/sessions/<id>: one
- * session's page,
+ * session's page, #/sessions/new[/<task>]: starting one, for a task or not,
  * #/recap/<day|week|month>[/<key>]: what you did in a period,
  * #/you: where you contribute, #/you/<id>: one area open in its row, #/bot:
  * Pace's status and logs,
@@ -114,6 +117,12 @@ function readRoute(): Route {
     }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
   if (hash.startsWith('#/sessions') && window.pacenoteDesktop?.sessions) {
+    const start = /^#\/sessions\/new(?:\/([^/?#]+))?(?:[?#]|$)/.exec(hash)
+    if (start)
+      return {
+        page: 'sessions',
+        start: start[1] ? { task: decodeURIComponent(start[1]) } : {},
+      }
     const session = /^#\/sessions\/([^/?#]+)/.exec(hash)?.[1]
     return session
       ? { page: 'sessions', id: decodeURIComponent(session) }
@@ -253,7 +262,12 @@ export default function App() {
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
                   ) : route.page === 'sessions' ? (
-                    route.id ? (
+                    route.start ? (
+                      <NewSessionPage
+                        key={route.start.task ?? 'new'}
+                        task={route.start.task}
+                      />
+                    ) : route.id ? (
                       <SessionPage key={route.id} id={route.id} />
                     ) : (
                       <SessionsPage />

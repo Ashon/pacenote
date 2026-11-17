@@ -13,8 +13,10 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { useSessions } from '@/lib/sessions'
 import { useTaskDetail, useTaskWork } from '@/lib/tasks'
 import { TalkItems } from './session-items'
+import { sessionHref } from './session-open'
 import { text } from './task-row.text'
 import { resumeCommand, resumesInApp, sessionOf } from './task-sessions'
 
@@ -42,6 +44,18 @@ export function SessionLogPanel({
     void bridge?.sessionLog(entryId).then((result) => setLog(result ?? {}))
   }, [bridge, entryId])
   const entry = found?.entry
+  // One Pacenote runs now goes on on its page: a terminal too would tangle it
+  const view = useSessions('todo').data
+  const hosted = view?.on
+    ? view.open
+        .flatMap((group) => group.sessions)
+        .find(
+          (row) =>
+            row.where === 'pacenote' &&
+            row.tool === entry?.tool &&
+            row.session === entry?.session
+        )
+    : undefined
   const tool = entry ? CLI_NAMES[entry.tool] : t.theSession
   const resumeWith = resumeCommand(entry?.tool)
 
@@ -78,17 +92,23 @@ export function SessionLogPanel({
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => void act.resume(entry.id).then(setError)}
-                    disabled={!entry.session}
-                  >
-                    <SquareTerminal />
-                    {resumesInApp(entry)
-                      ? t.continueInApp(t.app.codex)
-                      : t.continueIn(tool)}
-                  </Button>
-                  {entry.session && (
+                  {hosted ? (
+                    <Button size="sm" asChild>
+                      <a href={sessionHref(hosted.id)}>{t.continueHere}</a>
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => void act.resume(entry.id).then(setError)}
+                      disabled={!entry.session}
+                    >
+                      <SquareTerminal />
+                      {resumesInApp(entry)
+                        ? t.continueInApp(t.app.codex)
+                        : t.continueIn(tool)}
+                    </Button>
+                  )}
+                  {entry.session && !hosted && (
                     <Button
                       size="sm"
                       variant="outline"

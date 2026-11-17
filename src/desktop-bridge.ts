@@ -62,6 +62,8 @@ import type { TasksLive } from './tasks/types.js'
 import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
 import type {
+  NewSessionDraft,
+  NewSessionStart,
   SessionMode,
   SessionsView,
   SessionLive,
@@ -310,6 +312,11 @@ export interface DesktopBridge {
     ): Promise<{ entry?: WorkEntry; error?: string; note?: string } | undefined>
     /** Opens a session again, to continue it */
     resume(entryId: string): Promise<{ error?: string } | undefined>
+    /**
+     * A new session Pacenote runs for the task, before you start it: its
+     * first message and folder; null for a task not open
+     */
+    newSession(id: string): Promise<NewSessionDraft | null>
     /** Has Claude Code draft a reply from the thread, read only */
     draft(
       id: string
@@ -408,6 +415,11 @@ export interface DesktopBridge {
     end(id: string): Promise<{ error?: string }>
     /** How it asks before it acts */
     mode(id: string, mode: SessionMode): Promise<{ error?: string }>
+    /**
+     * Starts a new Claude Code session Pacenote runs, in the folder, with its
+     * first message (V5): a task's work, for one; its page's id
+     */
+    start(how: NewSessionStart): Promise<{ id?: string; error?: string }>
     /** A session Pacenote runs changed: its id */
     onChanged(callback: (id: string) => void): () => void
     /**

@@ -39,8 +39,9 @@ progress to pick up, and the one waiting longest on someone else. A line shows o
 ## A task's buttons
 
 - **Done** and **Dismiss** are one click. Dismiss can say why: not for me, already done, not worth it.
-- **Continue in Claude Code** (or Codex, or opencode) opens a session in the task's repository, with the task and what
-  came before it.
+- **Continue here** opens a Claude Code session right here in Pacenote, in the task's repository, with the task and
+  what came before it written in, for you to start. The menu beside it opens Claude Code, Codex or opencode in your
+  terminal or their app instead.
 - **Draft a reply** writes a reply for you to send in the thread. Pacenote never posts it.
 - **More** has **Mark in progress** and **Waiting on someone else**. A task is in progress by itself when a session
   worked on it in the last day.

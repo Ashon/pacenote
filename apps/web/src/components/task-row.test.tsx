@@ -175,6 +175,11 @@ function renderRow(
 }
 
 const button = (name: string) => screen.getByRole('button', { name })
+/** Continue's menu: the tools' own sessions */
+const continueMenu = async () => {
+  fireEvent.keyDown(button('Continue in another app'), { key: 'Enter' })
+  return screen.findByRole('menu')
+}
 
 afterEach(() => {
   cleanup()
@@ -183,7 +188,7 @@ afterEach(() => {
 })
 
 describe('an open code task in the Todo list', () => {
-  it('shows what it is, a button for each tool, Done and Dismiss', async () => {
+  it('shows what it is, Continue here with each tool under it, Done and Dismiss', async () => {
     desktop()
     renderRow({ task: task({ action: 'code', repo: 'acme/pay', due: 'Fri' }) })
     expect(screen.getByText('Review the retry PR')).toBeTruthy()
@@ -194,8 +199,8 @@ describe('an open code task in the Todo list', () => {
     expect(
       within(tools)
         .getAllByRole('button')
-        .map((each) => each.textContent)
-    ).toEqual(['Claude Code', 'Codex'])
+        .map((each) => each.getAttribute('aria-label') ?? each.textContent)
+    ).toEqual(['Continue here', 'Continue in another app'])
     expect(button('Done')).toBeTruthy()
     expect(button('Dismiss')).toBeTruthy()
     expect(
@@ -205,14 +210,32 @@ describe('an open code task in the Todo list', () => {
     await waitFor(() =>
       expect(window.pacenoteDesktop?.tasks.repos).toHaveBeenCalled()
     )
+    // The tools' own sessions, where each opens
+    expect(
+      within(await continueMenu())
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent)
+    ).toEqual(['Continue in Claude CodeTerminal', 'Continue in CodexTerminal'])
   })
 
-  it('continues in the folder its repository opened in before', async () => {
+  it('continues here: a new session Pacenote runs, the task written in', () => {
+    const tasks = desktop({ folder: FOLDER })
+    renderRow({ task: task({ action: 'code', repo: 'acme/pay' }) })
+    fireEvent.click(button('Continue here'))
+    expect(window.location.hash).toBe('#/sessions/new/t1')
+    expect(tasks.continueIn).not.toHaveBeenCalled()
+  })
+
+  it("continues in a tool's own session, in the folder its repository opened in before", async () => {
     const tasks = desktop({ folder: FOLDER })
     const { onToggle } = renderRow({
       task: task({ action: 'code', repo: 'acme/pay' }),
     })
-    fireEvent.click(button('Continue in Claude Code'))
+    fireEvent.click(
+      within(await continueMenu()).getByRole('menuitem', {
+        name: /^Continue in Claude Code/,
+      })
+    )
     await waitFor(() =>
       expect(tasks.continueIn).toHaveBeenCalledWith('t1', {
         tool: 'claude',
@@ -228,7 +251,11 @@ describe('an open code task in the Todo list', () => {
   it('asks where to open when its repository has no folder yet', async () => {
     const tasks = desktop()
     renderRow({ task: task({ action: 'code', repo: 'acme/pay' }) })
-    fireEvent.click(button('Continue in Codex'))
+    fireEvent.click(
+      within(await continueMenu()).getByRole('menuitem', {
+        name: /^Continue in Codex/,
+      })
+    )
     const dialog = await screen.findByRole('dialog')
     expect(
       within(dialog).getByText('Where is acme/pay on this Mac?')

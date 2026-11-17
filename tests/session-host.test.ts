@@ -288,6 +288,48 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     expect(h.working()).toBe(0)
   })
 
+  it('starts a new session with its id, name and mode, and sends its first message', async () => {
+    const { h, procs, changes } = host()
+    expect(
+      h.begin('n1', '/w/pay', 'You are taking over a task', {
+        name: 'Retry the webhook',
+        mode: 'plan',
+      })
+    ).toEqual({})
+    const proc = procs[0]!
+    expect(proc.cwd).toBe('/w/pay')
+    expect(proc.args.slice(0, 7)).toEqual([
+      '-p',
+      '--session-id',
+      'n1',
+      '--name',
+      'Retry the webhook',
+      '--permission-mode',
+      'plan',
+    ])
+    await tick()
+    expect(proc.written).toEqual([
+      {
+        type: 'user',
+        message: { role: 'user', content: 'You are taking over a task' },
+      },
+    ])
+    // Known by its id at once, listed with its name until its log has one
+    expect(h.has('n1')).toBe(true)
+    expect(h.get('n1')).toMatchObject({ busy: true, mode: 'plan' })
+    expect(h.list()).toMatchObject([
+      { session: 'n1', cwd: '/w/pay', name: 'Retry the webhook', busy: true },
+    ])
+    expect(changes).toContain('n1')
+    // Claude Code says the same id: it stays
+    proc.say({ type: 'system', subtype: 'init', session_id: 'n1' })
+    await tick()
+    expect(h.has('n1')).toBe(true)
+    // An id already running is not started twice
+    expect(h.begin('n1', '/w/pay', 'Again')).toEqual({ error: 'taken' })
+    expect(procs).toHaveLength(1)
+  })
+
   it('continues a session in a copy, known by its own id once named', async () => {
     const { h, procs } = host()
     const copied = h.copy('s1', '/w', 'Try it the other way')

@@ -181,13 +181,36 @@ describe('the lines Pacenote writes to a session', () => {
   })
 
   it("resumes the session's own conversation, or a copy of it", () => {
-    const args = hostArgs('s1', false)
+    const args = hostArgs('s1', { kind: 'resume' })
     expect(args.slice(0, 3)).toEqual(['-p', '--resume', 's1'])
     expect(args).toContain('--permission-prompt-tool')
     expect(args[args.indexOf('--permission-prompt-tool') + 1]).toBe('stdio')
     expect(args).not.toContain('--fork-session')
     // Its answer as it writes it
     expect(args).toContain('--include-partial-messages')
-    expect(hostArgs('s1', true)).toContain('--fork-session')
+    expect(hostArgs('s1', { kind: 'copy' })).toContain('--fork-session')
+  })
+
+  it('starts a new one with its id, its name and how it asks', () => {
+    const args = hostArgs('s2', {
+      kind: 'new',
+      name: 'Retry the webhook',
+      mode: 'plan',
+    })
+    expect(args.slice(0, 7)).toEqual([
+      '-p',
+      '--session-id',
+      's2',
+      '--name',
+      'Retry the webhook',
+      '--permission-mode',
+      'plan',
+    ])
+    expect(args).not.toContain('--resume')
+    expect(args).toContain('--permission-prompt-tool')
+    // Asks before edits is Claude Code's own default: not said
+    const plain = hostArgs('s2', { kind: 'new', mode: 'default' })
+    expect(plain).not.toContain('--permission-mode')
+    expect(plain).not.toContain('--name')
   })
 })

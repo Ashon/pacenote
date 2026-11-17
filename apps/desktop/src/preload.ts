@@ -142,6 +142,7 @@ const bridge = {
     continueIn: (id, how) =>
       ipcRenderer.invoke('pacenote:tasks:continue', id, how),
     resume: (entryId) => ipcRenderer.invoke('pacenote:tasks:resume', entryId),
+    newSession: (id) => ipcRenderer.invoke('pacenote:tasks:new-session', id),
     draft: (id) => ipcRenderer.invoke('pacenote:tasks:draft', id),
     copyReply: (id, text) =>
       ipcRenderer.invoke('pacenote:tasks:copy-reply', id, text),
@@ -197,6 +198,7 @@ const bridge = {
     stop: (id) => ipcRenderer.invoke('pacenote:sessions:stop', id),
     end: (id) => ipcRenderer.invoke('pacenote:sessions:end', id),
     mode: (id, mode) => ipcRenderer.invoke('pacenote:sessions:mode', id, mode),
+    start: (how) => ipcRenderer.invoke('pacenote:sessions:start', how),
     onChanged: subscribe<string>('pacenote:sessions:changed'),
     onLive: subscribe<{ id: string; live: SessionLive }>(
       'pacenote:sessions:live'

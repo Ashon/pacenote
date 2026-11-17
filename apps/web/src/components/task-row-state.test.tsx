@@ -74,6 +74,7 @@ describe("a task's row", () => {
     expect(state.continues).toBe(false)
     expect(state.drafts).toBe(true)
     expect(state.menu).toEqual([
+      { kind: 'here', label: 'Continue here' },
       { kind: 'continue', tool: 'claude', label: 'Continue in Claude Code' },
       { kind: 'continue', tool: 'codex', label: 'Continue in Codex' },
     ])
@@ -287,6 +288,7 @@ describe("a task's row", () => {
       continues: false,
     })
     expect(labels(state.menu)).toEqual([
+      'Continue here',
       'Continue in Claude Code',
       'Continue in Codex',
       'Draft a reply',

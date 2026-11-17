@@ -383,7 +383,7 @@ function MessageBox({
 }
 
 /** How it asks before it acts, changed from its next step */
-function ModePicker({
+export function ModePicker({
   mode,
   onPick,
 }: {

@@ -778,6 +778,22 @@ code {
   padding: 0;
   justify-content: center;
 }
+/* Continue here, with the tools' own sessions under the menu beside it */
+.av-split {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.av-split .av-btn {
+  height: 26px;
+}
+.av-split .av-btn + .av-btn {
+  border-left: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+}
 .av-badge {
   display: inline-flex;
   align-items: center;

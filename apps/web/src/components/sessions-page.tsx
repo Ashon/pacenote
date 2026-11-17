@@ -92,7 +92,18 @@ function SessionsOn({ view }: { view: SessionsView }) {
     />
   )
   return (
-    <Page title={t.title} meta={t.meta(view.counts.open, view.counts.working)}>
+    <Page
+      title={t.title}
+      meta={t.meta(view.counts.open, view.counts.working)}
+      action={
+        <Button size="sm" variant="outline" asChild>
+          <a href="#/sessions/new">
+            <Plus />
+            {t.newSession}
+          </a>
+        </Button>
+      }
+    >
       <Briefing view={view} onPick={pick} />
       <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
         <TabsList className="mt-5">

@@ -1830,11 +1830,11 @@ function trajectory(c) {
   const CASES = [
     {
       title: 'Continued from Todo',
-      meta: 'Continue in Claude Code',
+      meta: 'Continue here',
       steps: [
         ['slack', 'mina asks', ['Review PR #482,', 'in #ops, by Thursday']],
         ['pacenote', 'Collected', ['Collect now adds it', 'with a summary']],
-        ['you', 'Continued', ['Claude Code opens', 'with what came before']],
+        ['you', 'Continued', ['Claude Code here,', 'with what came before']],
         ['tool', 'Working', ['Its session, live on', 'the task’s row']],
         ['tool', 'Closed', ['Resolved, with a note', 'and a reply to send']],
         ['pacenote', 'Wrapped up', ['How it ended,', 'from its thread']],

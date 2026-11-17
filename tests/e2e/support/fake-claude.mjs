@@ -63,12 +63,15 @@ const resumeAt = args.indexOf('--resume')
 // --input-format stream-json --permission-prompt-tool stdio): each message
 // you send runs the tests, asking first unless allowed in the session, and
 // answers; the conversation goes to the session's transcript as it goes.
-// With --fork-session it is a copy, with an id of its own.
+// With --fork-session it is a copy, with an id of its own; with --session-id a
+// new session (--name its title, --permission-mode how it asks), whose first
+// message, a task's, it answers with its plan.
 if (args.includes('--permission-prompt-tool')) {
   const { createInterface } = await import('node:readline')
   const { randomUUID } = await import('node:crypto')
-  const resumed = args[resumeAt + 1]
-  const session = args.includes('--fork-session') ? randomUUID() : resumed
+  const session = args.includes('--fork-session')
+    ? randomUUID()
+    : args[(sessionAt >= 0 ? sessionAt : resumeAt) + 1]
   appendFileSync(
     path.join(dir, 'calls.jsonl'),
     `${JSON.stringify({ args, system: '', prompt: '', request: '', images: 0, cwd: process.cwd(), pid: process.pid })}\n`
@@ -90,7 +93,10 @@ if (args.includes('--permission-prompt-tool')) {
     process.stdout.write(
       `${JSON.stringify({ ...event, session_id: session })}\n`
     )
-  let mode = 'default'
+  const nameAt = args.indexOf('--name')
+  if (nameAt >= 0) log({ type: 'custom-title', customTitle: args[nameAt + 1] })
+  const modeAt = args.indexOf('--permission-mode')
+  let mode = modeAt >= 0 ? args[modeAt + 1] : 'default'
   let allowed = false
   let turns = 0
   /** The ask waiting for its answer */
@@ -105,6 +111,20 @@ if (args.includes('--permission-prompt-tool')) {
       cwd: process.cwd(),
     })
     log({ type: 'user', message: { role: 'user', content: said } })
+    // A task handed over: its plan, then it waits for you
+    if (said.startsWith('You are taking over a task from Pacenote')) {
+      const title = /<task [^>]*>\n(.*)/.exec(said)?.[1] ?? 'the task'
+      const content = [
+        {
+          type: 'text',
+          text: `Here is my plan for "${title}": read the failing test, then fix the retry. Shall I start?`,
+        },
+      ]
+      log({ type: 'assistant', message: { role: 'assistant', content } })
+      out({ type: 'assistant', message: { content } })
+      out({ type: 'result', subtype: 'success', is_error: false })
+      return
+    }
     // Asked to explain: it thinks a while, then writes its answer as it
     // goes (--include-partial-messages), in Markdown
     if (/^Explain/.test(said)) {

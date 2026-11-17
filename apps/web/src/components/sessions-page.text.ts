@@ -3,6 +3,7 @@ import type { SessionAskKind, SessionWhere } from '@src/sessions/types'
 
 const en = {
   title: 'Sessions',
+  newSession: 'New session',
   meta: (open: number, working: number) =>
     `${open} open on this Mac · ${working} working`,
   yourTurnLabel: 'Your turn',
@@ -100,6 +101,7 @@ const en = {
 
 const ko: typeof en = {
   title: '세션',
+  newSession: '새 세션',
   meta: (open, working) => `이 Mac에서 ${open}개 열림 · ${working}개 작업 중`,
   yourTurnLabel: '내 차례',
   workingLabel: '작업 중',

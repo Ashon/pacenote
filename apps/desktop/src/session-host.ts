@@ -7,6 +7,7 @@ import {
   askOf,
   type CanUseTool,
   hostArgs,
+  type HostStart,
   interruptLine,
   modeLine,
   refuseLine,
@@ -24,7 +25,8 @@ import { stepLine } from './handoff.js'
 /**
  * The Claude Code sessions Pacenote runs on this Mac (V2): each is the
  * installed claude, with your own sign-in, resuming the session's own
- * conversation (claude -p --resume, stream-json in and out), so what you type
+ * conversation (claude -p --resume, stream-json in and out) or starting a new
+ * one with the id Pacenote gives it (--session-id, V5), so what you type
  * on its page goes to it and its asks come back to be answered there. Claude
  * Code keeps the conversation in its own log, as for any session; Pacenote
  * keeps nothing of it. A session runs while Pacenote does, the window closed
@@ -66,6 +68,8 @@ export interface SessionHostOptions {
 export interface HostedSession {
   session: string
   cwd: string
+  /** The name it started with: a task's title, until its log says one */
+  name?: string
   busy: boolean
   asks?: SessionAskKind
   startedAt: string
@@ -75,6 +79,7 @@ interface Hosted {
   /** Its id: the copy's own once Claude Code names it */
   session: string
   cwd: string
+  name?: string
   proc: HostProcess
   live: SessionLive
   /** Its asks, in the order they came, with what answering needs */
@@ -126,6 +131,7 @@ export class SessionHost {
     return [...this.hosted.values()].map((h) => ({
       session: h.session,
       cwd: h.cwd,
+      ...(h.name ? { name: h.name } : {}),
       busy: h.live.busy,
       ...(h.live.ask ? { asks: h.live.ask.kind } : {}),
       startedAt: h.startedAt,
@@ -142,8 +148,26 @@ export class SessionHost {
    * it once the step it is on is done
    */
   send(session: string, cwd: string, text: string): { error?: string } {
-    const h = this.hosted.get(session) ?? this.start(session, cwd, false)
+    const h =
+      this.hosted.get(session) ?? this.start(session, cwd, { kind: 'resume' })
     if ('error' in h) return h
+    return this.write(h, userLine(text), true)
+  }
+
+  /**
+   * Starts a new session with the id given, in the folder, and sends it its
+   * first message (V5): a task's, for one started from Todo
+   */
+  begin(
+    session: string,
+    cwd: string,
+    text: string,
+    options: { name?: string; mode?: SessionMode } = {}
+  ): { error?: string } {
+    if (this.hosted.has(session)) return { error: 'taken' }
+    const h = this.start(session, cwd, { kind: 'new', ...options })
+    if ('error' in h) return h
+    if (options.mode) h.live.mode = options.mode
     return this.write(h, userLine(text), true)
   }
 
@@ -156,7 +180,7 @@ export class SessionHost {
     cwd: string,
     text: string
   ): Promise<{ session?: string; error?: string }> {
-    const h = this.start(session, cwd, true)
+    const h = this.start(session, cwd, { kind: 'copy' })
     if ('error' in h) return h
     const named = new Promise<string | undefined>((resolve) => {
       const timer = setTimeout(() => resolve(undefined), NAMED_MS)
@@ -235,12 +259,12 @@ export class SessionHost {
   private start(
     session: string,
     cwd: string,
-    copy: boolean
+    start: HostStart
   ): Hosted | { error: string } {
     this.failed.delete(session)
     let proc: HostProcess
     try {
-      const args = hostArgs(session, copy)
+      const args = hostArgs(session, start)
       proc = this.options.spawn
         ? this.options.spawn(this.options.bin(), args, cwd)
         : spawn(this.options.bin(), args, {
@@ -254,6 +278,7 @@ export class SessionHost {
     const h: Hosted = {
       session,
       cwd,
+      ...(start.kind === 'new' && start.name ? { name: start.name } : {}),
       proc,
       live: { busy: false },
       asks: new Map(),
@@ -261,7 +286,7 @@ export class SessionHost {
       stderr: '',
     }
     // A copy is known by its own id once Claude Code names it
-    if (!copy) this.hosted.set(session, h)
+    if (start.kind !== 'copy') this.hosted.set(session, h)
     proc.stdin?.on('error', () => {
       // It went: its exit says why
     })
