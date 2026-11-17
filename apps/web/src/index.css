@@ -156,6 +156,10 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
+  /* A sheet's gap from the window's edges and its corners (App sets them from
+     the window's own corners: lib/sheet-shape.ts) */
+  --sheet-gap: 6px;
+  --sheet-radius: 10px;
   /* The mark's three stops: the logo, Pace's spinner, the gradient bars */
   --mark-1: #01ab78;
   --mark-2: #1fc289;

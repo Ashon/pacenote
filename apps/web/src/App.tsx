@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
 import { openAiSheet } from '@/lib/ai-sheet'
 import { desktopValue, useDesktopValue } from '@/lib/desktop'
+import { sheetShape } from '@/lib/sheet-shape'
 import { useText } from '@/lib/i18n'
 import { isMac, shortcutKeyHeld } from '@/lib/platform'
 import { useTasksPush } from '@/lib/tasks'
@@ -171,6 +172,7 @@ export default function App() {
   const windowWidth = useWindowWidth()
   const isMacDesktop = window.pacenoteDesktop?.platform === 'darwin'
   const fullScreen = useFullScreen()
+  useSheetShape(fullScreen)
   // An AI tool's work on your tasks shows everywhere as it happens.
   useTasksPush()
   const [collapsed, setCollapsed] = useStoredFlag(
@@ -311,6 +313,20 @@ const fullScreen = desktopValue(() => {
 /** Whether the window is in macOS full screen, where its traffic lights hide */
 function useFullScreen(): boolean {
   return useDesktopValue(fullScreen) ?? false
+}
+
+/**
+ * Sets a sheet's gap and corners on the root, concentric with the window's
+ * own corners; in full screen they are square, and nothing is to follow
+ */
+function useSheetShape(fullScreen: boolean) {
+  const corners = fullScreen ? 0 : (window.pacenoteDesktop?.windowCorners ?? 0)
+  useEffect(() => {
+    const { gap, radius } = sheetShape(corners)
+    const root = document.documentElement.style
+    root.setProperty('--sheet-gap', `${gap}px`)
+    root.setProperty('--sheet-radius', `${radius}px`)
+  }, [corners])
 }
 
 /**

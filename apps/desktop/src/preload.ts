@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { DesktopBridge } from '../../../src/desktop-bridge.js'
 import type { LanguageState } from '../../../src/i18n/locale.js'
 import type { SessionLive } from '../../../src/sessions/types.js'
+import { windowCorners } from './window-rules.js'
 
 /**
  * Listens to what the app sends on a channel; the function returned stops
@@ -20,6 +21,8 @@ const subscribe =
 // here. History queries go through pacenote://app/api.
 const bridge = {
   platform: process.platform,
+  // The radius the window's corners are rounded with, for the sheet's
+  windowCorners: windowCorners(process.platform, process.getSystemVersion()),
   // Runs from the repository (Pacenote Dev), as opposed to the installed app.
   dev: process.argv.includes('--pacenote-dev'),
   // The app's language: the one chosen in Settings, or macOS's. Read before

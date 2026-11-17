@@ -14,10 +14,12 @@ const VARIANT = {
     content:
       'motion-dialog top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[20px]',
   },
-  // A panel over the window's right side: it slides in (sheet)
+  // A panel over the window's right side: it slides in (sheet). Its gap and
+  // corners follow the window's (sheet-shape.ts), set on the root by App.
   sheet: {
     overlay: 'motion-sheet-overlay bg-foreground/15',
-    content: 'motion-sheet inset-y-2 right-2 overflow-hidden rounded-[18px]',
+    content:
+      'motion-sheet inset-y-(--sheet-gap) right-(--sheet-gap) max-w-[calc(100vw-2*var(--sheet-gap))] overflow-hidden rounded-(--sheet-radius)',
   },
 }
 

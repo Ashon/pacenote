@@ -4,6 +4,7 @@ import {
   CrashBudget,
   isScreenUrl,
   opensInBrowser,
+  windowCorners,
 } from '../apps/desktop/src/window-rules.js'
 
 describe('closing the window', () => {
@@ -52,5 +53,20 @@ describe('where the window goes', () => {
     expect(opensInBrowser('https://app.slack.com/client')).toBe(true)
     expect(opensInBrowser('file:///etc/passwd')).toBe(false)
     expect(opensInBrowser('javascript:alert(1)')).toBe(false)
+  })
+})
+
+describe("the window's corners", () => {
+  it("are macOS's radius for its version, for the sheet to follow", () => {
+    expect(windowCorners('darwin', '27.2.1')).toBe(16)
+    expect(windowCorners('darwin', '26.0')).toBe(16)
+    expect(windowCorners('darwin', '15.7.1')).toBe(10)
+    expect(windowCorners('darwin', '12.0')).toBe(10)
+  })
+
+  it('are square where Pacenote does not know them', () => {
+    expect(windowCorners('darwin', '10.15.7')).toBe(0)
+    expect(windowCorners('darwin', '')).toBe(0)
+    expect(windowCorners('linux', '6.8.0')).toBe(0)
   })
 })

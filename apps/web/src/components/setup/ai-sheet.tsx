@@ -59,7 +59,7 @@ export function AiSheet() {
       <DialogContent
         variant="sheet"
         aria-describedby={undefined}
-        className="w-[min(40rem,calc(100vw-1rem))]"
+        className="w-[40rem]"
       >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-6">
           <DialogTitle className="text-body font-semibold">

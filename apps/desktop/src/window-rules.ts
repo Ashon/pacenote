@@ -48,3 +48,17 @@ export const opensInBrowser = (url: string): boolean => /^https:\/\//.test(url)
 export const isScreenUrl = (url: string, webDevUrl?: string): boolean =>
   url.startsWith('pacenote://app/') ||
   Boolean(webDevUrl && url.startsWith(webDevUrl))
+
+/**
+ * The radius macOS rounds the window's corners with, so what sits in them
+ * (the sheet) can follow them: 16 since macOS 26 (NSWindow's own
+ * _cornerRadius on macOS 27.2, for a titled, full-size-content window as
+ * Pacenote's hiddenInset one is, with or without a toolbar), 10 from macOS 11
+ * to 15; 0 elsewhere, where Pacenote does not round them
+ */
+export function windowCorners(platform: string, version: string): number {
+  if (platform !== 'darwin') return 0
+  const major = Number.parseInt(version, 10)
+  if (!Number.isFinite(major)) return 0
+  return major >= 26 ? 16 : major >= 11 ? 10 : 0
+}

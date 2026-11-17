@@ -145,6 +145,11 @@ export interface DesktopBridge {
   remote?: { mac: string }
   platform: string
   /**
+   * The radius macOS rounds the window's corners with (0 for square ones), so
+   * a sheet in them can be concentric with them
+   */
+  windowCorners?: number
+  /**
    * Runs from the repository (Pacenote Dev) rather than the installed app
    */
   dev?: boolean

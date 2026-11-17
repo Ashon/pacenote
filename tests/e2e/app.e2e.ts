@@ -1724,6 +1724,23 @@ else fail('unexpected: ' + args.join(' '))
     await log.getByText('Here is the task as I understand it.').waitFor()
     await log.getByText('Continue where we left off.').waitFor()
     await faded(log, 'the log panel in')
+    // Its corners are concentric with the window's: their radius less its
+    // gap, which is the same at its top and its side
+    const shape = await log.evaluate((sheet) => {
+      const box = sheet.getBoundingClientRect()
+      const bridge = (
+        window as unknown as { pacenoteDesktop?: { windowCorners?: number } }
+      ).pacenoteDesktop
+      return {
+        corners: bridge?.windowCorners ?? 0,
+        radius: Number.parseFloat(getComputedStyle(sheet).borderTopRightRadius),
+        top: box.top,
+        side: window.innerWidth - box.right,
+      }
+    })
+    expect(shape.corners).toBeGreaterThan(0)
+    expect(shape.top).toBe(shape.side)
+    expect(shape.radius + shape.side).toBe(shape.corners)
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-session-log.png'),
     })

@@ -64,7 +64,7 @@ export function SessionLogPanel({
       <DialogContent
         variant="sheet"
         aria-describedby={undefined}
-        className="w-[40rem] max-w-[calc(100vw-1rem)]"
+        className="w-[40rem]"
       >
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
           <DialogTitle className="text-section">{t.sessionLog}</DialogTitle>
