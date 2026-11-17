@@ -380,6 +380,12 @@ export interface DesktopBridge {
     open(id: string): Promise<{ error?: string }>
     /** A session's own log, read when you open it */
     log(id: string): Promise<{ items?: SessionItem[]; error?: string }>
+    /** Links a session to an open task: it is that task's work */
+    link(id: string, task: string): Promise<{ error?: string }>
+    /** Takes a session off its task: not found for it again */
+    unlink(id: string): Promise<{ error?: string }>
+    /** A task of your own from a session, with the session as its work */
+    makeTask(id: string): Promise<{ task?: string; error?: string }>
   }
   /** Recap (src/you/recap.ts): a day, a week or a month of your work */
   recap: {

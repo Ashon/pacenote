@@ -71,6 +71,14 @@ export interface SessionsInput {
   areas: { id: string; name: string; repos: string[] }[]
   /** The task each session is linked to, by the tool's session id */
   tasks: ReadonlyMap<string, { id: string; title: string }>
+  /**
+   * The open task each session not linked to one looks like, by the tool's
+   * session id, with the suggestion's id
+   */
+  suggested?: ReadonlyMap<
+    string,
+    { id: string; task: { id: string; title: string } }
+  >
   /** Where a session ran while it was open, for one that ended since */
   seen?: ReadonlyMap<string, { where: SessionWhere; terminal?: string }>
 }
@@ -137,6 +145,7 @@ export function sessionsView(
   input: SessionsInput
 ): Omit<SessionsView, 'on' | 'found'> {
   const { now, dayStart, agents, repos, tasks } = input
+  const suggested = input.suggested ?? new Map()
   const today = (s: LoggedSession) => Date.parse(s.lastAt) >= dayStart
   const byId = new Map(
     input.logged.map((s) => [`${s.tool}:${s.session}`, s] as const)
@@ -177,7 +186,11 @@ export function sessionsView(
       ...(logged?.branch ? { branch: logged.branch } : {}),
       ...(repos.get(cwd)?.name ? { repo: repos.get(cwd)!.name } : {}),
       typed: typed.slice(-TYPED).reverse(),
-      ...(tasks.get(session) ? { task: tasks.get(session) } : {}),
+      ...(tasks.get(session)
+        ? { task: tasks.get(session) }
+        : suggested.get(session)
+          ? { looksLike: suggested.get(session) }
+          : {}),
     }
   }
 

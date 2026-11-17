@@ -2,7 +2,6 @@ import type {
   SessionGroup,
   SessionRow,
   SessionsView,
-  SessionWhere,
 } from '@src/sessions/types'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { SessionItem } from '@src/tasks/types'
@@ -10,17 +9,17 @@ import {
   AppWindow,
   ChevronRight,
   Copy,
-  ExternalLink,
+  Link2,
   ListChecks,
   MessageSquare,
   MessagesSquare,
+  Plus,
   SquareTerminal,
+  Unlink,
   X,
-  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Page } from '@/components/page'
-import { Pill } from '@/components/task-meta'
 import { Line } from '@/components/task-line'
 import { TaskRowsSkeleton } from '@/components/tasks-list'
 import { Button } from '@/components/ui/button'
@@ -34,50 +33,20 @@ import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  formatDateTime,
-  formatRelative,
-  formatWait,
-  homePath,
-} from '@/lib/format'
+import { formatDateTime, formatRelative, homePath } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
-import { useSessions, useShowSessions } from '@/lib/sessions'
+import { canOpen } from '@/lib/session-rows'
+import { useSessionTasks, useSessions, useShowSessions } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { LogItem } from './session-log'
+import { OpenButton, StateMark, toolWhere } from './session-open'
+import { LinkTaskDialog } from './session-task'
 import { text } from './sessions-page.text'
 import { text as rowText } from './task-row.text'
 import { resumeCommand } from './task-sessions'
 
-type Words = (typeof text)['en']
-
 const GRID =
   'mt-7 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-copy'
-
-const OPEN_ICON: Record<SessionWhere, LucideIcon> = {
-  'claude-app': AppWindow,
-  terminal: SquareTerminal,
-  web: ExternalLink,
-  'codex-app': AppWindow,
-}
-
-/** Whether Pacenote can take you to where it runs */
-const canOpen = (s: SessionRow) =>
-  s.state !== 'ended' &&
-  (s.tool === 'codex'
-    ? s.where === 'codex-app'
-    : s.where !== 'terminal' || !!s.terminal)
-
-const openLabel = (s: SessionRow, t: Words) =>
-  s.where === 'terminal' ? t.openIn.terminal(s.terminal) : t.openIn[s.where]
-
-/** The tool and where it runs: "Claude app", "Claude Code · iTerm" */
-function toolWhere(s: SessionRow, t: Words) {
-  if (s.where === 'claude-app' || s.where === 'codex-app')
-    return t.where[s.where]
-  const where =
-    s.where === 'terminal' ? (s.terminal ?? t.where.terminal) : t.where[s.where]
-  return `${CLI_NAMES[s.tool]} · ${where}`
-}
 
 /**
  * Sessions: the Claude Code and Codex sessions on this Mac, by your area or
@@ -273,62 +242,6 @@ function GroupSection({
   )
 }
 
-/** Working, your turn, quiet or ended: the session's state on its row */
-function StateMark({ s }: { s: SessionRow }) {
-  const t = useText(text)
-  if (s.state === 'working')
-    return (
-      <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
-        <span
-          aria-hidden="true"
-          className="size-1.5 rounded-full bg-status-running"
-        />
-        {t.working}
-      </span>
-    )
-  if (s.state === 'turn')
-    return (
-      <Pill tone="primary" className="gap-1.5">
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
-        {t.yourTurn}
-      </Pill>
-    )
-  return (
-    <Pill>
-      {s.state === 'ended'
-        ? t.ended
-        : t.quiet(formatWait(Date.now() - Date.parse(s.lastAt)))}
-    </Pill>
-  )
-}
-
-function OpenButton({
-  s,
-  onError,
-  size,
-}: {
-  s: SessionRow
-  onError: (error?: string) => void
-  size?: 'sm'
-}) {
-  const t = useText(text)
-  const Icon = OPEN_ICON[s.where]
-  return (
-    <Button
-      variant="outline"
-      size={size}
-      onClick={() =>
-        void window.pacenoteDesktop?.sessions
-          .open(s.id)
-          .then((result) => onError(result?.error))
-      }
-    >
-      <Icon />
-      {openLabel(s, t)}
-    </Button>
-  )
-}
-
 function SessionRowItem({
   s,
   open,
@@ -404,6 +317,96 @@ function SessionRowItem({
   )
 }
 
+/**
+ * The task a session is for: linked (Unlink), or not a task yet (link it to
+ * one, or make one of it), with the task it looks like to say yes or no to
+ */
+function TaskLines({ s }: { s: SessionRow }) {
+  const t = useText(text)
+  const act = useSessionTasks()
+  const [error, setError] = useState<string>()
+  const [picking, setPicking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const run = (done: Promise<string | undefined>) => {
+    setBusy(true)
+    setError(undefined)
+    void done.then(setError).finally(() => setBusy(false))
+  }
+  const action = (label: string, Icon: typeof Link2, onClick: () => void) => (
+    <Button
+      size="xs"
+      variant="ghost"
+      className="text-primary"
+      disabled={busy}
+      onClick={onClick}
+    >
+      <Icon />
+      {label}
+    </Button>
+  )
+  return (
+    <>
+      {s.task ? (
+        <Line
+          label={t.task}
+          actions={action(t.unlink, Unlink, () => run(act.unlink(s.id)))}
+        >
+          <a
+            href={`#/tasks/${encodeURIComponent(s.task.id)}`}
+            className="hover:text-primary"
+          >
+            {s.task.title}
+          </a>
+        </Line>
+      ) : (
+        <Line
+          label={t.task}
+          actions={
+            <>
+              {action(t.linkToTask, Link2, () => setPicking(true))}
+              {action(t.makeTask, Plus, () =>
+                run(act.makeTask(s.id).then((result) => result.error))
+              )}
+            </>
+          }
+        >
+          <span className="text-muted-foreground">{t.notATask}</span>
+        </Line>
+      )}
+      {!s.task && s.looksLike && (
+        <Line
+          label={t.looksLike}
+          actions={
+            <>
+              {action(t.link, Link2, () =>
+                run(act.answer(s.looksLike!.id, true).then(() => undefined))
+              )}
+              {action(t.notIt, X, () =>
+                run(act.answer(s.looksLike!.id, false).then(() => undefined))
+              )}
+            </>
+          }
+        >
+          <a
+            href={`#/tasks/${encodeURIComponent(s.looksLike.task.id)}`}
+            className="hover:text-primary"
+          >
+            {s.looksLike.task.title}
+          </a>
+        </Line>
+      )}
+      <InlineError error={error} className="py-1" />
+      {picking && (
+        <LinkTaskDialog
+          s={s}
+          onClose={() => setPicking(false)}
+          onPick={(task) => act.link(s.id, task)}
+        />
+      )}
+    </>
+  )
+}
+
 function CopyResume({ s }: { s: SessionRow }) {
   const t = useText(text)
   const command = `${resumeCommand(s.tool)} ${s.session}`
@@ -456,16 +459,7 @@ function Opened({ s, onLog }: { s: SessionRow; onLog: () => void }) {
         <Line label={t.folder}>
           <span className="font-mono select-text">{homePath(s.cwd)}</span>
         </Line>
-        {s.task && (
-          <Line label={t.task}>
-            <a
-              href={`#/tasks/${encodeURIComponent(s.task.id)}`}
-              className="hover:text-primary"
-            >
-              {s.task.title}
-            </a>
-          </Line>
-        )}
+        <TaskLines s={s} />
         <Line label={t.started}>
           <span>{formatDateTime(s.startedAt)}</span>
         </Line>

@@ -39,6 +39,11 @@ export interface SessionRow {
   typed: { at?: string; text: string }[]
   /** The task it worked on, when it is linked to one */
   task?: { id: string; title: string }
+  /**
+   * The open task it looks like, by the words they share, until you say
+   * whether it is that task's work: id is the suggestion's
+   */
+  looksLike?: { id: string; task: { id: string; title: string } }
 }
 
 /** Sessions of one of your areas (You), one repository, or neither */

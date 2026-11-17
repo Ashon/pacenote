@@ -13,6 +13,8 @@ import {
   useTasks,
   useTasksLive,
 } from '@/lib/tasks'
+import { sessionsByTask, sessionsLine } from '@/lib/session-rows'
+import { useSessions } from '@/lib/sessions'
 import { todayLines } from '@/lib/today'
 import {
   declinedFrom,
@@ -93,6 +95,8 @@ export function TasksPage({
   const you = useYou().data
   // Your other Macs, by name, for what they did
   const macs = useMacs()
+  // The sessions on this Mac, with Sessions on: each task's, and Today's line
+  const sessions = useSessions('todo').data
   const decide = useDecide()
   const setStage = useStage()
   // What Let your AI help's first look added, once it closed
@@ -203,6 +207,7 @@ export function TasksPage({
     live: live?.working,
   })
   const { stages, counts, shown, rows, arrived } = list
+  const byTask = sessionsByTask(sessions)
   writeStored(ROWS_KEY, String(counts.open))
   rememberYourWork(data.collectedAt ? you : undefined)
   if (list.seenNow) setSeen(list.seenNow)
@@ -258,6 +263,7 @@ export function TasksPage({
       <TodoFirst />
       <Today
         lines={todayLines(data.tasks, stages, data.working, live?.working)}
+        sessions={sessionsLine(sessions)}
       />
       <YourWork you={data.collectedAt ? you : undefined} />
       {offer && (
@@ -330,6 +336,7 @@ export function TasksPage({
                       tools={data.settings.tools}
                       opensIn={data.settings.opensIn}
                       working={data.working?.[task.id]}
+                      session={byTask.get(task.id)}
                       live={live?.working[task.id]}
                       stage={stages[task.id]}
                       onStage={(stage) => void setStage(task.id, stage)}

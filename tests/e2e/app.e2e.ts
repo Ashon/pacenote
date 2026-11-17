@@ -3014,6 +3014,133 @@ else fail('unexpected: ' + args.join(' '))
     ).toMatch(/linkSessions"?\s*:\s*true/)
   }, 120_000)
 
+  it('links a session to a task from Sessions, shows it on the task in Todo, and makes a task of one', async () => {
+    world = await World.create()
+    const { home, root } = world
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    const project = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[/.]/g, '-')
+    )
+    mkdirSync(project, { recursive: true })
+    writeFileSync(
+      path.join(project, 'open-1.jsonl'),
+      [
+        {
+          type: 'user',
+          message: { role: 'user', content: 'Look at the export job' },
+        },
+        { type: 'custom-title', customTitle: 'Export job' },
+      ]
+        .map(
+          (line) =>
+            `${JSON.stringify({ sessionId: 'open-1', cwd: checkout, timestamp: new Date().toISOString(), ...line })}\n`
+        )
+        .join('')
+    )
+    writeFileSync(
+      path.join(world.claudeDir, 'agents.json'),
+      JSON.stringify([
+        {
+          pid: 999_999,
+          cwd: checkout,
+          kind: 'interactive',
+          startedAt: Date.now() - 20 * 60_000,
+          sessionId: 'open-1',
+          status: 'idle',
+        },
+      ])
+    )
+    const now = Date.now()
+    addTasks(
+      home,
+      [
+        {
+          title: 'Check the invoice totals',
+          asked_by: 'mina',
+          where: '#ops',
+          link: `https://acme.slack.com/archives/C0OPS/p${Math.floor((now - 3_600_000) / 1000)}000100`,
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'mina asked to check the invoice totals.',
+        },
+      ],
+      {
+        settings: { on: true, dms: false, exclude: [] },
+        now: new Date(now - 3_600_000),
+      }
+    )
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+    await page.evaluate("window.location.hash = '#/sessions'")
+    const row = page.locator('li', { has: page.getByText('Export job') })
+    await row
+      .getByRole('button', { name: 'Export job' })
+      .click({ timeout: 30_000 })
+    await row.getByText('Not a task yet').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/sessions-not-a-task.png'),
+    })
+
+    // Link to a task: the open tasks, the repository's first
+    await row.getByRole('button', { name: 'Link to a task' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Link to a task' })
+    await dialog
+      .getByRole('button', { name: /Check the invoice totals/ })
+      .click()
+    await dialog.waitFor({ state: 'detached' })
+    await row.getByRole('button', { name: 'Unlink' }).waitFor()
+    await row
+      .getByRole('link', { name: 'Check the invoice totals' })
+      .first()
+      .waitFor()
+
+    // On Todo: the task's row says its session waits for you, and Today
+    // has a line for the sessions
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const task = page.locator('[data-task-row]', {
+      has: page.getByText('Check the invoice totals'),
+    })
+    await task.getByText(/^Your turn · Terminal/).waitFor({ timeout: 20_000 })
+    const today = page
+      .getByRole('definition')
+      .filter({ hasText: '1 your turn' })
+    await today.waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/sessions-todo.png'),
+    })
+
+    // Taken off the task, then made a task of its own
+    await page.evaluate("window.location.hash = '#/sessions'")
+    await row.getByRole('button', { name: 'Export job' }).waitFor()
+    if (!(await row.getByText('Started').isVisible()))
+      await row.getByRole('button', { name: 'Export job' }).click()
+    await row.getByRole('button', { name: 'Unlink' }).click()
+    await row.getByText('Not a task yet').waitFor()
+    await row.getByRole('button', { name: 'Make it a task' }).click()
+    await row.getByRole('button', { name: 'Unlink' }).waitFor()
+    await row.getByRole('link', { name: 'Export job' }).first().waitFor()
+    await page.evaluate("window.location.hash = '#/tasks'")
+    await page
+      .locator('[data-task-row]', { has: page.getByText('Export job') })
+      .getByText(/^Your turn · Terminal/)
+      .waitFor({ timeout: 20_000 })
+    // The other task's link stays taken back
+    expect(await task.getByText(/^Your turn/).count()).toBe(0)
+  }, 120_000)
+
   it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {
     const judged = JSON.stringify({
       done: true,

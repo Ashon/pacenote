@@ -190,6 +190,42 @@ describe('merging your Todo from two Macs', () => {
     expect(onPro.entries[1]).toMatchObject({ resumedAt: [at(-1)] })
   })
 
+  it('drops a link taken back on either Mac, and keeps one made again after', () => {
+    const linked = (patch = {}): WorkEntry => ({
+      kind: 'session',
+      id: 'e1',
+      task: '1',
+      tool: 'claude',
+      session: 'abc',
+      cwd: '/Users/me/payments',
+      startedAt: at(-60),
+      found: true,
+      foundBy: 'tools',
+      ...patch,
+    })
+    // Taken off the task on the Air; the Pro still has the link
+    const onAir: WorkFile = {
+      version: 1,
+      entries: [],
+      notIt: [{ task: '1', session: 'abc', at: at(-10) }],
+    }
+    const onPro: WorkFile = { version: 1, entries: [linked()], notIt: [] }
+    expect(
+      mergeWork(onPro, onAir, { here: 'pro', peer: 'air' }).entries
+    ).toEqual([])
+    expect(
+      mergeWork(onAir, onPro, { here: 'air', peer: 'pro' }).entries
+    ).toEqual([])
+    // Linked to it again on the Pro after: the old notIt does not drop it
+    const again = linked({ id: 'e2', foundBy: 'you', linkedAt: at(-2) })
+    const merged = mergeWork(
+      { version: 1, entries: [again], notIt: [] },
+      onAir,
+      { here: 'pro', peer: 'air' }
+    )
+    expect(merged.entries.map((e) => e.id)).toEqual(['e2'])
+  })
+
   it("keeps the latest write-up, your areas from both, and the other Mac's collections", () => {
     expect(
       mergeLatest(

@@ -1,4 +1,5 @@
 import { HISTORY_MS } from '../tasks/store.js'
+import { unlinked } from '../tasks/work.js'
 import type {
   CollectionRecord,
   Task,
@@ -214,9 +215,13 @@ export function mergeWork(
   )
   return {
     ...local,
-    entries: [...byId.values()].sort(
-      (a, b) => touchedAtStart(a) - touchedAtStart(b) || (a.id < b.id ? -1 : 1)
-    ),
+    // A link taken back on either Mac stays taken back
+    entries: [...byId.values()]
+      .filter((entry) => !unlinked(entry, notIt))
+      .sort(
+        (a, b) =>
+          touchedAtStart(a) - touchedAtStart(b) || (a.id < b.id ? -1 : 1)
+      ),
     notIt: [...notIt.values()].sort((a, b) =>
       a.at < b.at ? -1 : a.at > b.at ? 1 : a.task < b.task ? -1 : 1
     ),

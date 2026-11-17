@@ -1,4 +1,5 @@
 import { InlineError } from '@/components/ui/inline-error'
+import type { SessionRow } from '@src/sessions/types'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { StageRecord, TaskStage } from '@src/tasks/stage'
 import {
@@ -32,6 +33,7 @@ import {
 import { cn } from '@/lib/utils'
 import { areaHash } from '@/lib/you'
 import { SessionLogPanel } from './session-log'
+import { StateMark } from './session-open'
 import { TaskActions } from './task-actions'
 import { FolderDialog } from './task-folder'
 import { AreaPill, Pill, StagePill, TaskMeta, whereOf } from './task-meta'
@@ -64,6 +66,7 @@ export function TaskRow({
   tools = ['claude', 'codex'],
   opensIn,
   working,
+  session,
   live,
   stage,
   follows,
@@ -92,6 +95,8 @@ export function TaskRow({
   opensIn?: Record<WorkTool, 'app' | 'terminal'>
   /** Its latest session: the tool and when it was last active */
   working?: { tool: WorkTool; at: string }
+  /** Its session open on this Mac now (Sessions), when it has one */
+  session?: SessionRow
   /** An AI tool working on it now over MCP (tasks-activity.jsonl) */
   live?: { by?: string; at: string }
   /** Open, it may be in progress or waiting on someone (src/tasks/stage.ts) */
@@ -159,6 +164,7 @@ export function TaskRow({
       stage,
       staging: Boolean(onStage),
       working,
+      session,
       live,
       filling,
       proposal,
@@ -282,6 +288,7 @@ export function TaskRow({
             onDecide={onDecide}
             onDismiss={() => setDismissing(true)}
             onStep={runStep}
+            onError={setError}
           />
         </div>
         {state.looksLike && (
@@ -313,6 +320,7 @@ export function TaskRow({
             fill={state.fill}
             onUndoFill={() => void fillAct.takeBack().then(setError)}
             onError={setError}
+            session={state.session}
           />
         </CollapsibleContent>
       </Collapsible>
@@ -401,7 +409,11 @@ function RowMeta({
           {t.workingIn(liveTool.current)}
         </span>
       )}
-      {working && !atWork.mounted && (
+      {/* Its open session says how it stands, where it runs */}
+      {state.session && !atWork.mounted && (
+        <StateMark s={state.session} where />
+      )}
+      {working && !state.session && !atWork.mounted && (
         <span
           title={t.lastActiveIn(CLI_NAMES[working.tool])}
           className="inline-flex items-center gap-1"

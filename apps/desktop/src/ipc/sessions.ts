@@ -12,7 +12,13 @@ import { SingleFlight } from '../../../../src/single-flight.js'
 import { TOOL_LABEL } from '../../../../src/tasks/context.js'
 import { codexLogs, yourFolder } from '../../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../../src/tasks/store.js'
-import { readWork } from '../../../../src/tasks/work.js'
+import {
+  changeWork,
+  linkSession,
+  readWork,
+  unlinkSession,
+} from '../../../../src/tasks/work.js'
+import { addYourTask } from '../../../../src/tasks/write.js'
 import { readYou } from '../../../../src/you/store.js'
 import { codexThreadLink, openLink, readSessionLog } from '../handoff.js'
 import { text } from '../main.text.js'
@@ -105,15 +111,29 @@ export function registerSessionsIpc(
         name: area.name,
         repos: area.parts.flatMap((p) => (p.kind === 'repo' ? [p.id] : [])),
       }))
-    const titleOf = new Map(
-      allTaskViews(dataDir).map((task) => [task.id, task.title])
+    const all = allTaskViews(dataDir)
+    const titleOf = new Map(all.map((task) => [task.id, task.title]))
+    const open = new Set(
+      all.filter((task) => task.status === 'open').map((task) => task.id)
     )
+    const work = readWork(dataDir)
     const tasks = new Map<string, { id: string; title: string }>()
-    for (const entry of readWork(dataDir).entries)
+    for (const entry of work.entries)
       if (entry.kind === 'session' && entry.session && titleOf.has(entry.task))
         tasks.set(entry.session, {
           id: entry.task,
           title: titleOf.get(entry.task)!,
+        })
+    // What a session not linked to a task looks like, while the task is open
+    const suggested = new Map<
+      string,
+      { id: string; task: { id: string; title: string } }
+    >()
+    for (const suggestion of work.suggested ?? [])
+      if (suggestion.session && open.has(suggestion.task))
+        suggested.set(suggestion.session, {
+          id: suggestion.id,
+          task: { id: suggestion.task, title: titleOf.get(suggestion.task)! },
         })
     const view = sessionsView({
       now,
@@ -123,6 +143,7 @@ export function registerSessionsIpc(
       repos,
       areas,
       tasks,
+      suggested,
       seen,
     })
     const apps = new Map(agents?.map((agent) => [agent.session, agent.app]))
@@ -173,6 +194,78 @@ export function registerSessionsIpc(
         log.warn(`Could not open the session: ${(error as Error).message}`)
         return { error: (error as Error).message.split('\n')[0] }
       }
+    }
+  )
+
+  /** A session as last shown, while it can be linked to a task */
+  const linkable = (id: unknown) => {
+    const row = typeof id === 'string' ? shown.get(id) : undefined
+    return row && row.tool !== 'opencode' ? row : undefined
+  }
+  const link = (row: SessionRow, task: string) => {
+    changeWork(dataDir, (file) =>
+      linkSession(
+        file,
+        {
+          task,
+          tool: row.tool,
+          session: row.session,
+          cwd: row.cwd,
+          startedAt: row.startedAt,
+        },
+        new Date()
+      )
+    )
+    // A session that is the task's lends it its branch: look again.
+    sessions.linkSoon(true)
+  }
+
+  /** Links a session to an open task: it is that task's work */
+  ipc.windowOnly(
+    'pacenote:sessions:link',
+    () => ({ error: localized(text).noSuchSession }),
+    (id, taskId) => {
+      const t = localized(text)
+      const row = linkable(id)
+      const task = allTaskViews(dataDir).find(
+        (task) => task.id === taskId && task.status === 'open'
+      )
+      if (!row) return { error: t.noSuchSession }
+      if (!task) return { error: t.noSuchTask }
+      link(row, task.id)
+      return {}
+    }
+  )
+
+  /** Takes a session off its task: not found for it again */
+  ipc.windowOnly(
+    'pacenote:sessions:unlink',
+    () => ({ error: localized(text).noSuchSession }),
+    (id) => {
+      const row = linkable(id)
+      if (!row) return { error: localized(text).noSuchSession }
+      changeWork(dataDir, (file) =>
+        unlinkSession(file, row.session, new Date())
+      )
+      return {}
+    }
+  )
+
+  /**
+   * A task of your own from a session, in its repository's project, with
+   * the session as its work
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:make-task',
+    () => ({ error: localized(text).noSuchSession }),
+    (id) => {
+      const row = linkable(id)
+      if (!row) return { error: localized(text).noSuchSession }
+      const added = addYourTask(dataDir, { title: row.title, repo: row.repo })
+      if (!added) return { error: localized(text).noSuchSession }
+      if ('error' in added) return added
+      link(row, added.id)
+      return { task: added.id }
     }
   )
 

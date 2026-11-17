@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useText } from '@/lib/i18n'
+import { OpenButton } from './session-open'
 import { OpensIn } from './task-folder'
 import type { RowStep, TaskRowState } from './task-row-state'
 import { text } from './task-row.text'
@@ -62,6 +63,7 @@ export function TaskActions({
   onDecide,
   onDismiss,
   onStep,
+  onError,
 }: {
   task: TaskView
   state: TaskRowState
@@ -78,6 +80,8 @@ export function TaskActions({
   onDismiss: () => void
   /** A step chosen under the menu */
   onStep: (step: RowStep) => void
+  /** Why its session did not open, or none */
+  onError: (error?: string) => void
 }) {
   const t = useText(text)
   const dismiss = (
@@ -98,6 +102,9 @@ export function TaskActions({
       className="flex shrink-0 items-center gap-1.5 @max-[44rem]:flex-wrap @max-[44rem]:pl-6"
     >
       <span className="flex items-center gap-1.5 empty:hidden">
+        {state.opensSession && state.session && (
+          <OpenButton s={state.session} onError={onError} size="sm" />
+        )}
         {state.continues && (
           // Each tool it can continue in, by its name, the one set in
           // Settings first: one control, as an outline button is drawn

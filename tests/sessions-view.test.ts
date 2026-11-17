@@ -471,6 +471,22 @@ describe('sessionsView: rows linked to tasks, and the counts', () => {
     expect(row('k2')?.task).toBeUndefined()
   })
 
+  it('says the task one looks like only while it is on none', () => {
+    const like = { id: 'sg1', task: { id: 'T2', title: 'Retry limit' } }
+    const v = view({
+      agents: [agent({ session: 'k1' }), agent({ session: 'k2' })],
+      tasks: new Map([['k1', { id: 'T1', title: 'Fix billing' }]]),
+      suggested: new Map([
+        ['k1', like],
+        ['k2', like],
+      ]),
+    })
+    const row = (session: string) =>
+      rows(v.open).find((r) => r.session === session)
+    expect(row('k1')?.looksLike).toBeUndefined()
+    expect(row('k2')?.looksLike).toEqual(like)
+  })
+
   it('counts open, working, your turn and ended', () => {
     const v = view({
       agents: [

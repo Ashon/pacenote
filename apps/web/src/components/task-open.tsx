@@ -1,4 +1,5 @@
 import { CLI_NAMES } from '@src/tasks/own-ai'
+import type { SessionRow } from '@src/sessions/types'
 import type { Proposal, TaskUpdate, TaskView, WorkTool } from '@src/tasks/types'
 import { Undo2 } from 'lucide-react'
 import { useState } from 'react'
@@ -30,6 +31,7 @@ export function TaskOpen({
   fill,
   onUndoFill,
   onError,
+  session,
 }: {
   task: TaskView
   drafting: boolean
@@ -47,6 +49,8 @@ export function TaskOpen({
   onUndoFill: () => void
   /** What went wrong with something done here, or none */
   onError: (error: string | undefined) => void
+  /** Its session open on this Mac now (Sessions), when it has one */
+  session?: SessionRow
 }) {
   const t = useText(text)
   const detail = useTaskDetail(task.id).data
@@ -67,6 +71,8 @@ export function TaskOpen({
       macs={macs}
       onResume={(entryId) => void act.resume(entryId).then(onError)}
       onStartHere={onStartHere}
+      open={session}
+      onError={onError}
     />
   )
 

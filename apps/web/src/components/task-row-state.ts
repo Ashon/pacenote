@@ -1,4 +1,5 @@
 import type { Locale } from '@src/i18n/locale'
+import type { SessionRow } from '@src/sessions/types'
 import { FILLED_SHOWN_MS, standingFill } from '@src/tasks/filled'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import { ADDED_BY_YOU, sourceOf } from '@src/tasks/sources'
@@ -10,6 +11,7 @@ import type {
   TaskView,
   WorkTool,
 } from '@src/tasks/types'
+import { canOpen } from '../lib/session-rows'
 import { lastChange } from './task-changes'
 import type { text } from './task-row.text'
 import { closedBy } from './task-sessions'
@@ -53,6 +55,8 @@ export interface TaskRowInput {
   staging: boolean
   /** Its latest session: the tool and when it was last active */
   working?: { tool: WorkTool; at: string }
+  /** Its session open on this Mac now (Sessions), when it has one */
+  session?: SessionRow
   /** An AI tool working on it now over MCP */
   live?: { by?: string; at: string }
   /** Your AI filling it in now, by the CLI's name */
@@ -90,6 +94,16 @@ export interface TaskRowState {
   filling?: string
   /** Its last session, while it is open */
   working?: { tool: WorkTool; at: string }
+  /**
+   * Its session open on this Mac, while the task is open: its state on the
+   * row, working or waiting for you, in place of when it was last active
+   */
+  session?: SessionRow
+  /**
+   * Open where it runs, as the row's button: Continue would open another
+   * session beside it, so its tools go under the menu
+   */
+  opensSession: boolean
   /** The mark of an AI tool at work on it */
   atWork: boolean
   /** The mark of a quiet session that says it looks done */
@@ -169,9 +183,15 @@ export function taskRowState(
     fill && now - Date.parse(fill.at) < FILLED_SHOWN_MS ? fill : undefined
   const tools = [cli, ...input.tools.filter((tool) => tool !== cli)]
   const folder = repoFolderOf(input.repos, task.repo)
-  // A code task has a button for each tool, so they are not in the menu
+  const session =
+    task.status === 'open' && input.session?.state !== 'ended'
+      ? input.session
+      : undefined
+  const opensSession = acting && !!session && canOpen(session)
+  // A code task has a button for each tool, so they are not in the menu,
+  // unless its open session's button takes their place
   const menu: RowStep[] = [
-    ...(task.action === 'code'
+    ...(task.action === 'code' && !opensSession
       ? []
       : tools.map((tool): RowStep => ({
           kind: 'continue',
@@ -215,12 +235,14 @@ export function taskRowState(
     filled: justFilled && !filling && !open ? justFilled : undefined,
     filling: acting ? filling : undefined,
     working: task.status === 'open' ? input.working : undefined,
+    session,
+    opensSession,
     atWork: Boolean(input.live) && task.status === 'open',
     looksDone: Boolean(input.proposal) && task.status === 'open' && !open,
     asking: Boolean(input.askGroup) && !dismissing,
     folder,
     tools,
-    continues: acting && task.action === 'code',
+    continues: acting && task.action === 'code' && !opensSession,
     drafts: acting && task.action === 'reply' && !local,
     backToOpen: acting && stage?.stage === 'waiting' && input.staging,
     decide: acting

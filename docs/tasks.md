@@ -231,6 +231,13 @@ on, from the switch or from the screen's card, which says what it reads first.
   started, its log, read when you ask for it, and the command that continues it in a terminal.
 - **Opening it** goes where it runs: `claude --desktop --resume <id>` for the Claude app, claude.ai's Code page, the
   Codex app's link for a Codex app session, or the terminal app it runs in, brought to the front.
+- **Its task:** opened in place, a session not linked to a task can be **linked to one** (your open tasks, its
+  repository's first) or **made a task** of its own, in its repository's project; one that looks like an open task's
+  work says so, to link or say it is not. **Unlink** takes a linked one off its task: it is not found for that task
+  again, on this Mac or your other ones.
+- **On Todo:** a task with a session open says how it stands on its row ("Your turn · Claude app"), and its button
+  opens that session where it runs instead of continuing in a new one (Continue moves under the row's menu). Today has
+  a **Sessions** line: how many wait for your turn or work, how many more are quiet, and in which projects.
 
 What it reads stays on this Mac, and your other devices do not see it. Pacenote's own sessions and its data folder are
 left out.

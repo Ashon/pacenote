@@ -1,4 +1,5 @@
 import { FILLED_IN } from '@src/tasks/filled'
+import type { SessionRow } from '@src/sessions/types'
 import type { TaskView } from '@src/tasks/types'
 import { describe, expect, it } from 'vitest'
 import { repoFolderOf, taskRowState, type TaskRowInput } from './task-row-state'
@@ -263,6 +264,47 @@ describe("a task's row", () => {
       looksDone: false,
       proposal: undefined,
     })
+  })
+
+  it('opens its open session in place of Continue, its tools under the menu', () => {
+    const session: SessionRow = {
+      id: 'claude:s1',
+      tool: 'claude',
+      session: 's1',
+      title: 'Raise the limit',
+      where: 'claude-app',
+      state: 'turn',
+      lastAt: ago(4 * 60_000),
+      startedAt: ago(HOUR),
+      cwd: '/Users/me/code/pay',
+      typed: [],
+    }
+    const code = task({ action: 'code' })
+    const state = stateOf({ task: code, session })
+    expect(state).toMatchObject({
+      session,
+      opensSession: true,
+      continues: false,
+    })
+    expect(labels(state.menu)).toEqual([
+      'Continue in Claude Code',
+      'Continue in Codex',
+      'Draft a reply',
+    ])
+    // One in a terminal Pacenote cannot bring forward: Continue stays
+    const terminal = { ...session, where: 'terminal' as const }
+    expect(stateOf({ task: code, session: terminal })).toMatchObject({
+      session: terminal,
+      opensSession: false,
+      continues: true,
+    })
+    // Settled, it shows no session; ended, there is none to show
+    expect(
+      stateOf({ task: task({ status: 'done' }), session }).session
+    ).toBeUndefined()
+    expect(
+      stateOf({ task: code, session: { ...session, state: 'ended' } })
+    ).toMatchObject({ session: undefined, opensSession: false })
   })
 
   it('names the task it carries on from only for one you added', () => {

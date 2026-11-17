@@ -4,7 +4,9 @@ import { formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { readStored, writeStored } from '@/lib/storage'
 import { taskHash } from '@/lib/tasks'
+import type { SessionsLine } from '@/lib/session-rows'
 import { daysSince, type TodayLine } from '@/lib/today'
+import { cn } from '@/lib/utils'
 import { text } from './today.text'
 
 /** Todo's Today (lib/today.ts): three lines at most, above the tabs */
@@ -34,10 +36,18 @@ export function TodaySkeleton({ lines }: { lines: number }) {
   )
 }
 
-export function Today({ lines }: { lines: TodayLine[] }) {
+export function Today({
+  lines,
+  sessions,
+}: {
+  lines: TodayLine[]
+  /** The sessions on this Mac, with Sessions on and one open */
+  sessions?: SessionsLine
+}) {
   const t = useText(text)
-  writeStored(LINES_KEY, String(lines.length))
-  if (lines.length === 0) return null
+  const count = lines.length + (sessions ? 1 : 0)
+  writeStored(LINES_KEY, String(count))
+  if (count === 0) return null
   return (
     <dl aria-label={t.today} className={GRID}>
       {lines.map((line) => (
@@ -56,7 +66,37 @@ export function Today({ lines }: { lines: TodayLine[] }) {
           </dd>
         </div>
       ))}
+      {sessions && <SessionsRow line={sessions} />}
     </dl>
+  )
+}
+
+/** How the sessions on this Mac stand, a link to Sessions */
+function SessionsRow({ line }: { line: SessionsLine }) {
+  const t = useText(text)
+  const busy = line.turn + line.working > 0
+  const rest = [
+    busy && line.quiet > 0 && t.sessionsQuiet(line.quiet),
+    line.groups.length > 0 && t.sessionsIn(line.groups, line.more),
+  ].filter(Boolean)
+  return (
+    <div className="contents">
+      <dt className="text-muted-foreground">{t.sessions}</dt>
+      <dd className="truncate">
+        <a
+          href="#/sessions"
+          className={cn('hover:underline', busy && 'text-primary')}
+        >
+          {t.sessionsNow(line.turn, line.working, line.quiet)}
+        </a>
+        {rest.length > 0 && (
+          <span className="text-muted-foreground">
+            {' · '}
+            {rest.join(' · ')}
+          </span>
+        )}
+      </dd>
+    </div>
   )
 }
 

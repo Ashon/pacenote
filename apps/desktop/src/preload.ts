@@ -187,6 +187,9 @@ const bridge = {
     view: () => ipcRenderer.invoke('pacenote:sessions:view'),
     open: (id) => ipcRenderer.invoke('pacenote:sessions:open', id),
     log: (id) => ipcRenderer.invoke('pacenote:sessions:log', id),
+    link: (id, task) => ipcRenderer.invoke('pacenote:sessions:link', id, task),
+    unlink: (id) => ipcRenderer.invoke('pacenote:sessions:unlink', id),
+    makeTask: (id) => ipcRenderer.invoke('pacenote:sessions:make-task', id),
   },
   // Recap: a day, a week or a month of your work, and writing it up
   recap: {

@@ -1,5 +1,6 @@
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { MacsView } from '@src/macs/types'
+import type { SessionRow } from '@src/sessions/types'
 import type { WorkTool } from '@src/tasks/types'
 import { SquareTerminal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,8 @@ import { formatRelative, formatShortDay } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { macNamed } from '@/lib/macs'
 import { taskHash } from '@/lib/tasks'
+import { canOpen } from '@/lib/session-rows'
+import { OpenButton, StateMark } from './session-open'
 import { Line } from './task-line'
 import type { Earlier } from './task-open-state'
 import { text } from './task-row.text'
@@ -24,12 +27,18 @@ export function EarlierLine({
   macs,
   onResume,
   onStartHere,
+  open,
+  onError,
 }: {
   line: Earlier
   taskId: string
   macs: MacsView | undefined
   onResume: (entryId: string) => void
   onStartHere?: (tool: WorkTool) => void
+  /** The task's session open on this Mac now (Sessions), when it has one */
+  open?: SessionRow
+  /** Why its session did not open, or none */
+  onError?: (error?: string) => void
 }) {
   const t = useText(text)
   const { task, run } = line
@@ -128,9 +137,22 @@ export function EarlierLine({
     )
   if (!line.session) return null
   const own = line.session as Session
+  // Open now: it goes where it runs, rather than in another session beside it
+  const now =
+    open && own.session === open.session && !elsewhere ? open : undefined
   return (
-    <Line label={line.label} actions={action}>
+    <Line
+      label={line.label}
+      actions={
+        now && canOpen(now) ? (
+          <OpenButton s={now} onError={(e) => onError?.(e)} size="sm" />
+        ) : (
+          action
+        )
+      }
+    >
       {name(t.toolSession(CLI_NAMES[own.tool]), log, t.readSession)}
+      {now && <StateMark s={now} where />}
       {quiet(
         [
           elsewhere && t.onMac(elsewhere),

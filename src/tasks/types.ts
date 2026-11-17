@@ -389,6 +389,11 @@ export type WorkEntry =
       /** The git branch it worked on, when it was found by it */
       branch?: string
       /**
+       * When you linked it to the task yourself (Sessions): a link taken
+       * back before then (WorkFile.notIt) does not drop it
+       */
+      linkedAt?: string
+      /**
        * Another of your Macs it runs on, by id (Settings > Devices): it
        * continues there, not here
        */
@@ -451,7 +456,10 @@ export interface WorkFile {
   entries: WorkEntry[]
   /** Sessions that look like a task's work, waiting for you to say */
   suggested?: SessionSuggestion[]
-  /** Sessions you said were not a task's work, not asked about again */
+  /**
+   * Sessions you said were not a task's work, or took off it, not asked
+   * about again
+   */
   notIt?: { task: string; session: string; at: string }[]
   /** What quiet sessions looked like, done or not (done-watch.ts) */
   proposals?: Proposal[]

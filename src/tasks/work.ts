@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { readJson, writeJsonIfChanged } from '../json-file.js'
 import { HISTORY_MS } from './store.js'
@@ -134,6 +135,113 @@ export function answerSuggestion(
     now.getTime()
   )
   return answered
+}
+
+type Session = Extract<WorkEntry, { kind: 'session' }>
+
+/** One of a session's links: the task and the session, as notIt keys them */
+const pair = (task: string, session: string) => `${task}\n${session}`
+
+/**
+ * Links a session to a task yourself (Sessions): it comes off any other task
+ * it was linked to, as a session is one task's work, and is no longer
+ * suggested for one
+ */
+export function linkSession(
+  file: WorkFile,
+  link: Pick<Session, 'task' | 'tool' | 'cwd' | 'startedAt'> & {
+    session: string
+  },
+  now: Date,
+  id: string = randomUUID()
+): WorkFile {
+  const at = now.toISOString()
+  const theirs = (entry: WorkEntry): entry is Session =>
+    entry.kind === 'session' && entry.session === link.session
+  const others = file.entries.filter(
+    (entry) => theirs(entry) && entry.task !== link.task
+  )
+  const already = file.entries.some(
+    (entry) => theirs(entry) && entry.task === link.task
+  )
+  return {
+    ...file,
+    entries: [
+      ...file.entries.filter(
+        (entry) => !theirs(entry) || entry.task === link.task
+      ),
+      ...(already
+        ? []
+        : [
+            {
+              kind: 'session',
+              id,
+              ...link,
+              found: true,
+              foundBy: 'you',
+              linkedAt: at,
+            } satisfies Session,
+          ]),
+    ],
+    suggested: (file.suggested ?? []).filter(
+      (suggestion) => suggestion.session !== link.session
+    ),
+    notIt: [
+      ...(file.notIt ?? []).filter(
+        (no) => pair(no.task, no.session) !== pair(link.task, link.session)
+      ),
+      ...[...new Set(others.map((entry) => entry.task))].map((task) => ({
+        task,
+        session: link.session,
+        at,
+      })),
+    ],
+  }
+}
+
+/**
+ * Takes a session off the task it was linked to: it is not found for that
+ * task again, and your other Macs drop the link too (mergeWork)
+ */
+export function unlinkSession(
+  file: WorkFile,
+  session: string,
+  now: Date
+): WorkFile {
+  const at = now.toISOString()
+  const tasks = new Set(
+    file.entries.flatMap((entry) =>
+      entry.kind === 'session' && entry.session === session ? [entry.task] : []
+    )
+  )
+  if (tasks.size === 0) return file
+  return {
+    ...file,
+    entries: file.entries.filter(
+      (entry) => entry.kind !== 'session' || entry.session !== session
+    ),
+    notIt: [
+      ...(file.notIt ?? []).filter(
+        (no) => no.session !== session || !tasks.has(no.task)
+      ),
+      ...[...tasks].map((task) => ({ task, session, at })),
+    ],
+  }
+}
+
+/**
+ * Whether a session's link was taken back after it was made: you took it off
+ * the task, or said it was not the task's, on this Mac or another
+ */
+export function unlinked(
+  entry: WorkEntry,
+  notIt: ReadonlyMap<string, { at: string }>
+): boolean {
+  if (entry.kind !== 'session' || !entry.session) return false
+  const no = notIt.get(pair(entry.task, entry.session))
+  return (
+    !!no && Date.parse(no.at) >= Date.parse(entry.linkedAt ?? entry.startedAt)
+  )
 }
 
 /** How long a session opened in a desktop app waits to be sent there */
