@@ -6,12 +6,14 @@ import {
   History,
   LayoutDashboard,
   ListChecks,
+  MessagesSquare,
   Settings,
   UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useSupervisor } from '@/lib/desktop'
+import { useSessionsTurn } from '@/lib/sessions'
 import { useText } from '@/lib/i18n'
 import { useTasks } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
@@ -19,13 +21,25 @@ import { PacenoteMark } from './logo'
 import { text } from './sidebar.text'
 
 export type Section =
-  'overview' | 'runs' | 'tasks' | 'recap' | 'you' | 'bot' | 'settings' | 'debug'
+  | 'overview'
+  | 'runs'
+  | 'tasks'
+  | 'sessions'
+  | 'recap'
+  | 'you'
+  | 'bot'
+  | 'settings'
+  | 'debug'
 
 type Item = { section: Section; icon: LucideIcon }
 
 /** Your work, at the top: what you have to do first */
 const ITEMS: Item[] = [
   { section: 'tasks', icon: ListChecks },
+  // The sessions on this Mac, and those waiting for you (the desktop app's)
+  ...(window.pacenoteDesktop?.sessions
+    ? [{ section: 'sessions' as const, icon: MessagesSquare }]
+    : []),
   // What you did, by day, week and month: what is behind, after what is ahead
   { section: 'recap', icon: CalendarCheck },
   // Where you contribute, from those tasks and your sessions
@@ -73,12 +87,20 @@ export function Sidebar({
         (task) => task.status === 'open' && stages[task.id]?.stage !== 'waiting'
       ).length
     : 0
+  // Sessions waiting for you, beside Sessions
+  const sessionsTurn = useSessionsTurn()
   const item = (props: Item) => (
     <NavItem
       key={props.section}
       {...props}
       label={t.sections[props.section]}
-      count={props.section === 'tasks' ? openTasks : 0}
+      count={
+        props.section === 'tasks'
+          ? openTasks
+          : props.section === 'sessions'
+            ? sessionsTurn
+            : 0
+      }
       current={active === props.section}
       compact={compact}
       onClick={() => onNavigate(props.section)}

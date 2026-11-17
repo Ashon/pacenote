@@ -38,6 +38,14 @@ export interface SessionSummary {
   prompts: { at?: string; text: string }[]
   /** The tasks it named to Pacenote's task_context or close_task */
   taskRefs: string[]
+  /** Claude Code: the title you gave it, and the one it made up */
+  title?: string
+  autoTitle?: string
+  /** Claude Code: where it ran last (cli, claude-desktop, sdk-cli) */
+  entrypoint?: string
+  /** Codex: the app that ran it (Codex Desktop) and how (cli, exec) */
+  originator?: string
+  source?: string
 }
 
 type Reading = Omit<SessionSummary, 'session' | 'cwd' | 'startedAt'> & {
@@ -102,10 +110,19 @@ function claudeLine(summary: Reading, line: string) {
   summary.cwd ??= field(line, 'cwd')
   summary.startedAt ??= field(line, 'timestamp')
   onBranch(summary, field(line, 'gitBranch'))
+  if (line.includes('"entrypoint"'))
+    summary.entrypoint = field(line, 'entrypoint') ?? summary.entrypoint
+  // Its title: the latest you gave it (/rename), and the latest it made up
+  if (line.includes('"customTitle"'))
+    summary.title = field(line, 'customTitle') || summary.title
+  if (line.includes('"aiTitle"'))
+    summary.autoTitle = field(line, 'aiTitle') || summary.autoTitle
   const typed =
     line.includes('"type":"user"') &&
     !line.includes('"tool_result"') &&
-    !line.includes('"isMeta":true')
+    !line.includes('"isMeta":true') &&
+    // The summary a session goes on from once its context was summed up
+    !line.includes('"isCompactSummary":true')
   const tools = line.includes('"tool_use"') && PACENOTE_TOOL.test(line)
   if (!typed && !tools) return
   let event: {
@@ -155,6 +172,8 @@ function codexLine(summary: Reading, line: string) {
       id?: string
       cwd?: string
       timestamp?: string
+      originator?: string
+      source?: unknown
       git?: { branch?: string }
       role?: string
       content?: unknown
@@ -173,6 +192,14 @@ function codexLine(summary: Reading, line: string) {
   if (event.type === 'session_meta') {
     summary.session ??= payload.id
     summary.cwd ??= payload.cwd
+    summary.originator ??= payload.originator
+    // A subagent's rollout says whose it is in place of how it ran
+    summary.source ??=
+      typeof payload.source === 'string'
+        ? payload.source
+        : payload.source
+          ? 'subagent'
+          : undefined
     onBranch(summary, payload.git?.branch)
   } else if (payload.type === 'message' && payload.role === 'user') {
     const text = textOf(payload.content)

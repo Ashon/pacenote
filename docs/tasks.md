@@ -163,7 +163,7 @@ task's folder finds the session whose first message has the task's marker, and s
 session export` reads it for the session's log and for "looks done". It continues with `opencode --session <id>`. A
 task row's menu offers the other tools that are on this Mac, opencode among them once its CLI is on the PATH.
 
-With "Show sessions you start yourself" on (Settings > Todo), the work log also has the sessions you started on your
+With "Sessions on this Mac" on (Settings > Todo), the work log also has the sessions you started on your
 own, from Claude Code's and Codex's logs on this Mac (the last 14 days; Claude Code's in the Claude app and IDE
 extensions too), checked every 30 seconds or so while the Todo screen is open:
 
@@ -210,6 +210,30 @@ the work is done, how it ended and what is left. A task that looks done says so 
 with **Close it** (closed as done in its session, with that as its wrap-up) and **Not yet**, and each thing left with
 **Keep as a task**. A session is read again only after it was active again, at most two at a time, while Todo is open.
 It uses your Claude Code login, and is off until you turn it on.
+
+## Sessions on this Mac
+
+With "Sessions on this Mac" on, the desktop app's **Sessions** screen, below Todo in the sidebar, lists the Claude Code
+and Codex sessions on this Mac in one place, and the sidebar counts the ones waiting for you. It is off until you turn it
+on, from the switch or from the screen's card, which says what it reads first.
+
+- **Open:** the Claude Code sessions Claude Code says are open (`claude agents --json`), and the Codex sessions that
+  wrote to their logs today (Codex keeps no list of open ones; `codex exec` runs, Pacenote's among them, and subagents
+  are left out). Each is in your area (You) whose repository it works in, else under its repository, else "Not in a
+  project". If Claude Code cannot list its sessions, its sessions that wrote today stand in for them.
+- **Where it runs:** told from the process a session runs under: the Claude app, claude.ai (`claude remote-control`),
+  or the terminal or editor app it was started in. A Codex session says whether the Codex app ran it.
+- **State:** working (on a turn), your turn (stopped within the last 30 minutes), or quiet for how long. Codex sessions
+  are told from when they last wrote. **Ended today** has the Claude Code sessions that wrote today and are not open
+  anymore.
+- **A row:** its title (yours, else the tool's, else what you typed first), where it runs, its state, branch and the
+  task it is linked to, and what you typed last. Opened in place, it has what you typed lately, its folder and when it
+  started, its log, read when you ask for it, and the command that continues it in a terminal.
+- **Opening it** goes where it runs: `claude --desktop --resume <id>` for the Claude app, claude.ai's Code page, the
+  Codex app's link for a Codex app session, or the terminal app it runs in, brought to the front.
+
+What it reads stays on this Mac, and your other devices do not see it. Pacenote's own sessions and its data folder are
+left out.
 
 ## The MCP tools
 

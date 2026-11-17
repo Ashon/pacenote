@@ -182,6 +182,12 @@ const bridge = {
     merge: (id, into) => ipcRenderer.invoke('pacenote:you:merge', id, into),
     leave: (id, left) => ipcRenderer.invoke('pacenote:you:leave', id, left),
   },
+  // Sessions: the sessions on this Mac, opening one, and its log
+  sessions: {
+    view: () => ipcRenderer.invoke('pacenote:sessions:view'),
+    open: (id) => ipcRenderer.invoke('pacenote:sessions:open', id),
+    log: (id) => ipcRenderer.invoke('pacenote:sessions:log', id),
+  },
   // Recap: a day, a week or a month of your work, and writing it up
   recap: {
     get: (period, key) => ipcRenderer.invoke('pacenote:recap:get', period, key),

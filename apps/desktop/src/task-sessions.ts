@@ -37,7 +37,7 @@ export function taskSessions(
     desktop
   const env = () => settings.effectiveEnv()
   // Sessions you started yourself, from Claude Code's and Codex's logs on
-  // this Mac (Settings > Todo > Show sessions you start yourself): linked to
+  // this Mac (Settings > Todo > Sessions on this Mac): linked to
   // the task they worked on, or suggested for you to say, at most every 30
   // seconds and never two passes at once (session-links.ts).
   // End-to-end tests look more often (PACENOTE_TASKS_LINK_MS).
@@ -241,5 +241,13 @@ export function taskSessions(
     }
     return rows
   }
-  return { linkSoon: linkSessionsSoon, sessionNow, judgeSoon, working }
+  return {
+    linkSoon: linkSessionsSoon,
+    sessionNow,
+    judgeSoon,
+    working,
+    /** The sessions' logs, read for linking and for the Sessions screen */
+    index: sessionIndex,
+    repos: repoLookup,
+  }
 }

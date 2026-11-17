@@ -378,7 +378,7 @@ export const codexThreadLink = (session: string) =>
   `codex://threads/${encodeURIComponent(session)}`
 
 /** Opens a link in its app (no shell reads it) */
-async function openLink(url: string): Promise<void> {
+export async function openLink(url: string): Promise<void> {
   const opener = process.env.PACENOTE_HANDOFF_OPENER
   if (opener) return standIn(opener, url)
   await run('open', [url])

@@ -61,6 +61,7 @@ import type {
 import type { TasksLive } from './tasks/types.js'
 import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
+import type { SessionsView } from './sessions/types.js'
 import type {
   McpClientId,
   McpClientStatus,
@@ -368,6 +369,17 @@ export interface DesktopBridge {
     merge(id: string, into: string): Promise<YouView | null>
     /** Not yours anymore, or yours again */
     leave(id: string, left: boolean): Promise<YouView | null>
+  }
+  /**
+   * Sessions (src/sessions): the Claude Code and Codex sessions on this Mac,
+   * read here and never sent anywhere
+   */
+  sessions: {
+    view(): Promise<SessionsView | null>
+    /** Opens a session where it runs: its app, claude.ai or its terminal */
+    open(id: string): Promise<{ error?: string }>
+    /** A session's own log, read when you open it */
+    log(id: string): Promise<{ items?: SessionItem[]; error?: string }>
   }
   /** Recap (src/you/recap.ts): a day, a week or a month of your work */
   recap: {

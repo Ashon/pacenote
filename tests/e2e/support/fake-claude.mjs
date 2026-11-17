@@ -11,7 +11,8 @@
 //     "answer": "default answer" }
 // With --output-format json, only the result comes back, as one object.
 // The bot's startup check (claude --version, claude auth status) is answered
-// without a record: a fake that is installed and signed in.
+// without a record: a fake that is installed and signed in, and so is claude
+// agents --json, from $FAKE_CLAUDE_DIR/agents.json.
 // An interactive session the desktop app opens to continue a task
 // (claude --session-id ID -n NAME PROMPT, or claude --resume ID) is recorded
 // the same way, with its folder, and leaves a transcript where Claude Code
@@ -29,6 +30,22 @@ if (process.argv[2] === '--version') {
 }
 if (process.argv[2] === 'auth') {
   process.stdout.write(`${JSON.stringify({ loggedIn: true })}\n`)
+  process.exit(0)
+}
+
+// claude agents --json: the sessions $FAKE_CLAUDE_DIR/agents.json says are
+// open on this Mac, none without it
+if (process.argv[2] === 'agents') {
+  let list = '[]'
+  try {
+    list = readFileSync(
+      path.join(process.env.FAKE_CLAUDE_DIR ?? '', 'agents.json'),
+      'utf8'
+    )
+  } catch {
+    // No sessions open
+  }
+  process.stdout.write(`${list.trim()}\n`)
   process.exit(0)
 }
 

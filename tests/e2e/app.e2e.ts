@@ -2891,6 +2891,129 @@ else fail('unexpected: ' + args.join(' '))
     240_000
   )
 
+  it('lists the sessions on this Mac once you turn Sessions on: where each runs, whether it waits for you, and its log', async () => {
+    world = await World.create()
+    const { root } = world
+    // A checkout of the repository the sessions work in
+    const checkout = path.join(root, 'git', 'payments')
+    mkdirSync(checkout, { recursive: true })
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    /** A session's log, as Claude Code keeps it */
+    const session = (id: string, lines: Record<string, unknown>[]) => {
+      const project = path.join(
+        root,
+        '.claude',
+        'projects',
+        checkout.replace(/[/.]/g, '-')
+      )
+      mkdirSync(project, { recursive: true })
+      writeFileSync(
+        path.join(project, `${id}.jsonl`),
+        lines
+          .map(
+            (line) =>
+              `${JSON.stringify({ sessionId: id, cwd: checkout, timestamp: new Date().toISOString(), ...line })}\n`
+          )
+          .join('')
+      )
+    }
+    // Open, and waiting for you, with the title you gave it
+    session('open-1', [
+      {
+        type: 'user',
+        gitBranch: 'fix/retry',
+        message: { role: 'user', content: 'Raise max_attempts to 5' },
+      },
+      { type: 'custom-title', customTitle: 'Webhook retry limit' },
+    ])
+    // Ended today: Claude Code no longer lists it
+    session('ended-1', [
+      {
+        type: 'user',
+        message: { role: 'user', content: 'Check the nightly backup' },
+      },
+    ])
+    writeFileSync(
+      path.join(world.claudeDir, 'agents.json'),
+      JSON.stringify([
+        {
+          pid: 999_999,
+          cwd: checkout,
+          kind: 'interactive',
+          startedAt: Date.now() - 20 * 60_000,
+          sessionId: 'open-1',
+          name: 'payments-1a',
+          status: 'idle',
+        },
+      ])
+    )
+    const page = await launch(world, {
+      settings: ['TASKS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+    await page.evaluate("window.location.hash = '#/sessions'")
+
+    // Off: a card says what it would show and what it reads
+    await page.getByText('Your sessions, in one place').waitFor()
+    await page.getByText('1 open now: in a terminal').waitFor()
+    await page.getByText('None wrote to their logs today').waitFor()
+    await page.getByRole('button', { name: 'Show my sessions' }).click()
+
+    // On: the session under its repository, waiting for you
+    await page
+      .getByRole('heading', { name: 'payments' })
+      .waitFor({ timeout: 30_000 })
+    // Its row, and the line at the top that names it
+    const row = page.locator('li', {
+      has: page.getByText('Webhook retry limit'),
+    })
+    const title = row.getByRole('button', { name: 'Webhook retry limit' })
+    await page
+      .getByRole('definition')
+      .getByRole('button', { name: 'Webhook retry limit' })
+      .waitFor()
+    await row.getByText('Your turn').waitFor()
+    await row.getByText('fix/retry').waitFor()
+    await row.getByText('“Raise max_attempts to 5”').waitFor()
+    await row.getByText(/^Claude Code · Terminal · /).waitFor()
+    // No terminal app to bring forward: it runs under none Pacenote knows
+    expect(await row.getByRole('button', { name: /^Show in / }).count()).toBe(0)
+    // Waiting for you, beside Sessions in the sidebar
+    await page
+      .getByRole('navigation')
+      .getByRole('button', { name: /Sessions/ })
+      .getByText('1', { exact: true })
+      .first()
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/sessions.png'),
+    })
+
+    // Opened in place, with its log a click away
+    await title.click()
+    await row.getByText('Started').waitFor()
+    await row.getByRole('button', { name: 'Show the log' }).click()
+    const log = page.getByRole('dialog', { name: 'Session log' })
+    await log.getByText('Raise max_attempts to 5').first().waitFor()
+    await page.keyboard.press('Escape')
+    await log.waitFor({ state: 'detached' })
+
+    // Ended today
+    await page.getByRole('tab', { name: 'Ended today 1' }).click()
+    await page
+      .getByRole('button', { name: 'Check the nightly backup' })
+      .waitFor()
+    // Turned on, it stays on
+    expect(
+      readFileSync(path.join(world.home, 'settings.json'), 'utf8')
+    ).toMatch(/linkSessions"?\s*:\s*true/)
+  }, 120_000)
+
   it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {
     const judged = JSON.stringify({
       done: true,

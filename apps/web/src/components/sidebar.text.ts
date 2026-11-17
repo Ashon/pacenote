@@ -5,6 +5,7 @@ const en = {
   sections: {
     overview: 'Overview',
     tasks: 'Todo',
+    sessions: 'Sessions',
     recap: 'Recap',
     you: 'You',
     runs: 'Runs',
@@ -24,6 +25,7 @@ const ko: typeof en = {
   sections: {
     overview: '개요',
     tasks: '할 일',
+    sessions: '세션',
     recap: '회고',
     you: '나',
     runs: '실행 기록',

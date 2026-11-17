@@ -401,8 +401,8 @@ export const FIELDS_KO: Record<string, FieldWords> = {
     help: '세션이 할 일과 계획을 정리한 다음, 무엇이든 바꾸기 전에 내 확인을 기다려요.',
   },
   TASKS_LINK_SESSIONS: {
-    label: '직접 시작한 세션 보이기',
-    help: '직접 시작한 Claude Code와 Codex 세션을 할 일의 작업 기록에 더해요. 그 할 일에 Pacenote의 할 일 도구를 썼거나, 입력한 내용에 그 Slack 링크가 있었거나, 그 브랜치에서 작업한 세션이에요. 관련 있어 보이기만 하는 세션은 연결하도록 제안해요. 세션 로그는 이 Mac에서 읽고, 그 내용은 이 Mac 밖으로 나가지 않아요.',
+    label: '이 Mac의 세션',
+    help: '이 Mac의 Claude Code와 Codex 세션을 세션 화면에 모아 보여 줘요. 어디서 돌고 있는지, 작업 중인지 내 차례인지요. 직접 시작한 세션은 할 일의 작업 기록에도 더해요. 그 할 일에 Pacenote의 할 일 도구를 썼거나, 입력한 내용에 그 Slack 링크가 있었거나, 그 브랜치에서 작업한 세션이에요. 관련 있어 보이기만 하는 세션은 연결하도록 제안해요. 세션 로그는 이 Mac에서 읽고, 그 내용은 이 Mac 밖으로 나가지 않아요.',
   },
   TASKS_SUGGEST_DONE: {
     label: '끝난 것 같으면 알려 주기',

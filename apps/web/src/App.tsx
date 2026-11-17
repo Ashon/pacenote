@@ -30,6 +30,7 @@ import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
 import { YouPage } from './components/you-page'
+import { SessionsPage } from './components/sessions-page'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
 import { AiSheet } from './components/setup/ai-sheet'
@@ -64,6 +65,7 @@ type Route =
       /** Let your AI help opens over it (#/start) */
       ai?: true
     }
+  | { page: 'sessions' }
   | {
       page: 'you'
       /** The area open in its row */
@@ -83,7 +85,8 @@ type Route =
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
- * the list), #/recap/<day|week|month>[/<key>]: what you did in a period,
+ * the list), #/sessions: the sessions on this Mac,
+ * #/recap/<day|week|month>[/<key>]: what you did in a period,
  * #/you: where you contribute, #/you/<id>: one area open in its row, #/bot:
  * Pace's status and logs,
  * #/settings: Settings, #/setup: setting Pace up (its wizard), #/start:
@@ -104,6 +107,8 @@ function readRoute(): Route {
       entry: task[2] ? decodeURIComponent(task[2]) : undefined,
     }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
+  if (hash.startsWith('#/sessions') && window.pacenoteDesktop?.sessions)
+    return { page: 'sessions' }
   const recap = /^#\/recap(?:\/(day|week|month)(?:\/([^/?#]+))?)?/.exec(hash)
   if (recap)
     return {
@@ -237,6 +242,8 @@ export default function App() {
                     // The same list whether a task is open or not, so its
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
+                  ) : route.page === 'sessions' ? (
+                    <SessionsPage />
                   ) : route.page === 'recap' ? (
                     <RecapPage period={route.period} periodKey={route.key} />
                   ) : route.page === 'you' ? (

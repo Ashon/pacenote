@@ -96,6 +96,7 @@ import { HubAdmin } from './hub-admin.js'
 import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
 import { OpencodeSessions } from './opencode-sessions.js'
+import { OpenSessions } from './open-sessions.js'
 import { hubFromLink } from '../../../src/hub/install.js'
 import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
@@ -115,6 +116,7 @@ import { registerSettingsIpc } from './ipc/settings.js'
 import { registerSetupIpc } from './ipc/setup.js'
 import { registerTaskWorkIpc } from './ipc/task-work.js'
 import { registerTasksIpc } from './ipc/tasks.js'
+import { registerSessionsIpc } from './ipc/sessions.js'
 import { registerYouIpc } from './ipc/you.js'
 import { SetupClaim } from './setup-claim.js'
 import { taskSessions } from './task-sessions.js'
@@ -474,6 +476,13 @@ const cliBins = (): Bins => {
 const opencodeSessions = new OpencodeSessions({
   bin: () => cliBins().opencode,
   env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
+})
+/** The Claude Code sessions open on this Mac, for the Sessions screen */
+const openSessions = new OpenSessions({
+  bin: () => cliBins().claude,
+  env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
+  home: homedir(),
+  warn: (message) => log.warn(message),
 })
 /** How Pacenote's own work runs a CLI on this Mac */
 const ownWork = (cli: OwnCli) => ({
@@ -1063,6 +1072,7 @@ function registerIpc(): void {
     historyMcp: paths.historyMcp,
   })
   registerYouIpc(ipc, desktop)
+  registerSessionsIpc(ipc, desktop, { sessions, openSessions, todo })
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
   stopTasksWatch = watchTasks(dataDir, () =>

@@ -136,7 +136,7 @@ export function SessionLogPanel({
  * One turn of the log: you or the tool, in a bubble with its time, or a tool
  * step on a line of its own
  */
-function LogItem({ item, tool }: { item: SessionItem; tool: string }) {
+export function LogItem({ item, tool }: { item: SessionItem; tool: string }) {
   const t = useText(text)
   if (item.role === 'tool')
     return (

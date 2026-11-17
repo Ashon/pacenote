@@ -275,6 +275,64 @@ describe("the sessions' logs", () => {
     })
   })
 
+  it('keep where a session ran and its titles, and leave out the summary a session goes on from', async () => {
+    const home = dir('titles-home')
+    const project = dir('titles-home', '.claude', 'projects', '-w-payments')
+    writeFileSync(
+      path.join(project, 't1.jsonl'),
+      jsonl(
+        {
+          type: 'user',
+          sessionId: 't1',
+          cwd: '/w/payments',
+          entrypoint: 'cli',
+          timestamp: POSTED,
+          message: { role: 'user', content: 'Look at the retry timeouts' },
+        },
+        { type: 'ai-title', sessionId: 't1', aiTitle: 'Retry timeouts' },
+        {
+          type: 'user',
+          sessionId: 't1',
+          isCompactSummary: true,
+          entrypoint: 'claude-desktop',
+          timestamp: LATER,
+          message: {
+            role: 'user',
+            content: 'This session is being continued from a previous one',
+          },
+        },
+        { type: 'custom-title', sessionId: 't1', customTitle: 'Payments' },
+        { type: 'ai-title', sessionId: 't1', aiTitle: 'Retry backoff' }
+      )
+    )
+    const codex = dir('titles-home', '.codex', 'sessions', '2026', '10', '13')
+    for (const [id, payload] of [
+      ['x2', { originator: 'Codex Desktop', source: 'vscode' }],
+      ['x3', { originator: 'codex_cli_rs', source: { subagent: 'review' } }],
+    ] as const)
+      writeFileSync(
+        path.join(codex, `rollout-2026-10-13T10-00-00-${id}.jsonl`),
+        jsonl({
+          timestamp: POSTED,
+          type: 'session_meta',
+          payload: { id, cwd: '/w/payments', ...payload },
+        })
+      )
+    const index = new SessionIndex({ home })
+    await index.refresh(NOW)
+    expect(index.session('t1')).toMatchObject({
+      title: 'Payments',
+      autoTitle: 'Retry backoff',
+      entrypoint: 'claude-desktop',
+      prompts: [{ at: POSTED, text: 'Look at the retry timeouts' }],
+    })
+    expect(index.session('x2')).toMatchObject({
+      originator: 'Codex Desktop',
+      source: 'vscode',
+    })
+    expect(index.session('x3')).toMatchObject({ source: 'subagent' })
+  })
+
   it('reads a log from where it was left as it grows, a line once it ends, and a log cut shorter again', async () => {
     const home = dir('grow-home')
     const file = path.join(

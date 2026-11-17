@@ -1,0 +1,617 @@
+import type {
+  SessionGroup,
+  SessionRow,
+  SessionsView,
+  SessionWhere,
+} from '@src/sessions/types'
+import { CLI_NAMES } from '@src/tasks/own-ai'
+import type { SessionItem } from '@src/tasks/types'
+import {
+  AppWindow,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  ListChecks,
+  MessageSquare,
+  MessagesSquare,
+  SquareTerminal,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Page } from '@/components/page'
+import { Pill } from '@/components/task-meta'
+import { Line } from '@/components/task-line'
+import { TaskRowsSkeleton } from '@/components/tasks-list'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { InlineError } from '@/components/ui/inline-error'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { SkeletonWord } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  formatDateTime,
+  formatRelative,
+  formatWait,
+  homePath,
+} from '@/lib/format'
+import { useLocale, useText } from '@/lib/i18n'
+import { useSessions, useShowSessions } from '@/lib/sessions'
+import { cn } from '@/lib/utils'
+import { LogItem } from './session-log'
+import { text } from './sessions-page.text'
+import { text as rowText } from './task-row.text'
+import { resumeCommand } from './task-sessions'
+
+type Words = (typeof text)['en']
+
+const GRID =
+  'mt-7 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-copy'
+
+const OPEN_ICON: Record<SessionWhere, LucideIcon> = {
+  'claude-app': AppWindow,
+  terminal: SquareTerminal,
+  web: ExternalLink,
+  'codex-app': AppWindow,
+}
+
+/** Whether Pacenote can take you to where it runs */
+const canOpen = (s: SessionRow) =>
+  s.state !== 'ended' &&
+  (s.tool === 'codex'
+    ? s.where === 'codex-app'
+    : s.where !== 'terminal' || !!s.terminal)
+
+const openLabel = (s: SessionRow, t: Words) =>
+  s.where === 'terminal' ? t.openIn.terminal(s.terminal) : t.openIn[s.where]
+
+/** The tool and where it runs: "Claude app", "Claude Code · iTerm" */
+function toolWhere(s: SessionRow, t: Words) {
+  if (s.where === 'claude-app' || s.where === 'codex-app')
+    return t.where[s.where]
+  const where =
+    s.where === 'terminal' ? (s.terminal ?? t.where.terminal) : t.where[s.where]
+  return `${CLI_NAMES[s.tool]} · ${where}`
+}
+
+/**
+ * Sessions: the Claude Code and Codex sessions on this Mac, by your area or
+ * repository, each opened in place or where it runs; before it is on, a card
+ * that says what it reads and turns it on
+ */
+export function SessionsPage() {
+  const t = useText(text)
+  const query = useSessions()
+  const view = query.data
+  if (!view)
+    return (
+      <Page title={t.title} meta={<SkeletonWord width="9rem" />}>
+        {query.error ? (
+          <InlineError
+            className="mt-7"
+            error={(query.error as Error).message}
+          />
+        ) : (
+          <div className="mt-7">
+            <TaskRowsSkeleton count={4} />
+          </div>
+        )}
+      </Page>
+    )
+  if (!view.on) return <SessionsOff view={view} />
+  return <SessionsOn view={view} />
+}
+
+function SessionsOn({ view }: { view: SessionsView }) {
+  const t = useText(text)
+  const [tab, setTab] = useState<'open' | 'ended'>('open')
+  const [opened, setOpened] = useState<string[]>([])
+  const [logOf, setLogOf] = useState<SessionRow>()
+  const toggle = (id: string) =>
+    setOpened((ids) =>
+      ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id]
+    )
+  /** A row the briefing named: opened, and scrolled to */
+  const pick = (id: string) => {
+    setTab('open')
+    setOpened((ids) => (ids.includes(id) ? ids : [...ids, id]))
+    requestAnimationFrame(() =>
+      document
+        .getElementById(rowId(id))
+        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    )
+  }
+  const rows = (row: SessionRow) => (
+    <SessionRowItem
+      key={row.id}
+      s={row}
+      open={opened.includes(row.id)}
+      onToggle={() => toggle(row.id)}
+      onLog={() => setLogOf(row)}
+    />
+  )
+  return (
+    <Page title={t.title} meta={t.meta(view.counts.open, view.counts.working)}>
+      <Briefing view={view} onPick={pick} />
+      <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+        <TabsList className="mt-5">
+          <TabsTrigger value="open">
+            {t.tabOpen} {view.counts.open}
+          </TabsTrigger>
+          {view.listed && (
+            <TabsTrigger value="ended">
+              {t.tabEnded} {view.counts.ended}
+            </TabsTrigger>
+          )}
+        </TabsList>
+      </Tabs>
+      {!view.listed && (
+        <p className="mt-4 text-meta text-muted-foreground">{t.notListed}</p>
+      )}
+      {tab === 'open' ? (
+        view.open.length ? (
+          view.open.map((g) => (
+            <GroupSection key={g.key} g={g}>
+              {g.sessions.map(rows)}
+            </GroupSection>
+          ))
+        ) : (
+          <p className="mt-7 text-copy text-muted-foreground">{t.noneOpen}</p>
+        )
+      ) : view.ended.length ? (
+        <ul className="mt-5">{view.ended.map(rows)}</ul>
+      ) : (
+        <p className="mt-7 text-copy text-muted-foreground">{t.noneEnded}</p>
+      )}
+      {logOf && <LogSheet s={logOf} onClose={() => setLogOf(undefined)} />}
+    </Page>
+  )
+}
+
+const rowId = (id: string) => `session-${id.replace(/[^\w-]/g, '-')}`
+
+/** Your turn and working, at the top, each a link to its row */
+function Briefing({
+  view,
+  onPick,
+}: {
+  view: SessionsView
+  onPick: (id: string) => void
+}) {
+  const t = useText(text)
+  const all = view.open.flatMap((g) =>
+    g.sessions.map((s) => ({ s, group: g.name ?? t.notInProject }))
+  )
+  const turn = all.filter(({ s }) => s.state === 'turn')
+  const working = all.filter(({ s }) => s.state === 'working')
+  if (!turn.length && !working.length) return null
+  const link = (s: SessionRow) => (
+    <button
+      type="button"
+      className="rounded-sm text-left hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+      onClick={() => onPick(s.id)}
+    >
+      {s.title}
+    </button>
+  )
+  return (
+    <dl className={GRID}>
+      {turn[0] && (
+        <>
+          <dt className="text-muted-foreground">{t.yourTurnLabel}</dt>
+          <dd className="truncate">
+            {link(turn[0].s)}
+            <span className="text-muted-foreground">
+              {' · '}
+              {turn[0].group} · {formatRelative(turn[0].s.lastAt)}
+              {turn.length > 1 && ` · ${t.andMore(turn.length - 1)}`}
+            </span>
+          </dd>
+        </>
+      )}
+      {working.length > 0 && (
+        <>
+          <dt className="text-muted-foreground">{t.workingLabel}</dt>
+          <dd className="truncate">
+            {working.slice(0, 2).map(({ s }, index) => (
+              <span key={s.id}>
+                {index > 0 && <span className="text-muted-foreground">, </span>}
+                {link(s)}
+              </span>
+            ))}
+            {working.length > 2 && (
+              <span className="text-muted-foreground">
+                {' · '}
+                {t.andMore(working.length - 2)}
+              </span>
+            )}
+          </dd>
+        </>
+      )}
+    </dl>
+  )
+}
+
+function GroupSection({
+  g,
+  children,
+}: {
+  g: SessionGroup
+  children: ReactNode
+}) {
+  const t = useText(text)
+  const working = g.sessions.filter((s) => s.state === 'working').length
+  const turn = g.sessions.filter((s) => s.state === 'turn').length
+  return (
+    <section className="mt-7">
+      <div className="flex items-baseline gap-2.5">
+        <h2
+          className={cn(
+            'text-section',
+            !g.name && 'font-medium text-muted-foreground'
+          )}
+        >
+          {g.name ?? t.notInProject}
+        </h2>
+        {g.repo && (
+          <span className="font-mono text-meta text-muted-foreground">
+            {g.repo}
+          </span>
+        )}
+        <span className="flex-1" />
+        <span className="text-meta text-muted-foreground">
+          {t.groupLine(g.sessions.length, working, turn)}
+        </span>
+      </div>
+      <ul className="mt-2">{children}</ul>
+    </section>
+  )
+}
+
+/** Working, your turn, quiet or ended: the session's state on its row */
+function StateMark({ s }: { s: SessionRow }) {
+  const t = useText(text)
+  if (s.state === 'working')
+    return (
+      <span className="inline-flex items-center gap-1.5 font-medium text-status-running">
+        <span
+          aria-hidden="true"
+          className="size-1.5 rounded-full bg-status-running"
+        />
+        {t.working}
+      </span>
+    )
+  if (s.state === 'turn')
+    return (
+      <Pill tone="primary" className="gap-1.5">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
+        {t.yourTurn}
+      </Pill>
+    )
+  return (
+    <Pill>
+      {s.state === 'ended'
+        ? t.ended
+        : t.quiet(formatWait(Date.now() - Date.parse(s.lastAt)))}
+    </Pill>
+  )
+}
+
+function OpenButton({
+  s,
+  onError,
+  size,
+}: {
+  s: SessionRow
+  onError: (error?: string) => void
+  size?: 'sm'
+}) {
+  const t = useText(text)
+  const Icon = OPEN_ICON[s.where]
+  return (
+    <Button
+      variant="outline"
+      size={size}
+      onClick={() =>
+        void window.pacenoteDesktop?.sessions
+          .open(s.id)
+          .then((result) => onError(result?.error))
+      }
+    >
+      <Icon />
+      {openLabel(s, t)}
+    </Button>
+  )
+}
+
+function SessionRowItem({
+  s,
+  open,
+  onToggle,
+  onLog,
+}: {
+  s: SessionRow
+  open: boolean
+  onToggle: () => void
+  onLog: () => void
+}) {
+  const t = useText(text)
+  const [error, setError] = useState<string>()
+  const last = s.typed[0]
+  return (
+    <li
+      id={rowId(s.id)}
+      className={cn(
+        'border-t border-border py-3.5',
+        s.state === 'ended' && !open && 'opacity-60'
+      )}
+    >
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1 pl-6">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            className="group -ml-6 flex items-start gap-2 rounded-sm text-left text-section leading-snug focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <ChevronRight
+              aria-hidden="true"
+              className={cn(
+                'mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform',
+                open && 'rotate-90'
+              )}
+            />
+            <span className="group-hover:underline">{s.title}</span>
+          </button>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
+            {/* A quiet one says how long on its pill */}
+            {s.state === 'quiet'
+              ? toolWhere(s, t)
+              : [toolWhere(s, t), formatRelative(s.lastAt)].join(' · ')}
+            <StateMark s={s} />
+            {s.branch && <span className="font-mono">{s.branch}</span>}
+            {s.task && (
+              <a
+                href={`#/tasks/${encodeURIComponent(s.task.id)}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-px font-medium hover:text-foreground"
+              >
+                <ListChecks aria-hidden="true" className="size-3" />
+                {s.task.title}
+              </a>
+            )}
+          </p>
+          {!open && last && (
+            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
+              <MessageSquare aria-hidden="true" className="size-3 shrink-0" />
+              <span className="truncate">“{last.text}”</span>
+            </p>
+          )}
+        </div>
+        {canOpen(s) && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <OpenButton s={s} onError={setError} />
+          </div>
+        )}
+      </div>
+      <InlineError error={error} className="mt-2 pl-6" />
+      {open && <Opened s={s} onLog={onLog} />}
+    </li>
+  )
+}
+
+function CopyResume({ s }: { s: SessionRow }) {
+  const t = useText(text)
+  const command = `${resumeCommand(s.tool)} ${s.session}`
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      aria-label={t.copyResume(command)}
+      onClick={() => void navigator.clipboard.writeText(command)}
+    >
+      <Copy />
+      <span className="font-mono text-meta">
+        {resumeCommand(s.tool)} {s.session.slice(0, 8)}…
+      </span>
+    </Button>
+  )
+}
+
+/** A session opened in place: what you typed, where, and its log */
+function Opened({ s, onLog }: { s: SessionRow; onLog: () => void }) {
+  const t = useText(text)
+  return (
+    <div className="flex flex-col gap-2 pt-2.5 pl-6">
+      <div className="flex flex-col gap-0.5 rounded-xl bg-well px-3.5 py-3">
+        {s.typed.length > 0 && (
+          <div className="grid min-h-[30px] grid-cols-[6rem_minmax(0,1fr)_auto] items-start gap-3 text-body">
+            <span className="pt-1.5 text-meta text-muted-foreground">
+              {t.youAsked}
+            </span>
+            <span className="flex min-w-0 flex-col gap-1 py-1">
+              {s.typed.map((typed, index) => (
+                <span key={index} className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate select-text">{typed.text}</span>
+                  {typed.at && (
+                    <span className="shrink-0 text-meta text-muted-foreground">
+                      {formatRelative(typed.at)}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </span>
+            <span />
+          </div>
+        )}
+        {s.branch && (
+          <Line label={t.branch}>
+            <span className="font-mono select-text">{s.branch}</span>
+          </Line>
+        )}
+        <Line label={t.folder}>
+          <span className="font-mono select-text">{homePath(s.cwd)}</span>
+        </Line>
+        {s.task && (
+          <Line label={t.task}>
+            <a
+              href={`#/tasks/${encodeURIComponent(s.task.id)}`}
+              className="hover:text-primary"
+            >
+              {s.task.title}
+            </a>
+          </Line>
+        )}
+        <Line label={t.started}>
+          <span>{formatDateTime(s.startedAt)}</span>
+        </Line>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={onLog}>
+            <MessagesSquare />
+            {t.showLog}
+          </Button>
+          <CopyResume s={s} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** A session's own log, read from its tool's files when you open it */
+function LogSheet({ s, onClose }: { s: SessionRow; onClose: () => void }) {
+  const t = useText(text)
+  const r = useText(rowText)
+  const tool = CLI_NAMES[s.tool]
+  const [log, setLog] = useState<{ items?: SessionItem[]; error?: string }>()
+  const [error, setError] = useState<string>()
+  useEffect(() => {
+    void window.pacenoteDesktop?.sessions
+      .log(s.id)
+      .then((result) => setLog(result ?? {}))
+  }, [s.id])
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        variant="sheet"
+        aria-describedby={undefined}
+        className="w-[40rem] max-w-[calc(100vw-1rem)]"
+      >
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
+          <DialogTitle className="text-section">{r.sessionLog}</DialogTitle>
+          <span className="flex-1" />
+          <DialogClose asChild>
+            <Button size="icon-sm" variant="ghost" aria-label={r.closeLog}>
+              <X />
+            </Button>
+          </DialogClose>
+        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="flex flex-col gap-4 px-6 py-5">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-heading">{s.title}</h2>
+              <p className="text-meta text-muted-foreground">
+                {toolWhere(s, t)} ·{' '}
+                <span className="font-mono">{homePath(s.cwd)}</span> ·{' '}
+                {formatDateTime(s.startedAt)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canOpen(s) && <OpenButton s={s} onError={setError} size="sm" />}
+              <CopyResume s={s} />
+            </div>
+            <InlineError error={error} />
+            {!log ? (
+              <p className="text-copy text-muted-foreground">{r.readingLog}</p>
+            ) : log.error ? (
+              <p className="text-copy text-muted-foreground">{log.error}</p>
+            ) : (
+              <ol className="flex flex-col gap-3">
+                {(log.items ?? []).map((item, index) => (
+                  <LogItem key={index} item={item} tool={tool} />
+                ))}
+              </ol>
+            )}
+            <p className="flex items-start gap-1.5 text-meta text-muted-foreground">
+              <MessagesSquare className="mt-px size-3.5 shrink-0" />
+              {r.readFrom(tool)}
+            </p>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Before Sessions is on: what it would show, what it reads, and a switch */
+function SessionsOff({ view }: { view: SessionsView }) {
+  const t = useText(text)
+  const locale = useLocale()
+  const show = useShowSessions()
+  const [busy, setBusy] = useState(false)
+  const list = (items: string[]) =>
+    new Intl.ListFormat(locale, { type: 'conjunction' }).format(items)
+  const found = view.found
+  const tools = [
+    {
+      icon: AppWindow,
+      title: CLI_NAMES.claude,
+      body: t.claudeOpen(
+        found?.claude.open ?? 0,
+        list((found?.claude.where ?? []).map((where) => t.inWhere[where]))
+      ),
+    },
+    {
+      icon: SquareTerminal,
+      title: CLI_NAMES.codex,
+      body: t.codexToday(found?.codex.today ?? 0),
+    },
+  ]
+  return (
+    <Page title={t.title}>
+      <section className="mt-5 rounded-xl bg-card-accent px-5 pt-4 pb-3">
+        <h2 className="text-section">{t.offTitle}</h2>
+        <p className="mt-0.5 max-w-[44rem] text-meta text-muted-foreground">
+          {t.offLead}
+        </p>
+        <ul className="mt-3 flex flex-col divide-y divide-border border-t border-border">
+          {tools.map(({ icon: Icon, title, body }) => (
+            <li key={title} className="flex items-center gap-3 py-3">
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-card text-primary [&_svg]:size-4">
+                <Icon />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-row">{title}</p>
+                <p className="text-meta text-muted-foreground">{body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <footer className="mt-1 flex items-center gap-2 border-t border-border pt-3">
+          <p className="min-w-0 flex-1 text-meta text-muted-foreground">
+            {/* The first read of the logs can take a while */}
+            {busy ? t.reading : t.offFoot}
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() => (window.location.hash = '#/tasks')}
+          >
+            {t.notNow}
+          </Button>
+          <Button
+            disabled={busy}
+            onClick={() => {
+              setBusy(true)
+              void show().finally(() => setBusy(false))
+            }}
+          >
+            {t.show}
+          </Button>
+        </footer>
+      </section>
+    </Page>
+  )
+}
