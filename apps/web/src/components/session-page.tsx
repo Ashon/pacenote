@@ -39,6 +39,7 @@ import {
 import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonWord } from '@/components/ui/skeleton'
+import { remoteMac } from '@/lib/desktop'
 import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { canShow } from '@/lib/session-rows'
@@ -123,7 +124,10 @@ export function SessionPage({ id }: { id: string }) {
     <div className="flex h-full flex-col">
       <ScrollArea viewportRef={scroller} className="min-h-0 flex-1">
         <div className="@container mx-auto max-w-4xl px-10 pt-9 pb-6">
-          <nav className="flex items-center gap-1.5 text-meta text-muted-foreground">
+          <nav
+            data-page-crumbs
+            className="flex items-center gap-1.5 text-meta text-muted-foreground"
+          >
             <a href="#/sessions" className="hover:text-foreground">
               {l.title}
             </a>
@@ -315,6 +319,8 @@ function MessageBox({
   sendLabel?: string
 }) {
   const t = useText(text)
+  const mac = remoteMac()
+  const foot = mac ? t.footOn(mac) : t.foot
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
@@ -377,7 +383,7 @@ function MessageBox({
         </div>
       </div>
       <InlineError error={error} className="mt-2" />
-      <p className="mt-2 text-meta text-muted-foreground">{t.foot}</p>
+      <p className="mt-2 text-meta text-muted-foreground">{foot}</p>
     </form>
   )
 }
@@ -488,10 +494,13 @@ function Bar({
   )
 }
 
-/** Where it runs, when Pacenote can take you there */
+/**
+ * Where it runs, when Pacenote can take you there: on the Mac, not from a
+ * device of yours, which talks to it here
+ */
 function SessionButtons({ talk }: { talk: SessionTalk }) {
   const [error, setError] = useState<string>()
-  if (!canShow(talk.row)) return null
+  if (remoteMac() || !canShow(talk.row)) return null
   return (
     <>
       <ShowButton s={talk.row} onError={setError} size="sm" />
@@ -502,7 +511,8 @@ function SessionButtons({ talk }: { talk: SessionTalk }) {
 
 /**
  * The session's other buttons: where it runs, its resume command, and,
- * for one Pacenote runs, ending its run here
+ * for one Pacenote runs, ending its run here. A device of yours has the last
+ * alone: the first two are the Mac's own terminal and apps.
  */
 function SessionMenu({ talk }: { talk: SessionTalk }) {
   const t = useText(text)
@@ -510,8 +520,10 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
   const act = useSessionActions(talk.row.id)
   const { row } = talk
   const command = `${resumeCommand(row.tool)} ${row.session}`
-  const show = canShow(row)
+  const onMac = !remoteMac()
+  const show = onMac && canShow(row)
   const running = talk.live && row.where === 'pacenote'
+  if (!onMac && !running) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -529,17 +541,19 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
               : l.openIn[row.where]}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem
-          onSelect={() => void navigator.clipboard.writeText(command)}
-        >
-          <Copy />
-          {l.copyResume(
-            `${resumeCommand(row.tool)} ${row.session.slice(0, 8)}…`
-          )}
-        </DropdownMenuItem>
+        {onMac && (
+          <DropdownMenuItem
+            onSelect={() => void navigator.clipboard.writeText(command)}
+          >
+            <Copy />
+            {l.copyResume(
+              `${resumeCommand(row.tool)} ${row.session.slice(0, 8)}…`
+            )}
+          </DropdownMenuItem>
+        )}
         {running && (
           <>
-            <DropdownMenuSeparator />
+            {onMac && <DropdownMenuSeparator />}
             <DropdownMenuItem onSelect={() => void act.end()}>
               <Power />
               {t.endHere}

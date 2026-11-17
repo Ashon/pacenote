@@ -389,7 +389,7 @@ export interface DesktopBridge {
   }
   /**
    * Sessions (src/sessions): the Claude Code and Codex sessions on this Mac,
-   * read here and never sent anywhere
+   * read here and sent only to your own devices that ask (src/macs/asks.ts)
    */
   sessions: {
     view(): Promise<SessionsView | null>

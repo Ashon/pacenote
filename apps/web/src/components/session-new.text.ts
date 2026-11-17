@@ -6,8 +6,13 @@ const en = {
   fromTask: (repo?: string) =>
     repo ? `From your tasks · ${repo}` : 'From your tasks',
   lead: 'Claude Code runs it here, in the folder you choose.',
+  /** From your phone or iPad: the Mac it runs on */
+  leadOn: (mac: string) =>
+    `Claude Code runs it on ${mac}, in the folder you choose.`,
   runIn: 'Runs in',
   here: 'Claude Code, here in Pacenote',
+  /** From your phone or iPad: the Mac it runs on */
+  hereOn: (mac: string) => `Claude Code, on ${mac}`,
   folder: 'Folder',
   noFolder: 'No folder yet',
   change: 'Change',
@@ -28,8 +33,10 @@ const ko: typeof en = {
   title: '새 세션',
   fromTask: (repo) => (repo ? `할 일에서 · ${repo}` : '할 일에서'),
   lead: '선택한 폴더에서 Claude Code가 여기서 실행돼요.',
+  leadOn: (mac) => `Claude Code가 ${mac}의 선택한 폴더에서 실행돼요.`,
   runIn: '실행',
   here: 'Claude Code, 여기 Pacenote에서',
+  hereOn: (mac) => `Claude Code, ${mac}에서`,
   folder: '폴더',
   noFolder: '아직 폴더가 없어요',
   change: '바꾸기',

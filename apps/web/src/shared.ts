@@ -22,6 +22,11 @@ export { RunDetail } from './components/run-detail'
 export { RunList } from './components/run-list'
 export { SettingsPage } from './components/settings-page'
 export { YouPage } from './components/you-page'
+// The sessions on the Mac, a session's page to talk to it there, and a new
+// one (from a task's Continue here): the Mac runs them, the device talks
+export { SessionsPage } from './components/sessions-page'
+export { SessionPage } from './components/session-page'
+export { NewSessionPage } from './components/session-new'
 export { PacenoteMark } from './components/logo'
 // The mark at work, which the app's pull to refresh shows as it waits
 export { PaceSpinner } from './components/pace-spinner'
@@ -42,6 +47,7 @@ export { text as firstRunText } from './components/setup/first-run.text'
 export { text as partsText } from './components/setup/parts.text'
 export { text as recapPageText } from './components/recap-page.text'
 export { text as runListText } from './components/run-list.text'
+export { text as sessionNewText } from './components/session-new.text'
 export { text as settingsPageText } from './components/settings-page.text'
 export { text as sidebarText } from './components/sidebar.text'
 export { text as taskRowText } from './components/task-row.text'
@@ -147,6 +153,8 @@ export type {
   WorkTool,
 } from '@src/tasks/types'
 export { taskArea } from '@src/you/task-area'
+// A session's page as the Mac answers it: the phone's bar takes its title
+export type { SessionTalk } from '@src/sessions/types'
 // New task's project: guessed from its words, or one you pick
 export { areaChoices, guessArea } from '@src/you/guess'
 export type { AreaChoice, AreaGuess } from '@src/you/guess'

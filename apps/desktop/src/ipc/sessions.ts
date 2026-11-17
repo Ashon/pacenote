@@ -80,7 +80,9 @@ function claudeLog(home: string, session: string): string | undefined {
 /**
  * Sessions: the Claude Code and Codex sessions on this Mac, where each runs
  * and whether it waits for you (src/sessions), and opening one where it runs.
- * For the window alone: your devices do not see your sessions (U10).
+ * The window and your own devices (a phone, an iPad) use them, the device
+ * over its sealed channel (src/macs/asks.ts): you talk there to a session
+ * this Mac runs. Opening one in its terminal or app is the window's alone.
  */
 export function registerSessionsIpc(
   ipc: Ipc,
@@ -222,7 +224,7 @@ export function registerSessionsIpc(
     return { on: true, ...view }
   }
 
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:view',
     () => null,
     () =>
@@ -286,7 +288,7 @@ export function registerSessionsIpc(
   }
 
   /** Links a session to an open task: it is that task's work */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:link',
     () => ({ error: localized(text).noSuchSession }),
     (id, taskId) => {
@@ -303,7 +305,7 @@ export function registerSessionsIpc(
   )
 
   /** Takes a session off its task: not found for it again */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:unlink',
     () => ({ error: localized(text).noSuchSession }),
     (id) => {
@@ -320,7 +322,7 @@ export function registerSessionsIpc(
    * A task of your own from a session, in its repository's project, with
    * the session as its work
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:make-task',
     () => ({ error: localized(text).noSuchSession }),
     (id) => {
@@ -385,7 +387,7 @@ export function registerSessionsIpc(
    * A session's page: its conversation from its tool's own log, read again
    * as it grows, and how Pacenote runs it
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:talk',
     () => null,
     async (id): Promise<SessionTalk | null> => {
@@ -431,7 +433,7 @@ export function registerSessionsIpc(
    * Sends a session what you typed: Pacenote runs it from then on, unless it
    * is open somewhere else, where you type instead
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:send',
     () => ({ error: localized(text).noSuchSession }),
     async (id, message) => {
@@ -448,7 +450,7 @@ export function registerSessionsIpc(
    * Continues a session open somewhere else in a copy Pacenote runs, with
    * what you typed; the copy is the same task's work
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:copy',
     () => ({ error: localized(text).noSuchSession }),
     async (id, message) => {
@@ -479,7 +481,7 @@ export function registerSessionsIpc(
    * message: for a task, from Todo's Continue, it is the task's work, its
    * folder kept for its repository, and named after it. Its page's id.
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:start',
     () => ({ error: localized(text).noSuchSession }),
     (how) => {
@@ -546,7 +548,7 @@ export function registerSessionsIpc(
   )
 
   /** Your answer to what it asks: allow, allow in this session, or deny */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:answer',
     () => ({ error: localized(text).noSuchSession }),
     (id, ask, answer, message) => {
@@ -571,7 +573,7 @@ export function registerSessionsIpc(
   )
 
   /** Stops the turn it is on */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:stop',
     () => ({ error: localized(text).noSuchSession }),
     (id) => {
@@ -581,7 +583,7 @@ export function registerSessionsIpc(
   )
 
   /** Ends its run here; the conversation stays in Claude Code's log */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:end',
     () => ({ error: localized(text).noSuchSession }),
     (id) => {
@@ -592,7 +594,7 @@ export function registerSessionsIpc(
   )
 
   /** Changes how it asks before it acts */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:sessions:mode',
     () => ({ error: localized(text).noSuchSession }),
     (id, mode) => {

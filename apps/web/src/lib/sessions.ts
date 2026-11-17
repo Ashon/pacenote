@@ -7,6 +7,7 @@ import type {
 } from '@src/sessions/types'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { remoteMac } from './desktop'
 
 /**
  * The sessions on this Mac (src/sessions), from the desktop app. The screen
@@ -20,6 +21,11 @@ const CHANGED_MS = 1_500
 /** A session's page: while it works or is open elsewhere, and otherwise */
 const TALK_BUSY_MS = 2_000
 const TALK_MS = 5_000
+/**
+ * On a device of yours, while it works: the Mac tells a device nothing as it
+ * writes (onLive), so the page asks again sooner for the answer as it comes
+ */
+const TALK_REMOTE_BUSY_MS = 1_000
 
 export function useSessions(asker: keyof typeof EVERY = 'screen') {
   const bridge = window.pacenoteDesktop?.sessions
@@ -132,7 +138,9 @@ export function useSessionTalk(id: string) {
       return talk?.live?.busy ||
         talk?.row.state === 'working' ||
         talk?.typeIn === 'elsewhere'
-        ? TALK_BUSY_MS
+        ? remoteMac()
+          ? TALK_REMOTE_BUSY_MS
+          : TALK_BUSY_MS
         : TALK_MS
     },
   })

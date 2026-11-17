@@ -10,9 +10,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DeviceAnswers } from '../apps/desktop/src/device-answers.js'
 import type { Desktop } from '../apps/desktop/src/ipc/context.js'
 import type { Ipc, Run } from '../apps/desktop/src/ipc/gate.js'
 import { SessionHost } from '../apps/desktop/src/session-host.js'
+import type { HistoryReader } from '../src/history/reader.js'
+import { DEVICE_ASKS } from '../src/macs/asks.js'
 import type { SessionTalk } from '../src/sessions/types.js'
 import { readRepos } from '../src/tasks/folders.js'
 import { readWork } from '../src/tasks/work.js'
@@ -70,9 +73,23 @@ afterAll(() => host.endAll())
 
 /** The channels as the window would call them */
 const channels = new Map<string, Run>()
+/** And as your devices ask for them (DeviceAnswers), the ones they may */
+const logged: string[] = []
+const devices = new DeviceAnswers({
+  reader: {} as HistoryReader,
+  peerName: () => 'iPhone',
+  log: (line) => logged.push(line),
+})
+const windowOnly = new Set<string>()
 const ipc = {
-  windowOnly: (channel: string, _denied: unknown, run: Run) =>
-    channels.set(channel, run),
+  windowOnly: (channel: string, _denied: unknown, run: Run) => {
+    windowOnly.add(channel)
+    channels.set(channel, run)
+  },
+  handleDenying: (channel: string, _denied: unknown, run: Run) => {
+    devices.bridge(channel, run)
+    channels.set(channel, run)
+  },
 } as unknown as Ipc
 registerSessionsIpc(
   ipc,
@@ -227,5 +244,56 @@ describe('starting a session Pacenote runs', () => {
     expect(procs.at(-1)!.args).not.toContain('--name')
     expect(procs.at(-1)!.args).not.toContain('--permission-mode')
     expect(readWork(dataDir).entries).toHaveLength(before)
+  })
+})
+
+describe('a session from your phone', () => {
+  it('answers the sessions asks a device may make, and opens none on the Mac', () => {
+    const asked = Object.entries(DEVICE_ASKS)
+      .filter(([what]) => what.startsWith('sessions.'))
+      .map(([, channel]) => channel)
+    expect(asked.length).toBeGreaterThan(5)
+    for (const channel of asked) {
+      expect(channels.has(channel)).toBe(true)
+      expect(windowOnly.has(channel)).toBe(false)
+    }
+    // Where it runs, a terminal or an app on the Mac, is the window's
+    expect(windowOnly.has('pacenote:sessions:open')).toBe(true)
+    expect(Object.hasOwn(DEVICE_ASKS, 'sessions.open')).toBe(false)
+  })
+
+  it('starts one in a folder of your work, and talks to it, as the Mac does', async () => {
+    const before = procs.length
+    // Not anywhere on the Mac: a folder of your work, as on the Mac
+    await expect(
+      devices.answer(
+        'sessions.start',
+        [{ folder: path.join(home, 'gone'), message: 'Look' }],
+        'phone-1'
+      )
+    ).resolves.toMatchObject({ error: expect.stringMatching(/folder/) })
+    const started = (await devices.answer(
+      'sessions.start',
+      [{ folder, message: 'Look at the retry from my phone' }],
+      'phone-1'
+    )) as { id: string }
+    expect(started.id).toMatch(/^claude:/)
+    expect(procs).toHaveLength(before + 1)
+    const proc = procs.at(-1)!
+    expect(proc.cwd).toBe(folder)
+    expect(JSON.parse(proc.written.trim()).message.content).toBe(
+      'Look at the retry from my phone'
+    )
+    // Its page, and what you type next, from the phone
+    const talk = (await devices.answer(
+      'sessions.talk',
+      [started.id],
+      'phone-1'
+    )) as SessionTalk
+    expect(talk.row.where).toBe('pacenote')
+    expect(talk.typeIn).toBe('here')
+    // A change goes in the log, by the device's name; what it reads does not
+    expect(logged).toContain('iPhone asked: sessions.start')
+    expect(logged.some((line) => line.includes('sessions.talk'))).toBe(false)
   })
 })

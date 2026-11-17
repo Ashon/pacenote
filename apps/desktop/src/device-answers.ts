@@ -4,6 +4,7 @@ import {
   API_ASK,
   DEVICE_ASKS,
   argsFromDevice,
+  isDeviceRead,
   valueForDevice,
   type DeviceAsk,
 } from '../../../src/macs/asks.js'
@@ -51,7 +52,7 @@ export class DeviceAnswers {
           (taken[0] ?? {}) as object
         ).join(', ')}`
       )
-    else if (!/\.(get|state|now|status|validate)$/.test(what))
+    else if (!isDeviceRead(what) && what !== 'settings.validate')
       log(`${peerName(peer)} asked: ${what}`)
     return valueForDevice(what, await run(...taken))
   }

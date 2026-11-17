@@ -218,7 +218,9 @@ const en = {
     } with the task written in. Start it there.`,
 
   // The folder dialog
-  whereIsRepo: (repo: string) => `Where is ${repo} on this Mac?`,
+  /** mac: the Mac it is on, by its name, from your phone or iPad */
+  whereIsRepo: (repo: string, mac?: string) =>
+    `Where is ${repo} on ${mac ?? 'this Mac'}?`,
   whereToOpen: 'Where should the session open?',
   /** remembers: the folder is kept for the task's repository */
   opensHere: (tool: string, remembers: boolean) =>
@@ -227,9 +229,13 @@ const en = {
         ? ' Pacenote remembers it for this repository; change it in Settings > Todo.'
         : ''
     }`,
+  /** A new session of no task */
+  opensFolder: (tool: string) => `${tool} opens in this folder.`,
   folder: 'Folder',
-  lookingForRepo: (repo: string) => `Looking for ${repo} on this Mac.`,
+  lookingForRepo: (repo: string, mac?: string) =>
+    `Looking for ${repo} on ${mac ?? 'this Mac'}.`,
   lookingForFolders: 'Looking for the folders you worked in.',
+  noFolders: 'No folders of your work yet. Start one on your Mac first.',
   noCheckout: (repo: string) =>
     `No checkout of ${repo} found under your usual folders.`,
   remote: (remote: string) => `Its remote is ${remote}`,
@@ -239,8 +245,13 @@ const en = {
   notRepo: (repo: string) => `not ${repo}`,
   used: (when: string) => `used ${when}`,
   chooseFolder: 'Choose another folder',
-  runsAsYou: (tool: string) =>
-    `${tool} runs as you, with your own permissions, and asks you before it changes anything. Pacenote opens the session and hands it the task; it runs no commands itself.`,
+  /** withTask: the session is a task's, handed to it */
+  runsAsYou: (tool: string, withTask = true) =>
+    `${tool} runs as you, with your own permissions, and asks you before it changes anything. ${
+      withTask
+        ? 'Pacenote opens the session and hands it the task; it runs no commands itself.'
+        : 'Pacenote opens the session; it runs no commands itself.'
+    }`,
   cancel: 'Cancel',
   openHere: (tool: string) => `Open ${tool} here`,
 
@@ -455,7 +466,8 @@ const ko: typeof en = {
   opensHereInPacenote: (folder) =>
     `${folder ? `${folder}에서 ` : ''}할 일을 적어 둔 새 세션이 여기 Pacenote에서 열려요. 거기서 시작하세요.`,
 
-  whereIsRepo: (repo) => `이 Mac에서 ${josa(repo, '은/는')} 어디에 있나요?`,
+  whereIsRepo: (repo, mac) =>
+    `${mac ?? '이 Mac'}에서 ${josa(repo, '은/는')} 어디에 있나요?`,
   whereToOpen: '세션을 어디서 열까요?',
   opensHere: (tool, remembers) =>
     `${josa(tool, '이/가')} 이 폴더에서 할 일을 받아 열려요.${
@@ -463,9 +475,12 @@ const ko: typeof en = {
         ? ' Pacenote가 이 저장소의 폴더로 기억해요. 설정 > 할 일에서 바꿀 수 있어요.'
         : ''
     }`,
+  opensFolder: (tool) => `${josa(tool, '이/가')} 이 폴더에서 열려요.`,
   folder: '폴더',
-  lookingForRepo: (repo) => `이 Mac에서 ${josa(repo, '을/를')} 찾고 있어요.`,
+  lookingForRepo: (repo, mac) =>
+    `${mac ?? '이 Mac'}에서 ${josa(repo, '을/를')} 찾고 있어요.`,
   lookingForFolders: '작업했던 폴더를 찾고 있어요.',
+  noFolders: '아직 작업한 폴더가 없어요. Mac에서 먼저 시작해 보세요.',
   noCheckout: (repo) => `자주 쓰는 폴더에서 ${repo} 체크아웃을 찾지 못했어요.`,
   remote: (remote) => `원격 ${remote}`,
   noRemote: '원격 없음',
@@ -474,8 +489,12 @@ const ko: typeof en = {
   notRepo: (repo) => `${repo} 아님`,
   used: (when) => `${when} 사용`,
   chooseFolder: '다른 폴더 선택',
-  runsAsYou: (tool) =>
-    `${josa(tool, '은/는')} 내 권한으로 나로서 실행되고, 무언가를 바꾸기 전에 물어봐요. Pacenote는 세션을 열고 할 일을 넘길 뿐, 직접 명령을 실행하지 않아요.`,
+  runsAsYou: (tool, withTask = true) =>
+    `${josa(tool, '은/는')} 내 권한으로 나로서 실행되고, 무언가를 바꾸기 전에 물어봐요. ${
+      withTask
+        ? 'Pacenote는 세션을 열고 할 일을 넘길 뿐, 직접 명령을 실행하지 않아요.'
+        : 'Pacenote는 세션을 열 뿐, 직접 명령을 실행하지 않아요.'
+    }`,
   cancel: '취소',
   openHere: (tool) => `여기서 ${tool} 열기`,
 

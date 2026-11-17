@@ -44,6 +44,9 @@ const en = {
     auto: 'Auto',
   } satisfies Record<SessionMode, string>,
   foot: "Runs Claude Code on this Mac with your own sign-in. The conversation stays in Claude Code's own log: claude --resume picks it up anywhere.",
+  /** From your phone or iPad */
+  footOn: (mac: string) =>
+    `Claude Code runs on ${mac}, with your own sign-in there.`,
   // Open somewhere else
   elseTitle: (where: string) => `It is open in ${where}, so you type there`,
   elseLead:
@@ -95,6 +98,7 @@ const ko: typeof en = {
     auto: '자동',
   },
   foot: '이 Mac의 Claude Code를 내 로그인으로 실행해요. 대화는 Claude Code의 로그에 남아서 claude --resume으로 어디서든 이어 갈 수 있어요.',
+  footOn: (mac) => `${mac}에서 그 Mac의 내 로그인으로 Claude Code가 실행돼요.`,
   elseTitle: (where) => `${where}에 열려 있어서 그곳에서 입력해요`,
   elseLead:
     'Pacenote는 진행되는 대로 보여 줘요. 한 세션에 두 곳에서 입력하면 엉키기 때문에, 그곳에서 닫으면 여기서 입력할 수 있어요.',

@@ -133,7 +133,11 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   ([src/tasks/hand-over.ts](../src/tasks/hand-over.ts)): the Mac adds only ones new to it, with how you left them there
   (done, dismissed, in progress, waiting), and never changes a task it has. From a device, Todo sync takes only what you
   decided and the stages you set, so a device never makes or changes a task by sending a list. A Mac before 0.6.23
-  answers the handover not-allowed, and the device keeps its tasks.
+  answers the handover not-allowed, and the device keeps its tasks. With Sessions on this Mac on, a device has the
+  Sessions screen and a session's page, and starts and talks to sessions the Mac runs (`sessions.*`, with
+  `tasks.newSession`, `tasks.detail` and `tasks.folders` for Continue here); the Mac starts one only in a folder of your
+  work, and never opens a terminal or an app for a device ([Todo](tasks.md#sessions-on-this-mac)). A Mac before 0.6.33
+  answers those not-allowed.
 - **Pace follows only within one Slack app.** Each Mac says which Slack app Pace answers through there, one way (a hash
   of its key), and Pace moves only between Macs of the same app of your own. Macs that only share Todo never stand by
   for one another.

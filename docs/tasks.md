@@ -273,8 +273,17 @@ on, from the switch or from the screen's card, which says what it reads first.
   opens that session where it runs instead of continuing in a new one (Continue moves under the row's menu). Today has
   a **Sessions** line: how many wait for your turn or work, how many more are quiet, and in which projects.
 
-What it reads stays on this Mac, and your other devices do not see it. Pacenote's own sessions and its data folder are
-left out.
+- **From your phone or iPad:** the Pacenote app on a phone or iPad paired with this Mac has the same Sessions screen
+  and pages, and talks to the sessions this Mac runs: you type, answer what it asks, stop a turn, change how it asks,
+  and start a new one, from a task's **Continue here** or **New session**, while Claude Code does the work on the Mac,
+  with your own sign-in there. A new one starts only in a folder of your work on this Mac: the task's, or one your
+  sessions ran in, as the device cannot browse the Mac's folders. Opening a session in its terminal or app, and its
+  resume command, are the Mac's alone. While it writes, the device asks for its page every second rather than being
+  told. A Mac before 0.6.33 answers a device's sessions not-allowed, and the device says to update it.
+
+What it reads stays on this Mac but for your own devices: a phone or iPad paired with it gets the sessions and their
+pages over its sealed channel ([Your Macs](macs.md)) when you open them, and keeps none of it. Your other Macs do not
+see them. Pacenote's own sessions and its data folder are left out.
 
 ## The MCP tools
 

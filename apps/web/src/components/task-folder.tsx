@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tooltip } from '@/components/ui/tooltip'
+import { remoteMac } from '@/lib/desktop'
 import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -52,7 +53,10 @@ export function OpensIn({
 }
 
 type FolderProps = {
-  task: TaskView
+  /** The task it opens for; none: a new session of no task */
+  task?: TaskView
+  /** The folders to choose from, when not the task's (asked of the Mac) */
+  folders?: FolderCheck[]
   tool: WorkTool
   onOpen: (folder: string) => Promise<string | undefined>
   /** What its button does, when not opening the tool there */
@@ -78,21 +82,29 @@ export function FolderDialog({
   )
 }
 
-function FolderChoice({ task, tool, onOpen, action }: FolderProps) {
+function FolderChoice({ task, folders, tool, onOpen, action }: FolderProps) {
   const t = useText(text)
   const bridge = window.pacenoteDesktop?.tasks
   const [found, setFound] = useState<FolderCheck[]>()
   const [chosen, setChosen] = useState<string>()
   const [error, setError] = useState<string>()
   const [opening, setOpening] = useState(false)
+  const repo = task?.repo
+  const taskId = task?.id
   useEffect(() => {
-    void bridge?.folders(task.id).then((folders) => {
-      setFound(folders)
-      setChosen((current) => current ?? folders[0]?.path)
-    })
-  }, [bridge, task.id])
+    const take = (list: FolderCheck[]) => {
+      setFound(list)
+      setChosen((current) => current ?? list[0]?.path)
+    }
+    if (folders) take(folders)
+    else if (taskId) void bridge?.folders(taskId).then(take)
+  }, [bridge, taskId, folders])
+  // A folder dialog is the Mac's own: from a device, the folders it knows,
+  // on the Mac it names
+  const mac = remoteMac()
+  const canBrowse = !mac
   const choose = async () => {
-    const check = await bridge?.chooseFolder(task.repo)
+    const check = await bridge?.chooseFolder(repo)
     if (!check) return
     setFound((list) => [
       check,
@@ -105,10 +117,12 @@ function FolderChoice({ task, tool, onOpen, action }: FolderProps) {
     <>
       <div className="flex flex-col gap-1.5">
         <DialogTitle className="text-heading">
-          {task.repo ? t.whereIsRepo(task.repo) : t.whereToOpen}
+          {repo ? t.whereIsRepo(repo, mac) : t.whereToOpen}
         </DialogTitle>
         <DialogDescription className="text-body text-muted-foreground">
-          {t.opensHere(CLI_NAMES[tool], Boolean(task.repo))}
+          {task
+            ? t.opensHere(CLI_NAMES[tool], Boolean(repo))
+            : t.opensFolder(CLI_NAMES[tool])}
         </DialogDescription>
       </div>
       <div
@@ -118,36 +132,38 @@ function FolderChoice({ task, tool, onOpen, action }: FolderProps) {
       >
         {found === undefined && (
           <p className="text-body text-muted-foreground">
-            {task.repo ? t.lookingForRepo(task.repo) : t.lookingForFolders}
+            {repo ? t.lookingForRepo(repo, mac) : t.lookingForFolders}
           </p>
         )}
-        {found?.length === 0 && task.repo && (
+        {found?.length === 0 && (
           <p className="text-body text-muted-foreground">
-            {t.noCheckout(task.repo)}
+            {repo ? t.noCheckout(repo) : t.noFolders}
           </p>
         )}
         {found?.map((folder) => (
           <FolderOption
             key={folder.path}
             folder={folder}
-            repo={task.repo}
+            repo={repo}
             chosen={folder.path === chosen}
             onChoose={() => setChosen(folder.path)}
           />
         ))}
-        <Button
-          size="sm"
-          variant="outline"
-          className="self-start"
-          onClick={() => void choose()}
-        >
-          <FolderOpen />
-          {t.chooseFolder}
-        </Button>
+        {canBrowse && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="self-start"
+            onClick={() => void choose()}
+          >
+            <FolderOpen />
+            {t.chooseFolder}
+          </Button>
+        )}
       </div>
       <p className="flex items-start gap-2 rounded-[10px] bg-well px-3 py-2.5 text-meta text-muted-foreground">
         <Lock className="mt-px size-3.5 shrink-0" />
-        {t.runsAsYou(CLI_NAMES[tool])}
+        {t.runsAsYou(CLI_NAMES[tool], Boolean(task))}
       </p>
       <InlineError error={error} />
       <div className="flex justify-end gap-2">

@@ -241,7 +241,7 @@ export function registerTaskWorkIpc(
    * its first message, as a terminal's, with the marker its work entry takes,
    * and the folder its repository opened in last
    */
-  ipc.windowOnly(
+  ipc.handleDenying(
     'pacenote:tasks:new-session',
     () => null,
     (id): NewSessionDraft | null => {

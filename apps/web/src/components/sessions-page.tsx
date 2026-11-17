@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
 import { SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { remoteMac } from '@/lib/desktop'
 import { formatDateTime, formatRelative, homePath } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
 import { canOpen } from '@/lib/session-rows'
@@ -67,6 +68,8 @@ export function SessionsPage() {
 
 function SessionsOn({ view }: { view: SessionsView }) {
   const t = useText(text)
+  // From your phone or iPad: the Mac they are on, by its name
+  const remote = remoteMac()
   const [tab, setTab] = useState<'open' | 'ended'>('open')
   const [opened, setOpened] = useState<string[]>([])
   const toggle = (id: string) =>
@@ -94,7 +97,11 @@ function SessionsOn({ view }: { view: SessionsView }) {
   return (
     <Page
       title={t.title}
-      meta={t.meta(view.counts.open, view.counts.working)}
+      meta={
+        remote
+          ? t.metaOn(remote, view.counts.open, view.counts.working)
+          : t.meta(view.counts.open, view.counts.working)
+      }
       action={
         <Button size="sm" variant="outline" asChild>
           <a href="#/sessions/new">
@@ -456,9 +463,12 @@ function Opened({ s }: { s: SessionRow }) {
         <Line label={t.started}>
           <span>{formatDateTime(s.startedAt)}</span>
         </Line>
-        <div className="mt-1.5 flex flex-wrap gap-2">
-          <CopyResume s={s} />
-        </div>
+        {/* A command for the Mac's terminal: of no use on a device */}
+        {!remoteMac() && (
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            <CopyResume s={s} />
+          </div>
+        )}
       </div>
     </div>
   )

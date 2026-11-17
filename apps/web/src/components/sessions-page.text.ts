@@ -6,6 +6,9 @@ const en = {
   newSession: 'New session',
   meta: (open: number, working: number) =>
     `${open} open on this Mac · ${working} working`,
+  /** From your phone or iPad: on the Mac it is linked to, by its name */
+  metaOn: (mac: string, open: number, working: number) =>
+    `${open} open on ${mac} · ${working} working`,
   yourTurnLabel: 'Your turn',
   workingLabel: 'Working',
   andMore: (n: number) => `and ${n} more`,
@@ -79,7 +82,7 @@ const en = {
   offLead:
     'Pacenote can list the Claude Code and Codex sessions open on this Mac: where each runs, whether it is working or waiting for you, and the task it is for.',
   offFoot:
-    "It reads which sessions are open and what you typed in them, and a session's whole log only when you open it. Sessions that worked on a task show on it too. Nothing leaves this Mac. Settings > Todo turns it off.",
+    "It reads which sessions are open and what you typed in them, and a session's whole log only when you open it. Sessions that worked on a task show on it too. Nothing leaves this Mac but for your own phone or iPad paired with it. Settings > Todo turns it off.",
   claudeOpen: (n: number, where: string) =>
     n === 0 ? 'None open now' : `${n} open now: ${where}`,
   codexToday: (n: number) =>
@@ -103,6 +106,8 @@ const ko: typeof en = {
   title: '세션',
   newSession: '새 세션',
   meta: (open, working) => `이 Mac에서 ${open}개 열림 · ${working}개 작업 중`,
+  metaOn: (mac, open, working) =>
+    `${mac}에서 ${open}개 열림 · ${working}개 작업 중`,
   yourTurnLabel: '내 차례',
   workingLabel: '작업 중',
   andMore: (n) => `외 ${n}개`,
@@ -172,7 +177,7 @@ const ko: typeof en = {
   offLead:
     'Pacenote가 이 Mac에 열린 Claude Code와 Codex 세션을 모아 보여 줘요. 어디서 돌고 있는지, 작업 중인지 내 차례인지, 어떤 할 일을 하는지요.',
   offFoot:
-    '어떤 세션이 열려 있는지와 내가 입력한 말을 읽고, 세션의 전체 로그는 열어 볼 때만 읽어요. 할 일을 다룬 세션은 그 할 일에도 보여요. 이 Mac 밖으로 나가는 것은 없어요. 설정 > 할 일에서 끌 수 있어요.',
+    '어떤 세션이 열려 있는지와 내가 입력한 말을 읽고, 세션의 전체 로그는 열어 볼 때만 읽어요. 할 일을 다룬 세션은 그 할 일에도 보여요. 이 Mac과 연결한 내 폰이나 iPad 말고는 이 Mac 밖으로 나가지 않아요. 설정 > 할 일에서 끌 수 있어요.',
   claudeOpen: (n, where) =>
     n === 0 ? '지금 열린 세션 없음' : `지금 ${n}개 열림: ${where}`,
   codexToday: (n) =>

@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonWord } from '@/components/ui/skeleton'
+import { remoteMac } from '@/lib/desktop'
 import { homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { recentFolders } from '@/lib/session-rows'
 import {
   useNewSessionDraft,
   useSessions,
@@ -70,6 +72,8 @@ export function NewSessionPage({ task }: { task?: string }) {
       </div>
     )
 
+  const mac = remoteMac()
+  const remote = Boolean(mac)
   const said = message ?? ''
   // Pacenote runs it once Sessions on this Mac lists it
   const ready = Boolean(folder && said.trim()) && view?.on !== false
@@ -95,7 +99,9 @@ export function NewSessionPage({ task }: { task?: string }) {
     void go()
   }
   const choose = async () => {
-    if (taskView) return setChoosing(true)
+    // A task's folders, or from a device the ones the Mac knows (its file
+    // dialog is the Mac's own)
+    if (taskView || remote) return setChoosing(true)
     const check = await window.pacenoteDesktop?.tasks.chooseFolder()
     if (check && !check.error) setFolder(check.path)
     else if (check?.error) setError(check.error)
@@ -104,7 +110,10 @@ export function NewSessionPage({ task }: { task?: string }) {
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 pt-9 pb-10">
-        <nav className="flex items-center gap-1.5 text-meta text-muted-foreground">
+        <nav
+          data-page-crumbs
+          className="flex items-center gap-1.5 text-meta text-muted-foreground"
+        >
           <a href="#/sessions" className="hover:text-foreground">
             {l.title}
           </a>
@@ -122,6 +131,8 @@ export function NewSessionPage({ task }: { task?: string }) {
             >
               {t.fromTask(taskView.repo)}
             </a>
+          ) : mac ? (
+            t.leadOn(mac)
           ) : (
             t.lead
           )}
@@ -143,7 +154,7 @@ export function NewSessionPage({ task }: { task?: string }) {
 
         <dl className="mt-6 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 rounded-[14px] bg-well px-4 py-3.5 text-copy">
           <dt className="text-muted-foreground">{t.runIn}</dt>
-          <dd>{t.here}</dd>
+          <dd>{mac ? t.hereOn(mac) : t.here}</dd>
           <dt className="text-muted-foreground">{t.folder}</dt>
           <dd className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             {folder ? (
@@ -196,7 +207,11 @@ export function NewSessionPage({ task }: { task?: string }) {
                 }}
               />
               <span className="flex-1" />
-              <span className="text-meta text-muted-foreground">{t.keys}</span>
+              {!remote && (
+                <span className="text-meta text-muted-foreground">
+                  {t.keys}
+                </span>
+              )}
               <Button type="submit" size="sm" disabled={!ready || starting}>
                 <Play />
                 {t.start}
@@ -204,13 +219,16 @@ export function NewSessionPage({ task }: { task?: string }) {
             </div>
           </div>
           <InlineError error={error} className="mt-2" />
-          <p className="mt-2 text-meta text-muted-foreground">{p.foot}</p>
+          <p className="mt-2 text-meta text-muted-foreground">
+            {mac ? p.footOn(mac) : p.foot}
+          </p>
         </form>
       </div>
 
-      {taskView && (
+      {(taskView || remote) && (
         <FolderDialog
           task={taskView}
+          folders={taskView ? undefined : recentFolders(view)}
           tool="claude"
           open={choosing}
           action={t.useFolder}

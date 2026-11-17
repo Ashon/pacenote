@@ -38,6 +38,16 @@ export const DEVICE_READS = {
   'ai.state': 'pacenote:ai:state',
   'mcp.status': 'pacenote:mcp:status',
   'sandbox.status': 'pacenote:sandbox:status',
+  // A task's page and where its session would run (a Mac before 0.6.33
+  // answers these not-allowed, and the device says to update it)
+  'tasks.detail': 'pacenote:tasks:detail',
+  'tasks.folders': 'pacenote:tasks:folders',
+  'tasks.newSession': 'pacenote:tasks:new-session',
+  // The sessions on the Mac and a session's page: what you typed in them
+  // and their logs go to your own device over its sealed channel, and to
+  // nothing else
+  'sessions.view': 'pacenote:sessions:view',
+  'sessions.talk': 'pacenote:sessions:talk',
 } as const satisfies Partial<Record<BridgeCall, `pacenote:${string}`>>
 
 /** What a device may change on the Mac, as you would there */
@@ -63,11 +73,30 @@ export const DEVICE_CHANGES = {
   // before 0.6.24 answers not-allowed)
   'tasks.takeBackFill': 'pacenote:tasks:take-back-fill',
   'tasks.keepBoth': 'pacenote:tasks:keep-both',
+  // A session the Mac runs, from your device: it starts in a folder of your
+  // work on the Mac (ipc/sessions.ts checks), with your own sign-in there,
+  // and you talk to it, answer what it asks and stop it as on the Mac. It
+  // never opens in a terminal or an app from a device (sessions.open stays
+  // the Mac's).
+  'sessions.start': 'pacenote:sessions:start',
+  'sessions.send': 'pacenote:sessions:send',
+  'sessions.copy': 'pacenote:sessions:copy',
+  'sessions.answer': 'pacenote:sessions:answer',
+  'sessions.stop': 'pacenote:sessions:stop',
+  'sessions.end': 'pacenote:sessions:end',
+  'sessions.mode': 'pacenote:sessions:mode',
+  'sessions.link': 'pacenote:sessions:link',
+  'sessions.unlink': 'pacenote:sessions:unlink',
+  'sessions.makeTask': 'pacenote:sessions:make-task',
 } as const satisfies Partial<
   Record<BridgeCall | DeviceOwnAsk, `pacenote:${string}`>
 >
 
 export const DEVICE_ASKS = { ...DEVICE_READS, ...DEVICE_CHANGES }
+
+/** Whether a device's ask only reads: not worth a line in the log each time */
+export const isDeviceRead = (what: string): boolean =>
+  what === 'api' || Object.hasOwn(DEVICE_READS, what)
 
 export type DeviceAsk = keyof typeof DEVICE_ASKS | 'api'
 

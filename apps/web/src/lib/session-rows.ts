@@ -4,7 +4,7 @@ import type {
   SessionState,
   SessionsView,
 } from '../../../../src/sessions/types.js'
-import type { TaskView } from '../../../../src/tasks/types.js'
+import type { FolderCheck, TaskView } from '../../../../src/tasks/types.js'
 
 /**
  * The sessions on this Mac as Todo shows them (src/sessions): each open
@@ -105,4 +105,31 @@ export function tasksToLink(
         Number(same(b)) - Number(same(a)) ||
         Date.parse(b.postedAt) - Date.parse(a.postedAt)
     )
+}
+
+/** How many folders of your sessions a device chooses from */
+const RECENT_FOLDERS = 8
+
+/**
+ * The folders your sessions ran in, the last used first: where a device
+ * starts one of no task, as it cannot browse the Mac's
+ */
+export function recentFolders(
+  view: SessionsView | null | undefined
+): FolderCheck[] {
+  const rows = [
+    ...(view?.open.flatMap((g) => g.sessions) ?? []),
+    ...(view?.ended ?? []),
+  ]
+  rows.sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+  const folders = new Map<string, FolderCheck>()
+  for (const row of rows)
+    if (!folders.has(row.cwd))
+      folders.set(row.cwd, {
+        path: row.cwd,
+        ...(row.repo && { remote: row.repo }),
+        matches: false,
+        usedAt: row.lastAt,
+      })
+  return [...folders.values()].slice(0, RECENT_FOLDERS)
 }
