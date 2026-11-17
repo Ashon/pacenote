@@ -1,15 +1,20 @@
 import { execFile } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { localized } from '../../../../src/i18n/locale.js'
+import { SESSION_MODES } from '../../../../src/sessions/live.js'
 import type {
+  SessionMode,
   SessionRow,
   SessionsView,
+  SessionTalk,
 } from '../../../../src/sessions/types.js'
 import { sessionsView } from '../../../../src/sessions/view.js'
 import { SingleFlight } from '../../../../src/single-flight.js'
 import { TOOL_LABEL } from '../../../../src/tasks/context.js'
+import type { SessionItem } from '../../../../src/tasks/types.js'
 import { codexLogs, yourFolder } from '../../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../../src/tasks/store.js'
 import {
@@ -28,6 +33,7 @@ import {
   type OpenClaude,
   type OpenSessions,
 } from '../open-sessions.js'
+import type { SessionHost } from '../session-host.js'
 import type { TaskSessions } from '../task-sessions.js'
 import type { TodoSettings } from '../todo-settings.js'
 import type { Desktop } from './context.js'
@@ -37,6 +43,26 @@ const run = promisify(execFile)
 
 /** Opening a session in the Claude app: claude --desktop --resume */
 const OPEN_TIMEOUT_MS = 20_000
+/** The logs kept read, for a page asking every few seconds */
+const LOGS_KEPT = 4
+/** What you type to a session, at most */
+const MESSAGE_CHARS = 20_000
+
+/**
+ * Claude Code's log of a session, looked for in each project's folder: the
+ * one written last, where a session resumed from another folder goes on
+ */
+function claudeLog(home: string, session: string): string | undefined {
+  const root = path.join(home, '.claude', 'projects')
+  if (!existsSync(root)) return undefined
+  let found: { file: string; at: number } | undefined
+  for (const project of readdirSync(root)) {
+    const file = path.join(root, project, `${session}.jsonl`)
+    const at = existsSync(file) ? statSync(file).mtimeMs : undefined
+    if (at !== undefined && (!found || at > found.at)) found = { file, at }
+  }
+  return found?.file
+}
 
 /**
  * Sessions: the Claude Code and Codex sessions on this Mac, where each runs
@@ -49,11 +75,13 @@ export function registerSessionsIpc(
   deps: {
     sessions: TaskSessions
     openSessions: OpenSessions
+    /** The Claude Code sessions Pacenote runs (session-host.ts) */
+    host: SessionHost
     todo: Pick<TodoSettings, 'hasApp'>
   }
 ): void {
   const { dataDir, settings, toolPath, cliBins, log } = desktop
-  const { sessions, openSessions, todo } = deps
+  const { sessions, openSessions, host, todo } = deps
   const home = homedir()
   const codexTitles = new CodexTitles(
     process.env.CODEX_HOME || path.join(home, '.codex')
@@ -64,8 +92,9 @@ export function registerSessionsIpc(
     string,
     { where: OpenClaude['where']; terminal?: string }
   >()
-  /** The rows last shown, and the app each open one runs in */
-  let shown = new Map<string, SessionRow & { app?: string }>()
+  /** The rows last shown, the app each open one runs in, and its group */
+  let shown = new Map<string, SessionRow>()
+  let shownIn = new Map<string, { app?: string; group?: string }>()
   const viewing = new SingleFlight<SessionsView>()
 
   const read = async (): Promise<SessionsView> => {
@@ -74,7 +103,19 @@ export function registerSessionsIpc(
     day.setHours(0, 0, 0, 0)
     const dayStart = day.getTime()
     const listed = await openSessions.list(now)
-    const agents = listed?.filter((agent) => yours(agent.cwd))
+    // The sessions Pacenote runs, in place of how Claude Code lists them
+    const hosted: OpenClaude[] = host.list().map((h) => ({
+      session: h.session,
+      cwd: h.cwd,
+      busy: h.busy,
+      ...(h.asks ? { asks: h.asks } : {}),
+      startedAt: h.startedAt,
+      where: 'pacenote',
+    }))
+    const agents = listed
+      ?.filter((agent) => !host.has(agent.session))
+      .concat(hosted)
+      .filter((agent) => yours(agent.cwd))
     if (settings.effectiveEnv().TASKS_LINK_SESSIONS !== 'on')
       return {
         on: false,
@@ -149,10 +190,19 @@ export function registerSessionsIpc(
     const apps = new Map(agents?.map((agent) => [agent.session, agent.app]))
     for (const agent of agents ?? [])
       seen.set(agent.session, { where: agent.where, terminal: agent.terminal })
+    const listedRows = view.open.flatMap((g) =>
+      g.sessions.map((row) => ({ row, group: g.name }))
+    )
     shown = new Map(
-      [...view.open.flatMap((g) => g.sessions), ...view.ended].map((row) => [
+      [...listedRows.map(({ row }) => row), ...view.ended].map((row) => [
         row.id,
-        { ...row, app: apps.get(row.session) },
+        row,
+      ])
+    )
+    shownIn = new Map(
+      listedRows.map(({ row, group }) => [
+        row.id,
+        { app: apps.get(row.session), group },
       ])
     )
     return { on: true, ...view }
@@ -187,7 +237,8 @@ export function registerSessionsIpc(
             timeout: OPEN_TIMEOUT_MS,
           })
         else if (row.where === 'web') await openLink('https://claude.ai/code')
-        else if (row.app) await openLink(row.app)
+        else if (shownIn.get(row.id)?.app)
+          await openLink(shownIn.get(row.id)!.app!)
         else return { error: t.noSuchSession }
         return {}
       } catch (error) {
@@ -269,21 +320,196 @@ export function registerSessionsIpc(
     }
   )
 
-  /** A session's own log, read when you open it */
+  /** The logs read last, kept while they have not changed */
+  const logs = new Map<
+    string,
+    { size: number; mtimeMs: number; items: SessionItem[] }
+  >()
+  const readLog = (file: string, row: SessionRow): SessionItem[] => {
+    const info = statSync(file)
+    const kept = logs.get(file)
+    if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs)
+      return kept.items
+    const items = readSessionLog(file, row.tool)
+    logs.delete(file)
+    logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, items })
+    for (const old of logs.keys()) if (logs.size > LOGS_KEPT) logs.delete(old)
+    return items
+  }
+
+  /** A session as last shown; the list read first for a page opened first */
+  const rowOf = async (id: unknown) => {
+    if (typeof id !== 'string') return undefined
+    if (!shown.has(id)) await viewing.run(read).catch(() => undefined)
+    return shown.get(id)
+  }
+
+  /**
+   * Where you type to a session: here, for one Pacenote runs or that runs
+   * nowhere now; where it is open; or in Codex
+   */
+  const typeIn = (row: SessionRow): SessionTalk['typeIn'] =>
+    row.tool !== 'claude'
+      ? 'codex'
+      : row.where === 'pacenote' ||
+          row.state === 'ended' ||
+          host.has(row.session)
+        ? 'here'
+        : 'elsewhere'
+
+  /**
+   * A session's page: its conversation from its tool's own log, read again
+   * as it grows, and how Pacenote runs it
+   */
   ipc.windowOnly(
-    'pacenote:sessions:log',
-    () => ({ error: localized(text).noSuchSession }),
-    async (id) => {
-      const t = localized(text)
-      const row = typeof id === 'string' ? shown.get(id) : undefined
-      if (!row || row.tool === 'opencode') return { error: t.noSuchSession }
-      const summary = sessions.index.session(row.session)
-      if (!summary) return { error: t.noSessionLog(TOOL_LABEL[row.tool]) }
-      try {
-        return { items: readSessionLog(summary.file, row.tool) }
-      } catch (error) {
-        return { error: (error as Error).message }
+    'pacenote:sessions:talk',
+    () => null,
+    async (id): Promise<SessionTalk | null> => {
+      const row = await rowOf(id)
+      if (!row || row.tool === 'opencode') return null
+      const group = shownIn.get(row.id)?.group
+      const live = row.tool === 'claude' ? host.get(row.session) : undefined
+      const talk = {
+        row,
+        ...(group ? { group } : {}),
+        typeIn: typeIn(row),
+        ...(live ? { live } : {}),
       }
+      const file =
+        (row.tool === 'claude' ? claudeLog(home, row.session) : undefined) ??
+        sessions.index.session(row.session)?.file
+      if (!file)
+        return {
+          ...talk,
+          items: [],
+          error: localized(text).noSessionLog(TOOL_LABEL[row.tool]),
+        }
+      try {
+        return { ...talk, items: readLog(file, row) }
+      } catch (error) {
+        return { ...talk, items: [], error: (error as Error).message }
+      }
+    }
+  )
+
+  /** A Claude Code session you type to here, and what you typed */
+  const typedTo = async (id: unknown, message: unknown) => {
+    const t = localized(text)
+    const row = await rowOf(id)
+    if (!row) return { error: t.noSuchSession }
+    if (row.tool !== 'claude') return { error: t.sessionOnlyClaude }
+    const said = typeof message === 'string' ? message.trim() : ''
+    if (!said) return { error: t.emptyMessage }
+    return { row, said: said.slice(0, MESSAGE_CHARS) }
+  }
+
+  /**
+   * Sends a session what you typed: Pacenote runs it from then on, unless it
+   * is open somewhere else, where you type instead
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:send',
+    () => ({ error: localized(text).noSuchSession }),
+    async (id, message) => {
+      const to = await typedTo(id, message)
+      if ('error' in to) return to
+      if (typeIn(to.row) !== 'here')
+        return { error: localized(text).sessionOpenThere }
+      const sent = host.send(to.row.session, to.row.cwd, to.said)
+      return sent.error ? { error: localized(text).sessionNotHere } : {}
+    }
+  )
+
+  /**
+   * Continues a session open somewhere else in a copy Pacenote runs, with
+   * what you typed; the copy is the same task's work
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:copy',
+    () => ({ error: localized(text).noSuchSession }),
+    async (id, message) => {
+      const to = await typedTo(id, message)
+      if ('error' in to) return to
+      const copy = await host.copy(to.row.session, to.row.cwd, to.said)
+      if (!copy.session) return { error: copy.error }
+      if (to.row.task)
+        link(
+          {
+            ...to.row,
+            session: copy.session,
+            startedAt: new Date().toISOString(),
+          },
+          to.row.task.id
+        )
+      // The copy is listed from the next read on
+      shown.delete(`claude:${copy.session}`)
+      return { id: `claude:${copy.session}` }
+    }
+  )
+
+  /** A session Pacenote runs, by its row's id */
+  const hostedOf = (id: unknown) =>
+    typeof id === 'string' && id.startsWith('claude:')
+      ? id.slice('claude:'.length)
+      : undefined
+  const done = (result: { error?: string }) =>
+    result.error ? { error: localized(text).sessionNotHere } : {}
+
+  /** Your answer to what it asks: allow, allow in this session, or deny */
+  ipc.windowOnly(
+    'pacenote:sessions:answer',
+    () => ({ error: localized(text).noSuchSession }),
+    (id, ask, answer, message) => {
+      const session = hostedOf(id)
+      if (
+        !session ||
+        typeof ask !== 'string' ||
+        (answer !== 'allow' && answer !== 'always' && answer !== 'deny')
+      )
+        return { error: localized(text).noSuchSession }
+      return done(
+        host.answer(
+          session,
+          ask,
+          answer,
+          typeof message === 'string'
+            ? message.slice(0, MESSAGE_CHARS)
+            : undefined
+        )
+      )
+    }
+  )
+
+  /** Stops the turn it is on */
+  ipc.windowOnly(
+    'pacenote:sessions:stop',
+    () => ({ error: localized(text).noSuchSession }),
+    (id) => {
+      const session = hostedOf(id)
+      return session ? done(host.stop(session)) : done({ error: 'gone' })
+    }
+  )
+
+  /** Ends its run here; the conversation stays in Claude Code's log */
+  ipc.windowOnly(
+    'pacenote:sessions:end',
+    () => ({ error: localized(text).noSuchSession }),
+    (id) => {
+      const session = hostedOf(id)
+      if (session) host.end(session)
+      return {}
+    }
+  )
+
+  /** Changes how it asks before it acts */
+  ipc.windowOnly(
+    'pacenote:sessions:mode',
+    () => ({ error: localized(text).noSuchSession }),
+    (id, mode) => {
+      const session = hostedOf(id)
+      if (!session || !SESSION_MODES.includes(mode as SessionMode))
+        return { error: localized(text).noSuchSession }
+      return done(host.setMode(session, mode as SessionMode))
     }
   )
 }

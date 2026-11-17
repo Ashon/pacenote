@@ -186,7 +186,17 @@ const bridge = {
   sessions: {
     view: () => ipcRenderer.invoke('pacenote:sessions:view'),
     open: (id) => ipcRenderer.invoke('pacenote:sessions:open', id),
-    log: (id) => ipcRenderer.invoke('pacenote:sessions:log', id),
+    talk: (id) => ipcRenderer.invoke('pacenote:sessions:talk', id),
+    send: (id, message) =>
+      ipcRenderer.invoke('pacenote:sessions:send', id, message),
+    copy: (id, message) =>
+      ipcRenderer.invoke('pacenote:sessions:copy', id, message),
+    answer: (id, ask, answer, message) =>
+      ipcRenderer.invoke('pacenote:sessions:answer', id, ask, answer, message),
+    stop: (id) => ipcRenderer.invoke('pacenote:sessions:stop', id),
+    end: (id) => ipcRenderer.invoke('pacenote:sessions:end', id),
+    mode: (id, mode) => ipcRenderer.invoke('pacenote:sessions:mode', id, mode),
+    onChanged: subscribe<string>('pacenote:sessions:changed'),
     link: (id, task) => ipcRenderer.invoke('pacenote:sessions:link', id, task),
     unlink: (id) => ipcRenderer.invoke('pacenote:sessions:unlink', id),
     makeTask: (id) => ipcRenderer.invoke('pacenote:sessions:make-task', id),

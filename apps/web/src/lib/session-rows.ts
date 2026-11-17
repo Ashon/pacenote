@@ -11,9 +11,16 @@ import type { TaskView } from '../../../../src/tasks/types.js'
  * task's session, and Today's line about all of them. Plain, so tests load it.
  */
 
-/** Whether Pacenote can take you to where a session runs */
-export const canOpen = (s: SessionRow) =>
+/** Whether a session has a page in Pacenote: Claude Code's and Codex's */
+export const canOpen = (s: SessionRow) => s.tool !== 'opencode'
+
+/**
+ * Whether Pacenote can take you to where a session runs: its app, claude.ai
+ * or its terminal app (not one Pacenote runs itself)
+ */
+export const canShow = (s: SessionRow) =>
   s.state !== 'ended' &&
+  s.where !== 'pacenote' &&
   (s.tool === 'codex'
     ? s.where === 'codex-app'
     : s.where !== 'terminal' || !!s.terminal)

@@ -2994,14 +2994,16 @@ else fail('unexpected: ' + args.join(' '))
       path: path.join(REPO, 'test-results/sessions.png'),
     })
 
-    // Opened in place, with its log a click away
+    // Opened in place, and its page a click away: the conversation, typed
+    // to where it is open
     await title.click()
     await row.getByText('Started').waitFor()
-    await row.getByRole('button', { name: 'Show the log' }).click()
-    const log = page.getByRole('dialog', { name: 'Session log' })
-    await log.getByText('Raise max_attempts to 5').first().waitFor()
-    await page.keyboard.press('Escape')
-    await log.waitFor({ state: 'detached' })
+    await row.getByRole('link', { name: 'Open' }).click()
+    await page.getByRole('heading', { name: 'Webhook retry limit' }).waitFor()
+    await page.getByText('Raise max_attempts to 5').first().waitFor()
+    await page.getByText('It is open in Terminal, so you type there').waitFor()
+    await page.getByRole('link', { name: 'Sessions', exact: true }).click()
+    await page.getByRole('heading', { name: 'payments' }).waitFor()
 
     // Ended today
     await page.getByRole('tab', { name: 'Ended today 1' }).click()
@@ -3140,6 +3142,177 @@ else fail('unexpected: ' + args.join(' '))
     // The other task's link stays taken back
     expect(await task.getByText(/^Your turn/).count()).toBe(0)
   }, 120_000)
+
+  it('continues a session on its page: what you send, what it asks answered there, and a copy of one open elsewhere', async () => {
+    world = await World.create()
+    const { root } = world
+    // Where Claude Code says it ran: the folder's real path (/private/tmp)
+    mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
+    const checkout = realpathSync(path.join(root, 'git', 'payments'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    const project = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[/.]/g, '-')
+    )
+    mkdirSync(project, { recursive: true })
+    const transcript = (
+      session: string,
+      title: string,
+      lines: Record<string, unknown>[]
+    ) =>
+      writeFileSync(
+        path.join(project, `${session}.jsonl`),
+        [...lines, { type: 'custom-title', customTitle: title }]
+          .map(
+            (line) =>
+              `${JSON.stringify({ sessionId: session, cwd: checkout, timestamp: new Date(Date.now() - 40 * 60_000).toISOString(), ...line })}\n`
+          )
+          .join('')
+      )
+    // One that ran in a terminal and was closed, and one open in a terminal
+    transcript('ended-1', 'Raise max_attempts and test the backoff', [
+      {
+        type: 'user',
+        message: {
+          role: 'user',
+          content: 'Where do we read the retry config?',
+        },
+      },
+      {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'In src/webhook/config.ts: maxAttempts comes from WEBHOOK_MAX_ATTEMPTS, 3 by default.',
+            },
+          ],
+        },
+      },
+    ])
+    transcript('open-2', 'Answer the #418 review comments', [
+      {
+        type: 'user',
+        message: {
+          role: 'user',
+          content: 'Go through the review comments on #418',
+        },
+      },
+    ])
+    writeFileSync(
+      path.join(world.claudeDir, 'agents.json'),
+      JSON.stringify([
+        {
+          pid: 999_999,
+          cwd: checkout,
+          kind: 'interactive',
+          startedAt: Date.now() - 20 * 60_000,
+          sessionId: 'open-2',
+          status: 'busy',
+        },
+      ])
+    )
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+
+    // The one that ended, opened from Ended today: typed to here
+    await page.evaluate("window.location.hash = '#/sessions'")
+    await page
+      .getByRole('tab', { name: /^Ended today/ })
+      .click({ timeout: 30_000 })
+    await page
+      .locator('li', { hasText: 'Raise max_attempts and test the backoff' })
+      .getByRole('link', { name: 'Open' })
+      .click()
+    await page
+      .getByRole('heading', { name: 'Raise max_attempts and test the backoff' })
+      .waitFor()
+    await page
+      .getByText('maxAttempts comes from WEBHOOK_MAX_ATTEMPTS')
+      .waitFor()
+    const message = page.getByRole('textbox', { name: 'Message' })
+    await message.fill('Make max_attempts 5 and add a test for the backoff')
+    await message.press('Enter')
+
+    // It asks to run the tests: answered here, and allowed for the session
+    const ask = page.getByRole('region', {
+      name: 'Claude Code asks to run a command',
+    })
+    await ask
+      .getByText('pnpm vitest run test/webhook-retry.test.ts')
+      .waitFor({ timeout: 30_000 })
+    await page.getByText(/^Claude Code · Pacenote/).waitFor()
+    await page.getByText('Asks to run a command').first().waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-asks.png'),
+    })
+    await ask
+      .getByRole('button', { name: 'Allow pnpm vitest in this session' })
+      .click()
+    await page
+      .getByText(
+        'Done: Make max_attempts 5 and add a test for the backoff. The retry tests pass.'
+      )
+      .waitFor({ timeout: 30_000 })
+    await ask.waitFor({ state: 'detached' })
+    // Allowed for the session: the next turn runs them without asking
+    await message.fill('Run them once more')
+    await message.press('Enter')
+    await page
+      .getByText('Done: Run them once more. The retry tests pass.')
+      .waitFor({ timeout: 30_000 })
+    expect(await ask.count()).toBe(0)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-here.png'),
+    })
+
+    // The one open in a terminal: watched here, continued in a copy
+    await page.getByRole('link', { name: 'Sessions', exact: true }).click()
+    await page
+      .locator('li', { hasText: 'Answer the #418 review comments' })
+      .getByRole('link', { name: 'Open' })
+      .click({ timeout: 30_000 })
+    await page
+      .getByText('It is open in Terminal, so you type there')
+      .waitFor({ timeout: 30_000 })
+    expect(await message.count()).toBe(0)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-elsewhere.png'),
+    })
+    await page.getByRole('button', { name: 'Continue in a copy here' }).click()
+    await message.fill('Answer the naming comments first')
+    await page.getByRole('button', { name: 'Continue in a copy here' }).click()
+    // The copy's page, run here: told what to do instead of what it asks
+    await ask
+      .getByText('pnpm vitest run test/webhook-retry.test.ts')
+      .waitFor({ timeout: 30_000 })
+    expect(page.url()).not.toContain('open-2')
+    await message.fill('Only answer the comments, no tests')
+    await message.press('Enter')
+    await page
+      .getByText('I did not run them: Only answer the comments, no tests')
+      .waitFor({ timeout: 30_000 })
+
+    // Each ran Claude Code here, resuming its own conversation
+    const runs = world
+      .claudeCalls()
+      .filter((call) => call.args.includes('--permission-prompt-tool'))
+    expect(
+      runs.map((call) => call.args[call.args.indexOf('--resume') + 1])
+    ).toEqual(['ended-1', 'open-2'])
+    expect(runs[1]!.args).toContain('--fork-session')
+    expect(runs[0]!.cwd).toBe(checkout)
+  }, 150_000)
 
   it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {
     const judged = JSON.stringify({

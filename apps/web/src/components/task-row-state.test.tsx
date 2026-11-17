@@ -291,12 +291,12 @@ describe("a task's row", () => {
       'Continue in Codex',
       'Draft a reply',
     ])
-    // One in a terminal Pacenote cannot bring forward: Continue stays
+    // One in a terminal opens on its page in Pacenote all the same
     const terminal = { ...session, where: 'terminal' as const }
     expect(stateOf({ task: code, session: terminal })).toMatchObject({
       session: terminal,
-      opensSession: false,
-      continues: true,
+      opensSession: true,
+      continues: false,
     })
     // Settled, it shows no session; ended, there is none to show
     expect(

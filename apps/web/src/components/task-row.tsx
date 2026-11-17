@@ -288,7 +288,6 @@ export function TaskRow({
             onDecide={onDecide}
             onDismiss={() => setDismissing(true)}
             onStep={runStep}
-            onError={setError}
           />
         </div>
         {state.looksLike && (

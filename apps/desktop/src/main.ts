@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   nativeImage,
   nativeTheme,
@@ -97,6 +98,8 @@ import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
 import { OpencodeSessions } from './opencode-sessions.js'
 import { OpenSessions } from './open-sessions.js'
+import { SessionHost } from './session-host.js'
+import { text as hostText } from './session-host.text.js'
 import { hubFromLink } from '../../../src/hub/install.js'
 import { SandboxSignIn } from './sandbox-login.js'
 import { SettingsStore } from './settings.js'
@@ -484,6 +487,34 @@ const openSessions = new OpenSessions({
   home: homedir(),
   warn: (message) => log.warn(message),
 })
+/**
+ * The Claude Code sessions Pacenote runs, from their pages: each change read
+ * again by the window, each ask told as a notification while out of sight
+ */
+const sessionHost = new SessionHost({
+  bin: () => cliBins().claude,
+  env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
+  warn: (message) => log.warn(message),
+  onChange: (session) =>
+    mainWindow.send('pacenote:sessions:changed', `claude:${session}`),
+  onAsk: (session, cwd, ask) => {
+    if (mainWindow.isFocused() || !Notification.isSupported()) return
+    const t = localized(hostText)
+    const notice = new Notification({
+      title: t.asks(ask.kind, ask.tool),
+      body: t.inFolder(ask.what.split('\n')[0] ?? '', path.basename(cwd)),
+    })
+    notice.on('click', () =>
+      mainWindow.show(`#/sessions/${encodeURIComponent(`claude:${session}`)}`)
+    )
+    notice.on('failed', (_event, error) =>
+      log.warn(`Could not show a notification: ${error}`)
+    )
+    notice.show()
+  },
+})
+/** You said to quit while Claude Code was on a turn in a session here */
+let quitOnTurn = false
 /** How Pacenote's own work runs a CLI on this Mac */
 const ownWork = (cli: OwnCli) => ({
   cli,
@@ -1072,7 +1103,12 @@ function registerIpc(): void {
     historyMcp: paths.historyMcp,
   })
   registerYouIpc(ipc, desktop)
-  registerSessionsIpc(ipc, desktop, { sessions, openSessions, todo })
+  registerSessionsIpc(ipc, desktop, {
+    sessions,
+    openSessions,
+    host: sessionHost,
+    todo,
+  })
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
   stopTasksWatch = watchTasks(dataDir, () =>
@@ -1288,7 +1324,30 @@ let botStopping: Promise<void> | undefined
  * once Pace has stopped, and opens it itself (reopenIfReplaced).
  */
 app.on('before-quit', (event) => {
+  // Claude Code on a turn in a session Pacenote runs: you say whether to
+  // stop it, unless Pacenote is told to quit (an upgrade, a stop)
+  const working = sessionHost.working()
+  if (working > 0 && !quitOnTurn && !isQuitting && !bundleWatch?.swapping()) {
+    event.preventDefault()
+    const t = localized(hostText)
+    void dialog
+      .showMessageBox({
+        type: 'question',
+        message: t.quitTitle(working),
+        detail: t.quitDetail,
+        buttons: [t.quit, t.cancel],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then(({ response }) => {
+        if (response !== 0) return
+        quitOnTurn = true
+        app.quit()
+      })
+    return
+  }
   isQuitting = true
+  sessionHost.endAll()
   bundleWatch?.stop()
   stopTasksWatch?.()
   taskCollector.cancel()
@@ -1318,4 +1377,7 @@ app.on('will-quit', () => markQuit(quitMark))
 app.on('window-all-closed', () => {
   if (isQuitting) app.quit()
 })
-process.once('SIGTERM', () => app.quit())
+process.once('SIGTERM', () => {
+  isQuitting = true
+  app.quit()
+})

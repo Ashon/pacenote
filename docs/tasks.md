@@ -228,9 +228,26 @@ on, from the switch or from the screen's card, which says what it reads first.
   anymore.
 - **A row:** its title (yours, else the tool's, else what you typed first), where it runs, its state, branch and the
   task it is linked to, and what you typed last. Opened in place, it has what you typed lately, its folder and when it
-  started, its log, read when you ask for it, and the command that continues it in a terminal.
-- **Opening it** goes where it runs: `claude --desktop --resume <id>` for the Claude app, claude.ai's Code page, the
+  started, and the command that continues it in a terminal.
+- **Showing it** goes where it runs: `claude --desktop --resume <id>` for the Claude app, claude.ai's Code page, the
   Codex app's link for a Codex app session, or the terminal app it runs in, brought to the front.
+- **Its page:** **Open** shows a session's conversation in Pacenote, as it goes: what you typed, its answers and the
+  step it is on.
+- **Typing to it:** a Claude Code session that is not open anywhere else is continued on its page. Pacenote runs the
+  installed `claude` with your own sign-in, resuming the session's own conversation (`claude -p --resume`), in the
+  folder it ran in. Claude Code keeps the conversation in its own log, as always, so `claude --resume` picks it up
+  anywhere after; Pacenote keeps nothing of it. Under the box you pick how it asks before it acts (ask before edits,
+  edit without asking, plan first, or auto), and **Stop** stops the turn it is on.
+- **What it asks:** when it asks to run a command, edit a file, fetch a page or go ahead with a plan, the page shows
+  what it would do, in which folder: **Allow**, **Allow … in this session** (kept for that run alone, not written to
+  your settings) or **Deny**. Typing instead says no and tells it what to do. A notification says so when Pacenote is
+  out of sight, and the session's row says it waits for you.
+- **Open somewhere else:** a session open in a terminal, the Claude app or claude.ai is shown as it goes, and you type
+  there: two places typing into one session would tangle it. **Continue in a copy here** starts a copy of it in
+  Pacenote (`--fork-session`), linked to the same task. A Codex session is shown, and you type in Codex.
+- **How long it runs:** a session Pacenote runs keeps running with the window closed, until you end it (**End it
+  here**, in the page's menu) or it has had nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks
+  first.
 - **Its task:** opened in place, a session not linked to a task can be **linked to one** (your open tasks, its
   repository's first) or **made a task** of its own, in its repository's project; one that looks like an open task's
   work says so, to link or say it is not. **Unlink** takes a linked one off its task: it is not found for that task

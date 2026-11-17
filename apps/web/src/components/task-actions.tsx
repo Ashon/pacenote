@@ -63,7 +63,6 @@ export function TaskActions({
   onDecide,
   onDismiss,
   onStep,
-  onError,
 }: {
   task: TaskView
   state: TaskRowState
@@ -80,8 +79,6 @@ export function TaskActions({
   onDismiss: () => void
   /** A step chosen under the menu */
   onStep: (step: RowStep) => void
-  /** Why its session did not open, or none */
-  onError: (error?: string) => void
 }) {
   const t = useText(text)
   const dismiss = (
@@ -103,7 +100,7 @@ export function TaskActions({
     >
       <span className="flex items-center gap-1.5 empty:hidden">
         {state.opensSession && state.session && (
-          <OpenButton s={state.session} onError={onError} size="sm" />
+          <OpenButton s={state.session} size="sm" />
         )}
         {state.continues && (
           // Each tool it can continue in, by its name, the one set in

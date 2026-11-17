@@ -3,6 +3,7 @@ import { CLI_NAMES } from '@src/tasks/own-ai'
 import {
   AppWindow,
   ExternalLink,
+  MessagesSquare,
   SquareTerminal,
   type LucideIcon,
 } from 'lucide-react'
@@ -14,7 +15,8 @@ import { text } from './sessions-page.text'
 
 /**
  * A session on this Mac as Sessions and Todo show it: its state, where it
- * runs, and the button that takes you there
+ * runs, the button that opens its page, and the one that takes you to where
+ * it runs
  */
 
 type Words = (typeof text)['en']
@@ -24,7 +26,12 @@ const OPEN_ICON: Record<SessionWhere, LucideIcon> = {
   terminal: SquareTerminal,
   web: ExternalLink,
   'codex-app': AppWindow,
+  pacenote: MessagesSquare,
 }
+
+/** A session's page in Pacenote */
+export const sessionHref = (id: string) =>
+  `#/sessions/${encodeURIComponent(id)}`
 
 export const openLabel = (s: SessionRow, t: Words) =>
   s.where === 'terminal' ? t.openIn.terminal(s.terminal) : t.openIn[s.where]
@@ -60,7 +67,8 @@ export function StateMark({ s, where }: { s: SessionRow; where?: boolean }) {
     return (
       <Pill tone="primary" className="gap-1.5">
         <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
-        {said(t.yourTurn)}
+        {/* What it asks, in place of your turn */}
+        {s.asks ? t.asks[s.asks] : said(t.yourTurn)}
         {where && ` ${formatRelative(s.lastAt)}`}
       </Pill>
     )
@@ -73,8 +81,18 @@ export function StateMark({ s, where }: { s: SessionRow; where?: boolean }) {
   )
 }
 
+/** Opens the session's page, to follow it and type to it (V1) */
+export function OpenButton({ s, size }: { s: SessionRow; size?: 'sm' }) {
+  const t = useText(text)
+  return (
+    <Button variant="outline" size={size} asChild>
+      <a href={sessionHref(s.id)}>{t.open}</a>
+    </Button>
+  )
+}
+
 /** Takes you to where it runs: its app, claude.ai, or its terminal app */
-export function OpenButton({
+export function ShowButton({
   s,
   onError,
   size,

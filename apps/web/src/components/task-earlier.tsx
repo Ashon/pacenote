@@ -28,7 +28,6 @@ export function EarlierLine({
   onResume,
   onStartHere,
   open,
-  onError,
 }: {
   line: Earlier
   taskId: string
@@ -37,8 +36,6 @@ export function EarlierLine({
   onStartHere?: (tool: WorkTool) => void
   /** The task's session open on this Mac now (Sessions), when it has one */
   open?: SessionRow
-  /** Why its session did not open, or none */
-  onError?: (error?: string) => void
 }) {
   const t = useText(text)
   const { task, run } = line
@@ -143,13 +140,7 @@ export function EarlierLine({
   return (
     <Line
       label={line.label}
-      actions={
-        now && canOpen(now) ? (
-          <OpenButton s={now} onError={(e) => onError?.(e)} size="sm" />
-        ) : (
-          action
-        )
-      }
+      actions={now && canOpen(now) ? <OpenButton s={now} size="sm" /> : action}
     >
       {name(t.toolSession(CLI_NAMES[own.tool]), log, t.readSession)}
       {now && <StateMark s={now} where />}

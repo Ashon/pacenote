@@ -61,7 +61,11 @@ import type {
 import type { TasksLive } from './tasks/types.js'
 import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
-import type { SessionsView } from './sessions/types.js'
+import type {
+  SessionMode,
+  SessionsView,
+  SessionTalk,
+} from './sessions/types.js'
 import type {
   McpClientId,
   McpClientStatus,
@@ -378,8 +382,33 @@ export interface DesktopBridge {
     view(): Promise<SessionsView | null>
     /** Opens a session where it runs: its app, claude.ai or its terminal */
     open(id: string): Promise<{ error?: string }>
-    /** A session's own log, read when you open it */
-    log(id: string): Promise<{ items?: SessionItem[]; error?: string }>
+    /**
+     * A session's page: its conversation from its tool's own log, and how
+     * Pacenote runs it; null for none
+     */
+    talk(id: string): Promise<SessionTalk | null>
+    /** Sends what you typed: Pacenote runs it from then on */
+    send(id: string, message: string): Promise<{ error?: string }>
+    /**
+     * Continues a session open somewhere else in a copy Pacenote runs; the
+     * copy's id
+     */
+    copy(id: string, message: string): Promise<{ id?: string; error?: string }>
+    /** Your answer to what it asks; deny's message, why */
+    answer(
+      id: string,
+      ask: string,
+      answer: 'allow' | 'always' | 'deny',
+      message?: string
+    ): Promise<{ error?: string }>
+    /** Stops the turn it is on */
+    stop(id: string): Promise<{ error?: string }>
+    /** Ends its run here: the conversation stays in Claude Code */
+    end(id: string): Promise<{ error?: string }>
+    /** How it asks before it acts */
+    mode(id: string, mode: SessionMode): Promise<{ error?: string }>
+    /** A session Pacenote runs changed: its id */
+    onChanged(callback: (id: string) => void): () => void
     /** Links a session to an open task: it is that task's work */
     link(id: string, task: string): Promise<{ error?: string }>
     /** Takes a session off its task: not found for it again */

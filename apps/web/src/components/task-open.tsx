@@ -72,7 +72,6 @@ export function TaskOpen({
       onResume={(entryId) => void act.resume(entryId).then(onError)}
       onStartHere={onStartHere}
       open={session}
-      onError={onError}
     />
   )
 

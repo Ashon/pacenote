@@ -1,6 +1,7 @@
 import type { WorkTool } from '../tasks/types.js'
 import { MINUTE } from '../time.js'
 import type {
+  SessionAskKind,
   SessionGroup,
   SessionRow,
   SessionState,
@@ -32,6 +33,8 @@ export interface OpenAgent {
   name?: string
   /** On a turn */
   busy: boolean
+  /** What it waits for you to answer: Pacenote runs it */
+  asks?: SessionAskKind
   /** When it started, for one with no log yet */
   startedAt?: string
   where: SessionWhere
@@ -153,7 +156,7 @@ export function sessionsView(
   const row = (
     tool: WorkTool,
     session: string,
-    rest: Pick<SessionRow, 'where' | 'terminal' | 'state'> & {
+    rest: Pick<SessionRow, 'where' | 'terminal' | 'state' | 'asks'> & {
       cwd: string
       name?: string
       startedAt?: string
@@ -180,6 +183,7 @@ export function sessionsView(
       where: rest.where,
       ...(rest.terminal ? { terminal: rest.terminal } : {}),
       state: rest.state,
+      ...(rest.asks ? { asks: rest.asks } : {}),
       lastAt: logged?.lastAt ?? since,
       startedAt: logged?.startedAt ?? since,
       cwd,
@@ -212,7 +216,15 @@ export function sessionsView(
           startedAt: agent.startedAt,
           where: agent.where,
           terminal: agent.terminal,
-          state: agent.busy ? 'working' : quiet <= TURN_MS ? 'turn' : 'quiet',
+          // One that asks waits for you, on a turn or not
+          state: agent.asks
+            ? 'turn'
+            : agent.busy
+              ? 'working'
+              : quiet <= TURN_MS
+                ? 'turn'
+                : 'quiet',
+          asks: agent.asks,
         })
       )
     }

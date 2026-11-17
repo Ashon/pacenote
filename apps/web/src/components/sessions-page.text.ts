@@ -1,5 +1,5 @@
 import type { Locale } from '@src/i18n/locale'
-import type { SessionWhere } from '@src/sessions/types'
+import type { SessionAskKind, SessionWhere } from '@src/sessions/types'
 
 const en = {
   title: 'Sessions',
@@ -29,19 +29,29 @@ const en = {
     terminal: 'Terminal',
     web: 'claude.ai',
     'codex-app': 'Codex app',
+    pacenote: 'Pacenote',
   } satisfies Record<SessionWhere, string>,
   openIn: {
     'claude-app': 'Open in Claude',
     terminal: (app?: string) => `Show in ${app ?? 'Terminal'}`,
     web: 'Open on claude.ai',
     'codex-app': 'Open in Codex',
+    pacenote: 'Open',
   },
+  /** A session's page, in Pacenote */
+  open: 'Open',
+  asks: {
+    command: 'Asks to run a command',
+    edit: 'Asks to change a file',
+    web: 'Asks to go online',
+    plan: 'Has a plan',
+    tool: 'Asks to use a tool',
+  } satisfies Record<SessionAskKind, string>,
   youAsked: 'You typed',
   branch: 'Branch',
   folder: 'Folder',
   task: 'Task',
   started: 'Started',
-  showLog: 'Show the log',
   copyResume: (command: string) => `Copy ${command}`,
   // Its task
   notATask: 'Not a task yet',
@@ -82,6 +92,7 @@ const en = {
     terminal: 'in a terminal',
     web: 'from claude.ai',
     'codex-app': 'in the Codex app',
+    pacenote: 'in Pacenote',
   } satisfies Record<SessionWhere, string>,
   notNow: 'Not now',
   show: 'Show my sessions',
@@ -113,19 +124,28 @@ const ko: typeof en = {
     terminal: '터미널',
     web: 'claude.ai',
     'codex-app': 'Codex 앱',
+    pacenote: 'Pacenote',
   },
   openIn: {
     'claude-app': 'Claude에서 열기',
     terminal: (app) => `${app ?? '터미널'}에서 보기`,
     web: 'claude.ai에서 열기',
     'codex-app': 'Codex에서 열기',
+    pacenote: '열기',
+  },
+  open: '열기',
+  asks: {
+    command: '명령 실행을 물어요',
+    edit: '파일 변경을 물어요',
+    web: '인터넷 접속을 물어요',
+    plan: '계획을 보여 줘요',
+    tool: '도구 사용을 물어요',
   },
   youAsked: '내가 입력한 말',
   branch: '브랜치',
   folder: '폴더',
   task: '할 일',
   started: '시작',
-  showLog: '로그 보기',
   copyResume: (command) => `${command} 복사`,
   notATask: '아직 할 일이 아님',
   linkToTask: '할 일에 연결',
@@ -160,6 +180,7 @@ const ko: typeof en = {
     terminal: '터미널',
     web: 'claude.ai',
     'codex-app': 'Codex 앱',
+    pacenote: 'Pacenote',
   },
   notNow: '나중에',
   show: '내 세션 보기',

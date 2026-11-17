@@ -1,4 +1,4 @@
-import type { WorkTool } from '../tasks/types.js'
+import type { SessionItem, WorkTool } from '../tasks/types.js'
 
 /**
  * Sessions (the desktop app's Sessions screen): the Claude Code and Codex
@@ -7,8 +7,12 @@ import type { WorkTool } from '../tasks/types.js'
  * logs; nothing from them leaves it.
  */
 
-/** Where a session runs, and so where opening it goes */
-export type SessionWhere = 'claude-app' | 'terminal' | 'web' | 'codex-app'
+/**
+ * Where a session runs, and so where opening it goes; pacenote: Pacenote runs
+ * it, from its page (session-host.ts)
+ */
+export type SessionWhere =
+  'claude-app' | 'terminal' | 'web' | 'codex-app' | 'pacenote'
 
 /**
  * Working (the tool is on a turn), your turn (it stopped within the last 30
@@ -28,6 +32,8 @@ export interface SessionRow {
   /** The app it runs in when that is a terminal: "iTerm", "Ghostty" */
   terminal?: string
   state: SessionState
+  /** It waits for you to answer what it asks (Pacenote runs it) */
+  asks?: SessionAskKind
   /** When it last wrote to its log */
   lastAt: string
   startedAt: string
@@ -75,4 +81,60 @@ export interface SessionsView {
     claude: { open: number; where: SessionWhere[] }
     codex: { today: number }
   }
+}
+
+/**
+ * What a session Pacenote runs asks before it acts: to run a command, to
+ * change a file, to go online, to go ahead with its plan, or another tool
+ */
+export type SessionAskKind = 'command' | 'edit' | 'web' | 'plan' | 'tool'
+
+export interface SessionAsk {
+  /** Claude Code's id for the ask, to answer it */
+  id: string
+  kind: SessionAskKind
+  /** The tool's name as Claude Code shows it: Bash, Edit, mcp__… */
+  tool: string
+  /** What it would do: the command, the file, the address, the plan */
+  what: string
+  /**
+   * What "allow in this session" lets it do from then on without asking,
+   * when Claude Code offers that: "pnpm vitest"
+   */
+  rule?: string
+  at: string
+}
+
+/** How Claude Code asks before it acts, as Claude Code names the modes */
+export type SessionMode = 'default' | 'acceptEdits' | 'plan' | 'auto'
+
+/** A session as Pacenote runs it, from what Claude Code tells it */
+export interface SessionLive {
+  /** On a turn */
+  busy: boolean
+  /** What it waits for you to answer, the first of them */
+  ask?: SessionAsk
+  /** Its mode now: one of SessionMode, or another Claude Code has */
+  mode?: string
+  /** The step it is on, while on a turn */
+  step?: { name: string; text: string }
+  /** Why its last turn, or its run, stopped short */
+  error?: string
+}
+
+/**
+ * A session's page: the row, its conversation from its tool's own log, and
+ * where you type to it: here (Pacenote runs it, or will once you send it
+ * something), where it is open now (elsewhere), or in Codex
+ */
+export interface SessionTalk {
+  row: SessionRow
+  /** The group it is in, for the way back */
+  group?: string
+  items: SessionItem[]
+  /** Pacenote runs it */
+  live?: SessionLive
+  typeIn: 'here' | 'elsewhere' | 'codex'
+  /** Why its log could not be read */
+  error?: string
 }

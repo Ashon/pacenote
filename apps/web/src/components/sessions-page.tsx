@@ -4,7 +4,6 @@ import type {
   SessionsView,
 } from '@src/sessions/types'
 import { CLI_NAMES } from '@src/tasks/own-ai'
-import type { SessionItem } from '@src/tasks/types'
 import {
   AppWindow,
   ChevronRight,
@@ -12,25 +11,17 @@ import {
   Link2,
   ListChecks,
   MessageSquare,
-  MessagesSquare,
   Plus,
   SquareTerminal,
   Unlink,
   X,
 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Page } from '@/components/page'
 import { Line } from '@/components/task-line'
 import { TaskRowsSkeleton } from '@/components/tasks-list'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { InlineError } from '@/components/ui/inline-error'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatDateTime, formatRelative, homePath } from '@/lib/format'
@@ -38,11 +29,9 @@ import { useLocale, useText } from '@/lib/i18n'
 import { canOpen } from '@/lib/session-rows'
 import { useSessionTasks, useSessions, useShowSessions } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
-import { LogItem } from './session-log'
 import { OpenButton, StateMark, toolWhere } from './session-open'
 import { LinkTaskDialog } from './session-task'
 import { text } from './sessions-page.text'
-import { text as rowText } from './task-row.text'
 import { resumeCommand } from './task-sessions'
 
 const GRID =
@@ -80,7 +69,6 @@ function SessionsOn({ view }: { view: SessionsView }) {
   const t = useText(text)
   const [tab, setTab] = useState<'open' | 'ended'>('open')
   const [opened, setOpened] = useState<string[]>([])
-  const [logOf, setLogOf] = useState<SessionRow>()
   const toggle = (id: string) =>
     setOpened((ids) =>
       ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id]
@@ -101,7 +89,6 @@ function SessionsOn({ view }: { view: SessionsView }) {
       s={row}
       open={opened.includes(row.id)}
       onToggle={() => toggle(row.id)}
-      onLog={() => setLogOf(row)}
     />
   )
   return (
@@ -137,7 +124,6 @@ function SessionsOn({ view }: { view: SessionsView }) {
       ) : (
         <p className="mt-7 text-copy text-muted-foreground">{t.noneEnded}</p>
       )}
-      {logOf && <LogSheet s={logOf} onClose={() => setLogOf(undefined)} />}
     </Page>
   )
 }
@@ -246,15 +232,12 @@ function SessionRowItem({
   s,
   open,
   onToggle,
-  onLog,
 }: {
   s: SessionRow
   open: boolean
   onToggle: () => void
-  onLog: () => void
 }) {
   const t = useText(text)
-  const [error, setError] = useState<string>()
   const last = s.typed[0]
   return (
     <li
@@ -307,12 +290,11 @@ function SessionRowItem({
         </div>
         {canOpen(s) && (
           <div className="flex shrink-0 items-center gap-1.5">
-            <OpenButton s={s} onError={setError} />
+            <OpenButton s={s} />
           </div>
         )}
       </div>
-      <InlineError error={error} className="mt-2 pl-6" />
-      {open && <Opened s={s} onLog={onLog} />}
+      {open && <Opened s={s} />}
     </li>
   )
 }
@@ -425,8 +407,8 @@ function CopyResume({ s }: { s: SessionRow }) {
   )
 }
 
-/** A session opened in place: what you typed, where, and its log */
-function Opened({ s, onLog }: { s: SessionRow; onLog: () => void }) {
+/** A session opened in place: what you typed, where, and its task */
+function Opened({ s }: { s: SessionRow }) {
   const t = useText(text)
   return (
     <div className="flex flex-col gap-2 pt-2.5 pl-6">
@@ -464,79 +446,10 @@ function Opened({ s, onLog }: { s: SessionRow; onLog: () => void }) {
           <span>{formatDateTime(s.startedAt)}</span>
         </Line>
         <div className="mt-1.5 flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={onLog}>
-            <MessagesSquare />
-            {t.showLog}
-          </Button>
           <CopyResume s={s} />
         </div>
       </div>
     </div>
-  )
-}
-
-/** A session's own log, read from its tool's files when you open it */
-function LogSheet({ s, onClose }: { s: SessionRow; onClose: () => void }) {
-  const t = useText(text)
-  const r = useText(rowText)
-  const tool = CLI_NAMES[s.tool]
-  const [log, setLog] = useState<{ items?: SessionItem[]; error?: string }>()
-  const [error, setError] = useState<string>()
-  useEffect(() => {
-    void window.pacenoteDesktop?.sessions
-      .log(s.id)
-      .then((result) => setLog(result ?? {}))
-  }, [s.id])
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        variant="sheet"
-        aria-describedby={undefined}
-        className="w-[40rem] max-w-[calc(100vw-1rem)]"
-      >
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pr-2 pl-5">
-          <DialogTitle className="text-section">{r.sessionLog}</DialogTitle>
-          <span className="flex-1" />
-          <DialogClose asChild>
-            <Button size="icon-sm" variant="ghost" aria-label={r.closeLog}>
-              <X />
-            </Button>
-          </DialogClose>
-        </div>
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="flex flex-col gap-4 px-6 py-5">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-heading">{s.title}</h2>
-              <p className="text-meta text-muted-foreground">
-                {toolWhere(s, t)} ·{' '}
-                <span className="font-mono">{homePath(s.cwd)}</span> ·{' '}
-                {formatDateTime(s.startedAt)}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canOpen(s) && <OpenButton s={s} onError={setError} size="sm" />}
-              <CopyResume s={s} />
-            </div>
-            <InlineError error={error} />
-            {!log ? (
-              <p className="text-copy text-muted-foreground">{r.readingLog}</p>
-            ) : log.error ? (
-              <p className="text-copy text-muted-foreground">{log.error}</p>
-            ) : (
-              <ol className="flex flex-col gap-3">
-                {(log.items ?? []).map((item, index) => (
-                  <LogItem key={index} item={item} tool={tool} />
-                ))}
-              </ol>
-            )}
-            <p className="flex items-start gap-1.5 text-meta text-muted-foreground">
-              <MessagesSquare className="mt-px size-3.5 shrink-0" />
-              {r.readFrom(tool)}
-            </p>
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
   )
 }
 

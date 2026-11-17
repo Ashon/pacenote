@@ -30,6 +30,7 @@ import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
 import { YouPage } from './components/you-page'
+import { SessionPage } from './components/session-page'
 import { SessionsPage } from './components/sessions-page'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
@@ -65,7 +66,11 @@ type Route =
       /** Let your AI help opens over it (#/start) */
       ai?: true
     }
-  | { page: 'sessions' }
+  | {
+      page: 'sessions'
+      /** One session's page */
+      id?: string
+    }
   | {
       page: 'you'
       /** The area open in its row */
@@ -85,7 +90,8 @@ type Route =
 /**
  * #/runs: the run list, #/runs/<id>: one run, #/tasks: your tasks,
  * #/tasks/<id>: one task open in its row (/log/<entry>: a session's log over
- * the list), #/sessions: the sessions on this Mac,
+ * the list), #/sessions: the sessions on this Mac, #/sessions/<id>: one
+ * session's page,
  * #/recap/<day|week|month>[/<key>]: what you did in a period,
  * #/you: where you contribute, #/you/<id>: one area open in its row, #/bot:
  * Pace's status and logs,
@@ -107,8 +113,12 @@ function readRoute(): Route {
       entry: task[2] ? decodeURIComponent(task[2]) : undefined,
     }
   if (hash.startsWith('#/tasks')) return { page: 'tasks' }
-  if (hash.startsWith('#/sessions') && window.pacenoteDesktop?.sessions)
-    return { page: 'sessions' }
+  if (hash.startsWith('#/sessions') && window.pacenoteDesktop?.sessions) {
+    const session = /^#\/sessions\/([^/?#]+)/.exec(hash)?.[1]
+    return session
+      ? { page: 'sessions', id: decodeURIComponent(session) }
+      : { page: 'sessions' }
+  }
   const recap = /^#\/recap(?:\/(day|week|month)(?:\/([^/?#]+))?)?/.exec(hash)
   if (recap)
     return {
@@ -243,7 +253,11 @@ export default function App() {
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
                   ) : route.page === 'sessions' ? (
-                    <SessionsPage />
+                    route.id ? (
+                      <SessionPage key={route.id} id={route.id} />
+                    ) : (
+                      <SessionsPage />
+                    )
                   ) : route.page === 'recap' ? (
                     <RecapPage period={route.period} periodKey={route.key} />
                   ) : route.page === 'you' ? (

@@ -3,6 +3,7 @@ import type { SessionRow, SessionsView } from '../src/sessions/types.js'
 import type { TaskView } from '../src/tasks/types.js'
 import {
   canOpen,
+  canShow,
   sessionsByTask,
   sessionsLine,
   tasksToLink,
@@ -33,16 +34,24 @@ const view = (over: Partial<SessionsView> = {}): SessionsView => ({
 
 const task = { id: 'T1', title: 'Fix billing' }
 
-describe('canOpen: where Pacenote can take you', () => {
-  it('opens an app or claude.ai, a terminal only when its app is known', () => {
+describe('canOpen and canShow: its page, and where it runs', () => {
+  it("opens Claude Code's and Codex's in Pacenote, ended ones too", () => {
     expect(canOpen(row())).toBe(true)
-    expect(canOpen(row({ where: 'web' }))).toBe(true)
-    expect(canOpen(row({ where: 'terminal' }))).toBe(false)
-    expect(canOpen(row({ where: 'terminal', terminal: 'iTerm' }))).toBe(true)
-    expect(canOpen(row({ state: 'ended' }))).toBe(false)
-    expect(canOpen(row({ tool: 'codex', where: 'codex-app' }))).toBe(true)
+    expect(canOpen(row({ state: 'ended' }))).toBe(true)
+    expect(canOpen(row({ tool: 'codex', where: 'terminal' }))).toBe(true)
+    expect(canOpen(row({ tool: 'opencode' }))).toBe(false)
+  })
+
+  it('shows an app or claude.ai, a terminal only when its app is known', () => {
+    expect(canShow(row())).toBe(true)
+    expect(canShow(row({ where: 'web' }))).toBe(true)
+    expect(canShow(row({ where: 'terminal' }))).toBe(false)
+    expect(canShow(row({ where: 'terminal', terminal: 'iTerm' }))).toBe(true)
+    expect(canShow(row({ state: 'ended' }))).toBe(false)
+    expect(canShow(row({ where: 'pacenote' }))).toBe(false)
+    expect(canShow(row({ tool: 'codex', where: 'codex-app' }))).toBe(true)
     expect(
-      canOpen(row({ tool: 'codex', where: 'terminal', terminal: 'iTerm' }))
+      canShow(row({ tool: 'codex', where: 'terminal', terminal: 'iTerm' }))
     ).toBe(false)
   })
 })

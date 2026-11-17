@@ -112,6 +112,28 @@ describe('sessionsView: the open Claude Code sessions', () => {
     ])
   })
 
+  it('waits for you while one Pacenote runs asks, on a turn or not', () => {
+    const v = view({
+      agents: [
+        agent({
+          session: 'p1',
+          busy: true,
+          asks: 'command',
+          where: 'pacenote',
+        }),
+        agent({ session: 'p2', busy: true, where: 'pacenote' }),
+      ],
+      logged: [logged({ session: 'p1', lastAt: iso(now - 2 * HOUR) })],
+    })
+    expect(
+      rows(v.open).map((r) => [r.session, r.state, r.asks, r.where])
+    ).toEqual([
+      ['p2', 'working', undefined, 'pacenote'],
+      ['p1', 'turn', 'command', 'pacenote'],
+    ])
+    expect(v.counts).toMatchObject({ working: 1, turn: 1 })
+  })
+
   it('titles by yours, the tool, the name, what you typed, the folder', () => {
     const titleOf = (
       loggedOver: Partial<LoggedSession>,

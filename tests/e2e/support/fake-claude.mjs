@@ -58,6 +58,144 @@ const args = process.argv.slice(2)
 
 const sessionAt = args.indexOf('--session-id')
 const resumeAt = args.indexOf('--resume')
+
+// A session Pacenote runs from its page (claude -p --resume ID
+// --input-format stream-json --permission-prompt-tool stdio): each message
+// you send runs the tests, asking first unless allowed in the session, and
+// answers; the conversation goes to the session's transcript as it goes.
+// With --fork-session it is a copy, with an id of its own.
+if (args.includes('--permission-prompt-tool')) {
+  const { createInterface } = await import('node:readline')
+  const { randomUUID } = await import('node:crypto')
+  const resumed = args[resumeAt + 1]
+  const session = args.includes('--fork-session') ? randomUUID() : resumed
+  appendFileSync(
+    path.join(dir, 'calls.jsonl'),
+    `${JSON.stringify({ args, system: '', prompt: '', request: '', images: 0, cwd: process.cwd(), pid: process.pid })}\n`
+  )
+  const project = path.join(
+    process.env.HOME,
+    '.claude',
+    'projects',
+    process.cwd().replace(/[/.]/g, '-')
+  )
+  mkdirSync(project, { recursive: true })
+  const transcript = path.join(project, `${session}.jsonl`)
+  const log = (line) =>
+    appendFileSync(
+      transcript,
+      `${JSON.stringify({ ...line, sessionId: session, cwd: process.cwd(), timestamp: new Date().toISOString() })}\n`
+    )
+  const out = (event) =>
+    process.stdout.write(
+      `${JSON.stringify({ ...event, session_id: session })}\n`
+    )
+  let mode = 'default'
+  let allowed = false
+  let turns = 0
+  /** The ask waiting for its answer */
+  let pending
+  let queue = Promise.resolve()
+  const turn = async (said) => {
+    turns++
+    out({
+      type: 'system',
+      subtype: 'init',
+      permissionMode: mode,
+      cwd: process.cwd(),
+    })
+    log({ type: 'user', message: { role: 'user', content: said } })
+    const id = `toolu_${turns}`
+    const input = { command: 'pnpm vitest run test/webhook-retry.test.ts' }
+    const step = { type: 'tool_use', id, name: 'Bash', input }
+    log({ type: 'assistant', message: { role: 'assistant', content: [step] } })
+    out({ type: 'assistant', message: { content: [step] } })
+    let answer = { behavior: 'allow' }
+    if (!allowed && mode !== 'acceptEdits') {
+      const request_id = `ask_${turns}`
+      out({
+        type: 'control_request',
+        request_id,
+        request: {
+          subtype: 'can_use_tool',
+          tool_name: 'Bash',
+          display_name: 'Bash',
+          input,
+          permission_suggestions: [
+            {
+              type: 'addRules',
+              rules: [{ toolName: 'Bash', ruleContent: 'pnpm vitest:*' }],
+              behavior: 'allow',
+              destination: 'localSettings',
+            },
+          ],
+          tool_use_id: id,
+        },
+      })
+      answer = await new Promise((resolve) => {
+        pending = { request_id, resolve }
+      })
+      pending = undefined
+      if (
+        answer.updatedPermissions?.some(
+          (rule) => rule.destination === 'session'
+        )
+      )
+        allowed = true
+    }
+    const ran = answer.behavior === 'allow'
+    const result = {
+      type: 'tool_result',
+      tool_use_id: id,
+      content: ran ? '12 passed' : answer.message,
+      is_error: !ran,
+    }
+    log({ type: 'user', message: { role: 'user', content: [result] } })
+    out({ type: 'user', message: { content: [result] } })
+    const reply = ran
+      ? `Done: ${said}. The retry tests pass.`
+      : `I did not run them: ${answer.message}`
+    log({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text: reply }] },
+    })
+    out({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: reply }] },
+    })
+    out({ type: 'result', subtype: 'success', is_error: false, result: reply })
+  }
+  const input = createInterface({ input: process.stdin })
+  input.on('line', (line) => {
+    const message = JSON.parse(line)
+    if (message.type === 'user') {
+      const said = message.message.content
+      queue = queue.then(() => turn(said))
+    } else if (
+      message.type === 'control_response' &&
+      pending?.request_id === message.response.request_id
+    )
+      pending.resolve(message.response.response)
+    else if (message.type === 'control_request') {
+      const request = message.request
+      if (request.subtype === 'set_permission_mode') mode = request.mode
+      out({
+        type: 'control_response',
+        response: {
+          subtype: 'success',
+          request_id: message.request_id,
+          response:
+            request.subtype === 'interrupt' ? { still_queued: [] } : { mode },
+        },
+      })
+      if (request.subtype === 'interrupt')
+        pending?.resolve({ behavior: 'deny', message: 'Interrupted' })
+    }
+  })
+  input.on('close', () => void queue.then(() => process.exit(0)))
+  await new Promise(() => {})
+}
+
 if (sessionAt >= 0 || resumeAt >= 0) {
   const id = args[(sessionAt >= 0 ? sessionAt : resumeAt) + 1]
   const prompt = sessionAt >= 0 ? args[args.length - 1] : ''
