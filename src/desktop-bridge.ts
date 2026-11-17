@@ -64,6 +64,7 @@ import type { RecapPeriod, RecapView } from './you/types.js'
 import type {
   SessionMode,
   SessionsView,
+  SessionLive,
   SessionTalk,
 } from './sessions/types.js'
 import type {
@@ -409,6 +410,13 @@ export interface DesktopBridge {
     mode(id: string, mode: SessionMode): Promise<{ error?: string }>
     /** A session Pacenote runs changed: its id */
     onChanged(callback: (id: string) => void): () => void
+    /**
+     * What a session Pacenote runs does this moment, as it writes: its page
+     * shows it without asking again
+     */
+    onLive(
+      callback: (change: { id: string; live: SessionLive }) => void
+    ): () => void
     /** Links a session to an open task: it is that task's work */
     link(id: string, task: string): Promise<{ error?: string }>
     /** Takes a session off its task: not found for it again */

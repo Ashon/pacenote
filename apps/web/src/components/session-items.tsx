@@ -1,0 +1,543 @@
+import {
+  saidParts,
+  stepTarget,
+  toolLabel,
+  type SaidPart,
+} from '@src/sessions/said'
+import type { SessionLive } from '@src/sessions/types'
+import type { SessionItem } from '@src/tasks/types'
+import {
+  Bell,
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  CircleStop,
+  ClipboardList,
+  FilePen,
+  FilePlus,
+  FileText,
+  FolderSearch,
+  Globe,
+  Image as ImageIcon,
+  Layers,
+  ListTodo,
+  NotebookPen,
+  Plug,
+  ScrollText,
+  Search,
+  Sparkles,
+  SquareSlash,
+  SquareTerminal,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Markdown } from '@/components/markdown'
+import { formatDateTime } from '@/lib/format'
+import { useText } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+import { text } from './session-items.text'
+import { text as rowText } from './task-row.text'
+
+/**
+ * A session's conversation as its page and its log show it: your turns, with
+ * what Claude Code adds to them shown each in its own way (a slash command,
+ * a shell command, what they printed, a notice) and its reminders left out;
+ * its answers as Markdown; its steps by what they did, the ones in a row
+ * folded into a line once there are more than a few; and what it does this
+ * moment, while on a turn.
+ */
+
+/** Steps in a row shown one by one; more fold into a line to open */
+const STEPS_SHOWN = 3
+/** Tools named in a folded line, the most used first */
+const STEP_NAMES = 4
+
+const STEP_ICONS: Record<string, LucideIcon> = {
+  Bash: SquareTerminal,
+  BashOutput: SquareTerminal,
+  shell: SquareTerminal,
+  local_shell: SquareTerminal,
+  exec_command: SquareTerminal,
+  Read: FileText,
+  Edit: FilePen,
+  MultiEdit: FilePen,
+  apply_patch: FilePen,
+  Write: FilePlus,
+  NotebookEdit: NotebookPen,
+  Grep: Search,
+  Glob: FolderSearch,
+  LS: FolderSearch,
+  WebFetch: Globe,
+  WebSearch: Globe,
+  web_search: Globe,
+  TodoWrite: ListTodo,
+  update_plan: ListTodo,
+  Task: Bot,
+  Agent: Bot,
+  Skill: Sparkles,
+  ExitPlanMode: ClipboardList,
+}
+
+const stepIcon = (name: string): LucideIcon =>
+  STEP_ICONS[name] ?? (name.startsWith('mcp__') ? Plug : Wrench)
+
+type Block =
+  | { kind: 'turn'; item: SessionItem; at: number }
+  | { kind: 'steps'; items: SessionItem[]; at: number }
+
+/** Turns, and the steps between them together */
+function blocksOf(items: readonly SessionItem[]): Block[] {
+  const blocks: Block[] = []
+  items.forEach((item, at) => {
+    const last = blocks.at(-1)
+    if (item.role !== 'tool') blocks.push({ kind: 'turn', item, at })
+    else if (last?.kind === 'steps') last.items.push(item)
+    else blocks.push({ kind: 'steps', items: [item], at })
+  })
+  return blocks
+}
+
+/** The conversation, as list items */
+export function TalkItems({
+  items,
+  tool,
+  cwd,
+}: {
+  items: readonly SessionItem[]
+  tool: string
+  cwd: string
+}) {
+  return blocksOf(items).map((block) =>
+    block.kind === 'steps' ? (
+      <Steps key={block.at} items={block.items} cwd={cwd} />
+    ) : (
+      <Turn key={block.at} item={block.item} tool={tool} />
+    )
+  )
+}
+
+/** A turn of yours or its answer, in a bubble with who and when */
+function Bubble({
+  mine,
+  who,
+  at,
+  status,
+  children,
+}: {
+  mine: boolean
+  who: string
+  at?: string
+  status?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        className={cn(
+          'flex size-7 shrink-0 items-center justify-center rounded-full text-meta font-semibold',
+          mine
+            ? 'bg-secondary text-secondary-foreground'
+            : 'bg-foreground text-background'
+        )}
+        aria-hidden="true"
+      >
+        {who[0]}
+      </span>
+      <div
+        className={cn(
+          'min-w-0 flex-1 rounded-[20px] px-4 py-3',
+          mine ? 'bg-well' : 'border border-border'
+        )}
+      >
+        <p className="flex flex-wrap items-baseline gap-x-2 text-section">
+          {who}
+          {at && (
+            <span className="text-caption text-muted-foreground">
+              {formatDateTime(at)}
+            </span>
+          )}
+          {status}
+        </p>
+        <div className="mt-1 flex flex-col gap-2">{children}</div>
+      </div>
+    </li>
+  )
+}
+
+/** Its answer: Markdown, as Claude Code and Codex write */
+function Answer({ text: said }: { text: string }) {
+  return (
+    <Markdown
+      slack={false}
+      className={cn(
+        'text-foreground/90',
+        // Headings as a turn's own, not the page's
+        'prose-headings:mt-4 prose-headings:mb-1.5 prose-h1:text-section prose-h2:text-section prose-h3:text-section prose-h4:text-section',
+        '[&>:first-child]:mt-0 [&>:last-child]:mb-0'
+      )}
+    >
+      {said}
+    </Markdown>
+  )
+}
+
+function Turn({ item, tool }: { item: SessionItem; tool: string }) {
+  const r = useText(rowText)
+  const t = useText(text)
+  if (item.role === 'assistant')
+    return (
+      <Bubble mine={false} who={tool} at={item.at}>
+        <Answer text={item.text} />
+      </Bubble>
+    )
+  if (item.compacted) return <Compacted summary={item.text} />
+  const parts = saidParts(item.text)
+  // Only a stop or a notice: a line of its own, not a turn of yours
+  if (
+    !item.images &&
+    parts.every((part) => part.kind === 'stopped' || part.kind === 'note')
+  )
+    return parts.map((part, index) => <NoteLine key={index} part={part} />)
+  return (
+    <Bubble mine who={r.you} at={item.at}>
+      {parts.map((part, index) => (
+        <Part key={index} part={part} />
+      ))}
+      {!!item.images && (
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-background px-2.5 py-0.5 text-meta text-muted-foreground">
+          <ImageIcon aria-hidden="true" className="size-3.5" />
+          {t.images(item.images)}
+        </span>
+      )}
+    </Bubble>
+  )
+}
+
+/** A part of a turn of yours */
+function Part({ part }: { part: SaidPart }) {
+  switch (part.kind) {
+    case 'text':
+      return (
+        <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
+          {part.text}
+        </p>
+      )
+    case 'command':
+      return (
+        <p className="flex items-center gap-1.5 font-mono text-copy select-text">
+          <SquareSlash
+            aria-hidden="true"
+            className="size-3.5 shrink-0 text-muted-foreground"
+          />
+          <span className="font-medium">{part.name}</span>
+          {part.args && (
+            <span className="min-w-0 break-words text-muted-foreground">
+              {part.args}
+            </span>
+          )}
+        </p>
+      )
+    case 'shell':
+      return (
+        <p className="flex items-start gap-1.5 font-mono text-copy select-text">
+          <SquareTerminal
+            aria-hidden="true"
+            className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+          />
+          <span className="min-w-0 break-words">{part.command}</span>
+        </p>
+      )
+    case 'output':
+      return (
+        <pre
+          className={cn(
+            'max-h-64 overflow-auto rounded-[10px] bg-background px-3 py-2 font-mono text-meta break-words whitespace-pre-wrap select-text',
+            part.error ? 'text-status-failed' : 'text-foreground/80'
+          )}
+        >
+          {part.text}
+        </pre>
+      )
+    default:
+      return <NoteText part={part} />
+  }
+}
+
+function NoteText({ part }: { part: SaidPart }) {
+  const t = useText(text)
+  const stopped = part.kind === 'stopped'
+  const Icon = stopped ? CircleStop : Bell
+  return (
+    <span className="flex items-center gap-2 text-meta text-muted-foreground">
+      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+      <span className="min-w-0 break-words">
+        {stopped ? t.stopped : part.kind === 'note' ? part.text : ''}
+      </span>
+    </span>
+  )
+}
+
+/** A stop or a notice, on a line of its own */
+function NoteLine({ part }: { part: SaidPart }) {
+  return (
+    <li className="ml-10 px-2.5">
+      <NoteText part={part} />
+    </li>
+  )
+}
+
+/** Where Claude Code compacted the conversation, its summary to open */
+function Compacted({ summary }: { summary: string }) {
+  const t = useText(text)
+  const [open, setOpen] = useState(false)
+  return (
+    <li className="flex flex-col gap-3">
+      <div className="flex items-center gap-3 text-meta text-muted-foreground">
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 hover:bg-muted hover:text-foreground"
+        >
+          <ScrollText aria-hidden="true" className="size-3.5" />
+          {t.compacted}
+          <ChevronDown
+            aria-hidden="true"
+            className={cn('size-3.5', open && 'rotate-180')}
+          />
+        </button>
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
+      </div>
+      {open && (
+        <div className="rounded-[20px] bg-well px-4 py-3">
+          <Answer text={summary} />
+        </div>
+      )}
+    </li>
+  )
+}
+
+/** One step: what it used, on what, and how it came back */
+function StepLine({
+  name,
+  target,
+  cwd,
+  failed,
+  status,
+}: {
+  name: string
+  target: string
+  cwd: string
+  failed?: boolean
+  status?: ReactNode
+}) {
+  const t = useText(text)
+  const Icon = stepIcon(name)
+  const label = toolLabel(name)
+  return (
+    <div className="flex items-center gap-2.5 rounded-[10px] px-2.5 py-1 text-meta">
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          'size-3.5 shrink-0',
+          failed ? 'text-status-failed' : 'text-muted-foreground'
+        )}
+      />
+      <span className="shrink-0 font-medium">{label}</span>
+      {target && target !== name && (
+        <span
+          title={target}
+          className="min-w-0 truncate font-mono text-muted-foreground"
+        >
+          {stepTarget(target, cwd)}
+        </span>
+      )}
+      {failed && (
+        <span className="shrink-0 font-medium text-status-failed">
+          {t.failed}
+        </span>
+      )}
+      {status}
+    </div>
+  )
+}
+
+/** Steps in a row: each on its line, or folded into one past a few */
+function Steps({ items, cwd }: { items: SessionItem[]; cwd: string }) {
+  const t = useText(text)
+  const [open, setOpen] = useState(false)
+  const folds = items.length > STEPS_SHOWN
+  if (folds && !open) {
+    const used = new Map<string, number>()
+    for (const item of items) {
+      const label = toolLabel(item.name ?? '')
+      used.set(label, (used.get(label) ?? 0) + 1)
+    }
+    const names = [...used]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, STEP_NAMES)
+      .map(([label, count]) => (count > 1 ? `${label} ${count}` : label))
+      .join(' · ')
+    const failed = items.filter((item) => item.failed).length
+    return (
+      <li className="ml-10">
+        <button
+          type="button"
+          aria-expanded={false}
+          aria-label={t.showSteps}
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1 text-left text-meta hover:bg-muted"
+        >
+          <Layers
+            aria-hidden="true"
+            className="size-3.5 shrink-0 text-muted-foreground"
+          />
+          <span className="shrink-0 font-medium">{t.steps(items.length)}</span>
+          <span className="min-w-0 truncate text-muted-foreground">
+            {names}
+          </span>
+          {failed > 0 && (
+            <span className="shrink-0 font-medium text-status-failed">
+              {t.failedCount(failed)}
+            </span>
+          )}
+          <ChevronRight
+            aria-hidden="true"
+            className="ml-auto size-3.5 shrink-0 text-muted-foreground"
+          />
+        </button>
+      </li>
+    )
+  }
+  return (
+    <li className="ml-10 flex flex-col">
+      {items.map((item, index) => (
+        <StepLine
+          key={index}
+          name={item.name ?? ''}
+          target={item.text}
+          cwd={cwd}
+          failed={item.failed}
+        />
+      ))}
+      {folds && (
+        <button
+          type="button"
+          aria-expanded
+          onClick={() => setOpen(false)}
+          className="flex w-fit items-center gap-1.5 rounded-[10px] px-2.5 py-1 text-meta text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ChevronDown aria-hidden="true" className="size-3.5 rotate-180" />
+          {t.foldSteps}
+        </button>
+      )}
+    </li>
+  )
+}
+
+/** A dot that pulses, and what it does */
+function Doing({ label, since }: { label: string; since?: string }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 text-meta font-medium text-status-running">
+      <span
+        aria-hidden="true"
+        className="size-1.5 animate-pulse-dot rounded-full bg-status-running"
+      />
+      {label}
+      {since && <Elapsed since={since} />}
+    </span>
+  )
+}
+
+/** How long since its turn began, by the second */
+function Elapsed({ since }: { since: string }) {
+  const t = useText(text)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const seconds = Math.max(0, Math.round((now - Date.parse(since)) / 1000))
+  return (
+    <span className="font-normal text-muted-foreground tabular-nums">
+      · {t.elapsed(seconds)}
+    </span>
+  )
+}
+
+/**
+ * What it does this moment, at the end of the conversation: the answer it
+ * writes as it comes, the step it runs, or that it thinks or works. For a
+ * session open somewhere else, that it works there.
+ */
+export function NowItem({
+  live,
+  draft,
+  tool,
+  cwd,
+  where,
+}: {
+  live?: SessionLive
+  /** The answer it writes, kept on until its log has it */
+  draft?: string
+  tool: string
+  cwd: string
+  /** Where it works, for one open somewhere else */
+  where?: string
+}) {
+  const t = useText(text)
+  const writing = live?.busy && live.doing === 'writing'
+  const answer = draft && (
+    <Bubble
+      mine={false}
+      who={tool}
+      status={writing && <Doing label={t.writing} since={live.since} />}
+    >
+      <Answer text={draft} />
+    </Bubble>
+  )
+  if (!live?.busy || live.ask)
+    return (
+      <>
+        {answer}
+        {where && (
+          <li className="ml-10 px-2.5 py-1">
+            <Doing label={t.workingIn(where)} />
+          </li>
+        )}
+      </>
+    )
+  if (answer && writing) return answer
+  const now =
+    live.doing === 'tool' && live.step ? (
+      <li className="ml-10">
+        <StepLine
+          name={live.step.name}
+          target={live.step.text}
+          cwd={cwd}
+          status={<Doing label={t.running} since={live.since} />}
+        />
+      </li>
+    ) : (
+      <li className="ml-10 px-2.5 py-1">
+        <Doing
+          label={
+            live.doing === 'thinking'
+              ? t.thinking
+              : live.doing === 'writing'
+                ? t.writing
+                : t.working
+          }
+          since={live.since}
+        />
+      </li>
+    )
+  return (
+    <>
+      {answer}
+      {now}
+    </>
+  )
+}

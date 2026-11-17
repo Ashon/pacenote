@@ -668,26 +668,62 @@ function findSessionFile(home: string, entry: Session): string | undefined {
 const ITEM_CHARS = 2000
 /** The parts of a message that are text, the model's answers among them */
 const SAID = ['text', 'input_text', 'output_text']
+/** What a step's line reads first: its command, file, search or task */
+const STEP_KEYS = [
+  'command',
+  'file_path',
+  'notebook_path',
+  'pattern',
+  'path',
+  'url',
+  'query',
+  'description',
+  'skill',
+  'task',
+]
 
 /** What a tool step was about, in a line: its command, file or task */
 export function stepLine(input: unknown): string {
   if (!input || typeof input !== 'object') return ''
   const value = input as Record<string, unknown>
-  const first = ['command', 'file_path', 'path', 'pattern', 'task', 'query']
-    .map((key) => value[key])
-    .find((item) => typeof item === 'string')
+  // A to-do list: the one under way, else how far along it is
+  if (Array.isArray(value.todos)) {
+    const todos = value.todos as {
+      status?: string
+      content?: string
+      activeForm?: string
+    }[]
+    const doing = todos.find((todo) => todo.status === 'in_progress')
+    if (doing) return doing.activeForm ?? doing.content ?? ''
+    const done = todos.filter((todo) => todo.status === 'completed').length
+    return `${done}/${todos.length}`
+  }
+  const first = STEP_KEYS.map((key) => value[key]).find(
+    (item) => typeof item === 'string'
+  )
   return typeof first === 'string' ? first : JSON.stringify(input).slice(0, 200)
 }
 
 /**
  * A session's log as turns and steps: Claude Code's transcript or Codex's
- * rollout, the newest 300, secrets redacted
+ * rollout, the newest 300, secrets redacted, each turn at most `chars` long.
+ * Claude Code's own lines (its caveats, a skill's text, a subagent's turns)
+ * are left out.
  */
-export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
+export function readSessionLog(
+  file: string,
+  tool: WorkTool,
+  chars = ITEM_CHARS
+): SessionItem[] {
   const items: SessionItem[] = []
+  /** Claude Code's steps by their tool_use id, for how each came back */
+  const steps = new Map<string, SessionItem>()
   const push = (item: SessionItem) => {
-    const text = redactSecrets(item.text.trim()).slice(0, ITEM_CHARS)
-    if (text) items.push({ ...item, text })
+    const text = redactSecrets(item.text.trim()).slice(0, chars)
+    if (!text && !item.images) return undefined
+    const kept = { ...item, text }
+    items.push(kept)
+    return kept
   }
   const step = (name: unknown, input: unknown, at?: string) =>
     push({
@@ -709,12 +745,26 @@ export function readSessionLog(file: string, tool: WorkTool): SessionItem[] {
         { role?: string; content?: unknown } | undefined
       if (!message || (event.type !== 'user' && event.type !== 'assistant'))
         continue
+      if (event.isMeta === true || event.isSidechain === true) continue
+      let images = 0
       if (Array.isArray(message.content))
         for (const block of message.content as Record<string, unknown>[])
-          if (block.type === 'tool_use') step(block.name, block.input, at)
+          if (block.type === 'tool_use') {
+            const kept = step(block.name, block.input, at)
+            if (kept && typeof block.id === 'string') steps.set(block.id, kept)
+          } else if (block.type === 'tool_result' && block.is_error === true) {
+            const kept = steps.get(String(block.tool_use_id))
+            if (kept) kept.failed = true
+          } else if (block.type === 'image') images += 1
       const text = textOf(message.content, SAID)
-      if (text)
-        push({ role: event.type === 'user' ? 'user' : 'assistant', text, at })
+      if (text || images)
+        push({
+          role: event.type === 'user' ? 'user' : 'assistant',
+          text,
+          at,
+          ...(images ? { images } : {}),
+          ...(event.isCompactSummary === true ? { compacted: true } : {}),
+        })
       continue
     }
     // Codex: response_item messages and function calls

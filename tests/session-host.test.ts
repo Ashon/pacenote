@@ -120,6 +120,94 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     ])
   })
 
+  it('tells what it does this moment: thinks, writes as it comes, runs a step', async () => {
+    vi.useFakeTimers()
+    try {
+      const lives: { session: string; draft?: string }[] = []
+      const { h, procs } = host({
+        onLive: (session, live) => lives.push({ session, draft: live.draft }),
+      })
+      h.send('s1', '/w', 'Explain the retry')
+      const proc = procs[0]!
+      const since = h.get('s1')?.since
+      expect(since).toBeTruthy()
+      const stream = (event: Record<string, unknown>) =>
+        proc.say({ type: 'stream_event', event })
+      stream({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking' },
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')).toMatchObject({
+        busy: true,
+        doing: 'thinking',
+        since,
+      })
+      stream({
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'text', text: '' },
+      })
+      for (const text of ['It tries ', 'three times', '.'])
+        stream({
+          type: 'content_block_delta',
+          index: 1,
+          delta: { type: 'text_delta', text },
+        })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')).toMatchObject({
+        doing: 'writing',
+        draft: 'It tries three times.',
+      })
+      // Told once for the three, a moment after
+      expect(lives).toEqual([])
+      await vi.advanceTimersByTimeAsync(200)
+      expect(lives).toEqual([{ session: 's1', draft: 'It tries three times.' }])
+      // Written in full: its log has it, no draft left
+      proc.say({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'It tries three times.' }] },
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')?.draft).toBeUndefined()
+      expect(h.get('s1')?.doing).toBeUndefined()
+      stream({
+        type: 'content_block_start',
+        index: 2,
+        content_block: { type: 'tool_use', name: 'Read' },
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')).toMatchObject({
+        doing: 'tool',
+        step: { name: 'Read', text: '' },
+      })
+      proc.say({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', name: 'Read', input: { file_path: 'a.ts' } },
+          ],
+        },
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')?.step).toEqual({ name: 'Read', text: 'a.ts' })
+      // The step came back: on to the next
+      proc.say({
+        type: 'user',
+        message: { content: [{ type: 'tool_result', tool_use_id: 'x' }] },
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')?.doing).toBeUndefined()
+      expect(h.get('s1')?.step).toBeUndefined()
+      proc.say({ type: 'result', is_error: false })
+      await vi.advanceTimersByTimeAsync(1)
+      expect(h.get('s1')).toEqual({ busy: false })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows what it asks, answers it, and keeps a rule for the session', async () => {
     const asked = vi.fn()
     const { h, procs } = host({ onAsk: asked })

@@ -186,6 +186,8 @@ describe('the lines Pacenote writes to a session', () => {
     expect(args).toContain('--permission-prompt-tool')
     expect(args[args.indexOf('--permission-prompt-tool') + 1]).toBe('stdio')
     expect(args).not.toContain('--fork-session')
+    // Its answer as it writes it
+    expect(args).toContain('--include-partial-messages')
     expect(hostArgs('s1', true)).toContain('--fork-session')
   })
 })

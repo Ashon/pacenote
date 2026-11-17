@@ -98,19 +98,28 @@ export function useSessionTasks() {
 /**
  * A session's page (#/sessions/<id>): its conversation and how Pacenote runs
  * it, read again at once when Pacenote's run of it changes, and every few
- * seconds besides, sooner while it works
+ * seconds besides, sooner while it works; the answer it writes as it comes
  */
 export function useSessionTalk(id: string) {
   const bridge = window.pacenoteDesktop?.sessions
   const client = useQueryClient()
-  useEffect(
-    () =>
-      bridge?.onChanged((changed) => {
-        if (changed === id)
-          void client.invalidateQueries({ queryKey: ['session', id] })
-      }),
-    [bridge, client, id]
-  )
+  useEffect(() => {
+    const stopChanged = bridge?.onChanged((changed) => {
+      if (changed === id)
+        void client.invalidateQueries({ queryKey: ['session', id] })
+    })
+    // The answer it writes, as it comes: shown as it is, not read again
+    const stopLive = bridge?.onLive((change) => {
+      if (change.id !== id) return
+      client.setQueryData<SessionTalk | null>(['session', id], (talk) =>
+        talk ? { ...talk, live: change.live } : talk
+      )
+    })
+    return () => {
+      stopChanged?.()
+      stopLive?.()
+    }
+  }, [bridge, client, id])
   return useQuery({
     queryKey: ['session', id],
     queryFn: async (): Promise<SessionTalk | null> =>

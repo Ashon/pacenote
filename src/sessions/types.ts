@@ -118,6 +118,15 @@ export interface SessionLive {
   mode?: string
   /** The step it is on, while on a turn */
   step?: { name: string; text: string }
+  /**
+   * What it does this moment, while on a turn: thinks, writes its answer, or
+   * runs a step; none while it starts or between them
+   */
+  doing?: 'thinking' | 'writing' | 'tool'
+  /** When its turn began */
+  since?: string
+  /** What it has written of the answer it is writing, as it comes */
+  draft?: string
   /** Why its last turn, or its run, stopped short */
   error?: string
 }

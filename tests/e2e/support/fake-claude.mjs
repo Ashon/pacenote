@@ -105,6 +105,45 @@ if (args.includes('--permission-prompt-tool')) {
       cwd: process.cwd(),
     })
     log({ type: 'user', message: { role: 'user', content: said } })
+    // Asked to explain: it thinks a while, then writes its answer as it
+    // goes (--include-partial-messages), in Markdown
+    if (/^Explain/.test(said)) {
+      const stream = (event) => out({ type: 'stream_event', event })
+      stream({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking', thinking: '' },
+      })
+      await setTimeout(1500)
+      stream({ type: 'content_block_stop', index: 0 })
+      stream({
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'text', text: '' },
+      })
+      const reply = [
+        '## How the backoff works\n\n',
+        'Each retry waits twice as long as the one before, ',
+        'from `BASE_DELAY_MS`:\n\n',
+        '1. The first retry after **1s**\n',
+        '2. The second after **2s**\n',
+        '3. The third after **4s**\n\n',
+        'With `maxAttempts` at 5 the last one waits 16s.',
+      ]
+      for (const text of reply) {
+        stream({
+          type: 'content_block_delta',
+          index: 1,
+          delta: { type: 'text_delta', text },
+        })
+        await setTimeout(300)
+      }
+      const content = [{ type: 'text', text: reply.join('') }]
+      log({ type: 'assistant', message: { role: 'assistant', content } })
+      out({ type: 'assistant', message: { content } })
+      out({ type: 'result', subtype: 'success', is_error: false })
+      return
+    }
     const id = `toolu_${turns}`
     const input = { command: 'pnpm vitest run test/webhook-retry.test.ts' }
     const step = { type: 'tool_use', id, name: 'Bash', input }

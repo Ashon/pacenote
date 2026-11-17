@@ -43,13 +43,18 @@ const COMPONENTS: Components = {
   ),
 }
 
-/** Parses again only when its text or class changes */
+/**
+ * Parses again only when its text or class changes. Slack's mrkdwn is read as
+ * Markdown unless slack is false: a coding agent's answer is Markdown already.
+ */
 export const Markdown = memo(function Markdown({
   children,
   className,
+  slack = true,
 }: {
   children: string
   className?: string
+  slack?: boolean
 }) {
   return (
     <div
@@ -69,7 +74,7 @@ export const Markdown = memo(function Markdown({
       )}
     >
       <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS}>
-        {slackToMarkdown(children)}
+        {slack ? slackToMarkdown(children) : children}
       </ReactMarkdown>
     </div>
   )

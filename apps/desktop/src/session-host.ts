@@ -49,6 +49,11 @@ export interface SessionHostOptions {
   warn: (message: string) => void
   /** Something about a session changed: its page and the list read again */
   onChange: (session: string) => void
+  /**
+   * What it does this moment changed (the answer it writes grew): its page
+   * shows it as it is, without reading again; at most every LIVE_MS
+   */
+  onLive?: (session: string, live: SessionLive) => void
   /** A session asks something: told as a notification when out of sight */
   onAsk?: (session: string, cwd: string, ask: SessionAsk) => void
   /** How long a session with nothing to do keeps running */
@@ -84,6 +89,8 @@ interface Hosted {
   stderr: string
   /** A copy's id, once Claude Code names it */
   named?: (session: string) => void
+  /** onLive, due once LIVE_MS is up */
+  liveSoon?: NodeJS.Timeout
 }
 
 /** How long a session with nothing to do keeps running */
@@ -91,6 +98,10 @@ const IDLE_MS = 30 * MINUTE
 /** How long a copy has to say its id */
 const NAMED_MS = 60 * SECOND
 const STDERR_CHARS = 2000
+/** How often the answer it writes is told at most, as it grows */
+const LIVE_MS = 120
+/** How much of the answer it writes is told: its page shows the end */
+const DRAFT_CHARS = 12_000
 
 export class SessionHost {
   private readonly hosted = new Map<string, Hosted>()
@@ -278,6 +289,7 @@ export class SessionHost {
     h.proc.stdin.write(line)
     if (typed) {
       clearTimeout(h.idle)
+      if (!h.live.busy) h.live.since = new Date().toISOString()
       h.live.busy = true
       h.live.error = undefined
       this.options.onChange(h.session)
@@ -307,6 +319,7 @@ export class SessionHost {
           if (typeof event.permissionMode === 'string')
             h.live.mode = event.permissionMode
           h.live.busy = true
+          h.live.since ??= new Date().toISOString()
           this.options.onChange(h.session)
         } else if (
           event.subtype === 'status' &&
@@ -321,16 +334,33 @@ export class SessionHost {
           ?.content
         if (!Array.isArray(content)) return
         for (const block of content as Record<string, unknown>[])
-          if (block.type === 'tool_use')
+          if (block.type === 'tool_use') {
             h.live.step = {
               name: String(block.name ?? ''),
               text: stepLine(block.input),
             }
-          else if (block.type === 'text') h.live.step = undefined
+            h.live.doing = 'tool'
+          } else if (block.type === 'text') {
+            // Written in full: its log has it from now on
+            h.live.step = undefined
+            h.live.draft = undefined
+            h.live.doing = undefined
+          }
         h.live.busy = true
         this.options.onChange(h.session)
         return
       }
+      case 'user':
+        // A step came back: on to the next
+        if (h.live.doing === 'tool') {
+          h.live.doing = undefined
+          h.live.step = undefined
+          this.options.onChange(h.session)
+        }
+        return
+      case 'stream_event':
+        this.streamed(h, event.event as Record<string, unknown> | undefined)
+        return
       case 'control_request': {
         const id = event.request_id
         const request = event.request as { subtype?: string } | undefined
@@ -351,6 +381,11 @@ export class SessionHost {
       case 'result': {
         h.live.busy = false
         h.live.step = undefined
+        h.live.doing = undefined
+        h.live.draft = undefined
+        h.live.since = undefined
+        clearTimeout(h.liveSoon)
+        h.liveSoon = undefined
         h.asks.clear()
         h.live.ask = undefined
         h.live.error =
@@ -365,6 +400,48 @@ export class SessionHost {
         return
       }
     }
+  }
+
+  /**
+   * What the answer it writes says so far, and what it does this moment
+   * (claude --include-partial-messages)
+   */
+  private streamed(
+    h: Hosted,
+    event: Record<string, unknown> | undefined
+  ): void {
+    if (!h.live.busy) return
+    if (event?.type === 'content_block_start') {
+      const block = event.content_block as Record<string, unknown> | undefined
+      if (block?.type === 'thinking' || block?.type === 'redacted_thinking')
+        h.live.doing = 'thinking'
+      else if (block?.type === 'text') {
+        h.live.doing = 'writing'
+        h.live.draft = ''
+      } else if (block?.type === 'tool_use') {
+        h.live.doing = 'tool'
+        h.live.step = { name: String(block.name ?? ''), text: '' }
+      } else return
+      this.options.onChange(h.session)
+      return
+    }
+    if (event?.type !== 'content_block_delta') return
+    const delta = event.delta as { type?: string; text?: unknown } | undefined
+    if (delta?.type !== 'text_delta' || typeof delta.text !== 'string') return
+    h.live.doing = 'writing'
+    h.live.draft = ((h.live.draft ?? '') + delta.text).slice(-DRAFT_CHARS)
+    this.liveSoon(h)
+  }
+
+  /** Tells what it does this moment, at most every LIVE_MS */
+  private liveSoon(h: Hosted): void {
+    if (h.liveSoon || !this.options.onLive) return
+    h.liveSoon = setTimeout(() => {
+      h.liveSoon = undefined
+      if (this.hosted.get(h.session) === h)
+        this.options.onLive?.(h.session, { ...h.live })
+    }, LIVE_MS)
+    h.liveSoon.unref?.()
   }
 
   /** Ends it once it has had nothing to do for a while */
@@ -388,6 +465,7 @@ export class SessionHost {
 
   private forget(h: Hosted): void {
     clearTimeout(h.idle)
+    clearTimeout(h.liveSoon)
     if (this.hosted.get(h.session) === h) this.hosted.delete(h.session)
     this.options.onChange(h.session)
   }

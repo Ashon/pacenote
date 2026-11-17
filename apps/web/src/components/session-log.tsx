@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { useTaskDetail, useTaskWork } from '@/lib/tasks'
-import { cn } from '@/lib/utils'
+import { TalkItems } from './session-items'
 import { text } from './task-row.text'
 import { resumeCommand, resumesInApp, sessionOf } from './task-sessions'
 
@@ -114,9 +114,11 @@ export function SessionLogPanel({
                   <p className="text-copy text-muted-foreground">{log.error}</p>
                 ) : (
                   <ol className="flex flex-col gap-3">
-                    {(log.items ?? []).map((item, index) => (
-                      <LogItem key={index} item={item} tool={tool} />
-                    ))}
+                    <TalkItems
+                      items={log.items ?? []}
+                      tool={tool}
+                      cwd={entry.cwd}
+                    />
                   </ol>
                 )}
                 <p className="flex items-start gap-1.5 text-meta text-muted-foreground">
@@ -129,55 +131,5 @@ export function SessionLogPanel({
         </ScrollArea>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/**
- * One turn of the log: you or the tool, in a bubble with its time, or a tool
- * step on a line of its own
- */
-export function LogItem({ item, tool }: { item: SessionItem; tool: string }) {
-  const t = useText(text)
-  if (item.role === 'tool')
-    return (
-      <li className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-meta">
-        <span className="shrink-0 font-mono font-medium">{item.name}</span>
-        <span className="min-w-0 truncate font-mono text-muted-foreground">
-          {item.text}
-        </span>
-      </li>
-    )
-  return (
-    <li className="flex items-start gap-3">
-      <span
-        className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-full text-meta font-semibold',
-          item.role === 'user'
-            ? 'bg-secondary text-secondary-foreground'
-            : 'bg-foreground text-background'
-        )}
-        aria-hidden="true"
-      >
-        {item.role === 'user' ? t.youInitial : tool[0]}
-      </span>
-      <div
-        className={cn(
-          'min-w-0 flex-1 rounded-[20px] px-4 py-3',
-          item.role === 'user' ? 'bg-well' : 'border border-border'
-        )}
-      >
-        <p className="text-section">
-          {item.role === 'user' ? t.you : tool}
-          {item.at && (
-            <span className="ml-2 text-caption text-muted-foreground">
-              {formatDateTime(item.at)}
-            </span>
-          )}
-        </p>
-        <p className="mt-1 text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
-          {item.text}
-        </p>
-      </div>
-    </li>
   )
 }

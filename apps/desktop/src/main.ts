@@ -497,6 +497,11 @@ const sessionHost = new SessionHost({
   warn: (message) => log.warn(message),
   onChange: (session) =>
     mainWindow.send('pacenote:sessions:changed', `claude:${session}`),
+  onLive: (session, live) =>
+    mainWindow.send('pacenote:sessions:live', {
+      id: `claude:${session}`,
+      live,
+    }),
   onAsk: (session, cwd, ask) => {
     if (mainWindow.isFocused() || !Notification.isSupported()) return
     const t = localized(hostText)

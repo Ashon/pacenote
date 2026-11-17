@@ -1,4 +1,9 @@
-import type { SessionAsk, SessionMode, SessionTalk } from '@src/sessions/types'
+import type {
+  SessionAsk,
+  SessionLive,
+  SessionMode,
+  SessionTalk,
+} from '@src/sessions/types'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import {
   ArrowUp,
@@ -39,7 +44,7 @@ import { useText } from '@/lib/i18n'
 import { canShow } from '@/lib/session-rows'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
-import { LogItem } from './session-log'
+import { NowItem, TalkItems } from './session-items'
 import { ShowButton, StateMark, toolWhere, whereName } from './session-open'
 import { text } from './session-page.text'
 import { text as listText } from './sessions-page.text'
@@ -75,10 +80,18 @@ export function SessionPage({ id }: { id: string }) {
     return () => element.removeEventListener('scroll', onScroll)
   }, [loaded])
   const live = talk?.live
+  const draft = useDraft(live, talk?.items.length ?? 0)
   useLayoutEffect(() => {
     const element = scroller.current
     if (element && following.current) element.scrollTop = element.scrollHeight
-  }, [talk?.items.length, live?.ask?.id, live?.step?.text, live?.busy])
+  }, [
+    talk?.items.length,
+    live?.ask?.id,
+    live?.step?.text,
+    live?.busy,
+    live?.doing,
+    draft?.length,
+  ])
 
   if (talk === undefined)
     return (
@@ -101,6 +114,11 @@ export function SessionPage({ id }: { id: string }) {
 
   const { row, items } = talk
   const tool = CLI_NAMES[row.tool]
+  // One open somewhere else works there: said at the end, as it can be
+  const workingThere =
+    !live?.busy && row.state === 'working' && talk.typeIn !== 'here'
+      ? whereName(row, l)
+      : undefined
   return (
     <div className="flex h-full flex-col">
       <ScrollArea viewportRef={scroller} className="min-h-0 flex-1">
@@ -133,28 +151,16 @@ export function SessionPage({ id }: { id: string }) {
               </a>
             )}
           </p>
-          {items.length > 0 ? (
+          {items.length > 0 || live?.busy || workingThere ? (
             <ol aria-label={row.title} className="mt-6 flex flex-col gap-3">
-              {items.map((item, index) => (
-                <LogItem key={index} item={item} tool={tool} />
-              ))}
-              {live?.busy && live.step && !live.ask && (
-                <li className="ml-10 flex items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-meta">
-                  <span className="shrink-0 font-mono font-medium">
-                    {live.step.name}
-                  </span>
-                  <span className="min-w-0 truncate font-mono text-muted-foreground">
-                    {live.step.text}
-                  </span>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 font-medium text-status-running">
-                    <span
-                      aria-hidden="true"
-                      className="size-1.5 animate-pulse-dot rounded-full bg-status-running"
-                    />
-                    {t.running}
-                  </span>
-                </li>
-              )}
+              <TalkItems items={items} tool={tool} cwd={row.cwd} />
+              <NowItem
+                live={live}
+                draft={draft}
+                tool={tool}
+                cwd={row.cwd}
+                where={workingThere}
+              />
             </ol>
           ) : (
             <p className="mt-6 text-copy text-muted-foreground">
@@ -543,4 +549,24 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+/**
+ * The answer it writes, as it comes; kept on once written until its log has
+ * it, so it does not blink out between the two
+ */
+function useDraft(
+  live: SessionLive | undefined,
+  count: number
+): string | undefined {
+  const [kept, setKept] = useState<{ text: string; count: number }>()
+  const draft = live?.draft
+  const busy = live?.busy
+  useEffect(() => {
+    // A new answer begun, or the one written so far
+    if (draft !== undefined) setKept(draft ? { text: draft, count } : undefined)
+    else
+      setKept((old) => (old && (count > old.count || !busy) ? undefined : old))
+  }, [draft, count, busy])
+  return draft !== undefined ? draft || undefined : kept?.text
 }

@@ -848,6 +848,99 @@ describe("the tools' own session logs", () => {
       { role: 'assistant', text: 'Done.' },
     ])
   })
+
+  it("leaves out Claude Code's own lines, and tells a failed step, images and a compacted start", () => {
+    const file = path.join(dir('reader'), 'claude.jsonl')
+    const long = 'x'.repeat(3000)
+    writeFileSync(
+      file,
+      [
+        {
+          type: 'user',
+          isCompactSummary: true,
+          message: { role: 'user', content: 'This session is continued.' },
+        },
+        {
+          type: 'user',
+          isMeta: true,
+          message: { role: 'user', content: 'Caveat: generated locally.' },
+        },
+        {
+          type: 'user',
+          message: {
+            role: 'user',
+            content: [
+              { type: 'image', source: {} },
+              { type: 'text', text: 'Why is this red?' },
+            ],
+          },
+        },
+        {
+          type: 'assistant',
+          isSidechain: true,
+          message: { role: 'assistant', content: 'A subagent turn' },
+        },
+        {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool_use',
+                id: 't1',
+                name: 'Bash',
+                input: { command: 'pnpm test' },
+              },
+              {
+                type: 'tool_use',
+                id: 't2',
+                name: 'TodoWrite',
+                input: {
+                  todos: [
+                    { status: 'completed', content: 'Read it' },
+                    {
+                      status: 'in_progress',
+                      content: 'Fix it',
+                      activeForm: 'Fixing it',
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        {
+          type: 'user',
+          message: {
+            role: 'user',
+            content: [
+              { type: 'tool_result', tool_use_id: 't1', is_error: true },
+              { type: 'tool_result', tool_use_id: 't2' },
+            ],
+          },
+        },
+        {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: long }],
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join('\n')
+    )
+    const items = readSessionLog(file, 'claude', 5000)
+    expect(items).toEqual([
+      { role: 'user', text: 'This session is continued.', compacted: true },
+      { role: 'user', text: 'Why is this red?', images: 1 },
+      { role: 'tool', name: 'Bash', text: 'pnpm test', failed: true },
+      { role: 'tool', name: 'TodoWrite', text: 'Fixing it' },
+      { role: 'assistant', text: long },
+    ])
+    // Cut to 2000 a turn unless told otherwise
+    expect(readSessionLog(file, 'claude').at(-1)?.text).toHaveLength(2000)
+  })
 })
 
 describe('reply drafts', () => {

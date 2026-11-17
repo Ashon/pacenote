@@ -8,7 +8,6 @@ const en = {
   backToSessions: 'Back to Sessions',
   more: 'More for this session',
   nothingSaid: 'Nothing said in it yet.',
-  running: 'running',
   stoppedShort: (why: string) => `Its last turn stopped short: ${why}`,
   // What it asks
   askTitle: (kind: SessionAskKind, tool: string) =>
@@ -62,7 +61,6 @@ const ko: typeof en = {
   backToSessions: '세션으로 돌아가기',
   more: '세션 더 보기',
   nothingSaid: '아직 나눈 말이 없어요.',
-  running: '실행 중',
   stoppedShort: (why) => `지난 턴이 중간에 멈췄어요: ${why}`,
   askTitle: (kind, tool) =>
     ({

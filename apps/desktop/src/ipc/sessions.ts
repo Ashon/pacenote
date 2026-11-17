@@ -47,6 +47,8 @@ const OPEN_TIMEOUT_MS = 20_000
 const LOGS_KEPT = 4
 /** What you type to a session, at most */
 const MESSAGE_CHARS = 20_000
+/** How much of a turn its page shows: an answer in full, mostly */
+const TURN_CHARS = 12_000
 
 /**
  * Claude Code's log of a session, looked for in each project's folder: the
@@ -330,7 +332,7 @@ export function registerSessionsIpc(
     const kept = logs.get(file)
     if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs)
       return kept.items
-    const items = readSessionLog(file, row.tool)
+    const items = readSessionLog(file, row.tool, TURN_CHARS)
     logs.delete(file)
     logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, items })
     for (const old of logs.keys()) if (logs.size > LOGS_KEPT) logs.delete(old)

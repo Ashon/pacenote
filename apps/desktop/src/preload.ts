@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { DesktopBridge } from '../../../src/desktop-bridge.js'
 import type { LanguageState } from '../../../src/i18n/locale.js'
+import type { SessionLive } from '../../../src/sessions/types.js'
 
 /**
  * Listens to what the app sends on a channel; the function returned stops
@@ -197,6 +198,9 @@ const bridge = {
     end: (id) => ipcRenderer.invoke('pacenote:sessions:end', id),
     mode: (id, mode) => ipcRenderer.invoke('pacenote:sessions:mode', id, mode),
     onChanged: subscribe<string>('pacenote:sessions:changed'),
+    onLive: subscribe<{ id: string; live: SessionLive }>(
+      'pacenote:sessions:live'
+    ),
     link: (id, task) => ipcRenderer.invoke('pacenote:sessions:link', id, task),
     unlink: (id) => ipcRenderer.invoke('pacenote:sessions:unlink', id),
     makeTask: (id) => ipcRenderer.invoke('pacenote:sessions:make-task', id),

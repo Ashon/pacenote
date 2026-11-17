@@ -231,8 +231,13 @@ on, from the switch or from the screen's card, which says what it reads first.
   started, and the command that continues it in a terminal.
 - **Showing it** goes where it runs: `claude --desktop --resume <id>` for the Claude app, claude.ai's Code page, the
   Codex app's link for a Codex app session, or the terminal app it runs in, brought to the front.
-- **Its page:** **Open** shows a session's conversation in Pacenote, as it goes: what you typed, its answers and the
-  step it is on.
+- **Its page:** **Open** shows a session's conversation in Pacenote, as it goes: what you typed, its answers in
+  Markdown, and its steps by what they did (a command, a file read or changed, a search), a failed one marked; more than
+  three in a row fold into a line to open. What Claude Code adds to your turns shows as it is meant: a slash command
+  and what it printed, a command run with `!` and its output, a background task's notice, a turn you stopped; its
+  reminders to the model and its own lines are left out. A long session compacted shows its summary folded.
+- **What it does now:** while a session Pacenote runs is on a turn, the end of the conversation says what it does and
+  for how long: thinking, the step it runs, or its answer as it writes it. One open somewhere else says it works there.
 - **Typing to it:** a Claude Code session that is not open anywhere else is continued on its page. Pacenote runs the
   installed `claude` with your own sign-in, resuming the session's own conversation (`claude -p --resume`), in the
   folder it ran in. Claude Code keeps the conversation in its own log, as always, so `claude --resume` picks it up

@@ -189,6 +189,8 @@ export function hostArgs(session: string, copy: boolean): string[] {
     '--output-format',
     'stream-json',
     '--verbose',
+    // Its answer as it writes it, and what it does this moment
+    '--include-partial-messages',
     '--permission-prompt-tool',
     'stdio',
     // It asks its questions in its answer, which you answer in the composer

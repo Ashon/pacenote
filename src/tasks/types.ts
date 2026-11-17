@@ -534,6 +534,15 @@ export interface SessionItem {
   at?: string
   /** A tool step's name */
   name?: string
+  /** A tool step that came back with an error */
+  failed?: boolean
+  /** Images sent with a turn of yours */
+  images?: number
+  /**
+   * Claude Code's summary of what came before, when it compacted the
+   * conversation: the turn of yours it starts again from
+   */
+  compacted?: boolean
 }
 
 /** A task as its detail shows it, from the desktop app */
