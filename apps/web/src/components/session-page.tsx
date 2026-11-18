@@ -27,7 +27,6 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
-import { TaskRowsSkeleton } from '@/components/tasks-list'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -38,10 +37,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SkeletonWord } from '@/components/ui/skeleton'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { remoteMac } from '@/lib/desktop'
 import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { usePhone } from '@/lib/phone'
 import { canShow } from '@/lib/session-rows'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -63,6 +63,7 @@ const FOLLOW_PX = 80
 export function SessionPage({ id }: { id: string }) {
   const t = useText(text)
   const l = useText(listText)
+  const phone = usePhone()
   const query = useSessionTalk(id)
   const talk = query.data
   const scroller = useRef<HTMLDivElement>(null)
@@ -94,15 +95,7 @@ export function SessionPage({ id }: { id: string }) {
     draft?.length,
   ])
 
-  if (talk === undefined)
-    return (
-      <div className="mx-auto max-w-4xl px-10 py-9">
-        <SkeletonWord width="14rem" />
-        <div className="mt-7">
-          <TaskRowsSkeleton count={3} />
-        </div>
-      </div>
-    )
+  if (talk === undefined) return <TalkSkeleton phone={phone} />
   if (talk === null)
     return (
       <div className="mx-auto max-w-4xl px-10 py-9">
@@ -138,13 +131,16 @@ export function SessionPage({ id }: { id: string }) {
             <h1 data-page-title className="min-w-0 flex-1 text-title">
               {row.title}
             </h1>
-            <SessionMenu talk={talk} />
+            {/* On a phone its bar has these (More) */}
+            {!phone && <SessionMenu talk={talk} />}
           </header>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
             {toolWhere(row, l)}
             <StateMark s={row} />
             {row.branch && <span className="font-mono">{row.branch}</span>}
-            <span className="font-mono">{homePath(row.cwd)}</span>
+            <span className="max-w-full truncate font-mono">
+              {homePath(row.cwd)}
+            </span>
             {row.task && (
               <a
                 href={`#/tasks/${encodeURIComponent(row.task.id)}`}
@@ -156,7 +152,10 @@ export function SessionPage({ id }: { id: string }) {
             )}
           </p>
           {items.length > 0 || live?.busy || workingThere ? (
-            <ol aria-label={row.title} className="mt-6 flex flex-col gap-3">
+            <ol
+              aria-label={row.title}
+              className="mt-6 flex flex-col gap-3 @max-md:mt-5"
+            >
               <TalkItems items={items} tool={tool} cwd={row.cwd} />
               <NowItem
                 live={live}
@@ -178,7 +177,12 @@ export function SessionPage({ id }: { id: string }) {
         </div>
       </ScrollArea>
       <div className="shrink-0 border-t border-border">
-        <div className="mx-auto max-w-4xl px-10 pt-4 pb-5">
+        <div
+          className={cn(
+            'mx-auto max-w-4xl px-10',
+            phone ? 'pt-3 pb-3' : 'pt-4 pb-5'
+          )}
+        >
           {talk.typeIn === 'here' || talk.typeIn === 'move' ? (
             <Composer talk={talk} />
           ) : talk.typeIn === 'elsewhere' ? (
@@ -188,6 +192,79 @@ export function SessionPage({ id }: { id: string }) {
               <SessionButtons talk={talk} />
             </Bar>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Who said what, while the Mac reads its log: the page's own frame */
+const BUBBLES = [
+  { mine: true, lines: ['82%', '46%'] },
+  { mine: false, lines: ['94%', '78%', '38%'] },
+  { mine: true, lines: ['64%'] },
+]
+
+/**
+ * The page as it will be, before its log is read: its line of where it
+ * runs, a few turns and the box to type in at its foot, so nothing jumps
+ * once they come. A phone's bar has its title.
+ */
+function TalkSkeleton({ phone }: { phone: boolean }) {
+  return (
+    <div className="motion-skeleton flex h-full flex-col" aria-hidden="true">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto max-w-4xl px-10 pt-9 pb-6">
+          {!phone && (
+            <>
+              <SkeletonText className="text-meta" width="10rem" />
+              <SkeletonText className="mt-2 text-title" width="18rem" />
+            </>
+          )}
+          <SkeletonText
+            className={cn('text-meta', !phone && 'mt-1.5')}
+            width={phone ? '72%' : '24rem'}
+          />
+          <ul className={cn('flex flex-col gap-3', phone ? 'mt-5' : 'mt-6')}>
+            {BUBBLES.map((bubble, index) => (
+              <li key={index} className="flex items-start gap-3">
+                <SkeletonBlock className="size-7 shrink-0 rounded-full" />
+                <div
+                  className={cn(
+                    'min-w-0 flex-1 rounded-[20px] px-4 py-3',
+                    bubble.mine ? 'bg-well' : 'border border-border'
+                  )}
+                >
+                  <SkeletonText className="text-section" width="7rem" />
+                  <div className="mt-1">
+                    {bubble.lines.map((width) => (
+                      <SkeletonText
+                        key={width}
+                        className="text-body leading-relaxed"
+                        width={width}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="shrink-0 border-t border-border">
+        <div
+          className={cn(
+            'mx-auto max-w-4xl px-10',
+            phone ? 'pt-3 pb-3' : 'pt-4 pb-5'
+          )}
+        >
+          <SkeletonBlock
+            className={cn(
+              'rounded-[14px]',
+              phone ? 'h-[5.5rem]' : 'h-[6.625rem]'
+            )}
+          />
+          {!phone && <SkeletonText className="mt-2 text-meta" width="20rem" />}
         </div>
       </div>
     </div>
@@ -335,6 +412,8 @@ function MessageBox({
   const t = useText(text)
   const mac = remoteMac()
   const foot = mac ? t.footOn(mac) : t.foot
+  // A phone keeps its screen for the talk: where it runs is in Settings
+  const phone = usePhone()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
@@ -372,9 +451,12 @@ function MessageBox({
               send()
             }
           }}
-          rows={2}
+          rows={phone ? 1 : 2}
           placeholder={placeholder}
-          className="block max-h-60 min-h-16 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-body leading-relaxed outline-none select-text placeholder:text-muted-foreground [field-sizing:content]"
+          className={cn(
+            'block w-full resize-none bg-transparent px-4 pt-3 pb-1 text-body leading-relaxed outline-none select-text placeholder:text-muted-foreground [field-sizing:content]',
+            phone ? 'max-h-40 min-h-11' : 'max-h-60 min-h-16'
+          )}
         />
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           {tools}
@@ -397,7 +479,7 @@ function MessageBox({
         </div>
       </div>
       <InlineError error={error} className="mt-2" />
-      <p className="mt-2 text-meta text-muted-foreground">{foot}</p>
+      {!phone && <p className="mt-2 text-meta text-muted-foreground">{foot}</p>}
     </form>
   )
 }

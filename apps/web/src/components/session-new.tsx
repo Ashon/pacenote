@@ -5,10 +5,11 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SkeletonWord } from '@/components/ui/skeleton'
+import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { remoteMac } from '@/lib/desktop'
 import { homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { usePhone } from '@/lib/phone'
 import { recentFolders } from '@/lib/session-rows'
 import {
   useNewSessionDraft,
@@ -32,6 +33,7 @@ export function NewSessionPage({ task }: { task?: string }) {
   const t = useText(text)
   const l = useText(listText)
   const p = useText(pageText)
+  const phone = usePhone()
   const draft = useNewSessionDraft(task)
   const detail = useQuery({
     ...taskDetailQuery(task ?? ''),
@@ -56,11 +58,7 @@ export function NewSessionPage({ task }: { task?: string }) {
   }, [drafted])
 
   if (draft.data === undefined || (task && detail.data === undefined))
-    return (
-      <div className="mx-auto max-w-4xl px-10 py-9">
-        <SkeletonWord width="14rem" />
-      </div>
-    )
+    return <NewSkeleton phone={phone} />
   const taskView = detail.data?.task
   if (draft.data === null || (task && !taskView))
     return (
@@ -219,9 +217,12 @@ export function NewSessionPage({ task }: { task?: string }) {
             </div>
           </div>
           <InlineError error={error} className="mt-2" />
-          <p className="mt-2 text-meta text-muted-foreground">
-            {mac ? p.footOn(mac) : p.foot}
-          </p>
+          {/* A phone's lead says where it runs */}
+          {!phone && (
+            <p className="mt-2 text-meta text-muted-foreground">
+              {mac ? p.footOn(mac) : p.foot}
+            </p>
+          )}
         </form>
       </div>
 
@@ -241,5 +242,32 @@ export function NewSessionPage({ task }: { task?: string }) {
         />
       )}
     </ScrollArea>
+  )
+}
+
+/**
+ * The page as it will be, while the Mac drafts it: its line, where it runs
+ * and in which folder, and the box for its first message. A phone's bar has
+ * its title.
+ */
+function NewSkeleton({ phone }: { phone: boolean }) {
+  return (
+    <div
+      className="motion-skeleton mx-auto max-w-4xl px-10 pt-9 pb-10"
+      aria-hidden="true"
+    >
+      {!phone && (
+        <>
+          <SkeletonText className="text-meta" width="9rem" />
+          <SkeletonText className="mt-2 text-title" width="14rem" />
+        </>
+      )}
+      <SkeletonText
+        className={phone ? 'text-meta' : 'mt-1.5 text-meta'}
+        width={phone ? '84%' : '22rem'}
+      />
+      <SkeletonBlock className="mt-6 h-[5.25rem] rounded-[14px]" />
+      <SkeletonBlock className="mt-4 h-[10.5rem] rounded-[14px]" />
+    </div>
   )
 }

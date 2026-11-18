@@ -309,7 +309,7 @@ function MetricSkeleton({
   label: string
 }) {
   return (
-    <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0">
+    <div className="min-w-0 px-6 first:pl-0 [&:not(:first-child)]:border-l [&:not(:first-child)]:border-border @max-[46rem]:[&:nth-child(3)]:border-l-0 @max-[46rem]:[&:nth-child(3)]:pl-0 @max-[30rem]:px-4">
       <CardHeader icon={icon} label={label} />
       <SkeletonText className="mt-3 text-number tabular-nums" width="46%" />
       <SkeletonText className="mt-1 text-meta" width="66%" />

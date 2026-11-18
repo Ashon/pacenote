@@ -143,6 +143,9 @@ export function RecapPage({
     setWriting(undefined)
   }
 
+  // Its write-up is the AI's, asked here once there is something to write
+  const canWrite =
+    Boolean(view?.areas.length) && !view?.written && !noAi && !alone
   return (
     <ScrollArea className="h-full">
       <div className="@container mx-auto max-w-4xl px-10 py-9">
@@ -155,10 +158,11 @@ export function RecapPage({
           <span className="flex-1" />
           {view && view.areas.length > 0 && (
             <span className="flex items-center gap-1.5">
-              {!view.written && !noAi && !alone && (
+              {canWrite && (
                 <Button
                   size="sm"
                   variant="ghost"
+                  className="@max-md:hidden"
                   disabled={Boolean(writing)}
                   onClick={() => void writeUp()}
                 >
@@ -243,6 +247,20 @@ export function RecapPage({
                 </Button>
                 <span className="min-w-0">{t.copyWithoutAi}</span>
               </p>
+            )}
+            {/* Narrow, where its write-up comes, so the periods stay put
+                from one to the next */}
+            {canWrite && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-4 hidden w-full @max-md:flex"
+                disabled={Boolean(writing)}
+                onClick={() => void writeUp()}
+              >
+                <PenLine />
+                {writing ? t.writingItUp : t.writeItUp}
+              </Button>
             )}
             <InlineError error={error} className="mt-3" />
             {/* Another period takes this one's place; until its recap is

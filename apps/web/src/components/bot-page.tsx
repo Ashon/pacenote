@@ -343,9 +343,10 @@ function Controls({ supervisor }: { supervisor: SupervisorState | undefined }) {
   const [pending, setPending] = useState(false)
   if (control && !supervisor)
     return (
-      <div className="motion-skeleton flex shrink-0 items-center gap-1.5">
-        <SkeletonBlock className="h-8 w-20 rounded-md" />
-        <SkeletonBlock className="h-8 w-20 rounded-md" />
+      // Where its buttons come: under the title when narrow, as they do
+      <div className="motion-skeleton flex shrink-0 items-center gap-1.5 @max-[32rem]:basis-full">
+        <SkeletonBlock className="h-8 w-20 rounded-md @max-[32rem]:h-11 @max-[32rem]:w-24" />
+        <SkeletonBlock className="h-8 w-20 rounded-md @max-[32rem]:h-11 @max-[32rem]:w-20" />
       </div>
     )
   if (!control || !supervisor) {
@@ -529,7 +530,7 @@ const LogPanel = memo(function LogPanel() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b px-10 py-2.5">
+      <div className="@container flex shrink-0 items-center gap-2 border-b px-10 py-2.5">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-2 gap-y-1.5">
           <span className="text-row">{t.logs}</span>
           {/* Narrow, the views slide sideways rather than breaking a name
@@ -552,7 +553,8 @@ const LogPanel = memo(function LogPanel() {
               </button>
             ))}
           </div>
-          <div className="relative ml-auto w-56">
+          {/* Narrow, the search takes its row's width, Follow at its end */}
+          <div className="relative ml-auto w-56 @max-md:ml-0 @max-md:w-auto @max-md:min-w-0 @max-md:flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}

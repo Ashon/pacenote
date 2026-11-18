@@ -344,6 +344,8 @@ describe('one conversation, typed into in one place at a time', () => {
     expect(JSON.parse(proc.written.trim()).message.content).toBe(
       'Pick it up here'
     )
+    // Its page says it runs here now, before the list is read again
+    expect((await talk('claude:rest-1')).row.where).toBe('pacenote')
     host.end('rest-1')
   })
 

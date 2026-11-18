@@ -433,7 +433,16 @@ export function registerSessionsIpc(
     'pacenote:sessions:talk',
     () => null,
     async (id): Promise<SessionTalk | null> => {
-      const row = await rowOf(id)
+      let row = await rowOf(id)
+      // Moved here (or let go) since the list was last read: its row as it
+      // is now, so the page says where it runs
+      if (
+        row?.tool === 'claude' &&
+        host.has(row.session) !== (row.where === 'pacenote')
+      ) {
+        await viewing.run(read).catch(() => undefined)
+        row = shown.get(row.id) ?? row
+      }
       if (!row || row.tool === 'opencode') return null
       const group = shownIn.get(row.id)?.group
       const live = row.tool === 'claude' ? host.get(row.session) : undefined

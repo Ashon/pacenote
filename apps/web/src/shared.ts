@@ -48,6 +48,8 @@ export { text as partsText } from './components/setup/parts.text'
 export { text as recapPageText } from './components/recap-page.text'
 export { text as runListText } from './components/run-list.text'
 export { text as sessionNewText } from './components/session-new.text'
+export { text as sessionPageText } from './components/session-page.text'
+export { text as sessionsPageText } from './components/sessions-page.text'
 export { text as settingsPageText } from './components/settings-page.text'
 export { text as sidebarText } from './components/sidebar.text'
 export { text as taskRowText } from './components/task-row.text'
@@ -154,7 +156,9 @@ export type {
 } from '@src/tasks/types'
 export { taskArea } from '@src/you/task-area'
 // A session's page as the Mac answers it: the phone's bar takes its title
-export type { SessionTalk } from '@src/sessions/types'
+// (the list's, before the page has it) and its More (ending one run here)
+export type { SessionTalk, SessionsView } from '@src/sessions/types'
+export { useSessionActions } from './lib/sessions'
 // New task's project: guessed from its words, or one you pick
 export { areaChoices, guessArea } from '@src/you/guess'
 export type { AreaChoice, AreaGuess } from '@src/you/guess'

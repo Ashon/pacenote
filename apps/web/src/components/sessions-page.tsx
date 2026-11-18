@@ -19,18 +19,22 @@ import {
 import { useState, type ReactNode } from 'react'
 import { Page } from '@/components/page'
 import { Line } from '@/components/task-line'
-import { TaskRowsSkeleton } from '@/components/tasks-list'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
-import { SkeletonWord } from '@/components/ui/skeleton'
+import {
+  SkeletonBlock,
+  SkeletonText,
+  SkeletonWord,
+} from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { remoteMac } from '@/lib/desktop'
 import { formatDateTime, formatRelative, homePath } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
+import { usePhone } from '@/lib/phone'
 import { canOpen } from '@/lib/session-rows'
 import { useSessionTasks, useSessions, useShowSessions } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
-import { OpenButton, StateMark, toolWhere } from './session-open'
+import { OpenButton, sessionHref, StateMark, toolWhere } from './session-open'
 import { LinkTaskDialog } from './session-task'
 import { text } from './sessions-page.text'
 import { resumeCommand } from './task-sessions'
@@ -45,6 +49,7 @@ const GRID =
  */
 export function SessionsPage() {
   const t = useText(text)
+  const phone = usePhone()
   const query = useSessions()
   const view = query.data
   if (!view)
@@ -56,9 +61,7 @@ export function SessionsPage() {
             error={(query.error as Error).message}
           />
         ) : (
-          <div className="mt-7">
-            <TaskRowsSkeleton count={4} />
-          </div>
+          <SessionsSkeleton phone={phone} />
         )}
       </Page>
     )
@@ -70,14 +73,20 @@ function SessionsOn({ view }: { view: SessionsView }) {
   const t = useText(text)
   // From your phone or iPad: the Mac they are on, by its name
   const remote = remoteMac()
+  // A phone's row opens the session's screen, and its bar has New session
+  const phone = usePhone()
   const [tab, setTab] = useState<'open' | 'ended'>('open')
   const [opened, setOpened] = useState<string[]>([])
   const toggle = (id: string) =>
     setOpened((ids) =>
       ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id]
     )
-  /** A row the briefing named: opened, and scrolled to */
+  /** A row the briefing named: opened and scrolled to; on a phone, its page */
   const pick = (id: string) => {
+    if (phone) {
+      window.location.hash = sessionHref(id)
+      return
+    }
     setTab('open')
     setOpened((ids) => (ids.includes(id) ? ids : [...ids, id]))
     requestAnimationFrame(() =>
@@ -86,14 +95,17 @@ function SessionsOn({ view }: { view: SessionsView }) {
         ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     )
   }
-  const rows = (row: SessionRow) => (
-    <SessionRowItem
-      key={row.id}
-      s={row}
-      open={opened.includes(row.id)}
-      onToggle={() => toggle(row.id)}
-    />
-  )
+  const rows = (row: SessionRow, index: number) =>
+    phone ? (
+      <PhoneRow key={row.id} s={row} first={index === 0} />
+    ) : (
+      <SessionRowItem
+        key={row.id}
+        s={row}
+        open={opened.includes(row.id)}
+        onToggle={() => toggle(row.id)}
+      />
+    )
   return (
     <Page
       title={t.title}
@@ -103,22 +115,29 @@ function SessionsOn({ view }: { view: SessionsView }) {
           : t.meta(view.counts.open, view.counts.working)
       }
       action={
-        <Button size="sm" variant="outline" asChild>
-          <a href="#/sessions/new">
-            <Plus />
-            {t.newSession}
-          </a>
-        </Button>
+        !phone && (
+          <Button size="sm" variant="outline" asChild>
+            <a href="#/sessions/new">
+              <Plus />
+              {t.newSession}
+            </a>
+          </Button>
+        )
       }
     >
       <Briefing view={view} onPick={pick} />
-      <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
-        <TabsList className="mt-5">
-          <TabsTrigger value="open">
+      {/* Narrow, across its row, as a phone's other segments are */}
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as typeof tab)}
+        className="@max-md:w-full"
+      >
+        <TabsList className="mt-5 @max-md:w-full">
+          <TabsTrigger value="open" className="@max-md:flex-1">
             {t.tabOpen} {view.counts.open}
           </TabsTrigger>
           {view.listed && (
-            <TabsTrigger value="ended">
+            <TabsTrigger value="ended" className="@max-md:flex-1">
               {t.tabEnded} {view.counts.ended}
             </TabsTrigger>
           )}
@@ -138,7 +157,7 @@ function SessionsOn({ view }: { view: SessionsView }) {
           <p className="mt-7 text-copy text-muted-foreground">{t.noneOpen}</p>
         )
       ) : view.ended.length ? (
-        <ul className="mt-5">{view.ended.map(rows)}</ul>
+        <ul className={phone ? 'mt-3' : 'mt-5'}>{view.ended.map(rows)}</ul>
       ) : (
         <p className="mt-7 text-copy text-muted-foreground">{t.noneEnded}</p>
       )}
@@ -163,10 +182,11 @@ function Briefing({
   const turn = all.filter(({ s }) => s.state === 'turn')
   const working = all.filter(({ s }) => s.state === 'working')
   if (!turn.length && !working.length) return null
+  // Cut to the line with an ellipsis, the title first, as a row's words are
   const link = (s: SessionRow) => (
     <button
       type="button"
-      className="rounded-sm text-left hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="min-w-0 truncate rounded-sm text-left hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       onClick={() => onPick(s.id)}
     >
       {s.title}
@@ -177,9 +197,9 @@ function Briefing({
       {turn[0] && (
         <>
           <dt className="text-muted-foreground">{t.yourTurnLabel}</dt>
-          <dd className="truncate">
+          <dd className="flex min-w-0 items-baseline">
             {link(turn[0].s)}
-            <span className="text-muted-foreground">
+            <span className="min-w-0 shrink-[4] truncate whitespace-pre text-muted-foreground">
               {' · '}
               {turn[0].group} · {formatRelative(turn[0].s.lastAt)}
               {turn.length > 1 && ` · ${t.andMore(turn.length - 1)}`}
@@ -190,15 +210,19 @@ function Briefing({
       {working.length > 0 && (
         <>
           <dt className="text-muted-foreground">{t.workingLabel}</dt>
-          <dd className="truncate">
+          <dd className="flex min-w-0 items-baseline">
             {working.slice(0, 2).map(({ s }, index) => (
-              <span key={s.id}>
-                {index > 0 && <span className="text-muted-foreground">, </span>}
+              <span key={s.id} className="flex min-w-0 items-baseline">
+                {index > 0 && (
+                  <span className="whitespace-pre text-muted-foreground">
+                    ,{' '}
+                  </span>
+                )}
                 {link(s)}
               </span>
             ))}
             {working.length > 2 && (
-              <span className="text-muted-foreground">
+              <span className="shrink-0 whitespace-pre text-muted-foreground">
                 {' · '}
                 {t.andMore(working.length - 2)}
               </span>
@@ -222,7 +246,8 @@ function GroupSection({
   const turn = g.sessions.filter((s) => s.state === 'turn').length
   return (
     <section className="mt-7">
-      <div className="flex items-baseline gap-2.5">
+      {/* Narrow, what it counts goes under its name, whole */}
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
         <h2
           className={cn(
             'text-section',
@@ -236,12 +261,12 @@ function GroupSection({
             {g.repo}
           </span>
         )}
-        <span className="flex-1" />
-        <span className="text-meta text-muted-foreground">
+        <span className="flex-1 @max-md:hidden" />
+        <span className="text-meta text-muted-foreground @max-md:basis-full">
           {t.groupLine(g.sessions.length, working, turn)}
         </span>
       </div>
-      <ul className="mt-2">{children}</ul>
+      <ul className="mt-2 @max-md:mt-1">{children}</ul>
     </section>
   )
 }
@@ -314,6 +339,95 @@ function SessionRowItem({
       </div>
       {open && <Opened s={s} />}
     </li>
+  )
+}
+
+/**
+ * A session's row on a phone: the whole row opens its screen, as a task's
+ * row does in Todo, with its words on a line each and its pills under them
+ */
+function PhoneRow({ s, first }: { s: SessionRow; first: boolean }) {
+  const t = useText(text)
+  const last = s.typed[0]
+  const pills = s.branch || s.task || s.state !== 'quiet'
+  return (
+    // The row's tint reaches past the text; the line between rows does not
+    <li
+      id={rowId(s.id)}
+      className={cn('-mx-3', s.state === 'ended' && 'opacity-60')}
+    >
+      {!first && (
+        <div aria-hidden="true" className="mx-3 border-t border-border" />
+      )}
+      <a
+        href={sessionHref(s.id)}
+        className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-3 active:bg-selected/60"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-row">{s.title}</p>
+          <p className="mt-1 truncate text-meta text-muted-foreground">
+            {[toolWhere(s, t), formatRelative(s.lastAt)].join(' · ')}
+          </p>
+          {pills && (
+            <p className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-meta text-muted-foreground">
+              {s.state !== 'quiet' && <StateMark s={s} />}
+              {s.branch && (
+                <span className="max-w-full truncate font-mono">
+                  {s.branch}
+                </span>
+              )}
+              {s.task && (
+                <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-px font-medium">
+                  <ListChecks aria-hidden="true" className="size-3 shrink-0" />
+                  <span className="truncate">{s.task.title}</span>
+                </span>
+              )}
+            </p>
+          )}
+          {last && (
+            <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-meta text-muted-foreground">
+              <MessageSquare aria-hidden="true" className="size-3 shrink-0" />
+              <span className="truncate">“{last.text}”</span>
+            </p>
+          )}
+        </div>
+        <ChevronRight
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+      </a>
+    </li>
+  )
+}
+
+/**
+ * Sessions before the Mac's answer: its line at the top, its segments, a
+ * project's heading and its rows, each as tall as it will be
+ */
+function SessionsSkeleton({ phone }: { phone: boolean }) {
+  return (
+    <div aria-hidden="true" className="motion-skeleton">
+      <SkeletonBlock className="mt-5 h-9 w-56 rounded-lg @max-md:w-full" />
+      <SkeletonText className="mt-7 text-section" width="9rem" />
+      <ul className={phone ? 'mt-1' : 'mt-2'}>
+        {[78, 52, 66, 44].map((width, i) => (
+          <li
+            key={i}
+            className={cn(
+              phone ? 'py-3' : 'border-t border-border py-3.5 pl-6',
+              phone && i > 0 && 'border-t border-border'
+            )}
+          >
+            <SkeletonText
+              className={phone ? 'text-row' : 'text-section leading-snug'}
+              width={`${width}%`}
+            />
+            <SkeletonText className="mt-1 text-meta" width="46%" />
+            <SkeletonText className="mt-1.5 text-meta" width="34%" />
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
