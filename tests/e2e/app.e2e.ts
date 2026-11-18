@@ -3024,14 +3024,20 @@ else fail('unexpected: ' + args.join(' '))
       path: path.join(REPO, 'test-results/sessions.png'),
     })
 
-    // Opened in place, and its page a click away: the conversation, typed
-    // to where it is open
+    // Opened in place, and its page a click away: the conversation, resting
+    // in a terminal, which moves here as you send
     await title.click()
     await row.getByText('Started').waitFor()
     await row.getByRole('link', { name: 'Open' }).click()
     await page.getByRole('heading', { name: 'Webhook retry limit' }).waitFor()
     await page.getByText('Raise max_attempts to 5').first().waitFor()
-    await page.getByText('It is open in Terminal, so you type there').waitFor()
+    await page
+      .getByText(/^It is open in Terminal\. What you send continues it here/)
+      .waitFor()
+    await page.getByRole('textbox', { name: 'Message' }).waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-move.png'),
+    })
     await page.getByRole('link', { name: 'Sessions', exact: true }).click()
     await page.getByRole('heading', { name: 'payments' }).waitFor()
 
@@ -3377,14 +3383,14 @@ else fail('unexpected: ' + args.join(' '))
       await page.getByRole('heading', { name: 'How the backoff works' }).count()
     ).toBe(1)
 
-    // The one open in a terminal: watched here, continued in a copy
+    // The one working in a terminal: watched here, continued in a copy
     await page.getByRole('link', { name: 'Sessions', exact: true }).click()
     await page
       .locator('li', { hasText: 'Answer the #418 review comments' })
       .getByRole('link', { name: 'Open' })
       .click({ timeout: 30_000 })
     await page
-      .getByText('It is open in Terminal, so you type there')
+      .getByText('It is working in Terminal')
       .waitFor({ timeout: 30_000 })
     expect(await message.count()).toBe(0)
     await page.screenshot({

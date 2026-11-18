@@ -97,7 +97,7 @@ import { HubAdmin } from './hub-admin.js'
 import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
 import { OpencodeSessions } from './opencode-sessions.js'
-import { OpenSessions } from './open-sessions.js'
+import { claudeLogSize, OpenSessions } from './open-sessions.js'
 import { SessionHost } from './session-host.js'
 import { text as hostText } from './session-host.text.js'
 import { hubFromLink } from '../../../src/hub/install.js'
@@ -495,6 +495,8 @@ const sessionHost = new SessionHost({
   bin: () => cliBins().claude,
   env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
   warn: (message) => log.warn(message),
+  // Grown since its turn here: continued somewhere else, resumed again
+  logSize: (session) => claudeLogSize(homedir(), session),
   onChange: (session) =>
     mainWindow.send('pacenote:sessions:changed', `claude:${session}`),
   onLive: (session, live) =>

@@ -134,7 +134,9 @@ export interface SessionLive {
 /**
  * A session's page: the row, its conversation from its tool's own log, and
  * where you type to it: here (Pacenote runs it, or will once you send it
- * something), where it is open now (elsewhere), or in Codex
+ * something); here too for one resting in the Claude app or a terminal,
+ * which moves here as you send (move); where it is open now (elsewhere), or
+ * in Codex
  */
 export interface SessionTalk {
   row: SessionRow
@@ -143,7 +145,7 @@ export interface SessionTalk {
   items: SessionItem[]
   /** Pacenote runs it */
   live?: SessionLive
-  typeIn: 'here' | 'elsewhere' | 'codex'
+  typeIn: 'here' | 'move' | 'elsewhere' | 'codex'
   /** Why its log could not be read */
   error?: string
 }

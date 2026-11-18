@@ -11,6 +11,7 @@ import path from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DeviceAnswers } from '../apps/desktop/src/device-answers.js'
+import type { OpenClaude } from '../apps/desktop/src/open-sessions.js'
 import type { Desktop } from '../apps/desktop/src/ipc/context.js'
 import type { Ipc, Run } from '../apps/desktop/src/ipc/gate.js'
 import { SessionHost } from '../apps/desktop/src/session-host.js'
@@ -57,6 +58,10 @@ const folder = path.join(home, 'git', 'payments')
 mkdirSync(folder, { recursive: true })
 
 let env: NodeJS.ProcessEnv = {}
+/** The sessions open on the Mac, as Claude Code lists them */
+let open: OpenClaude[] = []
+/** The processes ended, by pid */
+const ended: number[] = []
 const procs: FakeClaude[] = []
 const host = new SessionHost({
   bin: () => 'claude',
@@ -110,7 +115,14 @@ registerSessionsIpc(
       repos: { all: async () => new Map() },
       linkSoon: () => {},
     },
-    openSessions: { list: async () => [] },
+    openSessions: {
+      list: async () => open,
+      end: async (pid: number) => {
+        ended.push(pid)
+        open = open.filter((agent) => agent.pid !== pid)
+        return true
+      },
+    },
     host,
     todo: { hasApp: () => false },
   } as unknown as Parameters<typeof registerSessionsIpc>[2]
@@ -138,6 +150,8 @@ const [task] = addTasks(
 
 beforeEach(() => {
   env = { TASKS_LINK_SESSIONS: 'on' }
+  open = []
+  ended.length = 0
 })
 
 describe('starting a session Pacenote runs', () => {
@@ -295,5 +309,96 @@ describe('a session from your phone', () => {
     // A change goes in the log, by the device's name; what it reads does not
     expect(logged).toContain('iPhone asked: sessions.start')
     expect(logged.some((line) => line.includes('sessions.talk'))).toBe(false)
+  })
+})
+
+describe('one conversation, typed into in one place at a time', () => {
+  const resting = (session: string, more: Partial<OpenClaude> = {}) => ({
+    session,
+    cwd: folder,
+    busy: false,
+    where: 'terminal' as const,
+    terminal: 'iTerm',
+    pid: 4242,
+    startedAt: new Date(Date.now() - 60_000).toISOString(),
+    ...more,
+  })
+  const talk = async (id: string) =>
+    (await call('pacenote:sessions:talk', id)) as unknown as SessionTalk
+
+  it('moves a session resting in a terminal or the Claude app here as you send', async () => {
+    open = [resting('rest-1')]
+    expect((await talk('claude:rest-1')).typeIn).toBe('move')
+    open = [resting('rest-1', { where: 'claude-app', terminal: undefined })]
+    expect((await talk('claude:rest-1')).typeIn).toBe('move')
+    const before = procs.length
+    await expect(
+      call('pacenote:sessions:send', 'claude:rest-1', 'Pick it up here')
+    ).resolves.toEqual({})
+    // Its process there ended first, then the same session resumed here
+    expect(ended).toEqual([4242])
+    expect(procs).toHaveLength(before + 1)
+    const proc = procs.at(-1)!
+    expect(proc.args.slice(0, 3)).toEqual(['-p', '--resume', 'rest-1'])
+    expect(proc.args).not.toContain('--fork-session')
+    expect(JSON.parse(proc.written.trim()).message.content).toBe(
+      'Pick it up here'
+    )
+    host.end('rest-1')
+  })
+
+  it('waits while it works there, and leaves claude.ai its own', async () => {
+    open = [resting('busy-1', { busy: true })]
+    expect((await talk('claude:busy-1')).typeIn).toBe('elsewhere')
+    await expect(
+      call('pacenote:sessions:send', 'claude:busy-1', 'Now')
+    ).resolves.toMatchObject({ error: expect.any(String) })
+    open = [resting('web-1', { where: 'web', terminal: undefined })]
+    expect((await talk('claude:web-1')).typeIn).toBe('elsewhere')
+    expect(ended).toEqual([])
+  })
+
+  it('lets go of a session it runs once another place opens it', async () => {
+    const { id } = (await call('pacenote:sessions:start', {
+      folder,
+      message: 'Start here',
+    })) as { id: string }
+    const session = id.slice('claude:'.length)
+    const proc = procs.at(-1)!
+    proc.stdout.write(
+      `${JSON.stringify({ type: 'result', is_error: false })}\n`
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(host.has(session)).toBe(true)
+    const view = () => call('pacenote:sessions:view')
+    // Opened in a terminal before Pacenote ran it: Pacenote keeps it
+    open = [resting(session, { pid: 5151 })]
+    await view()
+    expect((await talk(id)).typeIn).toBe('here')
+    expect(host.has(session)).toBe(true)
+    // Opened there since: Pacenote lets go, and you type there or move it back
+    const since = new Date(Date.now() + 1000).toISOString()
+    open = [resting(session, { pid: 5151, startedAt: since })]
+    await view()
+    expect((await talk(id)).typeIn).toBe('move')
+    expect(host.has(session)).toBe(false)
+  })
+
+  it('moves one it runs here again as you send, when it was opened there too', async () => {
+    const { id } = (await call('pacenote:sessions:start', {
+      folder,
+      message: 'Start here',
+    })) as { id: string }
+    const session = id.slice('claude:'.length)
+    const proc = procs.at(-1)!
+    // Opened in a terminal while Pacenote ran it, before the list said so
+    open = [resting(session, { pid: 6161 })]
+    await expect(
+      call('pacenote:sessions:send', id, 'And one more')
+    ).resolves.toEqual({})
+    expect(ended).toEqual([6161])
+    expect(procs.at(-1)).toBe(proc)
+    expect(proc.written).toContain('And one more')
+    host.end(session)
   })
 })

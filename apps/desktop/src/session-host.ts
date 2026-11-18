@@ -9,6 +9,7 @@ import {
   hostArgs,
   type HostStart,
   interruptLine,
+  isSessionMode,
   modeLine,
   refuseLine,
   userLine,
@@ -31,10 +32,18 @@ import { stepLine } from './handoff.js'
  * Code keeps the conversation in its own log, as for any session; Pacenote
  * keeps nothing of it. A session runs while Pacenote does, the window closed
  * or not, until you end it or it has had nothing to do for a while.
+ *
+ * One conversation, typed into in one place at a time: Claude Code lets two
+ * processes write one session, and then each goes on from what it knew, so
+ * the conversation splits in two. Pacenote lets go of a session another place
+ * opens while it rests (letGo), and one continued somewhere else since its
+ * turn here resumes again from its log before what you type goes to it.
  */
 
 /** A process as the host uses it: Node's, or a stand-in in tests */
 export interface HostProcess {
+  /** Its process id, as Claude Code lists it (claude agents) */
+  pid?: number
   stdin: Writable | null
   stdout: Readable | null
   stderr: Readable | null
@@ -60,6 +69,13 @@ export interface SessionHostOptions {
   onAsk?: (session: string, cwd: string, ask: SessionAsk) => void
   /** How long a session with nothing to do keeps running */
   idleMs?: number
+  /**
+   * How big the session's log is now: grown since its turn here ended, it
+   * was continued somewhere else in the meantime
+   */
+  logSize?: (session: string) => number | undefined
+  /** How long after its turn its log has had all of it written */
+  settleMs?: number
   /** Tests stand in for Claude Code */
   spawn?: (bin: string, args: string[], cwd: string) => HostProcess
 }
@@ -73,6 +89,8 @@ export interface HostedSession {
   busy: boolean
   asks?: SessionAskKind
   startedAt: string
+  /** Its process, told apart from another that has the session open */
+  pid?: number
 }
 
 interface Hosted {
@@ -96,6 +114,9 @@ interface Hosted {
   named?: (session: string) => void
   /** onLive, due once LIVE_MS is up */
   liveSoon?: NodeJS.Timeout
+  /** Its log's size once its turn here was all written */
+  settled?: number
+  settle?: NodeJS.Timeout
 }
 
 /** How long a session with nothing to do keeps running */
@@ -107,6 +128,10 @@ const STDERR_CHARS = 2000
 const LIVE_MS = 120
 /** How much of the answer it writes is told: its page shows the end */
 const DRAFT_CHARS = 12_000
+/** How long after its turn Claude Code may still add to its log */
+const SETTLE_MS = 5 * SECOND
+/** How long an ended run has to go */
+const GONE_MS = 5 * SECOND
 
 export class SessionHost {
   private readonly hosted = new Map<string, Hosted>()
@@ -135,6 +160,7 @@ export class SessionHost {
       busy: h.live.busy,
       ...(h.live.ask ? { asks: h.live.ask.kind } : {}),
       startedAt: h.startedAt,
+      ...(h.proc.pid ? { pid: h.proc.pid } : {}),
     }))
   }
 
@@ -147,11 +173,38 @@ export class SessionHost {
    * Sends it what you typed, running it here first when it is not: it reads
    * it once the step it is on is done
    */
-  send(session: string, cwd: string, text: string): { error?: string } {
+  async send(
+    session: string,
+    cwd: string,
+    text: string
+  ): Promise<{ error?: string }> {
+    let running = this.hosted.get(session)
+    let mode: SessionMode | undefined
+    // Continued somewhere else since its turn here: what it knows is behind,
+    // so it resumes again from its log as it is now, asking as it did
+    if (running && this.movedOn(running)) {
+      mode = isSessionMode(running.live.mode) ? running.live.mode : undefined
+      await this.ended(running)
+      running = undefined
+    }
     const h =
-      this.hosted.get(session) ?? this.start(session, cwd, { kind: 'resume' })
+      running ??
+      this.start(session, cwd, { kind: 'resume', ...(mode ? { mode } : {}) })
     if ('error' in h) return h
+    if (mode) h.live.mode = mode
     return this.write(h, userLine(text), true)
+  }
+
+  /**
+   * Lets go of it while it rests, for another place that opened it: one
+   * place types into a conversation at a time. Not while it is on a turn or
+   * asks something
+   */
+  letGo(session: string): boolean {
+    const h = this.hosted.get(session)
+    if (!h || h.live.busy || h.live.ask) return false
+    this.end(session)
+    return true
   }
 
   /**
@@ -314,6 +367,8 @@ export class SessionHost {
     h.proc.stdin.write(line)
     if (typed) {
       clearTimeout(h.idle)
+      clearTimeout(h.settle)
+      h.settled = undefined
       if (!h.live.busy) h.live.since = new Date().toISOString()
       h.live.busy = true
       h.live.error = undefined
@@ -421,10 +476,44 @@ export class SessionHost {
             : undefined
         h.stopping = false
         this.idleEnd(h)
+        this.settleSoon(h)
         this.options.onChange(h.session)
         return
       }
     }
+  }
+
+  /**
+   * Keeps its log's size once Claude Code has written all of its turn: a log
+   * that grew past it was continued somewhere else
+   */
+  private settleSoon(h: Hosted): void {
+    clearTimeout(h.settle)
+    h.settled = undefined
+    if (!this.options.logSize) return
+    h.settle = setTimeout(() => {
+      h.settled = this.options.logSize?.(h.session)
+    }, this.options.settleMs ?? SETTLE_MS)
+    h.settle.unref?.()
+  }
+
+  /** Continued somewhere else since its turn here, while it rested */
+  private movedOn(h: Hosted): boolean {
+    if (h.live.busy || h.live.ask || h.settled === undefined) return false
+    const size = this.options.logSize?.(h.session)
+    return size !== undefined && size !== h.settled
+  }
+
+  /** Ends its run and waits for it to go, so it writes no more to its log */
+  private ended(h: Hosted): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, GONE_MS)
+      h.proc.on('exit', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+      this.end(h.session)
+    })
   }
 
   /**
@@ -491,6 +580,7 @@ export class SessionHost {
   private forget(h: Hosted): void {
     clearTimeout(h.idle)
     clearTimeout(h.liveSoon)
+    clearTimeout(h.settle)
     if (this.hosted.get(h.session) === h) this.hosted.delete(h.session)
     this.options.onChange(h.session)
   }

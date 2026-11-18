@@ -54,6 +54,15 @@ const en = {
   copyHere: 'Continue in a copy here',
   copyLead:
     'The copy starts from this conversation and runs here; the session open there goes on as it is.',
+  // Resting in the Claude app or a terminal: it moves here as you send
+  moveFromApp: (where: string) =>
+    `It is open in ${where}. What you send continues it here; type in the app again and it goes on there, in the same conversation.`,
+  moveFromTerminal: (where: string) =>
+    `It is open in ${where}. What you send continues it here and closes it there; claude --resume opens it there again, in the same conversation.`,
+  // On a turn there
+  busyThereTitle: (where: string) => `It is working in ${where}`,
+  busyThereLead:
+    'Pacenote shows it as it goes. Once its turn there is done, you continue it here, in the same conversation.',
   cancel: 'Cancel',
   codexTitle: 'Codex runs it, so you continue it there',
   codexLead: 'Pacenote shows its log as it goes.',
@@ -105,6 +114,13 @@ const ko: typeof en = {
   copyHere: '여기서 복사본으로 잇기',
   copyLead:
     '복사본은 이 대화에서 시작해 여기서 돌아요. 그곳에 열린 세션은 그대로 이어져요.',
+  moveFromApp: (where) =>
+    `${where}에 열려 있어요. 여기서 보내면 여기서 이어지고, 앱에서 다시 입력하면 그곳에서 이어져요. 대화는 하나로 이어져요.`,
+  moveFromTerminal: (where) =>
+    `${where}에 열려 있어요. 여기서 보내면 여기서 이어지고 그곳의 Claude Code는 닫혀요. claude --resume으로 다시 열어도 같은 대화예요.`,
+  busyThereTitle: (where) => `${where}에서 일하는 중이에요`,
+  busyThereLead:
+    'Pacenote는 진행되는 대로 보여 줘요. 그곳의 턴이 끝나면 같은 대화로 여기서 이어 가세요.',
   cancel: '취소',
   codexTitle: 'Codex가 돌리고 있어서 그곳에서 이어 가요',
   codexLead: 'Pacenote는 로그를 진행되는 대로 보여 줘요.',

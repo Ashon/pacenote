@@ -80,7 +80,7 @@ const ask = {
 describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
   it('runs the session where it was, resuming it, and sends what you typed', async () => {
     const { h, procs } = host()
-    expect(h.send('s1', '/w/pay', 'Make it 5')).toEqual({})
+    await expect(h.send('s1', '/w/pay', 'Make it 5')).resolves.toEqual({})
     const [proc] = procs
     expect(proc!.cwd).toBe('/w/pay')
     expect(proc!.args.slice(0, 3)).toEqual(['-p', '--resume', 's1'])
@@ -359,6 +359,55 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     expect(procs[1]!.killed).toBe(true)
     expect(h.get('s1')).toBeUndefined()
     expect(warnings).toHaveLength(1)
+  })
+
+  it('resumes again from its log when it was continued somewhere else since its turn here', async () => {
+    let size = 100
+    const { h, procs } = host({ logSize: () => size, settleMs: 1 })
+    const done = async (proc: FakeClaude) => {
+      proc.say({ type: 'result', subtype: 'success', is_error: false })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    h.send('s1', '/w', 'hi')
+    procs[0]!.say({
+      type: 'system',
+      subtype: 'init',
+      session_id: 's1',
+      permissionMode: 'acceptEdits',
+    })
+    await done(procs[0]!)
+    // Its log as its turn left it: the same run goes on
+    await h.send('s1', '/w', 'and then')
+    expect(procs).toHaveLength(1)
+    size = 140
+    await done(procs[0]!)
+    // Another place wrote to it since: run again from its log, asking as before
+    size = 220
+    await expect(h.send('s1', '/w', 'Go on')).resolves.toEqual({})
+    expect(procs[0]!.killed).toBe(true)
+    expect(procs).toHaveLength(2)
+    expect(procs[1]!.args.slice(0, 3)).toEqual(['-p', '--resume', 's1'])
+    expect(procs[1]!.args).toEqual(
+      expect.arrayContaining(['--permission-mode', 'acceptEdits'])
+    )
+    await tick()
+    expect(procs[1]!.written).toEqual([
+      { type: 'user', message: { role: 'user', content: 'Go on' } },
+    ])
+    expect(h.get('s1')).toMatchObject({ busy: true, mode: 'acceptEdits' })
+  })
+
+  it('lets go of a session another place opened, but not on a turn or an ask', async () => {
+    const { h, procs } = host()
+    h.send('s1', '/w', 'hi')
+    expect(h.letGo('s1')).toBe(false)
+    procs[0]!.say(ask)
+    procs[0]!.say({ type: 'result', is_error: false })
+    await tick()
+    expect(h.letGo('s1')).toBe(true)
+    expect(procs[0]!.killed).toBe(true)
+    expect(h.has('s1')).toBe(false)
+    expect(h.letGo('s1')).toBe(false)
   })
 
   it('ends a run that has had nothing to do for a while', async () => {

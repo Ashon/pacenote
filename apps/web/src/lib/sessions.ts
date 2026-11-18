@@ -137,7 +137,8 @@ export function useSessionTalk(id: string) {
       const talk = query.state.data
       return talk?.live?.busy ||
         talk?.row.state === 'working' ||
-        talk?.typeIn === 'elsewhere'
+        talk?.typeIn === 'elsewhere' ||
+        talk?.typeIn === 'move'
         ? remoteMac()
           ? TALK_REMOTE_BUSY_MS
           : TALK_BUSY_MS

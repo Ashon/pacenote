@@ -179,7 +179,7 @@ export function SessionPage({ id }: { id: string }) {
       </ScrollArea>
       <div className="shrink-0 border-t border-border">
         <div className="mx-auto max-w-4xl px-10 pt-4 pb-5">
-          {talk.typeIn === 'here' ? (
+          {talk.typeIn === 'here' || talk.typeIn === 'move' ? (
             <Composer talk={talk} />
           ) : talk.typeIn === 'elsewhere' ? (
             <Elsewhere talk={talk} />
@@ -270,13 +270,15 @@ function AskCard({
 
 /**
  * Where you type to a session here: sent at once, read by Claude Code once
- * the step it is on is done; while it asks, what to do instead of that
+ * the step it is on is done; while it asks, what to do instead of that. One
+ * resting in the Claude app or a terminal moves here as you send
  */
 function Composer({ talk }: { talk: SessionTalk }) {
   const t = useText(text)
+  const l = useText(listText)
   const act = useSessionActions(talk.row.id)
   const live = talk.live
-  return (
+  const box = (
     <MessageBox
       placeholder={
         live?.ask
@@ -297,6 +299,18 @@ function Composer({ talk }: { talk: SessionTalk }) {
       }
       stop={live?.busy ? () => act.stop() : undefined}
     />
+  )
+  if (talk.typeIn !== 'move') return box
+  const where = whereName(talk.row, l)
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-meta text-muted-foreground">
+        {talk.row.where === 'claude-app'
+          ? t.moveFromApp(where)
+          : t.moveFromTerminal(where)}
+      </p>
+      {box}
+    </div>
   )
 }
 
@@ -464,8 +478,14 @@ function Elsewhere({ talk }: { talk: SessionTalk }) {
         />
       </div>
     )
+  const where = whereName(talk.row, l)
+  // In the Claude app or a terminal, on a turn: here once that turn is done
+  const moves = talk.row.where === 'claude-app' || talk.row.where === 'terminal'
   return (
-    <Bar title={t.elseTitle(whereName(talk.row, l))} lead={t.elseLead}>
+    <Bar
+      title={moves ? t.busyThereTitle(where) : t.elseTitle(where)}
+      lead={moves ? t.busyThereLead : t.elseLead}
+    >
       <SessionButtons talk={talk} />
       <Button size="sm" variant="outline" onClick={() => setCopying(true)}>
         <GitFork />

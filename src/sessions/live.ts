@@ -182,9 +182,16 @@ export const modeLine = (id: string, mode: SessionMode) =>
  * of it, or a new one with the id given (V5), its name and how it asks
  */
 export type HostStart =
-  | { kind: 'resume' }
+  | { kind: 'resume'; mode?: SessionMode }
   | { kind: 'copy' }
   | { kind: 'new'; name?: string; mode?: SessionMode }
+
+/** One of the modes you pick, to start it with again */
+export const isSessionMode = (mode: unknown): mode is SessionMode =>
+  SESSION_MODES.includes(mode as SessionMode)
+
+const modeArgs = (mode: SessionMode | undefined) =>
+  mode && mode !== 'default' ? ['--permission-mode', mode] : []
 
 /** Claude Code's arguments for a session Pacenote runs */
 export function hostArgs(session: string, start: HostStart): string[] {
@@ -196,14 +203,13 @@ export function hostArgs(session: string, start: HostStart): string[] {
           session,
           // Its name in Claude Code's lists, as for a terminal's (-n)
           ...(start.name ? ['--name', start.name] : []),
-          ...(start.mode && start.mode !== 'default'
-            ? ['--permission-mode', start.mode]
-            : []),
+          ...modeArgs(start.mode),
         ]
       : [
           '--resume',
           session,
           ...(start.kind === 'copy' ? ['--fork-session'] : []),
+          ...(start.kind === 'resume' ? modeArgs(start.mode) : []),
         ]),
     '--input-format',
     'stream-json',

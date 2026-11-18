@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -34,6 +34,7 @@ import { readYou } from '../../../../src/you/store.js'
 import { codexThreadLink, openLink, readSessionLog } from '../handoff.js'
 import { text } from '../main.text.js'
 import {
+  claudeLog,
   CodexTitles,
   codexToday,
   type OpenClaude,
@@ -60,22 +61,11 @@ const NAME_CHARS = 80
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** How much of a turn its page shows: an answer in full, mostly */
 const TURN_CHARS = 12_000
-
 /**
- * Claude Code's log of a session, looked for in each project's folder: the
- * one written last, where a session resumed from another folder goes on
+ * Where a session open now moves from to Pacenote while it rests: not
+ * claude.ai's (claude remote-control), which runs it for the web
  */
-function claudeLog(home: string, session: string): string | undefined {
-  const root = path.join(home, '.claude', 'projects')
-  if (!existsSync(root)) return undefined
-  let found: { file: string; at: number } | undefined
-  for (const project of readdirSync(root)) {
-    const file = path.join(root, project, `${session}.jsonl`)
-    const at = existsSync(file) ? statSync(file).mtimeMs : undefined
-    if (at !== undefined && (!found || at > found.at)) found = { file, at }
-  }
-  return found?.file
-}
+const MOVES_FROM = new Set<SessionRow['where']>(['claude-app', 'terminal'])
 
 /**
  * Sessions: the Claude Code and Codex sessions on this Mac, where each runs
@@ -118,6 +108,22 @@ export function registerSessionsIpc(
     day.setHours(0, 0, 0, 0)
     const dayStart = day.getTime()
     const listed = await openSessions.list(now)
+    // Claude Code lists the processes Pacenote runs too: the others are open
+    // somewhere else
+    const own = new Set(host.list().map((h) => h.pid))
+    const others = listed?.filter(
+      (agent) => agent.pid === undefined || !own.has(agent.pid)
+    )
+    // Opened somewhere else after Pacenote ran it: Pacenote lets go while it
+    // rests, so the place you type in last has it, one conversation
+    for (const h of host.list())
+      if (
+        others?.some(
+          (agent) =>
+            agent.session === h.session && (agent.startedAt ?? '') > h.startedAt
+        )
+      )
+        host.letGo(h.session)
     // The sessions Pacenote runs, in place of how Claude Code lists them
     const hosted: OpenClaude[] = host.list().map((h) => ({
       session: h.session,
@@ -128,7 +134,7 @@ export function registerSessionsIpc(
       startedAt: h.startedAt,
       where: 'pacenote',
     }))
-    const agents = listed
+    const agents = others
       ?.filter((agent) => !host.has(agent.session))
       .concat(hosted)
       .filter((agent) => yours(agent.cwd))
@@ -372,7 +378,9 @@ export function registerSessionsIpc(
 
   /**
    * Where you type to a session: here, for one Pacenote runs or that runs
-   * nowhere now; where it is open; or in Codex
+   * nowhere now; here too for one resting in the Claude app or a terminal,
+   * which moves here as you send (move); where it is open, while it works
+   * there or for claude.ai; or in Codex
    */
   const typeIn = (row: SessionRow): SessionTalk['typeIn'] =>
     row.tool !== 'claude'
@@ -381,7 +389,41 @@ export function registerSessionsIpc(
           row.state === 'ended' ||
           host.has(row.session)
         ? 'here'
-        : 'elsewhere'
+        : MOVES_FROM.has(row.where) && row.state !== 'working'
+          ? 'move'
+          : 'elsewhere'
+
+  /**
+   * Moves a session resting in the Claude app or a terminal here: its process
+   * there ends, so one place types into it and the conversation stays one.
+   * The Claude app resumes it again once you type there; a terminal's closes.
+   * One Pacenote runs moves too, when it was opened there since; one Claude
+   * Code cannot list goes on here, unless it is known open there (open)
+   */
+  const moveHere = async (
+    session: string,
+    open: boolean
+  ): Promise<{ error?: string }> => {
+    const t = localized(text)
+    const own = new Set(host.list().map((h) => h.pid))
+    const there = (
+      await openSessions.list(Date.now(), { fresh: true })
+    )?.filter(
+      (agent) =>
+        agent.session === session &&
+        (agent.pid === undefined || !own.has(agent.pid))
+    )
+    if (!there) return open ? { error: t.sessionOpenThere } : {}
+    if (there.some((agent) => agent.busy))
+      return { error: t.sessionWorkingThere }
+    for (const agent of there) {
+      if (!MOVES_FROM.has(agent.where) || agent.pid === undefined)
+        return { error: t.sessionOpenThere }
+      if (!(await openSessions.end(agent.pid)))
+        return { error: t.sessionNotMoved }
+    }
+    return {}
+  }
 
   /**
    * A session's page: its conversation from its tool's own log, read again
@@ -439,9 +481,13 @@ export function registerSessionsIpc(
     async (id, message) => {
       const to = await typedTo(id, message)
       if ('error' in to) return to
-      if (typeIn(to.row) !== 'here')
+      const where = typeIn(to.row)
+      if (where !== 'here' && where !== 'move')
         return { error: localized(text).sessionOpenThere }
-      const sent = host.send(to.row.session, to.row.cwd, to.said)
+      // Open somewhere else as well: it moves here, the place you type in
+      const moved = await moveHere(to.row.session, where === 'move')
+      if (moved.error) return moved
+      const sent = await host.send(to.row.session, to.row.cwd, to.said)
       return sent.error ? { error: localized(text).sessionNotHere } : {}
     }
   )

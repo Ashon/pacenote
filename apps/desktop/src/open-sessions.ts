@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { open, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -111,7 +112,51 @@ export function runsIn(pid: number, procs: Processes): RunsIn {
   return { where: 'terminal' }
 }
 
-export type OpenClaude = OpenAgent & { app?: string }
+/** Its process, too: the one ended when a session moves to Pacenote */
+export type OpenClaude = OpenAgent & { app?: string; pid?: number }
+
+/**
+ * Claude Code's log of a session, looked for in each project's folder: the
+ * one written last, where a session resumed from another folder goes on
+ */
+export function claudeLog(home: string, session: string): string | undefined {
+  const root = path.join(home, '.claude', 'projects')
+  if (!existsSync(root)) return undefined
+  let found: { file: string; at: number } | undefined
+  for (const project of readdirSync(root)) {
+    const file = path.join(root, project, `${session}.jsonl`)
+    const at = existsSync(file) ? statSync(file).mtimeMs : undefined
+    if (at !== undefined && (!found || at > found.at)) found = { file, at }
+  }
+  return found?.file
+}
+
+/** How big that log is now; none when there is none */
+export function claudeLogSize(
+  home: string,
+  session: string
+): number | undefined {
+  try {
+    const file = claudeLog(home, session)
+    return file ? statSync(file).size : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** How long a process ended for a session has to go */
+const END_MS = 5_000
+const END_POLL_MS = 100
+
+const alive = (pid: number) => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    // Still there, but not ours to signal
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
 
 export class OpenSessions {
   private kept?: { at: number; list: OpenClaude[] | undefined }
@@ -128,6 +173,8 @@ export class OpenSessions {
       warn: (message: string) => void
       /** Tests put a stand-in for running a command */
       exec?: (file: string, args: string[]) => Promise<string>
+      /** And for ending a process */
+      end?: (pid: number) => Promise<boolean>
     }
   ) {}
 
@@ -145,14 +192,36 @@ export class OpenSessions {
    * The open sessions, at most a few seconds old; none when Claude Code
    * cannot list them (not on this Mac, or a version without claude agents)
    */
-  list(now = Date.now()): Promise<OpenClaude[] | undefined> {
-    if (this.kept && now - this.kept.at < KEEP_MS)
+  list(
+    now = Date.now(),
+    options: { fresh?: boolean } = {}
+  ): Promise<OpenClaude[] | undefined> {
+    if (!options.fresh && this.kept && now - this.kept.at < KEEP_MS)
       return Promise.resolve(this.kept.list)
     return this.listing.run(async () => {
       const list = await this.read()
       this.kept = { at: Date.now(), list }
       return list
     })
+  }
+
+  /**
+   * Ends a session's process where it is open (the Claude app, a terminal)
+   * and waits for it to go: true once it has. The next listing is read anew
+   */
+  async end(pid: number): Promise<boolean> {
+    this.kept = undefined
+    if (this.options.end) return this.options.end(pid)
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {
+      return !alive(pid)
+    }
+    for (let waited = 0; waited < END_MS; waited += END_POLL_MS) {
+      if (!alive(pid)) return true
+      await new Promise((resolve) => setTimeout(resolve, END_POLL_MS))
+    }
+    return !alive(pid)
   }
 
   private async read(): Promise<OpenClaude[] | undefined> {
@@ -190,6 +259,7 @@ export class OpenSessions {
           where: at.where,
           ...(at.terminal ? { terminal: at.terminal } : {}),
           ...(at.app ? { app: at.app } : {}),
+          pid: agent.pid,
         }
       })
   }

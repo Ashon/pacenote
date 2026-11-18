@@ -189,9 +189,37 @@ describe('OpenSessions: claude agents and ps together', () => {
         where: 'terminal',
         terminal: 'iTerm',
         app: '/Applications/iTerm.app',
+        pid: 100,
       },
-      { session: 's-c', cwd: '/w/c', busy: false, where: 'web' },
+      { session: 's-c', cwd: '/w/c', busy: false, where: 'web', pid: 102 },
     ])
+  })
+
+  it('reads a listing anew when asked, and after it ends a process', async () => {
+    const asks: string[] = []
+    const endings: number[] = []
+    const os = new OpenSessions({
+      bin: () => 'claude',
+      env: () => ({}),
+      home: '/home',
+      warn: () => {},
+      exec: async (file) => {
+        asks.push(file)
+        return file === 'claude' ? AGENTS : PS
+      },
+      end: async (pid) => {
+        endings.push(pid)
+        return true
+      },
+    })
+    const at = Date.now()
+    await os.list(at)
+    await os.list(at, { fresh: true })
+    expect(asks.filter((file) => file === 'claude')).toHaveLength(2)
+    await expect(os.end(100)).resolves.toBe(true)
+    expect(endings).toEqual([100])
+    await os.list(at)
+    expect(asks.filter((file) => file === 'claude')).toHaveLength(3)
   })
 
   it('keeps a listing for five seconds: one ask per window', async () => {
