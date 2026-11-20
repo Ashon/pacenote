@@ -8,6 +8,7 @@ import { localized } from '../../../../src/i18n/locale.js'
 import { SESSION_MODES } from '../../../../src/sessions/live.js'
 import type {
   SessionMode,
+  SessionPlanStep,
   SessionRow,
   SessionsView,
   SessionTalk,
@@ -31,7 +32,7 @@ import {
 } from '../../../../src/tasks/work.js'
 import { addYourTask } from '../../../../src/tasks/write.js'
 import { readYou } from '../../../../src/you/store.js'
-import { codexThreadLink, openLink, readSessionLog } from '../handoff.js'
+import { codexThreadLink, openLink, readSessionTalk } from '../handoff.js'
 import { text } from '../main.text.js'
 import {
   claudeLog,
@@ -351,18 +352,23 @@ export function registerSessionsIpc(
   /** The logs read last, kept while they have not changed */
   const logs = new Map<
     string,
-    { size: number; mtimeMs: number; items: SessionItem[] }
+    {
+      size: number
+      mtimeMs: number
+      read: { items: SessionItem[]; plan?: SessionPlanStep[] }
+    }
   >()
-  const readLog = (file: string, row: SessionRow): SessionItem[] => {
+  /** Its turns and steps, and its plan while a step of it is left */
+  const readLog = (file: string, row: SessionRow) => {
     const info = statSync(file)
     const kept = logs.get(file)
     if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs)
-      return kept.items
-    const items = readSessionLog(file, row.tool, TURN_CHARS)
+      return kept.read
+    const read = readSessionTalk(file, row.tool, TURN_CHARS)
     logs.delete(file)
-    logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, items })
+    logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, read })
     for (const old of logs.keys()) if (logs.size > LOGS_KEPT) logs.delete(old)
-    return items
+    return read
   }
 
   /** A session as last shown; the list read first for a page opened first */
@@ -462,7 +468,7 @@ export function registerSessionsIpc(
           error: localized(text).noSessionLog(TOOL_LABEL[row.tool]),
         }
       try {
-        return { ...talk, items: readLog(file, row) }
+        return { ...talk, ...readLog(file, row) }
       } catch (error) {
         return { ...talk, items: [], error: (error as Error).message }
       }

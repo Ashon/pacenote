@@ -20,6 +20,13 @@ const en = {
   showSummary: 'Show the summary',
   stopped: 'You stopped it here',
   images: (count: number) => (count === 1 ? 'An image' : `${count} images`),
+  copy: 'Copy',
+  copied: 'Copied',
+  showAll: 'Show all',
+  showLess: 'Show less',
+  // What you sent, before Claude Code reads it
+  queued: 'Queued',
+  queuedNote: 'Claude Code reads it once the step it is on is done.',
 }
 
 const ko: typeof en = {
@@ -41,6 +48,12 @@ const ko: typeof en = {
   showSummary: '요약 보기',
   stopped: '여기서 멈췄어요',
   images: (count) => `이미지 ${count}개`,
+  copy: '복사',
+  copied: '복사됨',
+  showAll: '모두 보기',
+  showLess: '접기',
+  queued: '대기 중',
+  queuedNote: 'Claude Code가 지금 단계를 마치면 읽어요.',
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

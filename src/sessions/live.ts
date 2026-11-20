@@ -186,6 +186,44 @@ export type HostStart =
   | { kind: 'copy' }
   | { kind: 'new'; name?: string; mode?: SessionMode }
 
+/**
+ * How much of its model's context the conversation took at the end of a
+ * turn, from Claude Code's result: the last request's prompt and answer, of
+ * the model's window
+ */
+export function contextOf(
+  result: Record<string, unknown>,
+  model: string | undefined
+): { used: number; window: number } | undefined {
+  const usage = result.usage as
+    { iterations?: Record<string, unknown>[] } | undefined
+  const last = usage?.iterations?.at(-1) ?? (usage as Record<string, unknown>)
+  if (!last || typeof last !== 'object') return undefined
+  const tokens = (key: string) =>
+    typeof last[key] === 'number' ? (last[key] as number) : 0
+  const used =
+    tokens('input_tokens') +
+    tokens('cache_read_input_tokens') +
+    tokens('cache_creation_input_tokens') +
+    tokens('output_tokens')
+  const models = (result.modelUsage ?? {}) as Record<
+    string,
+    { contextWindow?: unknown } | undefined
+  >
+  const window = (model ? models[model] : undefined) ?? Object.values(models)[0]
+  const size = window?.contextWindow
+  if (!used || typeof size !== 'number' || size <= 0) return undefined
+  return { used, window: size }
+}
+
+/** A model as people call it: claude-opus-5-5 is Opus 5.5 */
+export function modelLabel(model: string): string {
+  const named = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(model)
+  if (!named) return model
+  const [, family, major, minor] = named
+  return `${family![0]!.toUpperCase()}${family!.slice(1)} ${major}${minor ? `.${minor}` : ''}`
+}
+
 /** One of the modes you pick, to start it with again */
 export const isSessionMode = (mode: unknown): mode is SessionMode =>
   SESSION_MODES.includes(mode as SessionMode)
@@ -218,6 +256,8 @@ export function hostArgs(session: string, start: HostStart): string[] {
     '--verbose',
     // Its answer as it writes it, and what it does this moment
     '--include-partial-messages',
+    // What you sent, told back as it reads it: till then it is queued
+    '--replay-user-messages',
     '--permission-prompt-tool',
     'stdio',
     // It asks its questions in its answer, which you answer in the composer

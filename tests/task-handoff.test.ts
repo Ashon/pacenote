@@ -31,6 +31,7 @@ import {
   openSession,
   lastActive,
   readSessionLog,
+  readSessionTalk,
   resumeCommand,
   resumeSession,
   sessionFile,
@@ -940,6 +941,11 @@ describe("the tools' own session logs", () => {
     ])
     // Cut to 2000 a turn unless told otherwise
     expect(readSessionLog(file, 'claude').at(-1)?.text).toHaveLength(2000)
+    // Its plan, while a step of it is left
+    expect(readSessionTalk(file, 'claude').plan).toEqual([
+      { text: 'Read it', state: 'done' },
+      { text: 'Fix it', state: 'doing', doing: 'Fixing it' },
+    ])
   })
 })
 

@@ -489,7 +489,8 @@ const openSessions = new OpenSessions({
 })
 /**
  * The Claude Code sessions Pacenote runs, from their pages: each change read
- * again by the window, each ask told as a notification while out of sight
+ * again by the window, each ask and each turn done told as a notification
+ * while out of sight
  */
 const sessionHost = new SessionHost({
   bin: () => cliBins().claude,
@@ -510,6 +511,21 @@ const sessionHost = new SessionHost({
     const notice = new Notification({
       title: t.asks(ask.kind, ask.tool),
       body: t.inFolder(ask.what.split('\n')[0] ?? '', path.basename(cwd)),
+    })
+    notice.on('click', () =>
+      mainWindow.show(`#/sessions/${encodeURIComponent(`claude:${session}`)}`)
+    )
+    notice.on('failed', (_event, error) =>
+      log.warn(`Could not show a notification: ${error}`)
+    )
+    notice.show()
+  },
+  onDone: (session, cwd, did) => {
+    if (mainWindow.isFocused() || !Notification.isSupported()) return
+    const t = localized(hostText)
+    const notice = new Notification({
+      title: t.done,
+      body: t.inFolder(did || t.doneTurn, path.basename(cwd)),
     })
     notice.on('click', () =>
       mainWindow.show(`#/sessions/${encodeURIComponent(`claude:${session}`)}`)

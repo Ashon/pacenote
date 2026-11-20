@@ -15,6 +15,8 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { PlanReader } from '../../../src/sessions/plan.js'
+import type { SessionPlanStep } from '../../../src/sessions/types.js'
 import {
   getLocale,
   LANGUAGE_FOR_AI,
@@ -715,7 +717,20 @@ export function readSessionLog(
   tool: WorkTool,
   chars = ITEM_CHARS
 ): SessionItem[] {
+  return readSessionTalk(file, tool, chars).items
+}
+
+/**
+ * A session's log as its page shows it: its turns and steps
+ * (readSessionLog), and the plan Claude Code keeps while it works
+ */
+export function readSessionTalk(
+  file: string,
+  tool: WorkTool,
+  chars = ITEM_CHARS
+): { items: SessionItem[]; plan?: SessionPlanStep[] } {
   const items: SessionItem[] = []
+  const plan = new PlanReader()
   /** Claude Code's steps by their tool_use id, for how each came back */
   const steps = new Map<string, SessionItem>()
   const push = (item: SessionItem) => {
@@ -752,8 +767,17 @@ export function readSessionLog(
           if (block.type === 'tool_use') {
             const kept = step(block.name, block.input, at)
             if (kept && typeof block.id === 'string') steps.set(block.id, kept)
-          } else if (block.type === 'tool_result' && block.is_error === true) {
-            const kept = steps.get(String(block.tool_use_id))
+            plan.use(
+              String(block.name ?? ''),
+              block.input,
+              typeof block.id === 'string' ? block.id : undefined
+            )
+          } else if (block.type === 'tool_result') {
+            const failed = block.is_error === true
+            plan.result(String(block.tool_use_id), event.toolUseResult, failed)
+            const kept = failed
+              ? steps.get(String(block.tool_use_id))
+              : undefined
             if (kept) kept.failed = true
           } else if (block.type === 'image') images += 1
       const text = textOf(message.content, SAID)
@@ -787,5 +811,6 @@ export function readSessionLog(
       step(payload.name, input, at)
     }
   }
-  return items.slice(-300)
+  const left = plan.plan()
+  return { items: items.slice(-300), ...(left ? { plan: left } : {}) }
 }

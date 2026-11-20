@@ -66,6 +66,14 @@ const en = {
   cancel: 'Cancel',
   codexTitle: 'Codex runs it, so you continue it there',
   codexLead: 'Pacenote shows its log as it goes.',
+  // Below the conversation
+  latest: 'Latest',
+  plan: 'Plan',
+  planDone: (done: number, total: number) => `${done} of ${total} done`,
+  context: (model: string, percent: number) =>
+    model ? `${model} · ${percent}%` : `${percent}%`,
+  contextNote: (percent: number) =>
+    `The conversation takes ${percent}% of the model's context. Claude Code summarizes what came before as it fills.`,
 }
 
 const ko: typeof en = {
@@ -124,6 +132,13 @@ const ko: typeof en = {
   cancel: '취소',
   codexTitle: 'Codex가 돌리고 있어서 그곳에서 이어 가요',
   codexLead: 'Pacenote는 로그를 진행되는 대로 보여 줘요.',
+  latest: '최신으로',
+  plan: '계획',
+  planDone: (done, total) => `${total}개 중 ${done}개 완료`,
+  context: (model, percent) =>
+    model ? `${model} · ${percent}%` : `${percent}%`,
+  contextNote: (percent) =>
+    `대화가 모델 컨텍스트의 ${percent}%를 쓰고 있어요. 차면 Claude Code가 앞의 대화를 요약해요.`,
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

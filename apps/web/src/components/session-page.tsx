@@ -1,15 +1,21 @@
+import { modelLabel } from '@src/sessions/live'
 import type {
   SessionAsk,
   SessionLive,
   SessionMode,
+  SessionPlanStep,
   SessionTalk,
 } from '@src/sessions/types'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import {
+  ArrowDown,
   ArrowUp,
   Check,
   ChevronDown,
   ChevronRight,
+  Circle,
+  CircleCheck,
+  CircleDot,
   Copy,
   GitFork,
   ListChecks,
@@ -20,6 +26,7 @@ import {
   Square,
 } from 'lucide-react'
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -45,7 +52,7 @@ import { usePhone } from '@/lib/phone'
 import { canShow } from '@/lib/session-rows'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
-import { NowItem, TalkItems } from './session-items'
+import { NowItem, SentItems, TalkItems } from './session-items'
 import { ShowButton, StateMark, toolWhere, whereName } from './session-open'
 import { text } from './session-page.text'
 import { text as listText } from './sessions-page.text'
@@ -53,6 +60,26 @@ import { resumeCommand } from './task-sessions'
 
 /** Close enough to the end to follow what comes next */
 const FOLLOW_PX = 80
+
+/** Room between the conversation's end and the composer floating over it */
+const DOCK_GAP_PX = 8
+
+/**
+ * How long something you sent stays after Claude Code read it, at most, while
+ * its log catches up
+ */
+const SENT_MS = 10_000
+
+/** Enter right after a word is put together ends it (Safari), not sends */
+const COMPOSED_MS = 500
+
+/** A message being written, by session: in memory only, never on disk */
+const drafts = new Map<string, string>()
+
+const smooth = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth'
 
 /**
  * A session's page (V1): its conversation from its tool's own log as it goes,
@@ -67,22 +94,85 @@ export function SessionPage({ id }: { id: string }) {
   const query = useSessionTalk(id)
   const talk = query.data
   const scroller = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
   /** At the end: what comes next scrolls into sight */
   const following = useRef(true)
+  /** On the way to the end (Latest): scrolls on the way do not stop it */
+  const jumping = useRef(false)
+  /** Scrolled up from the end, with more below */
+  const [behind, setBehind] = useState(false)
+  /** How tall the composer floating over the conversation's end is */
+  const [dock, setDock] = useState(0)
+  const docked = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return
+    const measure = () => setDock(element.offsetHeight)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  // What Tab or a find moves to scrolls into sight above it, not under it
+  useLayoutEffect(() => {
+    if (scroller.current)
+      scroller.current.style.scrollPaddingBottom = `${dock}px`
+  }, [dock])
   const loaded = talk !== undefined
   useEffect(() => {
     const element = scroller.current
-    if (!element) return
+    const inner = content.current
+    if (!element || !inner) return
+    const atEnd = () =>
+      element.scrollHeight - element.scrollTop - element.clientHeight <
+      FOLLOW_PX
     const onScroll = () => {
-      following.current =
-        element.scrollHeight - element.scrollTop - element.clientHeight <
-        FOLLOW_PX
+      if (jumping.current && !atEnd()) return
+      jumping.current = false
+      following.current = atEnd()
+      setBehind(!following.current)
     }
-    element.addEventListener('scroll', onScroll)
-    return () => element.removeEventListener('scroll', onScroll)
+    // Your hand on it: a jump to the end stops where you take over
+    const onHand = () => {
+      jumping.current = false
+    }
+    // Opening a step or a summary is to read it: what comes next waits below
+    const onOpen = (event: MouseEvent) => {
+      if ((event.target as Element | null)?.closest?.('[aria-expanded]'))
+        following.current = false
+    }
+    // An answer as it comes, a step opened, the composer grown: kept at the
+    // end while following
+    const observer = new ResizeObserver(() => {
+      if (following.current) element.scrollTop = element.scrollHeight
+      else setBehind(!atEnd())
+    })
+    observer.observe(inner, { box: 'border-box' })
+    element.addEventListener('scroll', onScroll, { passive: true })
+    element.addEventListener('wheel', onHand, { passive: true })
+    element.addEventListener('touchstart', onHand, { passive: true })
+    inner.addEventListener('click', onOpen)
+    return () => {
+      observer.disconnect()
+      element.removeEventListener('scroll', onScroll)
+      element.removeEventListener('wheel', onHand)
+      element.removeEventListener('touchstart', onHand)
+      inner.removeEventListener('click', onOpen)
+    }
   }, [loaded])
+  /** To the end, and following from there */
+  const toEnd = (animate: boolean) => {
+    const element = scroller.current
+    following.current = true
+    setBehind(false)
+    if (!element) return
+    jumping.current = animate
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior: animate ? smooth() : 'auto',
+    })
+  }
   const live = talk?.live
   const draft = useDraft(live, talk?.items.length ?? 0)
+  const sent = useSent(live, talk?.items)
   useLayoutEffect(() => {
     const element = scroller.current
     if (element && following.current) element.scrollTop = element.scrollHeight
@@ -93,6 +183,7 @@ export function SessionPage({ id }: { id: string }) {
     live?.busy,
     live?.doing,
     draft?.length,
+    sent.length,
   ])
 
   if (talk === undefined) return <TalkSkeleton phone={phone} />
@@ -114,9 +205,18 @@ export function SessionPage({ id }: { id: string }) {
       ? whereName(row, l)
       : undefined
   return (
-    <div className="flex h-full flex-col">
-      <ScrollArea viewportRef={scroller} className="min-h-0 flex-1">
-        <div className="@container mx-auto max-w-4xl px-10 pt-9 pb-6">
+    <div className="relative h-full">
+      <ScrollArea
+        viewportRef={scroller}
+        className="h-full"
+        scrollbarClassName="z-10"
+      >
+        {/* Its end clears the composer floating over it */}
+        <div
+          ref={content}
+          className="@container mx-auto max-w-4xl px-10 pt-9"
+          style={{ paddingBottom: dock + DOCK_GAP_PX }}
+        >
           <nav
             data-page-crumbs
             className="flex items-center gap-1.5 text-meta text-muted-foreground"
@@ -151,12 +251,14 @@ export function SessionPage({ id }: { id: string }) {
               </a>
             )}
           </p>
-          {items.length > 0 || live?.busy || workingThere ? (
+          {items.length > 0 || live?.busy || workingThere || sent.length ? (
             <ol
               aria-label={row.title}
               className="mt-6 flex flex-col gap-3 @max-md:mt-5"
             >
               <TalkItems items={items} tool={tool} cwd={row.cwd} />
+              {/* What started its turn, then the turn, then what waits */}
+              <SentItems sent={sent.filter((one) => !one.queued)} />
               <NowItem
                 live={live}
                 draft={draft}
@@ -164,6 +266,7 @@ export function SessionPage({ id }: { id: string }) {
                 cwd={row.cwd}
                 where={workingThere}
               />
+              <SentItems sent={sent.filter((one) => one.queued)} />
             </ol>
           ) : (
             <p className="mt-6 text-copy text-muted-foreground">
@@ -176,22 +279,60 @@ export function SessionPage({ id }: { id: string }) {
           )}
         </div>
       </ScrollArea>
-      <div className="shrink-0 border-t border-border">
+      {/*
+       * The composer floats over the conversation's end, which scrolls on
+       * under it and fades out above it. Only the composer itself takes the
+       * pointer: around it, a wheel or a finger scrolls the conversation.
+       */}
+      <div
+        ref={docked}
+        className="pointer-events-none absolute inset-x-0 bottom-0"
+      >
+        {behind && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            data-state="open"
+            aria-label={t.latest}
+            title={t.latest}
+            onClick={() => toEnd(true)}
+            className="motion-fade pointer-events-auto absolute bottom-full left-1/2 size-9 -translate-x-1/2 translate-y-2 rounded-full bg-background shadow-float"
+          >
+            <ArrowDown />
+            {/* At work: what comes next is on its way */}
+            {live?.busy && (
+              <span
+                aria-hidden="true"
+                className="absolute top-0.5 right-0.5 size-2 animate-pulse-dot rounded-full bg-status-running"
+              />
+            )}
+          </Button>
+        )}
         <div
+          aria-hidden="true"
           className={cn(
-            'mx-auto max-w-4xl px-10',
-            phone ? 'pt-3 pb-3' : 'pt-4 pb-5'
+            'bg-linear-to-t from-card to-transparent',
+            phone ? 'h-4' : 'h-6'
           )}
-        >
-          {talk.typeIn === 'here' || talk.typeIn === 'move' ? (
-            <Composer talk={talk} />
-          ) : talk.typeIn === 'elsewhere' ? (
-            <Elsewhere talk={talk} />
-          ) : (
-            <Bar title={t.codexTitle} lead={t.codexLead}>
-              <SessionButtons talk={talk} />
-            </Bar>
-          )}
+        />
+        <div className="bg-card">
+          <div
+            className={cn('mx-auto max-w-4xl px-10', phone ? 'pb-3' : 'pb-5')}
+          >
+            <div className="pointer-events-auto">
+              {talk.plan && <PlanBar plan={talk.plan} />}
+              {talk.typeIn === 'here' || talk.typeIn === 'move' ? (
+                <Composer talk={talk} onSend={() => toEnd(false)} />
+              ) : talk.typeIn === 'elsewhere' ? (
+                <Elsewhere talk={talk} />
+              ) : (
+                <Bar title={t.codexTitle} lead={t.codexLead}>
+                  <SessionButtons talk={talk} />
+                </Bar>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -251,7 +392,7 @@ function TalkSkeleton({ phone }: { phone: boolean }) {
           </ul>
         </div>
       </div>
-      <div className="shrink-0 border-t border-border">
+      <div className="shrink-0">
         <div
           className={cn(
             'mx-auto max-w-4xl px-10',
@@ -350,13 +491,21 @@ function AskCard({
  * the step it is on is done; while it asks, what to do instead of that. One
  * resting in the Claude app or a terminal moves here as you send
  */
-function Composer({ talk }: { talk: SessionTalk }) {
+function Composer({
+  talk,
+  onSend,
+}: {
+  talk: SessionTalk
+  /** As you send: what you sent comes in sight */
+  onSend: () => void
+}) {
   const t = useText(text)
   const l = useText(listText)
   const act = useSessionActions(talk.row.id)
   const live = talk.live
   const box = (
     <MessageBox
+      draftKey={talk.row.id}
       placeholder={
         live?.ask
           ? t.placeholder.ask
@@ -366,14 +515,18 @@ function Composer({ talk }: { talk: SessionTalk }) {
               ? t.placeholder.idle
               : t.placeholder.resume
       }
-      onSend={(said) =>
-        live?.ask ? act.answer(live.ask.id, 'deny', said) : act.send(said)
-      }
+      onSend={(said) => {
+        onSend()
+        return live?.ask
+          ? act.answer(live.ask.id, 'deny', said)
+          : act.send(said)
+      }}
       tools={
         live?.mode && (
           <ModePicker mode={live.mode} onPick={(mode) => act.mode(mode)} />
         )
       }
+      gauge={live?.context && <ContextGauge live={live} />}
       stop={live?.busy ? () => act.stop() : undefined}
     />
   )
@@ -396,27 +549,43 @@ function MessageBox({
   placeholder,
   onSend,
   tools,
+  gauge,
   stop,
   autoFocus,
   sendLabel,
+  draftKey,
 }: {
   placeholder: string
   /** Sends it; what went wrong, or nothing */
   onSend: (said: string) => Promise<string | undefined>
   tools?: ReactNode
-  /** Stops the turn it is on */
+  /** How full its context is, at the end of the tools */
+  gauge?: ReactNode
+  /** Stops the turn it is on (Esc) */
   stop?: () => Promise<string | undefined>
   autoFocus?: boolean
   sendLabel?: string
+  /** Keeps what you write while you look at another page, in memory */
+  draftKey?: string
 }) {
   const t = useText(text)
   const mac = remoteMac()
   const foot = mac ? t.footOn(mac) : t.foot
   // A phone keeps its screen for the talk: where it runs is in Settings
   const phone = usePhone()
-  const [message, setMessage] = useState('')
+  const [message, setMessageNow] = useState(
+    () => (draftKey && drafts.get(draftKey)) || ''
+  )
+  const setMessage = (said: string) => {
+    setMessageNow(said)
+    if (!draftKey) return
+    if (said) drafts.set(draftKey, said)
+    else drafts.delete(draftKey)
+  }
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
+  /** When a word was last put together (Korean, Japanese, Chinese) */
+  const composed = useRef(0)
   const send = () => {
     const said = message.trim()
     if (!said || sending) return
@@ -434,22 +603,33 @@ function MessageBox({
   }
   return (
     <form onSubmit={submit}>
-      <div className="rounded-[14px] border border-input bg-background focus-within:ring-[3px] focus-within:ring-ring/40">
+      <div className="rounded-[14px] border border-input bg-background shadow-float focus-within:ring-[3px] focus-within:ring-ring/40">
         <textarea
           aria-label={t.message}
           value={message}
           autoFocus={autoFocus}
           onChange={(event) => setMessage(event.target.value)}
+          onCompositionEnd={() => {
+            composed.current = Date.now()
+          }}
           onKeyDown={(event) => {
-            // Not while a Korean word is still being put together
-            if (
-              event.key === 'Enter' &&
-              !event.shiftKey &&
-              !event.nativeEvent.isComposing
-            ) {
+            if (event.key === 'Escape' && stop) {
               event.preventDefault()
-              send()
+              void stop().then(setError)
+              return
             }
+            // A phone's Return is a new line: its Send button sends
+            if (event.key !== 'Enter' || event.shiftKey || phone) return
+            // Not while a Korean word is still being put together, nor on
+            // the Enter that ends one (Safari tells it after the word)
+            if (
+              event.nativeEvent.isComposing ||
+              event.keyCode === 229 ||
+              (safari && Date.now() - composed.current < COMPOSED_MS)
+            )
+              return
+            event.preventDefault()
+            send()
           }}
           rows={phone ? 1 : 2}
           placeholder={placeholder}
@@ -458,9 +638,10 @@ function MessageBox({
             phone ? 'max-h-40 min-h-11' : 'max-h-60 min-h-16'
           )}
         />
-        <div className="flex items-center gap-2 px-2.5 pb-2.5">
+        <div className="flex min-w-0 items-center gap-2 px-2.5 pb-2.5">
           {tools}
           <span className="flex-1" />
+          {gauge}
           {stop && (
             <Button
               type="button"
@@ -481,6 +662,114 @@ function MessageBox({
       <InlineError error={error} className="mt-2" />
       {!phone && <p className="mt-2 text-meta text-muted-foreground">{foot}</p>}
     </form>
+  )
+}
+
+/** Safari, which ends a word being put together after its Enter */
+const safari =
+  typeof navigator !== 'undefined' &&
+  /AppleWebKit/.test(navigator.userAgent) &&
+  !/Chrome|Chromium|Edg/.test(navigator.userAgent)
+
+/**
+ * How much of its model's context the conversation takes: Claude Code
+ * summarizes what came before as it fills
+ */
+function ContextGauge({ live }: { live: SessionLive }) {
+  const t = useText(text)
+  const phone = usePhone()
+  if (!live.context) return null
+  const percent = Math.min(
+    100,
+    Math.round((live.context.used / live.context.window) * 100)
+  )
+  const model = live.model && !phone ? modelLabel(live.model) : ''
+  return (
+    <span
+      title={t.contextNote(percent)}
+      aria-label={t.contextNote(percent)}
+      className={cn(
+        'truncate text-meta text-muted-foreground tabular-nums',
+        percent >= 80 && 'text-status-interrupted'
+      )}
+    >
+      {t.context(model, percent)}
+    </span>
+  )
+}
+
+/**
+ * Its plan while it works, above the composer: how far along, the step it is
+ * on, and each step when opened
+ */
+function PlanBar({ plan }: { plan: SessionPlanStep[] }) {
+  const t = useText(text)
+  const [open, setOpen] = useState(false)
+  const done = plan.filter((step) => step.state === 'done').length
+  const now = plan.find((step) => step.state === 'doing')
+  return (
+    <div className="mb-3 rounded-lg border border-border bg-muted/40">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-meta"
+      >
+        <ListChecks
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-muted-foreground"
+        />
+        <span className="shrink-0 font-medium">{t.plan}</span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">
+          {t.planDone(done, plan.length)}
+        </span>
+        {now && (
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            <span aria-hidden="true">· </span>
+            {now.doing ?? now.text}
+          </span>
+        )}
+        <ChevronDown
+          aria-hidden="true"
+          className={cn(
+            'ml-auto size-3.5 shrink-0 text-muted-foreground',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+      {open && (
+        <ol className="flex max-h-48 flex-col gap-1 overflow-y-auto px-3 pb-2.5">
+          {plan.map((step, index) => (
+            <li
+              key={index}
+              className={cn(
+                'flex items-start gap-2 text-meta',
+                step.state === 'done' && 'text-muted-foreground line-through',
+                step.state === 'doing' && 'font-medium'
+              )}
+            >
+              {step.state === 'done' ? (
+                <CircleCheck
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0 text-status-succeeded"
+                />
+              ) : step.state === 'doing' ? (
+                <CircleDot
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0 text-status-running"
+                />
+              ) : (
+                <Circle
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                />
+              )}
+              <span className="min-w-0">{step.text}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   )
 }
 
@@ -665,6 +954,58 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+/**
+ * What you sent that its log does not have yet: queued while Claude Code is on
+ * a step (sent during its turn), and once read, kept until its log has it, so
+ * it does not blink out between the two
+ */
+function useSent(
+  live: SessionLive | undefined,
+  items: SessionTalk['items'] | undefined
+): { text: string; queued: boolean }[] {
+  const queued = live?.queued
+  const since = live?.since
+  const [read, setRead] = useState<{ text: string; at: number }[]>([])
+  const before = useRef(queued)
+  useEffect(() => {
+    const gone = (before.current ?? []).filter(
+      (one) => !queued?.some((q) => q.at === one.at && q.text === one.text)
+    )
+    before.current = queued
+    if (gone.length)
+      setRead((old) => [
+        ...old,
+        ...gone.map((one) => ({ text: one.text, at: Date.now() })),
+      ])
+  }, [queued])
+  // In its log now, or long enough
+  const said = items?.filter((item) => item.role === 'user').at(-1)?.text
+  useEffect(() => {
+    if (!read.length) return
+    const left = read.filter(
+      (one) =>
+        !(said && said.trim() === one.text.trim()) &&
+        Date.now() - one.at < SENT_MS
+    )
+    if (left.length !== read.length) {
+      setRead(left)
+      return
+    }
+    const timer = setTimeout(
+      () => setRead((old) => old.filter((o) => Date.now() - o.at < SENT_MS)),
+      SENT_MS
+    )
+    return () => clearTimeout(timer)
+  }, [read, said])
+  return [
+    ...read.map((one) => ({ text: one.text, queued: false })),
+    ...(queued ?? []).map((one) => ({
+      text: one.text,
+      queued: !!since && Date.parse(one.at) > Date.parse(since),
+    })),
+  ]
 }
 
 /**

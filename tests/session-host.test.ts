@@ -77,6 +77,13 @@ const ask = {
   },
 }
 
+/** Claude Code telling back what you sent, as it reads it */
+const replay = (content: string) => ({
+  type: 'user',
+  message: { role: 'user', content },
+  isReplay: true,
+})
+
 describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
   it('runs the session where it was, resuming it, and sends what you typed', async () => {
     const { h, procs } = host()
@@ -95,6 +102,7 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
       session_id: 's1',
       permissionMode: 'default',
     })
+    proc!.say(replay('Make it 5'))
     proc!.say({
       type: 'assistant',
       message: {
@@ -112,11 +120,103 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     // A second message goes to the same run
     h.send('s1', '/w/pay', 'And a test')
     expect(procs).toHaveLength(1)
+    proc!.say(replay('And a test'))
     proc!.say({ type: 'result', subtype: 'success', is_error: false })
     await tick()
     expect(h.get('s1')).toEqual({ busy: false, mode: 'default' })
     expect(h.list()).toMatchObject([
       { session: 's1', cwd: '/w/pay', busy: false },
+    ])
+  })
+
+  it('keeps what you sent queued until Claude Code reads it, and tells when its turn is done', async () => {
+    const done: string[][] = []
+    const { h, procs } = host({
+      onDone: (session, cwd, did) => done.push([session, cwd, did]),
+    })
+    await h.send('s1', '/w/pay', 'Fix the retry')
+    const proc = procs[0]!
+    expect(h.get('s1')?.queued).toMatchObject([{ text: 'Fix the retry' }])
+    proc.say({
+      type: 'system',
+      subtype: 'init',
+      permissionMode: 'default',
+      model: 'claude-opus-5-5',
+    })
+    proc.say(replay('Fix the retry'))
+    await tick()
+    expect(h.get('s1')).toMatchObject({ busy: true, model: 'claude-opus-5-5' })
+    expect(h.get('s1')?.queued).toBeUndefined()
+    // One sent on its turn waits for the step it is on
+    h.send('s1', '/w/pay', 'And add a test')
+    expect(h.get('s1')?.queued).toMatchObject([{ text: 'And add a test' }])
+    proc.say({
+      type: 'system',
+      subtype: 'post_turn_summary',
+      status_detail: 'Fixed the retry delay',
+    })
+    proc.say({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'Fixed it.',
+      usage: {
+        iterations: [
+          {
+            input_tokens: 1000,
+            cache_read_input_tokens: 50000,
+            cache_creation_input_tokens: 2000,
+            output_tokens: 500,
+          },
+        ],
+      },
+      modelUsage: { 'claude-opus-5-5': { contextWindow: 200000 } },
+    })
+    await tick()
+    // Not done while what you sent waits for it
+    expect(done).toEqual([])
+    expect(h.get('s1')).toMatchObject({
+      busy: false,
+      context: { used: 53500, window: 200000 },
+    })
+    expect(h.get('s1')?.queued).toHaveLength(1)
+    proc.say(replay('And add a test'))
+    await tick()
+    expect(h.get('s1')?.queued).toBeUndefined()
+    proc.say({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: '\nAdded the test.\nIt covers the delay.',
+    })
+    await tick()
+    // What it did, from its summary or its answer's first line
+    expect(done).toEqual([['s1', '/w/pay', 'Added the test.']])
+    // Not when you stopped it
+    h.send('s1', '/w/pay', 'Count to 200')
+    proc.say(replay('Count to 200'))
+    h.stop('s1')
+    proc.say({
+      type: 'result',
+      subtype: 'error_during_execution',
+      is_error: true,
+    })
+    await tick()
+    expect(done).toHaveLength(1)
+    // Its summary, as Claude Code writes it, made a sentence
+    h.send('s1', '/w/pay', 'Say done')
+    proc.say(replay('Say done'))
+    proc.say({
+      type: 'system',
+      subtype: 'post_turn_summary',
+      status_detail: 'agent replied DONE as requested',
+    })
+    proc.say({ type: 'result', subtype: 'success', is_error: false })
+    await tick()
+    expect(done.at(-1)).toEqual([
+      's1',
+      '/w/pay',
+      'Agent replied DONE as requested',
     ])
   })
 

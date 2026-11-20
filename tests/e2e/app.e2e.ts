@@ -3370,6 +3370,10 @@ else fail('unexpected: ' + args.join(' '))
     await page.screenshot({
       path: path.join(REPO, 'test-results/session-thinking.png'),
     })
+    // Sent on its turn: queued after it, till it is done with the step
+    await message.fill('Work through the retry fix')
+    await message.press('Enter')
+    await page.getByText('Queued', { exact: true }).waitFor()
     await page.getByText(/^Writing\s*·\s*\d+s$/).waitFor()
     await page.getByRole('heading', { name: 'How the backoff works' }).waitFor()
     await page.screenshot({
@@ -3382,6 +3386,29 @@ else fail('unexpected: ' + args.join(' '))
     expect(
       await page.getByRole('heading', { name: 'How the backoff works' }).count()
     ).toBe(1)
+    // Read once that turn is done: its plan above the composer, and how
+    // much of its model's context the conversation takes
+    await page
+      .getByText('The failing test reads the delay before the first retry.')
+      .waitFor({ timeout: 30_000 })
+    expect(await page.getByText('Queued', { exact: true }).count()).toBe(0)
+    const plan = page.getByRole('button', { name: /^Plan/ })
+    await plan.getByText('1 of 3 done').waitFor()
+    await plan.getByText('Fixing the backoff delay').waitFor()
+    await page.getByText(/^Opus 5\.5 · \d+%$/).waitFor()
+    await plan.click()
+    await page.getByText('Run the webhook tests', { exact: true }).waitFor()
+    // Scrolled up: a way back to the latest
+    await page
+      .locator('[data-radix-scroll-area-viewport]')
+      .evaluate((element) => element.scrollTo(0, 0))
+    const latest = page.getByRole('button', { name: 'Latest' })
+    await latest.waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-plan.png'),
+    })
+    await latest.click()
+    await latest.waitFor({ state: 'detached' })
 
     // The one working in a terminal: watched here, continued in a copy
     await page.getByRole('link', { name: 'Sessions', exact: true }).click()

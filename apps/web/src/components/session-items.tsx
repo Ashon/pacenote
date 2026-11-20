@@ -1,3 +1,4 @@
+import { PLAN_TOOLS } from '@src/sessions/plan'
 import {
   saidParts,
   stepTarget,
@@ -9,10 +10,12 @@ import type { SessionItem } from '@src/tasks/types'
 import {
   Bell,
   Bot,
+  Check,
   ChevronDown,
   ChevronRight,
   CircleStop,
   ClipboardList,
+  Copy,
   FilePen,
   FilePlus,
   FileText,
@@ -31,8 +34,16 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import { Markdown } from '@/components/markdown'
+import { Button } from '@/components/ui/button'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -47,6 +58,16 @@ import { text as rowText } from './task-row.text'
  * folded into a line once there are more than a few; and what it does this
  * moment, while on a turn.
  */
+
+/** How long a copied mark stays */
+const COPIED_MS = 1500
+
+/** How long a finger rests on a bubble to show what you do with it (copy) */
+const HOLD_MS = 450
+/** How long it stays shown then */
+const HELD_MS = 4000
+/** How far a finger moves before it scrolls instead */
+const HOLD_SLOP_PX = 10
 
 /** Steps in a row shown one by one; more fold into a line to open */
 const STEPS_SHOWN = 3
@@ -91,6 +112,8 @@ function blocksOf(items: readonly SessionItem[]): Block[] {
   const blocks: Block[] = []
   items.forEach((item, at) => {
     const last = blocks.at(-1)
+    // Its plan's steps: the plan above the composer has them
+    if (item.role === 'tool' && item.name && PLAN_TOOLS.has(item.name)) return
     if (item.role !== 'tool') blocks.push({ kind: 'turn', item, at })
     else if (last?.kind === 'steps') last.items.push(item)
     else blocks.push({ kind: 'steps', items: [item], at })
@@ -117,22 +140,73 @@ export function TalkItems({
   )
 }
 
-/** A turn of yours or its answer, in a bubble with who and when */
+/**
+ * A turn of yours or its answer, in a bubble with who and when, and what you
+ * do with it (copy) at its end: shown on hover or focus, and on a phone or
+ * iPad once a finger rests on the bubble
+ */
 function Bubble({
   mine,
   who,
   at,
   status,
+  actions,
+  waiting,
   children,
 }: {
   mine: boolean
   who: string
   at?: string
   status?: ReactNode
+  actions?: ReactNode
+  /** Sent, not read yet */
+  waiting?: boolean
   children: ReactNode
 }) {
+  const [held, setHeld] = useState(false)
+  const hold = useRef<{ x: number; y: number; timer: number }>(undefined)
+  const letGo = () => {
+    if (hold.current) clearTimeout(hold.current.timer)
+    hold.current = undefined
+  }
+  useEffect(() => letGo, [])
+  useEffect(() => {
+    if (!held) return
+    const timer = setTimeout(() => setHeld(false), HELD_MS)
+    return () => clearTimeout(timer)
+  }, [held])
   return (
-    <li className="flex items-start gap-3">
+    <li
+      data-held={held || undefined}
+      className={cn(
+        'group/turn flex items-start gap-3',
+        waiting && 'opacity-70'
+      )}
+      {...(actions
+        ? {
+            onPointerDown: (event: PointerEvent<HTMLLIElement>) => {
+              if (event.pointerType !== 'touch') return
+              letGo()
+              hold.current = {
+                x: event.clientX,
+                y: event.clientY,
+                timer: window.setTimeout(() => setHeld(true), HOLD_MS),
+              }
+            },
+            onPointerMove: (event: PointerEvent<HTMLLIElement>) => {
+              const at = hold.current
+              if (
+                at &&
+                Math.hypot(event.clientX - at.x, event.clientY - at.y) >
+                  HOLD_SLOP_PX
+              )
+                letGo()
+            },
+            onPointerUp: letGo,
+            onPointerCancel: letGo,
+          }
+        : {})}
+    >
       <span
         className={cn(
           'flex size-7 shrink-0 items-center justify-center rounded-full text-meta font-semibold',
@@ -150,18 +224,97 @@ function Bubble({
           mine ? 'bg-well' : 'border border-border'
         )}
       >
-        <p className="flex flex-wrap items-baseline gap-x-2 text-section">
-          {who}
-          {at && (
-            <span className="text-caption text-muted-foreground">
-              {formatDateTime(at)}
+        <div className="flex items-start gap-2">
+          <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 text-section">
+            {who}
+            {at && (
+              <span className="text-caption text-muted-foreground">
+                {formatDateTime(at)}
+              </span>
+            )}
+            {status}
+          </p>
+          {actions && (
+            <span className="pointer-events-none -my-1 -mr-2 flex shrink-0 opacity-0 transition-opacity group-focus-within/turn:pointer-events-auto group-focus-within/turn:opacity-100 group-hover/turn:pointer-events-auto group-hover/turn:opacity-100 group-data-held/turn:pointer-events-auto group-data-held/turn:opacity-100">
+              {actions}
             </span>
           )}
-          {status}
-        </p>
+        </div>
         <div className="mt-1 flex flex-col gap-2">{children}</div>
       </div>
     </li>
+  )
+}
+
+/** Copies what was said; a check for a moment once it has */
+function CopyButton({ said }: { said: string }) {
+  const t = useText(text)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), COPIED_MS)
+    return () => clearTimeout(timer)
+  }, [copied])
+  return (
+    <Button
+      type="button"
+      size="icon-sm"
+      variant="ghost"
+      aria-label={copied ? t.copied : t.copy}
+      title={copied ? t.copied : t.copy}
+      className="text-muted-foreground"
+      onClick={() =>
+        void navigator.clipboard?.writeText(said).then(() => setCopied(true))
+      }
+    >
+      {copied ? <Check /> : <Copy />}
+    </Button>
+  )
+}
+
+/**
+ * A long turn of yours (a task handed over, a pasted log) folded to its first
+ * lines, to open in full
+ */
+function Folded({ children }: { children: ReactNode }) {
+  const t = useText(text)
+  const box = useRef<HTMLDivElement>(null)
+  const [long, setLong] = useState(false)
+  const [open, setOpen] = useState(false)
+  useLayoutEffect(() => {
+    const element = box.current
+    if (element && !open)
+      setLong(element.scrollHeight > element.clientHeight + 1)
+  }, [children, open])
+  return (
+    <>
+      <div
+        ref={box}
+        className={cn(
+          'flex flex-col gap-2',
+          !open && 'max-h-56 overflow-hidden',
+          !open &&
+            long &&
+            '[mask-image:linear-gradient(to_bottom,black_70%,transparent)]'
+        )}
+      >
+        {children}
+      </div>
+      {(long || open) && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="flex w-fit items-center gap-1 text-meta font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ChevronDown
+            aria-hidden="true"
+            className={cn('size-3.5', open && 'rotate-180')}
+          />
+          {open ? t.showLess : t.showAll}
+        </button>
+      )}
+    </>
   )
 }
 
@@ -187,7 +340,12 @@ function Turn({ item, tool }: { item: SessionItem; tool: string }) {
   const t = useText(text)
   if (item.role === 'assistant')
     return (
-      <Bubble mine={false} who={tool} at={item.at}>
+      <Bubble
+        mine={false}
+        who={tool}
+        at={item.at}
+        actions={<CopyButton said={item.text} />}
+      >
         <Answer text={item.text} />
       </Bubble>
     )
@@ -199,11 +357,21 @@ function Turn({ item, tool }: { item: SessionItem; tool: string }) {
     parts.every((part) => part.kind === 'stopped' || part.kind === 'note')
   )
     return parts.map((part, index) => <NoteLine key={index} part={part} />)
+  const typed = parts
+    .flatMap((part) => (part.kind === 'text' ? [part.text] : []))
+    .join('\n\n')
   return (
-    <Bubble mine who={r.you} at={item.at}>
-      {parts.map((part, index) => (
-        <Part key={index} part={part} />
-      ))}
+    <Bubble
+      mine
+      who={r.you}
+      at={item.at}
+      actions={typed && <CopyButton said={typed} />}
+    >
+      <Folded>
+        {parts.map((part, index) => (
+          <Part key={index} part={part} />
+        ))}
+      </Folded>
       {!!item.images && (
         <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-background px-2.5 py-0.5 text-meta text-muted-foreground">
           <ImageIcon aria-hidden="true" className="size-3.5" />
@@ -437,6 +605,52 @@ function Steps({ items, cwd }: { items: SessionItem[]; cwd: string }) {
   )
 }
 
+/**
+ * What you sent that Claude Code has not read yet, after the conversation:
+ * one sent while it works waits for the step it is on
+ */
+export function SentItems({
+  sent,
+}: {
+  sent: readonly { text: string; queued: boolean }[]
+}) {
+  const r = useText(rowText)
+  const t = useText(text)
+  return sent.map((one, index) => (
+    <Bubble
+      key={index}
+      mine
+      waiting
+      who={r.you}
+      status={
+        one.queued && (
+          <span
+            title={t.queuedNote}
+            className="rounded-full bg-background px-2 py-px text-caption font-medium text-muted-foreground"
+          >
+            {t.queued}
+          </span>
+        )
+      }
+    >
+      <Folded>
+        <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
+          {one.text}
+        </p>
+      </Folded>
+    </Bubble>
+  ))
+}
+
+/**
+ * An answer as written so far: a code block it is in the middle of is closed
+ * for now, so what follows does not read as code until it is
+ */
+export function closeFence(draft: string): string {
+  const fences = draft.match(/^ {0,3}(`{3,}|~{3,})/gm) ?? []
+  return fences.length % 2 ? `${draft}\n${fences.at(-1)!.trim()}` : draft
+}
+
 /** A dot that pulses, and what it does */
 function Doing({ label, since }: { label: string; since?: string }) {
   return (
@@ -495,7 +709,7 @@ export function NowItem({
       who={tool}
       status={writing && <Doing label={t.writing} since={live.since} />}
     >
-      <Answer text={draft} />
+      <Answer text={closeFence(draft)} />
     </Bubble>
   )
   if (!live?.busy || live.ask)
@@ -511,7 +725,7 @@ export function NowItem({
     )
   if (answer && writing) return answer
   const now =
-    live.doing === 'tool' && live.step ? (
+    live.doing === 'tool' && live.step && !PLAN_TOOLS.has(live.step.name) ? (
       <li className="ml-10">
         <StepLine
           name={live.step.name}

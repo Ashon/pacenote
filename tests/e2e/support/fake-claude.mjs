@@ -102,6 +102,33 @@ if (args.includes('--permission-prompt-tool')) {
   /** The ask waiting for its answer */
   let pending
   let queue = Promise.resolve()
+  const model = 'claude-opus-5-5'
+  // Its turn done: what it did, and how much of its context it took
+  const done = (extra = {}) => {
+    out({
+      type: 'system',
+      subtype: 'post_turn_summary',
+      status_detail: extra.result ? 'Ran the retry tests' : 'Answered you',
+      needs_action: false,
+    })
+    out({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      usage: {
+        iterations: [
+          {
+            input_tokens: 1200,
+            cache_read_input_tokens: 52000 + turns * 9000,
+            cache_creation_input_tokens: 2400,
+            output_tokens: 800,
+          },
+        ],
+      },
+      modelUsage: { [model]: { contextWindow: 200000 } },
+      ...extra,
+    })
+  }
   const turn = async (said) => {
     turns++
     out({
@@ -109,8 +136,61 @@ if (args.includes('--permission-prompt-tool')) {
       subtype: 'init',
       permissionMode: mode,
       cwd: process.cwd(),
+      model,
     })
+    // What you sent, read now (--replay-user-messages)
+    if (args.includes('--replay-user-messages'))
+      out({
+        type: 'user',
+        message: { role: 'user', content: said },
+        isReplay: true,
+      })
     log({ type: 'user', message: { role: 'user', content: said } })
+    // A list of work: its plan (TaskCreate, TaskUpdate), the first step
+    // done and the second under way when its turn ends
+    if (/^Work through/.test(said)) {
+      const tasks = [
+        ['Read the failing retry test', 'Reading the failing retry test'],
+        ['Fix the backoff delay', 'Fixing the backoff delay'],
+        ['Run the webhook tests', 'Running the webhook tests'],
+      ]
+      const use = async (name, input, answer) => {
+        const id = `toolu_${turns}_${name}_${randomUUID().slice(0, 4)}`
+        const step = { type: 'tool_use', id, name, input }
+        log({
+          type: 'assistant',
+          message: { role: 'assistant', content: [step] },
+        })
+        out({ type: 'assistant', message: { content: [step] } })
+        await setTimeout(150)
+        const result = { type: 'tool_result', tool_use_id: id, content: 'ok' }
+        log({
+          type: 'user',
+          message: { role: 'user', content: [result] },
+          toolUseResult: answer,
+        })
+        out({ type: 'user', message: { content: [result] } })
+      }
+      for (const [index, [subject, activeForm]] of tasks.entries())
+        await use(
+          'TaskCreate',
+          { subject, description: subject, activeForm },
+          { task: { id: String(index + 1), subject } }
+        )
+      await use('TaskUpdate', { taskId: '1', status: 'in_progress' }, {})
+      await use('TaskUpdate', { taskId: '1', status: 'completed' }, {})
+      await use('TaskUpdate', { taskId: '2', status: 'in_progress' }, {})
+      const content = [
+        {
+          type: 'text',
+          text: 'The failing test reads the delay before the first retry. I am fixing the backoff next.',
+        },
+      ]
+      log({ type: 'assistant', message: { role: 'assistant', content } })
+      out({ type: 'assistant', message: { content } })
+      done()
+      return
+    }
     // A task handed over: its plan, then it waits for you
     if (said.startsWith('You are taking over a task from Pacenote')) {
       const title = /<task [^>]*>\n(.*)/.exec(said)?.[1] ?? 'the task'
@@ -122,7 +202,7 @@ if (args.includes('--permission-prompt-tool')) {
       ]
       log({ type: 'assistant', message: { role: 'assistant', content } })
       out({ type: 'assistant', message: { content } })
-      out({ type: 'result', subtype: 'success', is_error: false })
+      done()
       return
     }
     // Asked to explain: it thinks a while, then writes its answer as it
@@ -161,7 +241,7 @@ if (args.includes('--permission-prompt-tool')) {
       const content = [{ type: 'text', text: reply.join('') }]
       log({ type: 'assistant', message: { role: 'assistant', content } })
       out({ type: 'assistant', message: { content } })
-      out({ type: 'result', subtype: 'success', is_error: false })
+      done()
       return
     }
     const id = `toolu_${turns}`
@@ -222,7 +302,7 @@ if (args.includes('--permission-prompt-tool')) {
       type: 'assistant',
       message: { content: [{ type: 'text', text: reply }] },
     })
-    out({ type: 'result', subtype: 'success', is_error: false, result: reply })
+    done({ result: reply })
   }
   const input = createInterface({ input: process.stdin })
   input.on('line', (line) => {

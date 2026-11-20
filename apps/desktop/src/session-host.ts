@@ -6,6 +6,7 @@ import {
   answerLine,
   askOf,
   type CanUseTool,
+  contextOf,
   hostArgs,
   type HostStart,
   interruptLine,
@@ -67,6 +68,11 @@ export interface SessionHostOptions {
   onLive?: (session: string, live: SessionLive) => void
   /** A session asks something: told as a notification when out of sight */
   onAsk?: (session: string, cwd: string, ask: SessionAsk) => void
+  /**
+   * A session's turn is done, with nothing more you sent left for it: told
+   * as a notification when out of sight, with what it did in a line
+   */
+  onDone?: (session: string, cwd: string, did: string) => void
   /** How long a session with nothing to do keeps running */
   idleMs?: number
   /**
@@ -117,6 +123,13 @@ interface Hosted {
   /** Its log's size once its turn here was all written */
   settled?: number
   settle?: NodeJS.Timeout
+  /** What Claude Code says its turn did, in a line, as the turn ends */
+  did?: string
+  /**
+   * It told back something you sent: what is still queued at a turn's end
+   * waits for its next. One that never does read it all (an older Claude Code)
+   */
+  replays?: boolean
 }
 
 /** How long a session with nothing to do keeps running */
@@ -132,6 +145,8 @@ const DRAFT_CHARS = 12_000
 const SETTLE_MS = 5 * SECOND
 /** How long an ended run has to go */
 const GONE_MS = 5 * SECOND
+/** How much of a message you sent its page shows while it waits */
+const QUEUED_CHARS = 4000
 
 export class SessionHost {
   private readonly hosted = new Map<string, Hosted>()
@@ -192,7 +207,7 @@ export class SessionHost {
       this.start(session, cwd, { kind: 'resume', ...(mode ? { mode } : {}) })
     if ('error' in h) return h
     if (mode) h.live.mode = mode
-    return this.write(h, userLine(text), true)
+    return this.write(h, userLine(text), true, text)
   }
 
   /**
@@ -221,7 +236,7 @@ export class SessionHost {
     const h = this.start(session, cwd, { kind: 'new', ...options })
     if ('error' in h) return h
     if (options.mode) h.live.mode = options.mode
-    return this.write(h, userLine(text), true)
+    return this.write(h, userLine(text), true, text)
   }
 
   /**
@@ -242,7 +257,7 @@ export class SessionHost {
         resolve(id)
       }
     })
-    const wrote = this.write(h, userLine(text), true)
+    const wrote = this.write(h, userLine(text), true, text)
     if (wrote.error) return wrote
     const id = await named
     if (!id) {
@@ -362,9 +377,26 @@ export class SessionHost {
     return h
   }
 
-  private write(h: Hosted, line: string, typed: boolean): { error?: string } {
+  /**
+   * Writes a line to it; one you typed (said) waits as queued until Claude
+   * Code reads it and tells it back (--replay-user-messages)
+   */
+  private write(
+    h: Hosted,
+    line: string,
+    typed: boolean,
+    said?: string
+  ): { error?: string } {
     if (!h.proc.stdin?.writable) return { error: 'gone' }
     h.proc.stdin.write(line)
+    if (said !== undefined)
+      h.live.queued = [
+        ...(h.live.queued ?? []),
+        {
+          text: said.slice(0, QUEUED_CHARS),
+          at: new Date().toISOString(),
+        },
+      ]
     if (typed) {
       clearTimeout(h.idle)
       clearTimeout(h.settle)
@@ -398,6 +430,7 @@ export class SessionHost {
           }
           if (typeof event.permissionMode === 'string')
             h.live.mode = event.permissionMode
+          if (typeof event.model === 'string') h.live.model = event.model
           h.live.busy = true
           h.live.since ??= new Date().toISOString()
           this.options.onChange(h.session)
@@ -407,7 +440,11 @@ export class SessionHost {
         ) {
           h.live.mode = event.permissionMode
           this.options.onChange(h.session)
-        }
+        } else if (
+          event.subtype === 'post_turn_summary' &&
+          typeof event.status_detail === 'string'
+        )
+          h.did = event.status_detail
         return
       case 'assistant': {
         const content = (event.message as { content?: unknown } | undefined)
@@ -431,6 +468,11 @@ export class SessionHost {
         return
       }
       case 'user':
+        // What you sent, read now: no longer queued
+        if (event.isReplay === true) {
+          this.taken(h, event)
+          return
+        }
         // A step came back: on to the next
         if (h.live.doing === 'tool') {
           h.live.doing = undefined
@@ -474,6 +516,22 @@ export class SessionHost {
               ? event.result
               : String(event.subtype ?? 'error')
             : undefined
+        const context = contextOf(event, h.live.model)
+        if (context) h.live.context = context
+        if (!h.replays) h.live.queued = undefined
+        // Done, with nothing you sent left for it to read
+        if (!h.live.error && !h.stopping && !h.live.queued?.length)
+          this.options.onDone?.(
+            h.session,
+            h.cwd,
+            sentence(
+              h.did ??
+                (typeof event.result === 'string'
+                  ? firstLine(event.result)
+                  : '')
+            )
+          )
+        h.did = undefined
         h.stopping = false
         this.idleEnd(h)
         this.settleSoon(h)
@@ -481,6 +539,20 @@ export class SessionHost {
         return
       }
     }
+  }
+
+  /** Something you sent, told back as Claude Code reads it */
+  private taken(h: Hosted, event: Record<string, unknown>): void {
+    h.replays = true
+    const queued = h.live.queued ?? []
+    const content = (event.message as { content?: unknown } | undefined)
+      ?.content
+    const said =
+      typeof content === 'string' ? content.slice(0, QUEUED_CHARS) : ''
+    const at = queued.findIndex((sent) => sent.text === said)
+    const left = queued.filter((_, index) => index !== (at < 0 ? 0 : at))
+    h.live.queued = left.length ? left : undefined
+    this.options.onChange(h.session)
   }
 
   /**
@@ -585,6 +657,18 @@ export class SessionHost {
     this.options.onChange(h.session)
   }
 }
+
+/** Claude Code's summary as a sentence, with a capital to start */
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** The first line said, for a notification */
+const firstLine = (text: string) =>
+  text
+    .trim()
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean)
+    ?.slice(0, 200) ?? ''
 
 const lastLine = (text: string) =>
   text

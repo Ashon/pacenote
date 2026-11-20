@@ -7,11 +7,14 @@ function ScrollArea({
   children,
   viewportClassName,
   viewportRef,
+  scrollbarClassName,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   viewportClassName?: string
   /** The element that scrolls, for code that scrolls it (to follow output) */
   viewportRef?: React.Ref<HTMLDivElement>
+  /** Its scrollbar, kept above what floats over the content (z-10) */
+  scrollbarClassName?: string
 }) {
   return (
     <ScrollAreaPrimitive.Root
@@ -27,18 +30,21 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
+      <ScrollBar className={scrollbarClassName} />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   )
 }
 
 /** The one scrollbar any scroll area here has: vertical */
-function ScrollBar() {
+function ScrollBar({ className }: { className?: string }) {
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       orientation="vertical"
-      className="flex h-full w-2.5 touch-none border-l border-l-transparent p-px transition-colors select-none"
+      className={cn(
+        'flex h-full w-2.5 touch-none border-l border-l-transparent p-px transition-colors select-none',
+        className
+      )}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>

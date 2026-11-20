@@ -4,10 +4,12 @@ import {
   answerLine,
   askOf,
   type CanUseTool,
+  contextOf,
   hostArgs,
   interruptLine,
   modeLine,
   refuseLine,
+  modelLabel,
   ruleLabel,
   userLine,
 } from '../src/sessions/live.js'
@@ -188,7 +190,60 @@ describe('the lines Pacenote writes to a session', () => {
     expect(args).not.toContain('--fork-session')
     // Its answer as it writes it
     expect(args).toContain('--include-partial-messages')
+    // What you sent, told back as it reads it
+    expect(args).toContain('--replay-user-messages')
     expect(hostArgs('s1', { kind: 'copy' })).toContain('--fork-session')
+  })
+
+  it("tells how much of its model's context the conversation took", () => {
+    const result = {
+      type: 'result',
+      usage: {
+        input_tokens: 9,
+        iterations: [
+          { input_tokens: 10, output_tokens: 5 },
+          {
+            input_tokens: 1000,
+            cache_read_input_tokens: 50000,
+            cache_creation_input_tokens: 2000,
+            output_tokens: 500,
+          },
+        ],
+      },
+      modelUsage: {
+        'claude-haiku-5-5': { contextWindow: 100000 },
+        'claude-opus-5-5': { contextWindow: 200000 },
+      },
+    }
+    // The last request of its turn, of its own model's window
+    expect(contextOf(result, 'claude-opus-5-5')).toEqual({
+      used: 53500,
+      window: 200000,
+    })
+    // A model it does not name: the first it used
+    expect(contextOf(result, undefined)).toEqual({
+      used: 53500,
+      window: 100000,
+    })
+    // Without iterations, the turn's own usage
+    expect(
+      contextOf(
+        {
+          usage: { input_tokens: 400, output_tokens: 100 },
+          modelUsage: { m: { contextWindow: 1000 } },
+        },
+        'm'
+      )
+    ).toEqual({ used: 500, window: 1000 })
+    expect(contextOf({ usage: {} }, 'm')).toBeUndefined()
+    expect(contextOf({ usage: { input_tokens: 5 } }, 'm')).toBeUndefined()
+  })
+
+  it('names a model as people call it', () => {
+    expect(modelLabel('claude-opus-5-5')).toBe('Opus 5.5')
+    expect(modelLabel('claude-sonnet-4-20250514')).toBe('Sonnet 4')
+    expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
+    expect(modelLabel('gpt-5.1-codex')).toBe('gpt-5.1-codex')
   })
 
   it('starts a new one with its id, its name and how it asks', () => {

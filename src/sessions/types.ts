@@ -127,8 +127,31 @@ export interface SessionLive {
   since?: string
   /** What it has written of the answer it is writing, as it comes */
   draft?: string
+  /**
+   * What you sent that Claude Code has not read yet, oldest first: it reads
+   * each once the step it is on is done
+   */
+  queued?: { text: string; at: string }[]
+  /** The model it runs on, as Claude Code names it: claude-opus-5-5 */
+  model?: string
+  /**
+   * How much of the model's context the conversation took at its last turn,
+   * in tokens: Claude Code compacts it as it fills
+   */
+  context?: { used: number; window: number }
   /** Why its last turn, or its run, stopped short */
   error?: string
+}
+
+/**
+ * A step of the plan Claude Code keeps while it works (its task list): to do,
+ * under way, with what it does then, or done
+ */
+export interface SessionPlanStep {
+  text: string
+  state: 'todo' | 'doing' | 'done'
+  /** What it says while on it: "Running the tests" */
+  doing?: string
 }
 
 /**
@@ -143,6 +166,8 @@ export interface SessionTalk {
   /** The group it is in, for the way back */
   group?: string
   items: SessionItem[]
+  /** Its plan, from its log, while a step of it is left */
+  plan?: SessionPlanStep[]
   /** Pacenote runs it */
   live?: SessionLive
   typeIn: 'here' | 'move' | 'elsewhere' | 'codex'
