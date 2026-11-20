@@ -57,6 +57,8 @@ const en = {
     'It is open somewhere else, so you type there, or continue in a copy here.',
   sessionWorkingThere:
     'It is on a turn where it is open. Once that turn is done, you continue it here.',
+  sessionBackgroundThere:
+    'It runs work in the background where it is open, and moving it here would stop that work. Once it is done, you continue it here, or continue in a copy now.',
   sessionNotMoved:
     'It did not close where it is open, so it stays there for now.',
   sessionOnlyClaude: 'Only Claude Code sessions continue here for now.',
@@ -134,6 +136,8 @@ const ko: typeof en = {
     '다른 곳에 열려 있어서 그곳에서 입력해요. 아니면 여기서 복사본으로 이어 가세요.',
   sessionWorkingThere:
     '열려 있는 곳에서 턴을 진행하는 중이에요. 그 턴이 끝나면 여기서 이어 가세요.',
+  sessionBackgroundThere:
+    '열려 있는 곳에서 백그라운드 작업이 돌고 있어서, 여기로 옮기면 그 작업이 멈춰요. 작업이 끝나면 여기서 이어 가거나, 지금 복사본으로 이어 가세요.',
   sessionNotMoved: '열려 있는 곳에서 닫히지 않아서 아직 그곳에 있어요.',
   sessionOnlyClaude: '지금은 Claude Code 세션만 여기서 이어 갈 수 있어요.',
   emptyMessage: '먼저 보낼 말을 입력하세요.',

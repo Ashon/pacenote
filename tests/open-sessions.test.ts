@@ -6,6 +6,7 @@ import type { Processes } from '../apps/desktop/src/open-sessions.js'
 import {
   CodexTitles,
   OpenSessions,
+  backgroundShells,
   codexToday,
   parseAgents,
   parseProcesses,
@@ -138,6 +139,22 @@ describe('runsIn: where a process runs, from its parents', () => {
   })
 })
 
+describe('backgroundShells: the Bash shells a resting session runs', () => {
+  it("counts its own children that run from Claude Code's shell snapshot", () => {
+    const procs = parseProcesses(
+      [
+        '  200 1 claude',
+        '  201 200 /opt/homebrew/bin/node mcp-server.js',
+        "  202 200 /bin/zsh -c source /Users/me/.claude/shell-snapshots/snapshot-zsh-1-a.sh && eval 'pnpm dev'",
+        "  203 202 /bin/zsh -c source /Users/me/.claude/shell-snapshots/snapshot-zsh-1-a.sh && eval 'pnpm dev'",
+        "  204 300 /bin/zsh -c source /Users/me/.claude/shell-snapshots/snapshot-zsh-1-b.sh && eval 'ls'",
+      ].join('\n')
+    )
+    expect(backgroundShells(200, procs)).toBe(1)
+    expect(backgroundShells(201, procs)).toBe(0)
+  })
+})
+
 describe('OpenSessions: claude agents and ps together', () => {
   const AGENTS = JSON.stringify([
     {
@@ -157,10 +174,15 @@ describe('OpenSessions: claude agents and ps together', () => {
     },
     { pid: 102, cwd: '/w/c', sessionId: 's-c', status: 'idle' },
   ])
+  const SHELL =
+    "/bin/zsh -c source /Users/me/.claude/shell-snapshots/snapshot-zsh-1-a.sh && eval 'pnpm test'"
   const PS = [
     '  100 111 claude',
     '  111 1 /Applications/iTerm.app/Contents/MacOS/iTerm2',
+    `  120 100 ${SHELL}`,
     '  102 112 claude',
+    `  121 102 ${SHELL}`,
+    `  122 102 ${SHELL}`,
     '  112 1 /Users/me/.local/bin/claude remote-control --name x',
   ].join('\n')
 
@@ -191,13 +213,22 @@ describe('OpenSessions: claude agents and ps together', () => {
         app: '/Applications/iTerm.app',
         pid: 100,
       },
-      { session: 's-c', cwd: '/w/c', busy: false, where: 'web', pid: 102 },
+      // Resting, with two shells of its own: its background tasks. The one
+      // on a turn runs its Bash in the turn
+      {
+        session: 's-c',
+        cwd: '/w/c',
+        busy: false,
+        where: 'web',
+        background: 2,
+        pid: 102,
+      },
     ])
   })
 
   it('reads a listing anew when asked, and after it ends a process', async () => {
     const asks: string[] = []
-    const endings: number[] = []
+    const endings: string[] = []
     const os = new OpenSessions({
       bin: () => 'claude',
       env: () => ({}),
@@ -207,8 +238,8 @@ describe('OpenSessions: claude agents and ps together', () => {
         asks.push(file)
         return file === 'claude' ? AGENTS : PS
       },
-      end: async (pid) => {
-        endings.push(pid)
+      end: async (pid, where) => {
+        endings.push(`${pid} ${where}`)
         return true
       },
     })
@@ -216,8 +247,8 @@ describe('OpenSessions: claude agents and ps together', () => {
     await os.list(at)
     await os.list(at, { fresh: true })
     expect(asks.filter((file) => file === 'claude')).toHaveLength(2)
-    await expect(os.end(100)).resolves.toBe(true)
-    expect(endings).toEqual([100])
+    await expect(os.end(100, 'claude-app')).resolves.toBe(true)
+    expect(endings).toEqual(['100 claude-app'])
     await os.list(at)
     expect(asks.filter((file) => file === 'claude')).toHaveLength(3)
   })

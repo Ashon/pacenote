@@ -850,12 +850,26 @@ function Elsewhere({ talk }: { talk: SessionTalk }) {
       </div>
     )
   const where = whereName(talk.row, l)
-  // In the Claude app or a terminal, on a turn: here once that turn is done
+  // In the Claude app or a terminal, on a turn or with work in the
+  // background: here once it is done
   const moves = talk.row.where === 'claude-app' || talk.row.where === 'terminal'
+  const background = moves && !!talk.row.background
   return (
     <Bar
-      title={moves ? t.busyThereTitle(where) : t.elseTitle(where)}
-      lead={moves ? t.busyThereLead : t.elseLead}
+      title={
+        background
+          ? t.backgroundThereTitle(where)
+          : moves
+            ? t.busyThereTitle(where)
+            : t.elseTitle(where)
+      }
+      lead={
+        background
+          ? t.backgroundThereLead
+          : moves
+            ? t.busyThereLead
+            : t.elseLead
+      }
     >
       <SessionButtons talk={talk} />
       <Button size="sm" variant="outline" onClick={() => setCopying(true)}>

@@ -63,6 +63,11 @@ const en = {
   busyThereTitle: (where: string) => `It is working in ${where}`,
   busyThereLead:
     'Pacenote shows it as it goes. Once its turn there is done, you continue it here, in the same conversation.',
+  // Resting there with work in the background, which would stop if it moved
+  backgroundThereTitle: (where: string) =>
+    `It runs work in the background in ${where}`,
+  backgroundThereLead:
+    'Moving it here would stop that work. Once it is done, you continue it here, in the same conversation.',
   cancel: 'Cancel',
   codexTitle: 'Codex runs it, so you continue it there',
   codexLead: 'Pacenote shows its log as it goes.',
@@ -129,6 +134,9 @@ const ko: typeof en = {
   busyThereTitle: (where) => `${where}에서 일하는 중이에요`,
   busyThereLead:
     'Pacenote는 진행되는 대로 보여 줘요. 그곳의 턴이 끝나면 같은 대화로 여기서 이어 가세요.',
+  backgroundThereTitle: (where) => `${where}에서 백그라운드 작업이 돌고 있어요`,
+  backgroundThereLead:
+    '여기로 옮기면 그 작업이 멈춰요. 작업이 끝나면 같은 대화로 여기서 이어 가세요.',
   cancel: '취소',
   codexTitle: 'Codex가 돌리고 있어서 그곳에서 이어 가요',
   codexLead: 'Pacenote는 로그를 진행되는 대로 보여 줘요.',

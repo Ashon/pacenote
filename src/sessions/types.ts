@@ -34,6 +34,11 @@ export interface SessionRow {
   state: SessionState
   /** It waits for you to answer what it asks (Pacenote runs it) */
   asks?: SessionAskKind
+  /**
+   * The background tasks it runs where it is open (the Claude app, a
+   * terminal): moving it here would stop them, so it stays there for now
+   */
+  background?: number
   /** When it last wrote to its log */
   lastAt: string
   startedAt: string

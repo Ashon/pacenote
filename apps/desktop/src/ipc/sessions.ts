@@ -93,6 +93,29 @@ export function registerSessionsIpc(
     process.env.CODEX_HOME || path.join(home, '.codex')
   )
   const yours = (cwd: string) => yourFolder(home, cwd, [dataDir])
+  /**
+   * The processes Pacenote runs sessions in, and the ones it ran while
+   * Claude Code still lists them: one let go stays on that list as it quits
+   * (and in the listing kept a few seconds), open nowhere else
+   */
+  const ran = new Set<number>()
+  /** The sessions Claude Code lists that are open somewhere else */
+  const elsewhere = (listed: OpenClaude[] | undefined) => {
+    const running = new Set<number>()
+    for (const h of host.list())
+      if (h.pid !== undefined) {
+        running.add(h.pid)
+        ran.add(h.pid)
+      }
+    if (listed) {
+      const pids = new Set(listed.map((agent) => agent.pid))
+      for (const pid of ran)
+        if (!running.has(pid) && !pids.has(pid)) ran.delete(pid)
+    }
+    return listed?.filter(
+      (agent) => agent.pid === undefined || !ran.has(agent.pid)
+    )
+  }
   /** Where each Claude Code session ran while open, for once it ends */
   const seen = new Map<
     string,
@@ -108,13 +131,7 @@ export function registerSessionsIpc(
     const day = new Date(now)
     day.setHours(0, 0, 0, 0)
     const dayStart = day.getTime()
-    const listed = await openSessions.list(now)
-    // Claude Code lists the processes Pacenote runs too: the others are open
-    // somewhere else
-    const own = new Set(host.list().map((h) => h.pid))
-    const others = listed?.filter(
-      (agent) => agent.pid === undefined || !own.has(agent.pid)
-    )
+    const others = elsewhere(await openSessions.list(now))
     // Opened somewhere else after Pacenote ran it: Pacenote lets go while it
     // rests, so the place you type in last has it, one conversation
     for (const h of host.list())
@@ -395,7 +412,9 @@ export function registerSessionsIpc(
           row.state === 'ended' ||
           host.has(row.session)
         ? 'here'
-        : MOVES_FROM.has(row.where) && row.state !== 'working'
+        : MOVES_FROM.has(row.where) &&
+            row.state !== 'working' &&
+            !row.background
           ? 'move'
           : 'elsewhere'
 
@@ -411,21 +430,19 @@ export function registerSessionsIpc(
     open: boolean
   ): Promise<{ error?: string }> => {
     const t = localized(text)
-    const own = new Set(host.list().map((h) => h.pid))
-    const there = (
+    const there = elsewhere(
       await openSessions.list(Date.now(), { fresh: true })
-    )?.filter(
-      (agent) =>
-        agent.session === session &&
-        (agent.pid === undefined || !own.has(agent.pid))
-    )
+    )?.filter((agent) => agent.session === session)
     if (!there) return open ? { error: t.sessionOpenThere } : {}
     if (there.some((agent) => agent.busy))
       return { error: t.sessionWorkingThere }
+    // Its process going takes its background tasks with it
+    if (there.some((agent) => agent.background))
+      return { error: t.sessionBackgroundThere }
     for (const agent of there) {
       if (!MOVES_FROM.has(agent.where) || agent.pid === undefined)
         return { error: t.sessionOpenThere }
-      if (!(await openSessions.end(agent.pid)))
+      if (!(await openSessions.end(agent.pid, agent.where)))
         return { error: t.sessionNotMoved }
     }
     return {}
@@ -498,7 +515,12 @@ export function registerSessionsIpc(
       if ('error' in to) return to
       const where = typeIn(to.row)
       if (where !== 'here' && where !== 'move')
-        return { error: localized(text).sessionOpenThere }
+        return {
+          error:
+            to.row.background && MOVES_FROM.has(to.row.where)
+              ? localized(text).sessionBackgroundThere
+              : localized(text).sessionOpenThere,
+        }
       // Open somewhere else as well: it moves here, the place you type in
       const moved = await moveHere(to.row.session, where === 'move')
       if (moved.error) return moved

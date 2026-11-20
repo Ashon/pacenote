@@ -35,6 +35,8 @@ export interface OpenAgent {
   busy: boolean
   /** What it waits for you to answer: Pacenote runs it */
   asks?: SessionAskKind
+  /** Its background tasks still running, while it rests there */
+  background?: number
   /** When it started, for one with no log yet */
   startedAt?: string
   where: SessionWhere
@@ -156,7 +158,10 @@ export function sessionsView(
   const row = (
     tool: WorkTool,
     session: string,
-    rest: Pick<SessionRow, 'where' | 'terminal' | 'state' | 'asks'> & {
+    rest: Pick<
+      SessionRow,
+      'where' | 'terminal' | 'state' | 'asks' | 'background'
+    > & {
       cwd: string
       name?: string
       startedAt?: string
@@ -184,6 +189,7 @@ export function sessionsView(
       ...(rest.terminal ? { terminal: rest.terminal } : {}),
       state: rest.state,
       ...(rest.asks ? { asks: rest.asks } : {}),
+      ...(rest.background ? { background: rest.background } : {}),
       lastAt: logged?.lastAt ?? since,
       startedAt: logged?.startedAt ?? since,
       cwd,
@@ -225,6 +231,7 @@ export function sessionsView(
                 ? 'turn'
                 : 'quiet',
           asks: agent.asks,
+          background: agent.background,
         })
       )
     }

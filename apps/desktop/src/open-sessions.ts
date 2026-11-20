@@ -112,6 +112,21 @@ export function runsIn(pid: number, procs: Processes): RunsIn {
   return { where: 'terminal' }
 }
 
+/**
+ * The shells Claude Code's Bash runs for it (from its shell snapshot), its
+ * own children: on a session resting there, its background tasks
+ */
+export function backgroundShells(pid: number, procs: Processes): number {
+  let count = 0
+  for (const proc of procs.values())
+    if (
+      proc.ppid === pid &&
+      proc.command.includes('/shell-snapshots/snapshot-')
+    )
+      count++
+  return count
+}
+
 /** Its process, too: the one ended when a session moves to Pacenote */
 export type OpenClaude = OpenAgent & { app?: string; pid?: number }
 
@@ -174,7 +189,7 @@ export class OpenSessions {
       /** Tests put a stand-in for running a command */
       exec?: (file: string, args: string[]) => Promise<string>
       /** And for ending a process */
-      end?: (pid: number) => Promise<boolean>
+      end?: (pid: number, where: SessionWhere) => Promise<boolean>
     }
   ) {}
 
@@ -207,13 +222,20 @@ export class OpenSessions {
 
   /**
    * Ends a session's process where it is open (the Claude app, a terminal)
-   * and waits for it to go: true once it has. The next listing is read anew
+   * and waits for it to go: true once it has. The next listing is read anew.
+   *
+   * The Claude app's is killed outright. Claude Code quitting on SIGTERM
+   * turns Remote Control off on its way out, and claude.ai archives the
+   * session there until the app takes it up again. Killed, it stays on
+   * claude.ai, and the app attaches it again as you type there. The
+   * process rests (it is on no turn), with its log written. A terminal's
+   * quits, so the terminal gets its screen back.
    */
-  async end(pid: number): Promise<boolean> {
+  async end(pid: number, where: SessionWhere): Promise<boolean> {
     this.kept = undefined
-    if (this.options.end) return this.options.end(pid)
+    if (this.options.end) return this.options.end(pid, where)
     try {
-      process.kill(pid, 'SIGTERM')
+      process.kill(pid, where === 'claude-app' ? 'SIGKILL' : 'SIGTERM')
     } catch {
       return !alive(pid)
     }
@@ -248,6 +270,9 @@ export class OpenSessions {
       .filter((agent) => !agent.kind || agent.kind === 'interactive')
       .map((agent) => {
         const at = runsIn(agent.pid, procs)
+        // On a turn, its Bash runs in the turn
+        const background =
+          agent.status === 'busy' ? 0 : backgroundShells(agent.pid, procs)
         return {
           session: agent.sessionId,
           cwd: agent.cwd,
@@ -259,6 +284,7 @@ export class OpenSessions {
           where: at.where,
           ...(at.terminal ? { terminal: at.terminal } : {}),
           ...(at.app ? { app: at.app } : {}),
+          ...(background ? { background } : {}),
           pid: agent.pid,
         }
       })

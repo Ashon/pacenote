@@ -33,8 +33,10 @@ afterAll(() => rmSync(home, { recursive: true, force: true }))
 const { registerSessionsIpc } =
   await import('../apps/desktop/src/ipc/sessions.js')
 
+let pids = 90_000
 /** Claude Code as the host runs it: what it was started with and sent */
 class FakeClaude extends EventEmitter {
+  readonly pid = ++pids
   stdin = new PassThrough()
   stdout = new PassThrough()
   stderr = new PassThrough()
@@ -62,6 +64,8 @@ let env: NodeJS.ProcessEnv = {}
 let open: OpenClaude[] = []
 /** The processes ended, by pid */
 const ended: number[] = []
+/** Where each ended process ran, in the same order */
+const endedIn: string[] = []
 const procs: FakeClaude[] = []
 const host = new SessionHost({
   bin: () => 'claude',
@@ -117,8 +121,9 @@ registerSessionsIpc(
     },
     openSessions: {
       list: async () => open,
-      end: async (pid: number) => {
+      end: async (pid: number, where: string) => {
         ended.push(pid)
+        endedIn.push(where)
         open = open.filter((agent) => agent.pid !== pid)
         return true
       },
@@ -152,6 +157,7 @@ beforeEach(() => {
   env = { TASKS_LINK_SESSIONS: 'on' }
   open = []
   ended.length = 0
+  endedIn.length = 0
 })
 
 describe('starting a session Pacenote runs', () => {
@@ -337,6 +343,7 @@ describe('one conversation, typed into in one place at a time', () => {
     ).resolves.toEqual({})
     // Its process there ended first, then the same session resumed here
     expect(ended).toEqual([4242])
+    expect(endedIn).toEqual(['claude-app'])
     expect(procs).toHaveLength(before + 1)
     const proc = procs.at(-1)!
     expect(proc.args.slice(0, 3)).toEqual(['-p', '--resume', 'rest-1'])
@@ -357,6 +364,23 @@ describe('one conversation, typed into in one place at a time', () => {
     ).resolves.toMatchObject({ error: expect.any(String) })
     open = [resting('web-1', { where: 'web', terminal: undefined })]
     expect((await talk('claude:web-1')).typeIn).toBe('elsewhere')
+    expect(ended).toEqual([])
+  })
+
+  it('leaves one with work in the background where it is, which moving would stop', async () => {
+    open = [
+      resting('bg-1', {
+        where: 'claude-app',
+        terminal: undefined,
+        background: 1,
+      }),
+    ]
+    const page = await talk('claude:bg-1')
+    expect(page.typeIn).toBe('elsewhere')
+    expect(page.row.background).toBe(1)
+    await expect(
+      call('pacenote:sessions:send', 'claude:bg-1', 'Now')
+    ).resolves.toMatchObject({ error: expect.stringMatching(/background/) })
     expect(ended).toEqual([])
   })
 
@@ -384,6 +408,46 @@ describe('one conversation, typed into in one place at a time', () => {
     await view()
     expect((await talk(id)).typeIn).toBe('move')
     expect(host.has(session)).toBe(false)
+  })
+
+  it('takes the process it let go for none open elsewhere while it quits', async () => {
+    const { id } = (await call('pacenote:sessions:start', {
+      folder,
+      message: 'Start here',
+    })) as { id: string }
+    const session = id.slice('claude:'.length)
+    const proc = procs.at(-1)!
+    proc.stdout.write(
+      `${JSON.stringify({ type: 'result', is_error: false })}\n`
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+    // Claude Code lists the process Pacenote runs it in, under Pacenote
+    const ours = resting(session, { pid: proc.pid, terminal: 'Pacenote' })
+    open = [ours]
+    await call('pacenote:sessions:view')
+    expect((await talk(id)).row.where).toBe('pacenote')
+    // The Claude app takes it up again: Pacenote lets go, and its process
+    // stays on the list as it quits
+    const app = resting(session, {
+      pid: 7171,
+      where: 'claude-app',
+      terminal: undefined,
+      startedAt: new Date(Date.now() + 1000).toISOString(),
+    })
+    open = [ours, app]
+    await call('pacenote:sessions:view')
+    expect(host.has(session)).toBe(false)
+    await call('pacenote:sessions:view')
+    const back = await talk(id)
+    expect(back.row.where).toBe('claude-app')
+    expect(back.typeIn).toBe('move')
+    // Moved here again, only the app's process ends
+    ended.length = 0
+    await expect(
+      call('pacenote:sessions:send', id, 'Back here')
+    ).resolves.toEqual({})
+    expect(ended).toEqual([7171])
+    host.end(session)
   })
 
   it('moves one it runs here again as you send, when it was opened there too', async () => {
