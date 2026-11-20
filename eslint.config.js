@@ -19,6 +19,8 @@ export default tseslint.config(
       '_site/',
       // The design harness's own code and working copy (local, gitignored)
       '.design-system/',
+      // Storyboards drawn against the app's screens (local, kept out of git)
+      'apps/web/storyboard-*/',
     ],
   },
   eslint.configs.recommended,
