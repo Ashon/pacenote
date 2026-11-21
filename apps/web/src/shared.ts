@@ -27,6 +27,9 @@ export { YouPage } from './components/you-page'
 export { SessionsPage } from './components/sessions-page'
 export { SessionPage } from './components/session-page'
 export { NewSessionPage } from './components/session-new'
+// Your sessions beside a session's page and New session, as the Mac lists
+// them: an iPad's too, none on a phone
+export { SessionsSplit } from './components/sessions-nav'
 export { PacenoteMark } from './components/logo'
 // The mark at work, which the app's pull to refresh shows as it waits
 export { PaceSpinner } from './components/pace-spinner'
