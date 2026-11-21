@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
  * The accents Settings offers (apps/web/src/accents.css, made by
  * scripts/accent-palette.py). These checks keep each one as readable as green:
  * text on its fill, its text on a card and on a selected row, in light and
- * dark; and keep the file in step with index.css and with lib/theme.ts.
+ * dark; and keep the file in step with index.css and with lib/theme.ts. The
+ * surfaces, borders and text are gray, index.css's in every accent.
  */
 
 const WEB = path.join(import.meta.dirname, '../apps/web/src')
@@ -39,6 +40,34 @@ function themes() {
 }
 const block = (selector: string) =>
   declared(INDEX_CSS.match(new RegExp(`\\n${selector} \\{([^}]*)\\}`))![1]!)
+/** index.css's tokens in each mode: what a theme does not set */
+const BASE = {
+  light: block(':root'),
+  dark: { ...block(':root'), ...block('\\.dark') },
+}
+/** Gray in every accent: only what points takes the accent's color */
+const GRAY = [
+  'background',
+  'foreground',
+  'canvas',
+  'card',
+  'well',
+  'popover',
+  'popover-foreground',
+  'secondary',
+  'secondary-foreground',
+  'muted',
+  'muted-foreground',
+  'border',
+  'input',
+  'sidebar',
+  'sidebar-border',
+  'card-shadow',
+  'float-shadow',
+]
+/** The chroma of each oklch() in a token */
+const chromas = (value: string) =>
+  [...value.matchAll(/oklch\(\s*[\d.]+\s+([\d.]+)/g)].map((m) => Number(m[1]))
 
 // ---- Contrast, as WCAG measures it
 const linear = (c: number) =>
@@ -83,13 +112,26 @@ describe('accent colors', () => {
 
   it('makes green what index.css has', () => {
     const green = all.find((theme) => theme.key === 'green')!
-    const root = block(':root')
-    const dark = { ...root, ...block('\\.dark') }
     for (const [name, value] of Object.entries(green.light))
-      expect([name, value]).toEqual([name, root[name]])
+      expect([name, value]).toEqual([name, BASE.light[name]])
     for (const [name, value] of Object.entries(green.dark))
-      expect([name, value]).toEqual([name, dark[name]])
+      expect([name, value]).toEqual([name, BASE.dark[name]])
   })
+
+  it.each(['light', 'dark'] as const)(
+    'keeps the surfaces, borders, text and shadows gray in %s, in every accent',
+    (mode) => {
+      for (const name of GRAY)
+        expect([
+          name,
+          chromas(BASE[mode][name]!).every((c) => c === 0),
+        ]).toEqual([name, true])
+      for (const theme of all)
+        expect([theme.key, GRAY.filter((name) => name in theme[mode])]).toEqual(
+          [theme.key, []]
+        )
+    }
+  )
 
   it('sets in the dark every token it sets in light', () => {
     for (const { key, light, dark } of all)
@@ -107,7 +149,7 @@ describe('accent colors', () => {
     'reads at 4.5:1 or more in %s: text on the fill, the ink on a card and a selected row',
     (mode) => {
       for (const theme of all) {
-        const t = theme[mode]
+        const t = { ...BASE[mode], ...theme[mode] }
         const checks = {
           fill: contrast(t['primary']!, t['primary-foreground']!),
           ink: contrast(t['primary-ink']!, t.card!),

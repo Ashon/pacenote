@@ -139,7 +139,7 @@ export class MainWindow {
       show: false,
       title: appName,
       icon: this.options.icon,
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f1714' : '#fafdfb',
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#151515' : '#fcfcfc',
       titleBarStyle: 'hiddenInset',
       trafficLightPosition: { x: 16, y: 15 },
       webPreferences: {

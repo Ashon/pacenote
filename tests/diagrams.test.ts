@@ -186,8 +186,10 @@ describe("the renderer's theme", () => {
       range: { category: string[] }
       bar: { color: { stops: { color: string }[] } }
     }
-    // Shapes are the app's choice cards: white on a border hairline.
-    expect(css).toContain('--border: oklch(0.91 0.016 168)')
+    // Shapes are the app's choice cards: white on a hairline. The app's own
+    // surfaces are gray; images posted to Slack keep the brand's green-tinted
+    // hairline, as pacenote.dev does (another would rebuild the renderer's
+    // image).
     expect(read('mermaid.json')).toContain('"primaryBorderColor": "#d8e5df"')
     expect(read('render.sh')).toContain("-Ncolor='#d8e5df'")
     // Bars are filled with the logo's gradient, and series lead with the

@@ -145,6 +145,9 @@
  *   it differs from the gradient in lightness in both.
  * Other accents (accents.css, Settings > General) are this green turned to their hue: the same lightness, the same
  * contrasts. The statuses stay as they are in every one; they mean the same everywhere.
+ * Surfaces, borders, text and shadows are gray (no hue), the same in every accent: the color is only where it points
+ * (the fill, the ring, the selected item, card-accent, pills, the mark). A whole window in the accent's tint tires the
+ * eyes.
  * Surfaces, not borders, set the levels. Higher surfaces are lighter. (same rule in light and dark)
  *   sidebar: the window's chrome, card: the one content surface raised beside it,
  *   card-accent: emphasized surface such as bot replies and the setup notice,
@@ -170,78 +173,76 @@
     var(--mark-2) 46%,
     var(--mark-3) 100%
   );
-  --background: oklch(0.99 0.004 165);
-  --foreground: oklch(0.23 0.025 172);
-  --canvas: oklch(0.98 0.006 168);
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.23 0 0);
+  --canvas: oklch(0.98 0 0);
   --card: oklch(1 0 0);
   --card-accent: oklch(0.982 0.03 165);
   /* A skeleton's bars: the text's color, faint */
   --skeleton: color-mix(in oklch, var(--foreground) 7%, transparent);
   --selected: oklch(0.935 0.026 167);
-  --well: oklch(0.972 0.008 168);
+  --well: oklch(0.972 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.025 172);
+  --popover-foreground: oklch(0.23 0 0);
   --primary: #007154;
   --primary-foreground: #ffffff;
   --primary-ink: #007154;
-  --secondary: oklch(0.945 0.018 165);
-  --secondary-foreground: oklch(0.3 0.05 168);
-  --muted: oklch(0.95 0.011 168);
-  --muted-foreground: oklch(0.49 0.03 172);
+  --secondary: oklch(0.945 0 0);
+  --secondary-foreground: oklch(0.3 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.49 0 0);
   --accent: oklch(0.948 0.035 165);
   --accent-foreground: oklch(0.32 0.07 165);
   --destructive: oklch(0.53 0.19 25);
-  --border: oklch(0.91 0.016 168);
-  --input: oklch(0.89 0.018 168);
+  --border: oklch(0.91 0 0);
+  --input: oklch(0.89 0 0);
   --ring: rgba(12, 182, 126, 0.5);
-  --sidebar: oklch(0.975 0.01 165);
-  --sidebar-border: oklch(0.91 0.016 168);
+  --sidebar: oklch(0.975 0 0);
+  --sidebar-border: oklch(0.91 0 0);
   --status-running: #007369;
   --status-succeeded: #0b7637;
   --status-failed: oklch(0.53 0.19 25);
   --status-interrupted: oklch(0.53 0.125 65);
   --chart-1: #0cb67e;
   --chart-4: #007c5c;
-  /* Recap write-ups: teal beside the greens, darker than the well's tint */
+  /* Recap write-ups: teal beside the greens */
   --chart-5: oklch(0.6 0.09 205);
   /* Card shadow: a very faint lift */
   --card-shadow:
-    0 1px 2px oklch(0.3 0.03 170 / 0.05),
-    0 10px 28px -14px oklch(0.3 0.03 170 / 0.14);
+    0 1px 2px oklch(0.3 0 0 / 0.05), 0 10px 28px -14px oklch(0.3 0 0 / 0.14);
   /* Float shadow: what lies over the content (menus, tooltips, dialogs) */
   --float-shadow:
-    0 2px 6px oklch(0.3 0.03 170 / 0.06),
-    0 18px 40px -12px oklch(0.3 0.03 170 / 0.22);
+    0 2px 6px oklch(0.3 0 0 / 0.06), 0 18px 40px -12px oklch(0.3 0 0 / 0.22);
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.165 0.012 175);
-  --foreground: oklch(0.93 0.012 165);
-  --canvas: oklch(0.165 0.012 175);
-  --card: oklch(0.215 0.015 175);
+  --background: oklch(0.165 0 0);
+  --foreground: oklch(0.93 0 0);
+  --canvas: oklch(0.165 0 0);
+  --card: oklch(0.215 0 0);
   --card-accent: oklch(0.25 0.035 168);
   --skeleton: color-mix(in oklch, var(--foreground) 9%, transparent);
   --selected: oklch(0.265 0.03 168);
-  --well: oklch(0.175 0.012 175);
-  --popover: oklch(0.21 0.015 175);
-  --popover-foreground: oklch(0.93 0.012 165);
+  --well: oklch(0.175 0 0);
+  --popover: oklch(0.21 0 0);
+  --popover-foreground: oklch(0.93 0 0);
   --primary: #3ccb96;
   --primary-foreground: #04281d;
   --primary-ink: #3ccb96;
-  --secondary: oklch(0.25 0.02 172);
-  --secondary-foreground: oklch(0.9 0.015 165);
+  --secondary: oklch(0.25 0 0);
+  --secondary-foreground: oklch(0.9 0 0);
   /* Below the card, as light's is: pills and segment tracks sit in it */
-  --muted: oklch(0.17 0.012 175);
-  --muted-foreground: oklch(0.71 0.025 168);
+  --muted: oklch(0.17 0 0);
+  --muted-foreground: oklch(0.71 0 0);
   --accent: oklch(0.275 0.04 168);
   --accent-foreground: oklch(0.94 0.03 165);
   --destructive: oklch(0.7 0.17 22);
-  --border: oklch(0.9 0.05 165 / 11%);
-  --input: oklch(0.9 0.05 165 / 16%);
+  --border: oklch(0.9 0 0 / 11%);
+  --input: oklch(0.9 0 0 / 16%);
   --ring: rgba(60, 203, 150, 0.6);
-  --sidebar: oklch(0.183 0.013 175);
-  --sidebar-border: oklch(0.9 0.05 165 / 10%);
+  --sidebar: oklch(0.183 0 0);
+  --sidebar-border: oklch(0.9 0 0 / 10%);
   --status-running: #1bd3b3;
   --status-succeeded: oklch(0.78 0.16 148);
   --status-failed: oklch(0.7 0.17 22);

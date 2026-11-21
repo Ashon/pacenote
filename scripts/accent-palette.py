@@ -2,9 +2,11 @@
 
 Each is the green theme in apps/web/src/index.css turned to another hue, so
 it reads as green reads:
-  - The tinted surfaces (background, sidebar, selected rows, borders, the
-    dark card) keep their lightness and chroma and turn by the theme's hue
-    less green's (165), so every contrast stays as it is.
+  - The surfaces that point (selected rows and their hover, card-accent)
+    keep their lightness and chroma and turn by the theme's hue less green's
+    (165), so every contrast stays as it is.
+  - The gray tokens (background, sidebar, cards, borders, text) have no hue
+    and are index.css's in every theme: not written here.
   - The accent colors (the fill, the ring, the charts, the mark's three stops)
     keep green's luminance, so white text on the fill reads at green's 6.0:1,
     and green's share of the most chroma sRGB holds at that lightness and hue,
@@ -188,12 +190,17 @@ def dark_fill(H, on):
     return to_hex(hi, min(rel * max_chroma(hi, h2), C * CHROMA_CAP), h2)
 
 
+def gray(value):
+    """Whether every oklch(...) in a token has no chroma: the same in every theme"""
+    return all(float(c) == 0 for c in re.findall(r'oklch\([\d.]+ ([\d.]+) ', value))
+
+
 def theme(key, H, green):
     out = {}
     for mode in ('light', 'dark'):
         base = green[mode]
         t = {name: turn(value, H) for name, value in base.items()
-             if name not in FIXED and 'oklch' in value}
+             if name not in FIXED and 'oklch' in value and not gray(value)}
         if key == 'green':
             t.update(ACCENT[mode])
             t['primary-foreground'] = base['primary-foreground']
@@ -252,9 +259,10 @@ HEADER = '''/*
  * scripts/accent-palette.py from the green theme in index.css (pnpm accents);
  * write it again after changing a color there, not here.
  * Any element can take a theme with data-accent, as a swatch in the picker
- * does: bg-primary there is that theme's fill. Each theme sets every token in
- * both modes, so a light value never shows through in the dark.
- * Status colors are not here: they mean the same in every theme.
+ * does: bg-primary there is that theme's fill. Each theme sets the same tokens
+ * in both modes, so a light value never shows through in the dark.
+ * Status colors are not here: they mean the same in every theme. Nor are the
+ * gray surfaces, borders and text: index.css's in every theme.
  */
 '''
 
@@ -272,7 +280,7 @@ def main():
             f"{key:7} fill {light['primary']} {contrast(light['primary'], light['primary-foreground']):4.1f}"
             f"  ink {contrast(light['primary-ink'], '#ffffff'):4.1f}"
             f"  dark fill {dark['primary']} {contrast(dark['primary'], dark['primary-foreground']):4.1f}"
-            f"  ink {contrast(dark['primary-ink'], solid(dark['card'])):4.1f}")
+            f"  ink {contrast(dark['primary-ink'], solid(green['dark']['card'])):4.1f}")
     OUT.write_text(HEADER + '\n'.join(blocks) + '\n')
     print('\n'.join(report))
 

@@ -232,8 +232,8 @@ export function unavailablePage(options: {
 <meta http-equiv="content-security-policy" content="default-src 'none'; style-src 'unsafe-inline'">
 <title>${escape(options.app)}</title>
 <style>
-:root { color-scheme: light dark; --bg: #fafdfb; --fg: #1d302b; --muted: #5d7069; --well: #f2f7f4; --border: #e0ebe6; --primary: #007154; --on-primary: #fff; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0f1714; --fg: #e6efeb; --muted: #a2b4ad; --well: #121a17; --border: #26332e; --primary: #3ccb96; --on-primary: #04281d; } }
+:root { color-scheme: light dark; --bg: #fcfcfc; --fg: #2b2b2b; --muted: #6b6b6b; --well: #f5f5f5; --border: #e8e8e8; --primary: #007154; --on-primary: #fff; }
+@media (prefers-color-scheme: dark) { :root { --bg: #151515; --fg: #ececec; --muted: #afafaf; --well: #181818; --border: #303030; --primary: #3ccb96; --on-primary: #04281d; } }
 html, body { height: 100%; margin: 0; }
 body { display: flex; align-items: center; justify-content: center; padding: 48px 32px; box-sizing: border-box; background: var(--bg); color: var(--fg); font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; -webkit-app-region: drag; user-select: none; }
 :lang(ko) body { word-break: keep-all; overflow-wrap: break-word; }
