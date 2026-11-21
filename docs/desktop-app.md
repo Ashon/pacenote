@@ -299,10 +299,11 @@ Other:
   the same shape on the macOS icon grid (an 824 body in 1024, shadow, highlight) as `assets/pacenote-icon.png`.
   Development runs use the PNG as the Dock icon as is, so this does the system's processing by hand.
 - `PACENOTE_DESKTOP_THEME=light|dark` pins the theme. (The default follows the system; it can also be changed under "Theme" in Settings > General)
-- "Color" in Settings > General turns buttons, selections, the surfaces' faint tint and Pace's mark and spinner to green, blue,
-  purple, pink, red, orange or yellow; statuses keep their own colors. Each device keeps its own (`pacenote.accent` in the
-  window's storage). The app icon, the menu bar and the site stay green. The other colors are green turned around the wheel:
-  `apps/web/src/accents.css`, which `pnpm accents` writes from `index.css`, so change green there and run it again.
+- "Color" in Settings > General turns buttons, selections and Pace's mark and spinner to green, blue, purple, pink, red,
+  orange or yellow; statuses keep their own colors. The window's surfaces, borders and text are gray in every color. Each
+  device keeps its own (`pacenote.accent` in the window's storage). The app icon, the menu bar and the site stay green. The
+  other colors are green turned around the wheel: `apps/web/src/accents.css`, which `pnpm accents` writes from
+  `index.css`, so change green there and run it again.
 - The app reads in English and Korean: macOS's language by default, or the one chosen under "Language" in Settings > General
   (kept in `desktop.json`). `PACENOTE_DESKTOP_LANGUAGE=en|ko` stands in for macOS's language, as the end-to-end tests do. See
   [Languages](i18n.md).
