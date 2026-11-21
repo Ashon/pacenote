@@ -74,6 +74,21 @@ const en = {
   askedYou: (who: string) => `${who} asked you`,
   noneOpen: 'No sessions are open on this Mac.',
   noneEnded: 'No session ended today.',
+  // Your other Macs linked to this one
+  thisMac: 'This Mac',
+  /** Beside this Mac's count: "2 on MacBook Air" */
+  onOtherMac: (mac: string, open: number) => `${open} on ${mac}`,
+  macLine: (open: number, working: number) =>
+    working ? `${open} open · ${working} working` : `${open} open`,
+  macMissing: {
+    off: 'Sessions is off there. Settings > Todo on that Mac turns it on.',
+    update:
+      'Pacenote there is older than this one. Update it to see its sessions here.',
+    unreachable:
+      'It did not answer. It may be asleep, or off this network for now.',
+  },
+  noneOpenThere: 'No sessions are open there.',
+  noneEndedThere: 'No session ended there today.',
   notListed:
     'Claude Code did not say which of its sessions are open, so these are the ones that wrote to their logs today.',
   reading: 'Reading the sessions on this Mac.',
@@ -82,7 +97,7 @@ const en = {
   offLead:
     'Pacenote can list the Claude Code and Codex sessions open on this Mac: where each runs, whether it is working or waiting for you, and the task it is for.',
   offFoot:
-    "It reads which sessions are open and what you typed in them, and a session's whole log only when you open it. Sessions that worked on a task show on it too. Nothing leaves this Mac but for your own phone or iPad paired with it. Settings > Todo turns it off.",
+    "It reads which sessions are open and what you typed in them, and a session's whole log only when you open it. Sessions that worked on a task show on it too. Nothing leaves this Mac but for your own phone or iPad paired with it and your other Macs linked to it. Settings > Todo turns it off.",
   claudeOpen: (n: number, where: string) =>
     n === 0 ? 'None open now' : `${n} open now: ${where}`,
   codexToday: (n: number) =>
@@ -170,6 +185,19 @@ const ko: typeof en = {
   askedYou: (who) => `${who}님이 요청`,
   noneOpen: '이 Mac에 열린 세션이 없어요.',
   noneEnded: '오늘 끝난 세션이 없어요.',
+  thisMac: '이 Mac',
+  onOtherMac: (mac, open) => `${mac}에서 ${open}개`,
+  macLine: (open, working) =>
+    working ? `${open}개 열림 · ${working}개 작업 중` : `${open}개 열림`,
+  macMissing: {
+    off: '그 Mac에서 세션이 꺼져 있어요. 그 Mac의 설정 > 할 일에서 켤 수 있어요.',
+    update:
+      '그 Mac의 Pacenote가 이 Mac보다 예전 버전이에요. 업데이트하면 여기서 세션이 보여요.',
+    unreachable:
+      '답이 없어요. 잠자기 중이거나 지금 이 네트워크 밖에 있을 수 있어요.',
+  },
+  noneOpenThere: '그 Mac에 열린 세션이 없어요.',
+  noneEndedThere: '그 Mac에서 오늘 끝난 세션이 없어요.',
   notListed:
     'Claude Code가 어떤 세션이 열려 있는지 알려 주지 않아서, 오늘 로그를 쓴 세션을 보여 줘요.',
   reading: '이 Mac의 세션을 읽고 있어요.',
@@ -177,7 +205,7 @@ const ko: typeof en = {
   offLead:
     'Pacenote가 이 Mac에 열린 Claude Code와 Codex 세션을 모아 보여 줘요. 어디서 돌고 있는지, 작업 중인지 내 차례인지, 어떤 할 일을 하는지요.',
   offFoot:
-    '어떤 세션이 열려 있는지와 내가 입력한 말을 읽고, 세션의 전체 로그는 열어 볼 때만 읽어요. 할 일을 다룬 세션은 그 할 일에도 보여요. 이 Mac과 연결한 내 폰이나 iPad 말고는 이 Mac 밖으로 나가지 않아요. 설정 > 할 일에서 끌 수 있어요.',
+    '어떤 세션이 열려 있는지와 내가 입력한 말을 읽고, 세션의 전체 로그는 열어 볼 때만 읽어요. 할 일을 다룬 세션은 그 할 일에도 보여요. 이 Mac과 연결한 내 폰이나 iPad, 이 Mac과 이어진 내 다른 Mac 말고는 이 Mac 밖으로 나가지 않아요. 설정 > 할 일에서 끌 수 있어요.',
   claudeOpen: (n, where) =>
     n === 0 ? '지금 열린 세션 없음' : `지금 ${n}개 열림: ${where}`,
   codexToday: (n) =>

@@ -1,4 +1,5 @@
 import type {
+  MacSessions,
   NewSessionDraft,
   NewSessionStart,
   SessionMode,
@@ -8,6 +9,7 @@ import type {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { remoteMac } from './desktop'
+import { parseOtherId } from './session-rows'
 
 /**
  * The sessions on this Mac (src/sessions), from the desktop app. The screen
@@ -52,6 +54,24 @@ export function useSessions(asker: keyof typeof EVERY = 'screen') {
     enabled: Boolean(bridge),
     refetchInterval: (query) =>
       asker === 'screen' || query.state.data?.on ? EVERY[asker] : false,
+  })
+}
+
+/**
+ * The sessions on your other Macs linked to this one, each read there as you
+ * look: on Sessions every few seconds, and beside a session's page less often.
+ * None from a device of yours, which shows the Mac it is on.
+ */
+const OTHERS_EVERY = { screen: 5_000, nav: 10_000 } as const
+
+export function useOtherSessions(asker: keyof typeof OTHERS_EVERY = 'screen') {
+  const bridge = window.pacenoteDesktop?.sessions
+  return useQuery({
+    queryKey: ['sessions-others'],
+    queryFn: async (): Promise<MacSessions[]> =>
+      (await bridge?.others?.()) ?? [],
+    enabled: Boolean(bridge?.others),
+    refetchInterval: OTHERS_EVERY[asker],
   })
 }
 
@@ -111,7 +131,11 @@ export function useSessionTasks() {
 export function useSessionTalk(id: string) {
   const bridge = window.pacenoteDesktop?.sessions
   const client = useQueryClient()
+  // On another of your Macs: read from there, which tells this one nothing
+  // as it changes, so it is asked again as a device asks
+  const other = parseOtherId(id)
   useEffect(() => {
+    if (parseOtherId(id)) return
     const stopChanged = bridge?.onChanged((changed) => {
       if (changed === id)
         void client.invalidateQueries({ queryKey: ['session', id] })
@@ -131,15 +155,17 @@ export function useSessionTalk(id: string) {
   return useQuery({
     queryKey: ['session', id],
     queryFn: async (): Promise<SessionTalk | null> =>
-      (await bridge?.talk(id)) ?? null,
-    enabled: Boolean(bridge),
+      (other
+        ? await bridge?.otherTalk?.(other.mac, other.id)
+        : await bridge?.talk(id)) ?? null,
+    enabled: Boolean(other ? bridge?.otherTalk : bridge),
     refetchInterval: (query) => {
       const talk = query.state.data
       return talk?.live?.busy ||
         talk?.row.state === 'working' ||
         talk?.typeIn === 'elsewhere' ||
         talk?.typeIn === 'move'
-        ? remoteMac()
+        ? remoteMac() || other
           ? TALK_REMOTE_BUSY_MS
           : TALK_BUSY_MS
         : TALK_MS

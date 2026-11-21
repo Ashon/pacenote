@@ -4,7 +4,8 @@ import type { SessionItem, WorkTool } from '../tasks/types.js'
  * Sessions (the desktop app's Sessions screen): the Claude Code and Codex
  * sessions on this Mac, where each runs, whether it is working or waiting for
  * you, and the task it is for. Read on this Mac from the tools' own lists and
- * logs; nothing from them leaves it.
+ * logs; nothing from them leaves it but for your own devices and your other
+ * Macs that ask, over their sealed channel (src/macs/asks.ts).
  */
 
 /**
@@ -86,6 +87,21 @@ export interface SessionsView {
     claude: { open: number; where: SessionWhere[] }
     codex: { today: number }
   }
+}
+
+/**
+ * Another of your Macs and its sessions, as it showed them to this one
+ * (src/macs/asks.ts MAC_ASKS), read there each time you look
+ */
+export interface MacSessions {
+  mac: { id: string; name: string }
+  /** Its sessions, while Sessions is on there */
+  view?: SessionsView
+  /**
+   * Why it shows none: Sessions is off there (off), Pacenote there is older
+   * than 0.6.38 (update), or it did not answer (unreachable)
+   */
+  missing?: 'off' | 'update' | 'unreachable'
 }
 
 /**
@@ -178,6 +194,11 @@ export interface SessionTalk {
   typeIn: 'here' | 'move' | 'elsewhere' | 'codex'
   /** Why its log could not be read */
   error?: string
+  /**
+   * Another of your Macs has it: its page is read from there (MacSessions),
+   * and you type to it there
+   */
+  mac?: { id: string; name: string }
 }
 
 /**

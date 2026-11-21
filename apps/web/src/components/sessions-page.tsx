@@ -8,6 +8,7 @@ import {
   AppWindow,
   ChevronRight,
   Copy,
+  Laptop,
   Link2,
   ListChecks,
   MessageSquare,
@@ -31,8 +32,13 @@ import { remoteMac } from '@/lib/desktop'
 import { formatDateTime, formatRelative, homePath } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
 import { usePhone } from '@/lib/phone'
-import { canOpen } from '@/lib/session-rows'
-import { useSessionTasks, useSessions, useShowSessions } from '@/lib/sessions'
+import { canOpen, otherView } from '@/lib/session-rows'
+import {
+  useOtherSessions,
+  useSessionTasks,
+  useSessions,
+  useShowSessions,
+} from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { OpenButton, sessionHref, StateMark, toolWhere } from './session-open'
 import { LinkTaskDialog } from './session-task'
@@ -44,7 +50,8 @@ const GRID =
 
 /**
  * Sessions: the Claude Code and Codex sessions on this Mac, by your area or
- * repository, each opened in place or where it runs; before it is on, a card
+ * repository, each opened in place or where it runs, then those on your other
+ * Macs linked to this one, under each Mac's name; before it is on, a card
  * that says what it reads and turns it on
  */
 export function SessionsPage() {
@@ -77,6 +84,14 @@ function SessionsOn({ view }: { view: SessionsView }) {
   const phone = usePhone()
   const [tab, setTab] = useState<'open' | 'ended'>('open')
   const [opened, setOpened] = useState<string[]>([])
+  // Your other Macs' sessions, each row by its page's id here
+  const others = useOtherSessions().data ?? []
+  const theirs = others.map((other) => ({
+    ...other,
+    view: other.view && otherView(other.mac.id, other.view),
+  }))
+  // With your other Macs here, each Mac's sessions go under its name
+  const split = theirs.length > 0
   const toggle = (id: string) =>
     setOpened((ids) =>
       ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id]
@@ -95,25 +110,59 @@ function SessionsOn({ view }: { view: SessionsView }) {
         ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     )
   }
-  const rows = (row: SessionRow, index: number) =>
+  /** A session's row; mac: the other Mac it is on, by its name */
+  const rows = (mac?: string) => (row: SessionRow, index: number) =>
     phone ? (
       <PhoneRow key={row.id} s={row} first={index === 0} />
     ) : (
       <SessionRowItem
         key={row.id}
         s={row}
+        mac={mac}
         open={opened.includes(row.id)}
         onToggle={() => toggle(row.id)}
       />
     )
+  const groups = (open: SessionGroup[], mac?: string) =>
+    open.map((g) => (
+      <GroupSection key={g.key} g={g} level={split ? 3 : 2}>
+        {g.sessions.map(rows(mac))}
+      </GroupSection>
+    ))
+  const ended = (list: SessionRow[], mac?: string) => (
+    <ul className={phone ? 'mt-3' : 'mt-5'}>{list.map(rows(mac))}</ul>
+  )
+  const shown = theirs.flatMap((other) =>
+    other.view ? [{ name: other.mac.name, view: other.view }] : []
+  )
+  const total = (key: 'open' | 'ended') =>
+    view.counts[key] +
+    shown.reduce((sum, other) => sum + other.view.counts[key], 0)
+  // What to answer or follow, on any of your Macs
+  const briefed = [
+    ...view.open.flatMap((g) =>
+      g.sessions.map((s) => ({ s, group: g.name ?? t.notInProject }))
+    ),
+    ...shown.flatMap((other) =>
+      other.view.open.flatMap((g) =>
+        g.sessions.map((s) => ({
+          s,
+          group: `${other.name} · ${g.name ?? t.notInProject}`,
+        }))
+      )
+    ),
+  ]
   return (
     <Page
       title={t.title}
-      meta={
+      meta={[
         remote
           ? t.metaOn(remote, view.counts.open, view.counts.working)
-          : t.meta(view.counts.open, view.counts.working)
-      }
+          : t.meta(view.counts.open, view.counts.working),
+        ...shown.map((other) =>
+          t.onOtherMac(other.name, other.view.counts.open)
+        ),
+      ].join(' · ')}
       action={
         !phone && (
           <Button size="sm" variant="outline" asChild>
@@ -125,7 +174,7 @@ function SessionsOn({ view }: { view: SessionsView }) {
         )
       }
     >
-      <Briefing view={view} onPick={pick} />
+      <Briefing entries={briefed} onPick={pick} />
       {/* Narrow, across its row, as a phone's other segments are */}
       <Tabs
         value={tab}
@@ -134,11 +183,11 @@ function SessionsOn({ view }: { view: SessionsView }) {
       >
         <TabsList className="mt-5 @max-md:w-full">
           <TabsTrigger value="open" className="@max-md:flex-1">
-            {t.tabOpen} {view.counts.open}
+            {t.tabOpen} {total('open')}
           </TabsTrigger>
-          {view.listed && (
+          {(view.listed || shown.some((other) => other.view.listed)) && (
             <TabsTrigger value="ended" className="@max-md:flex-1">
-              {t.tabEnded} {view.counts.ended}
+              {t.tabEnded} {total('ended')}
             </TabsTrigger>
           )}
         </TabsList>
@@ -146,22 +195,98 @@ function SessionsOn({ view }: { view: SessionsView }) {
       {!view.listed && (
         <p className="mt-4 text-meta text-muted-foreground">{t.notListed}</p>
       )}
-      {tab === 'open' ? (
-        view.open.length ? (
-          view.open.map((g) => (
-            <GroupSection key={g.key} g={g}>
-              {g.sessions.map(rows)}
-            </GroupSection>
-          ))
+      {!split ? (
+        tab === 'open' ? (
+          view.open.length ? (
+            groups(view.open)
+          ) : (
+            <None>{t.noneOpen}</None>
+          )
+        ) : view.ended.length ? (
+          ended(view.ended)
         ) : (
-          <p className="mt-7 text-copy text-muted-foreground">{t.noneOpen}</p>
+          <None>{t.noneEnded}</None>
         )
-      ) : view.ended.length ? (
-        <ul className={phone ? 'mt-3' : 'mt-5'}>{view.ended.map(rows)}</ul>
       ) : (
-        <p className="mt-7 text-copy text-muted-foreground">{t.noneEnded}</p>
+        <>
+          <MacBlock
+            name={t.thisMac}
+            line={t.macLine(view.counts.open, view.counts.working)}
+          >
+            {tab === 'open' ? (
+              view.open.length ? (
+                groups(view.open)
+              ) : (
+                <None>{t.noneOpen}</None>
+              )
+            ) : view.ended.length ? (
+              ended(view.ended)
+            ) : (
+              <None>{t.noneEnded}</None>
+            )}
+          </MacBlock>
+          {theirs.map(({ mac, view: there, missing }) => (
+            <MacBlock
+              key={mac.id}
+              name={mac.name}
+              line={there && t.macLine(there.counts.open, there.counts.working)}
+            >
+              {!there ? (
+                <None>{t.macMissing[missing ?? 'unreachable']}</None>
+              ) : tab === 'open' ? (
+                there.open.length ? (
+                  groups(there.open, mac.name)
+                ) : (
+                  <None>{t.noneOpenThere}</None>
+                )
+              ) : there.ended.length ? (
+                ended(there.ended, mac.name)
+              ) : (
+                <None>{t.noneEndedThere}</None>
+              )}
+            </MacBlock>
+          ))}
+        </>
       )}
     </Page>
+  )
+}
+
+function None({ children }: { children: ReactNode }) {
+  return <p className="mt-7 text-copy text-muted-foreground">{children}</p>
+}
+
+/**
+ * The sessions on one of your Macs, under its name: this one's first, then
+ * each of your other Macs linked to it, or why it shows none
+ */
+function MacBlock({
+  name,
+  line,
+  children,
+}: {
+  name: string
+  line?: string
+  children: ReactNode
+}) {
+  return (
+    <section aria-label={name} className="mt-9">
+      {/* Narrow, what it counts goes under its name, whole */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-border pb-2">
+        <Laptop
+          aria-hidden="true"
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+        <h2 className="text-section">{name}</h2>
+        <span className="flex-1 @max-md:hidden" />
+        {line && (
+          <span className="text-meta text-muted-foreground @max-md:basis-full">
+            {line}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
   )
 }
 
@@ -169,18 +294,16 @@ const rowId = (id: string) => `session-${id.replace(/[^\w-]/g, '-')}`
 
 /** Your turn and working, at the top, each a link to its row */
 function Briefing({
-  view,
+  entries,
   onPick,
 }: {
-  view: SessionsView
+  /** The open sessions, each with its group's name */
+  entries: { s: SessionRow; group: string }[]
   onPick: (id: string) => void
 }) {
   const t = useText(text)
-  const all = view.open.flatMap((g) =>
-    g.sessions.map((s) => ({ s, group: g.name ?? t.notInProject }))
-  )
-  const turn = all.filter(({ s }) => s.state === 'turn')
-  const working = all.filter(({ s }) => s.state === 'working')
+  const turn = entries.filter(({ s }) => s.state === 'turn')
+  const working = entries.filter(({ s }) => s.state === 'working')
   if (!turn.length && !working.length) return null
   // Cut to the line with an ellipsis, the title first, as a row's words are
   const link = (s: SessionRow) => (
@@ -236,26 +359,30 @@ function Briefing({
 
 function GroupSection({
   g,
+  level = 2,
   children,
 }: {
   g: SessionGroup
+  /** Under a Mac's name (MacBlock), its heading is the next level down */
+  level?: 2 | 3
   children: ReactNode
 }) {
   const t = useText(text)
   const working = g.sessions.filter((s) => s.state === 'working').length
   const turn = g.sessions.filter((s) => s.state === 'turn').length
+  const Heading = level === 3 ? 'h3' : 'h2'
   return (
-    <section className="mt-7">
+    <section className={level === 3 ? 'mt-6' : 'mt-7'}>
       {/* Narrow, what it counts goes under its name, whole */}
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-        <h2
+        <Heading
           className={cn(
             'text-section',
             !g.name && 'font-medium text-muted-foreground'
           )}
         >
           {g.name ?? t.notInProject}
-        </h2>
+        </Heading>
         {g.repo && (
           <span className="font-mono text-meta text-muted-foreground">
             {g.repo}
@@ -273,10 +400,13 @@ function GroupSection({
 
 function SessionRowItem({
   s,
+  mac,
   open,
   onToggle,
 }: {
   s: SessionRow
+  /** The other Mac it is on, by its name: its task and command are there */
+  mac?: string
   open: boolean
   onToggle: () => void
 }) {
@@ -337,7 +467,7 @@ function SessionRowItem({
           </div>
         )}
       </div>
-      {open && <Opened s={s} />}
+      {open && <Opened s={s} mac={mac} />}
     </li>
   )
 }
@@ -539,8 +669,11 @@ function CopyResume({ s }: { s: SessionRow }) {
   )
 }
 
-/** A session opened in place: what you typed, where, and its task */
-function Opened({ s }: { s: SessionRow }) {
+/**
+ * A session opened in place: what you typed, where, and its task. One on
+ * another of your Macs leaves its task and its resume command to that Mac.
+ */
+function Opened({ s, mac }: { s: SessionRow; mac?: string }) {
   const t = useText(text)
   return (
     <div className="flex flex-col gap-2 pt-2.5 pl-6">
@@ -573,12 +706,26 @@ function Opened({ s }: { s: SessionRow }) {
         <Line label={t.folder}>
           <span className="font-mono select-text">{homePath(s.cwd)}</span>
         </Line>
-        <TaskLines s={s} />
+        {mac ? (
+          s.task && (
+            <Line label={t.task}>
+              <a
+                href={`#/tasks/${encodeURIComponent(s.task.id)}`}
+                className="hover:text-primary"
+              >
+                {s.task.title}
+              </a>
+            </Line>
+          )
+        ) : (
+          <TaskLines s={s} />
+        )}
         <Line label={t.started}>
           <span>{formatDateTime(s.startedAt)}</span>
         </Line>
-        {/* A command for the Mac's terminal: of no use on a device */}
-        {!remoteMac() && (
+        {/* A command for the Mac's terminal: of no use on a device, or on
+            a Mac the session is not on */}
+        {!remoteMac() && !mac && (
           <div className="mt-1.5 flex flex-wrap gap-2">
             <CopyResume s={s} />
           </div>

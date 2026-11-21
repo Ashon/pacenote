@@ -967,7 +967,7 @@ export const SETTING_FIELDS: SettingField[] = [
     path: 'tasks.linkSessions',
     group: 'work',
     label: 'Sessions on this Mac',
-    help: "Lists the Claude Code and Codex sessions on this Mac in Sessions: where each runs, and whether it is working or waiting for you. Also adds the sessions you start yourself to a task's work log: ones that used Pacenote's task tools for it, had its Slack link in what you typed, or worked on its branch. Ones that only look related are suggested for you to link. Their logs are read on this Mac, and nothing from them leaves it.",
+    help: "Lists the Claude Code and Codex sessions on this Mac in Sessions: where each runs, and whether it is working or waiting for you. Also adds the sessions you start yourself to a task's work log: ones that used Pacenote's task tools for it, had its Slack link in what you typed, or worked on its branch. Ones that only look related are suggested for you to link. Their logs are read on this Mac, and nothing from them leaves it but for your own phone or iPad paired with it and your other Macs linked to it, which show them too.",
     type: 'toggle',
     default: 'off',
     ...WITH_TODO,

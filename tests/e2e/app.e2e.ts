@@ -3038,7 +3038,10 @@ else fail('unexpected: ' + args.join(' '))
     await page.screenshot({
       path: path.join(REPO, 'test-results/session-move.png'),
     })
-    await page.getByRole('link', { name: 'Sessions', exact: true }).click()
+    await page
+      .locator('[data-page-crumbs]')
+      .getByRole('link', { name: 'Sessions', exact: true })
+      .click()
     await page.getByRole('heading', { name: 'payments' }).waitFor()
 
     // Ended today
@@ -3400,7 +3403,7 @@ else fail('unexpected: ' + args.join(' '))
     await page.getByText('Run the webhook tests', { exact: true }).waitFor()
     // Scrolled up: a way back to the latest
     await page
-      .locator('[data-radix-scroll-area-viewport]')
+      .locator('[data-radix-scroll-area-viewport]:has([data-page-crumbs])')
       .evaluate((element) => element.scrollTo(0, 0))
     const latest = page.getByRole('button', { name: 'Latest' })
     await latest.waitFor()
@@ -3411,7 +3414,10 @@ else fail('unexpected: ' + args.join(' '))
     await latest.waitFor({ state: 'detached' })
 
     // The one working in a terminal: watched here, continued in a copy
-    await page.getByRole('link', { name: 'Sessions', exact: true }).click()
+    await page
+      .locator('[data-page-crumbs]')
+      .getByRole('link', { name: 'Sessions', exact: true })
+      .click()
     await page
       .locator('li', { hasText: 'Answer the #418 review comments' })
       .getByRole('link', { name: 'Open' })
@@ -3560,7 +3566,10 @@ else fail('unexpected: ' + args.join(' '))
       .getByRole('heading', { name: 'Fix the flaky webhook retry test' })
       .waitFor()
     await page
-      .getByRole('link', { name: 'Fix the flaky webhook retry test' })
+      .getByRole('link', {
+        name: 'Fix the flaky webhook retry test',
+        exact: true,
+      })
       .waitFor()
     await page.getByRole('textbox', { name: 'Message' }).waitFor()
     await page.screenshot({

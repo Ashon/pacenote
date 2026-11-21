@@ -34,6 +34,7 @@ import { YouPage } from './components/you-page'
 import { SessionPage } from './components/session-page'
 import { SessionsPage } from './components/sessions-page'
 import { NewSessionPage } from './components/session-new'
+import { SessionsSplit } from './components/sessions-nav'
 import { lastPeriod, RecapPage } from './components/recap-page'
 import type { RecapPeriod } from '@src/you/types'
 import { AiSheet } from './components/setup/ai-sheet'
@@ -264,13 +265,19 @@ export default function App() {
                     // tab and scroll stay as they were
                     <TasksPage openId={route.id} logEntry={route.entry} />
                   ) : route.page === 'sessions' ? (
-                    route.start ? (
-                      <NewSessionPage
-                        key={route.start.task ?? 'new'}
-                        task={route.start.task}
-                      />
-                    ) : route.id ? (
-                      <SessionPage key={route.id} id={route.id} />
+                    // A session's page and New session have your sessions
+                    // beside them, kept as you move between them
+                    route.start || route.id ? (
+                      <SessionsSplit current={route.id}>
+                        {route.start ? (
+                          <NewSessionPage
+                            key={route.start.task ?? 'new'}
+                            task={route.start.task}
+                          />
+                        ) : (
+                          <SessionPage key={route.id} id={route.id!} />
+                        )}
+                      </SessionsSplit>
                     ) : (
                       <SessionsPage />
                     )

@@ -49,7 +49,7 @@ import { remoteMac } from '@/lib/desktop'
 import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { usePhone } from '@/lib/phone'
-import { canShow } from '@/lib/session-rows'
+import { canShow, parseOtherId } from '@/lib/session-rows'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { NowItem, SentItems, TalkItems } from './session-items'
@@ -186,11 +186,15 @@ export function SessionPage({ id }: { id: string }) {
     sent.length,
   ])
 
-  if (talk === undefined) return <TalkSkeleton phone={phone} />
-  if (talk === null)
+  // Another of your Macs that stopped answering before its page came
+  if (talk === undefined && !query.isError)
+    return <TalkSkeleton phone={phone} />
+  if (!talk)
     return (
       <div className="mx-auto max-w-4xl px-10 py-9">
-        <p className="text-copy text-muted-foreground">{t.notHere}</p>
+        <p className="text-copy text-muted-foreground">
+          {parseOtherId(id) ? t.notOnOtherMac : t.notHere}
+        </p>
         <Button variant="outline" size="sm" className="mt-4" asChild>
           <a href="#/sessions">{t.backToSessions}</a>
         </Button>
@@ -225,14 +229,22 @@ export function SessionPage({ id }: { id: string }) {
               {l.title}
             </a>
             <ChevronRight aria-hidden="true" className="size-3.5" />
+            {/* On another of your Macs: that Mac, then its group there */}
+            {talk.mac && (
+              <>
+                <span>{talk.mac.name}</span>
+                <ChevronRight aria-hidden="true" className="size-3.5" />
+              </>
+            )}
             <span>{talk.group ?? l.notInProject}</span>
           </nav>
           <header className="mt-2 flex items-start gap-3">
             <h1 data-page-title className="min-w-0 flex-1 text-title">
               {row.title}
             </h1>
-            {/* On a phone its bar has these (More) */}
-            {!phone && <SessionMenu talk={talk} />}
+            {/* On a phone its bar has these (More); another Mac's are
+                that Mac's */}
+            {!phone && !talk.mac && <SessionMenu talk={talk} />}
           </header>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
             {toolWhere(row, l)}
@@ -273,7 +285,10 @@ export function SessionPage({ id }: { id: string }) {
               {talk.error ?? t.nothingSaid}
             </p>
           )}
-          {live?.ask && <AskCard id={row.id} ask={live.ask} cwd={row.cwd} />}
+          {/* Another Mac's is answered there: its state says it asks */}
+          {live?.ask && !talk.mac && (
+            <AskCard id={row.id} ask={live.ask} cwd={row.cwd} />
+          )}
           {live?.error && (
             <InlineError className="mt-4" error={t.stoppedShort(live.error)} />
           )}
@@ -322,7 +337,12 @@ export function SessionPage({ id }: { id: string }) {
           >
             <div className="pointer-events-auto">
               {talk.plan && <PlanBar plan={talk.plan} />}
-              {talk.typeIn === 'here' || talk.typeIn === 'move' ? (
+              {talk.mac ? (
+                <Bar
+                  title={t.otherMacTitle(talk.mac.name)}
+                  lead={t.otherMacLead}
+                />
+              ) : talk.typeIn === 'here' || talk.typeIn === 'move' ? (
                 <Composer talk={talk} onSend={() => toEnd(false)} />
               ) : talk.typeIn === 'elsewhere' ? (
                 <Elsewhere talk={talk} />
@@ -888,13 +908,13 @@ function Bar({
 }: {
   title: string
   lead: string
-  children: ReactNode
+  children?: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-[14px] bg-well px-4 py-3.5">
       <p className="text-section">{title}</p>
       <p className="text-meta text-muted-foreground">{lead}</p>
-      <div className="mt-1 flex flex-wrap gap-2">{children}</div>
+      {children && <div className="mt-1 flex flex-wrap gap-2">{children}</div>}
     </div>
   )
 }

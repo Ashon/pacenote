@@ -62,6 +62,7 @@ import type { TasksLive } from './tasks/types.js'
 import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
 import type {
+  MacSessions,
   NewSessionDraft,
   NewSessionStart,
   SessionMode,
@@ -389,10 +390,21 @@ export interface DesktopBridge {
   }
   /**
    * Sessions (src/sessions): the Claude Code and Codex sessions on this Mac,
-   * read here and sent only to your own devices that ask (src/macs/asks.ts)
+   * read here and sent only to your own devices and your other Macs that ask
+   * (src/macs/asks.ts)
    */
   sessions: {
     view(): Promise<SessionsView | null>
+    /**
+     * The sessions on your other Macs linked to this one, as each shows them
+     * (MAC_ASKS). The desktop app's alone: a device shows the Mac it is on.
+     */
+    others?(): Promise<MacSessions[]>
+    /**
+     * A session's page on another of your Macs, read from there; null for
+     * none
+     */
+    otherTalk?(mac: string, id: string): Promise<SessionTalk | null>
     /** Opens a session where it runs: its app, claude.ai or its terminal */
     open(id: string): Promise<{ error?: string }>
     /**

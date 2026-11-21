@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { createRequire } from 'node:module'
@@ -91,6 +92,11 @@ async function openMac(
     todoOnly?: boolean
     /** Who setup let in, on a Mac set up before */
     me?: { id: string; name: string }
+    /**
+     * Your home folder on this Mac, where Claude Code keeps its sessions;
+     * the world's own, shared with the other Mac, otherwise
+     */
+    userHome?: string
   } = {}
 ): Promise<Mac> {
   const home = homeOf(world, name)
@@ -159,7 +165,9 @@ async function openMac(
     args: [path.join(REPO, 'apps/desktop')],
     env: {
       ...env,
-      HOME: world.root,
+      HOME: options.userHome ?? world.root,
+      // Which sessions Claude Code says are open (fake-claude.mjs agents)
+      FAKE_CLAUDE_DIR: world.claudeDir,
       PACENOTE_HOME: home,
       PACENOTE_DATA_DIR: home,
       PACENOTE_DESKTOP_USER_DATA: path.join(home, 'user-data'),
@@ -387,6 +395,169 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
     await reviewOnAir.getByText(/On MacBook Pro/).waitFor()
     await reviewOnAir.getByRole('button', { name: 'Start here' }).waitFor()
   })
+
+  it("lists each Mac's sessions on the other, and a session's page beside your sessions", async () => {
+    world = await World.create()
+    const { root } = world
+    /**
+     * A Mac's own home with a checkout and one session in it, as Claude
+     * Code keeps its log, open now
+     */
+    const sessionOn = (
+      user: string,
+      repo: string,
+      id: string,
+      title: string,
+      typed: string,
+      pid: number
+    ) => {
+      const checkout = path.join(user, 'git', repo)
+      mkdirSync(checkout, { recursive: true })
+      execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+      execFileSync(
+        'git',
+        ['remote', 'add', 'origin', `https://github.com/Ashon/${repo}.git`],
+        { cwd: checkout }
+      )
+      const project = path.join(
+        user,
+        '.claude',
+        'projects',
+        checkout.replace(/[/.]/g, '-')
+      )
+      mkdirSync(project, { recursive: true })
+      writeFileSync(
+        path.join(project, `${id}.jsonl`),
+        [
+          {
+            type: 'user',
+            message: { role: 'user', content: typed },
+          },
+          {
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: `On it: ${typed}` }],
+            },
+          },
+          { type: 'custom-title', customTitle: title },
+        ]
+          .map(
+            (line) =>
+              `${JSON.stringify({ sessionId: id, cwd: checkout, timestamp: new Date().toISOString(), ...line })}\n`
+          )
+          .join('')
+      )
+      return {
+        pid,
+        cwd: checkout,
+        kind: 'interactive',
+        startedAt: Date.now() - 10 * 60_000,
+        sessionId: id,
+        name: `${repo}-1`,
+        status: 'idle',
+      }
+    }
+    const proUser = path.join(root, 'pro-user')
+    const airUser = path.join(root, 'air-user')
+    writeFileSync(
+      path.join(world.claudeDir, 'agents.json'),
+      JSON.stringify([
+        sessionOn(
+          proUser,
+          'payments',
+          'pro-open-1',
+          'Webhook retry limit',
+          'Raise max_attempts to 5',
+          999_991
+        ),
+        sessionOn(
+          airUser,
+          'site',
+          'air-open-1',
+          'Site copy pass',
+          'Tighten the hero line',
+          999_992
+        ),
+      ])
+    )
+    const settings = ['TASKS=on', 'TASKS_LINK_SESSIONS=on']
+    const pro = await openMac(world, 'MacBook Pro', 2, {
+      settings,
+      userHome: proUser,
+    })
+    const air = await openMac(world, 'MacBook Air', 400, {
+      settings,
+      userHome: airUser,
+      addresses: [`127.0.0.1:${pro.port}`],
+    })
+
+    // On the Air: its own session, then the Pro's under the Pro's name
+    const page = air.page
+    await page.evaluate("window.location.hash = '#/sessions'")
+    const proBlock = page.getByRole('region', { name: 'MacBook Pro' })
+    await proBlock
+      .getByRole('heading', { name: 'payments' })
+      .waitFor({ timeout: 60_000 })
+    const hereBlock = page.getByRole('region', { name: 'This Mac' })
+    await hereBlock.getByRole('heading', { name: 'site' }).waitFor()
+    await page
+      .getByText(/1 open on this Mac · 0 working · 1 on MacBook Pro/)
+      .waitFor()
+    await page.getByRole('tab', { name: 'Open 2' }).waitFor()
+    // Both wait for you: the line at the top counts the Pro's too
+    await page
+      .getByRole('definition')
+      .getByText(/and 1 more/)
+      .waitFor()
+    // Opened in place: its task and its resume command are the Pro's
+    const proRow = proBlock.locator('li', {
+      has: page.getByText('Webhook retry limit'),
+    })
+    await proRow.getByRole('button', { name: 'Webhook retry limit' }).click()
+    await proRow.getByText('Started').waitFor()
+    expect(
+      await proRow.getByRole('button', { name: 'Link to a task' }).count()
+    ).toBe(0)
+    expect(await proRow.getByRole('button', { name: /^Copy / }).count()).toBe(0)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/sessions-other-mac.png'),
+    })
+
+    // Its page, read from the Pro: what was said, and you type there
+    await proRow.getByRole('link', { name: 'Open' }).click()
+    await page.getByRole('heading', { name: 'Webhook retry limit' }).waitFor()
+    await page.getByText('On it: Raise max_attempts to 5').waitFor()
+    await page.locator('[data-page-crumbs]').getByText('MacBook Pro').waitFor()
+    await page.getByText('It is on MacBook Pro, so you type there').waitFor()
+    expect(await page.getByRole('textbox', { name: 'Message' }).count()).toBe(0)
+    // Your sessions beside it, as Settings lists its sections
+    const nav = page.getByRole('navigation', { name: 'Sessions', exact: true })
+    await nav
+      .getByRole('link', { name: /^Webhook retry limit/ })
+      .and(page.locator('[aria-current="page"]'))
+      .waitFor()
+    await nav.getByText('MacBook Pro').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-other-mac.png'),
+    })
+
+    // To the Air's own from the list beside it: typed to here
+    await nav.getByRole('link', { name: /^Site copy pass/ }).click()
+    await page.getByRole('heading', { name: 'Site copy pass' }).waitFor()
+    await page.getByRole('textbox', { name: 'Message' }).waitFor()
+    await nav
+      .getByRole('link', { name: /^Site copy pass/ })
+      .and(page.locator('[aria-current="page"]'))
+      .waitFor()
+
+    // And the Pro lists the Air's
+    await pro.page.evaluate("window.location.hash = '#/sessions'")
+    await pro.page
+      .getByRole('region', { name: 'MacBook Air' })
+      .getByRole('heading', { name: 'site' })
+      .waitFor({ timeout: 60_000 })
+  }, 180_000)
 
   it('sets up a new Mac from the one already set up', async () => {
     world = await World.create([{ match: 'hello', answer: 'Hi alice.' }])

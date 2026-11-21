@@ -77,7 +77,7 @@ import type {
 } from '../../../src/tasks/types.js'
 import { KeepAwake } from './keep-awake.js'
 import { DeviceAnswers } from './device-answers.js'
-import { DeviceAsks } from '../../../src/macs/asks.js'
+import { DeviceAsks, MacAsker } from '../../../src/macs/asks.js'
 import { Macs } from '../../../src/macs/macs.js'
 import { SetupFromMac } from '../../../src/macs/setup.js'
 import { macsKey } from '../../../src/macs/channel.js'
@@ -620,6 +620,8 @@ let macUse: MacUseWatch | undefined
 let todoSync: TodoSync | undefined
 /** What your devices ask this Mac: its screens' own answers (asks.ts) */
 let deviceAsks: DeviceAsks | undefined
+/** What this Mac asks your other Macs: their sessions (asks.ts MAC_ASKS) */
+let macAsker: MacAsker | undefined
 /**
  * The screens' bridge, by channel: what each answers the window, which a
  * device of yours is answered by too (device-answers.ts, DEVICE_ASKS)
@@ -709,6 +711,8 @@ if (supervisor) {
       const me = setup.view().record.me
       return { values, ...(me ? { me } : {}) }
     },
+    // Your other Macs may read the sessions here while Sessions is on
+    sessions: () => settings.effectiveEnv().TASKS_LINK_SESSIONS === 'on',
     log: (message) => log.info(message),
     bonjour: flags.macs.bonjour,
     ...(flags.macs.port ? { port: flags.macs.port } : {}),
@@ -798,6 +802,7 @@ if (supervisor) {
     answer: (what, args, peer) => deviceAnswers.answer(what, args, peer),
     log: (message) => log.info(message),
   })
+  macAsker = new MacAsker(macs)
   // Pace started or stopped here: the others hear of it at once.
   let phase = supervisor.current.phase
   supervisor.on('change', (state) => {
@@ -1131,6 +1136,15 @@ function registerIpc(): void {
     openSessions,
     host: sessionHost,
     todo,
+    ...(macs &&
+      macAsker && {
+        otherMacs: {
+          linked: () => macs?.linkedMacs() ?? [],
+          ask: (mac, what, args) =>
+            macAsker?.ask(mac, what, args) ??
+            Promise.reject(new Error('no Macs')),
+        },
+      }),
   })
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
@@ -1297,6 +1311,7 @@ if (!app.requestSingleInstanceLock()) {
           )
         todoSync?.start()
         deviceAsks?.start()
+        macAsker?.start()
       }
       // A new install starts on Todo, on and with nothing in it yet, and Pace
       // off until it is set up: Todo's start card holds the rest (your AI,
@@ -1377,6 +1392,7 @@ app.on('before-quit', (event) => {
   void setupClaim.stop()
   todoSync?.stop()
   deviceAsks?.stop()
+  macAsker?.stop()
   fromMac?.cancel()
   void macs?.stop()
   supervisor?.dispose()

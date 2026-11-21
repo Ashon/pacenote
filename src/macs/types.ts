@@ -54,6 +54,12 @@ export interface MacState {
    * them and dials them too; Pacenote before 0.6.14 does not say them.
    */
   reach?: string[]
+  /**
+   * Sessions is on there (Settings > Todo > Sessions on this Mac): it shows
+   * its sessions to your other Macs that ask (asks.ts MAC_ASKS). Pacenote
+   * before 0.6.38 does not say it, nor answer them.
+   */
+  sessions?: boolean
 }
 
 /**

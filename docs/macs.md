@@ -54,7 +54,8 @@ These stay with their Mac:
 
 - **Sessions.** A Claude Code or Codex session runs in its own Mac's folders. On the other Mac, its line says "On MacBook
   Pro" and offers **Start here**: a new session for the task on this Mac, with what came before. Repository folders are
-  remembered per Mac.
+  remembered per Mac. Sessions on the other Mac lists them under that Mac's name and shows a session's page, read from
+  there as you look: you type to it on the Mac it is on ([Todo](tasks.md#sessions-on-this-mac)).
 - **Looks done** reads a quiet session's last turns, so the Mac with the session judges it.
 - **Pace's run history**, your logs and settings.
 
@@ -137,7 +138,9 @@ A Mac set up with the same Slack app still finds the others by that app, includi
   Sessions screen and a session's page, and starts and talks to sessions the Mac runs (`sessions.*`, with
   `tasks.newSession`, `tasks.detail` and `tasks.folders` for Continue here); the Mac starts one only in a folder of your
   work, and never opens a terminal or an app for a device ([Todo](tasks.md#sessions-on-this-mac)). A Mac before 0.6.33
-  answers those not-allowed.
+  answers those not-allowed. Another of your Macs may ask only for the sessions and a session's page (`sessions.view`
+  and `sessions.talk`, MAC_ASKS), to show them there; anything else it asks is answered not-allowed. Each Mac says
+  whether it shows its sessions (Sessions on this Mac on there), and one before 0.6.38 says nothing and answers no ask.
 - **Pace follows only within one Slack app.** Each Mac says which Slack app Pace answers through there, one way (a hash
   of its key), and Pace moves only between Macs of the same app of your own. Macs that only share Todo never stand by
   for one another.

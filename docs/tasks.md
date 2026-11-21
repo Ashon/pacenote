@@ -281,9 +281,18 @@ on, from the switch or from the screen's card, which says what it reads first.
   resume command, are the Mac's alone. While it writes, the device asks for its page every second rather than being
   told. A Mac before 0.6.33 answers a device's sessions not-allowed, and the device says to update it.
 
-What it reads stays on this Mac but for your own devices: a phone or iPad paired with it gets the sessions and their
-pages over its sealed channel ([Your Macs](macs.md)) when you open them, and keeps none of it. Your other Macs do not
-see them. Pacenote's own sessions and its data folder are left out.
+- **On your other Macs:** your other Macs linked to this one ([Your Macs](macs.md)) list its sessions on their Sessions
+  screen, under this Mac's name, after their own, and open a session's page to follow it as it goes, read from this Mac
+  each time you look. You type to it, answer what it asks and link it to a task on the Mac it is on; the other Mac only
+  reads (`sessions.view` and `sessions.talk`). A Mac shows its sessions while Sessions on this Mac is on there; one with
+  it off says so, and one before 0.6.38 says to update it.
+- **Beside a session's page:** a session's page and New session list your sessions on their left, as Settings lists
+  its sections: this Mac's open ones by project, your other Macs' under each one's name, then the ones ended today. The
+  open one is marked; a narrow window and a phone leave the list out.
+
+What it reads stays on this Mac but for your own devices and your other Macs: a phone or iPad paired with it, or another
+of your Macs linked to it, gets the sessions and their pages over its sealed channel ([Your Macs](macs.md)) when you open
+them, and keeps none of it. Pacenote's own sessions and its data folder are left out.
 
 ## The MCP tools
 

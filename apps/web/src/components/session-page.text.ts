@@ -5,6 +5,8 @@ import type { SessionAskKind, SessionMode } from '@src/sessions/types'
 /** A session's page: its conversation, what it asks, and the composer */
 const en = {
   notHere: 'This session is not on this Mac anymore.',
+  notOnOtherMac:
+    'This session is not on your other Mac anymore, or that Mac is out of reach.',
   backToSessions: 'Back to Sessions',
   more: 'More for this session',
   nothingSaid: 'Nothing said in it yet.',
@@ -69,6 +71,10 @@ const en = {
   backgroundThereLead:
     'Moving it here would stop that work. Once it is done, you continue it here, in the same conversation.',
   cancel: 'Cancel',
+  /** On another of your Macs: read from there */
+  otherMacTitle: (mac: string) => `It is on ${mac}, so you type there`,
+  otherMacLead:
+    'Pacenote shows it as it goes, read from that Mac each time. What it asks is answered there too.',
   codexTitle: 'Codex runs it, so you continue it there',
   codexLead: 'Pacenote shows its log as it goes.',
   // Below the conversation
@@ -83,6 +89,7 @@ const en = {
 
 const ko: typeof en = {
   notHere: '이 세션은 이제 이 Mac에 없어요.',
+  notOnOtherMac: '이 세션이 이제 다른 Mac에 없거나, 그 Mac에 닿지 않아요.',
   backToSessions: '세션으로 돌아가기',
   more: '세션 더 보기',
   nothingSaid: '아직 나눈 말이 없어요.',
@@ -138,6 +145,9 @@ const ko: typeof en = {
   backgroundThereLead:
     '여기로 옮기면 그 작업이 멈춰요. 작업이 끝나면 같은 대화로 여기서 이어 가세요.',
   cancel: '취소',
+  otherMacTitle: (mac) => `${mac}에 있는 세션이라 그곳에서 입력해요`,
+  otherMacLead:
+    'Pacenote가 그 Mac에서 그때그때 읽어 진행을 보여 줘요. 세션이 묻는 것도 그곳에서 답해요.',
   codexTitle: 'Codex가 돌리고 있어서 그곳에서 이어 가요',
   codexLead: 'Pacenote는 로그를 진행되는 대로 보여 줘요.',
   latest: '최신으로',

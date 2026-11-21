@@ -11,6 +11,33 @@ import type { FolderCheck, TaskView } from '../../../../src/tasks/types.js'
  * task's session, and Today's line about all of them. Plain, so tests load it.
  */
 
+/**
+ * A session on another of your Macs, by its page's id here:
+ * mac:<that Mac's id>/<the session's id there>
+ */
+export const otherId = (mac: string, id: string) => `mac:${mac}/${id}`
+
+/** The Mac and the session there a page's id names, for one on another Mac */
+export function parseOtherId(
+  id: string
+): { mac: string; id: string } | undefined {
+  const match = /^mac:([^/]+)\/(.+)$/.exec(id)
+  return match ? { mac: match[1]!, id: match[2]! } : undefined
+}
+
+/** Another Mac's sessions, each by its page's id here (otherId) */
+export function otherView(mac: string, view: SessionsView): SessionsView {
+  const here = (row: SessionRow) => ({ ...row, id: otherId(mac, row.id) })
+  return {
+    ...view,
+    open: view.open.map((group) => ({
+      ...group,
+      sessions: group.sessions.map(here),
+    })),
+    ended: view.ended.map(here),
+  }
+}
+
 /** Whether a session has a page in Pacenote: Claude Code's and Codex's */
 export const canOpen = (s: SessionRow) => s.tool !== 'opencode'
 

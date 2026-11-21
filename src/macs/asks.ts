@@ -44,8 +44,8 @@ export const DEVICE_READS = {
   'tasks.folders': 'pacenote:tasks:folders',
   'tasks.newSession': 'pacenote:tasks:new-session',
   // The sessions on the Mac and a session's page: what you typed in them
-  // and their logs go to your own device over its sealed channel, and to
-  // nothing else
+  // and their logs go to your own device, or another of your Macs
+  // (MAC_ASKS), over its sealed channel, and to nothing else
   'sessions.view': 'pacenote:sessions:view',
   'sessions.talk': 'pacenote:sessions:talk',
 } as const satisfies Partial<Record<BridgeCall, `pacenote:${string}`>>
@@ -105,6 +105,18 @@ export const API_ASK = 'api'
 
 export const isDeviceAsk = (what: string): what is DeviceAsk =>
   what === API_ASK || Object.hasOwn(DEVICE_ASKS, what)
+
+/**
+ * What another of your Macs asks this one: its sessions and a session's page,
+ * to show them there. They change nothing here, and are answered only while
+ * Sessions is on here (ipc/sessions.ts), as a device's are.
+ */
+export const MAC_ASKS = ['sessions.view', 'sessions.talk'] as const
+
+export type MacAsk = (typeof MAC_ASKS)[number]
+
+const isMacAsk = (what: string): what is MacAsk =>
+  (MAC_ASKS as readonly string[]).includes(what)
 
 /**
  * Settings a device leaves to the Mac: secrets (it never gets them, not even
@@ -196,8 +208,9 @@ export interface AnswerMessage {
 }
 
 /**
- * The Mac's side: answers what a device asks (answer), and nothing a Mac
- * asks. An ask it does not allow gets an error, never a value.
+ * The Mac's side: answers what a device asks (answer), and what another of
+ * your Macs asks of MAC_ASKS. An ask it does not allow gets an error, never
+ * a value.
  */
 export class DeviceAsks {
   private readonly listener = (peer: string, message: unknown) =>
@@ -224,18 +237,99 @@ export class DeviceAsks {
     if (t !== 'ask' || typeof id !== 'number' || typeof what !== 'string')
       return
     const { macs, answer, log } = this.options
-    if (!macs.isDevice(peer)) return
     const reply = (fields: Omit<AnswerMessage, 't' | 'id'>) =>
       macs.send(peer, { t: 'answer', id, ...fields } satisfies AnswerMessage)
-    if (!isDeviceAsk(what)) return void reply({ error: 'not-allowed' })
+    const device = macs.isDevice(peer)
+    // Another of your Macs reads the sessions here, and nothing else
+    const allowed: DeviceAsk | undefined = device
+      ? isDeviceAsk(what)
+        ? what
+        : undefined
+      : isMacAsk(what)
+        ? what
+        : undefined
+    if (!allowed) return void reply({ error: 'not-allowed' })
     void Promise.resolve()
-      .then(() => answer(what, Array.isArray(args) ? args : [], peer))
+      .then(() => answer(allowed, Array.isArray(args) ? args : [], peer))
       .then(
         (value) => reply({ value: value ?? null }),
         (err: unknown) => {
-          log(`Macs: a device asked ${what}: ${(err as Error).message}`)
+          log(
+            `Macs: ${device ? 'a device' : 'another Mac'} asked ${what}: ${(err as Error).message}`
+          )
           reply({ error: (err as Error).message })
         }
       )
+  }
+}
+
+/** How long an ask of another Mac waits for its answer */
+export const MAC_ASK_MS = 10_000
+
+/**
+ * This Mac's side of asking another of yours (MAC_ASKS), as a device asks
+ * one: each ask waits for its answer from that Mac, an error when it says
+ * one, and gives up after MAC_ASK_MS or once it is not linked
+ */
+export class MacAsker {
+  private next = 1
+  private readonly waiting = new Map<
+    number,
+    {
+      peer: string
+      resolve: (value: unknown) => void
+      reject: (error: Error) => void
+      timer: ReturnType<typeof setTimeout>
+    }
+  >()
+  private readonly listener = (peer: string, message: unknown) =>
+    this.heard(peer, message)
+
+  constructor(
+    private readonly macs: Pick<Macs, 'on' | 'off' | 'send'>,
+    private readonly waitMs = MAC_ASK_MS
+  ) {}
+
+  start(): void {
+    this.macs.on('message', this.listener)
+  }
+
+  stop(): void {
+    this.macs.off('message', this.listener)
+    for (const [id, waiting] of this.waiting) {
+      clearTimeout(waiting.timer)
+      this.waiting.delete(id)
+      waiting.reject(new Error('stopped'))
+    }
+  }
+
+  ask(peer: string, what: MacAsk, args: unknown[] = []): Promise<unknown> {
+    const id = this.next++
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.waiting.delete(id)
+        reject(new Error('no answer'))
+      }, this.waitMs)
+      timer.unref?.()
+      this.waiting.set(id, { peer, resolve, reject, timer })
+      const message: AskMessage = { t: 'ask', id, what, args }
+      if (!this.macs.send(peer, message)) {
+        clearTimeout(timer)
+        this.waiting.delete(id)
+        reject(new Error('not linked'))
+      }
+    })
+  }
+
+  private heard(peer: string, message: unknown): void {
+    const { t, id, value, error } = (message ?? {}) as Partial<AnswerMessage>
+    if (t !== 'answer' || typeof id !== 'number') return
+    const waiting = this.waiting.get(id)
+    // Only the Mac it asked answers it
+    if (!waiting || waiting.peer !== peer) return
+    clearTimeout(waiting.timer)
+    this.waiting.delete(id)
+    if (typeof error === 'string') waiting.reject(new Error(error))
+    else waiting.resolve(value)
   }
 }

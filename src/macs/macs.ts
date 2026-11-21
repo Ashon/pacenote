@@ -125,6 +125,11 @@ interface MacsOptions {
   collecting?: () => string | undefined
   /** What Add a device sends a new Mac once you Allow */
   setupPayload?: () => SetupPayload
+  /**
+   * Sessions is on here: your other Macs may ask for the sessions on this
+   * one (asks.ts MAC_ASKS)
+   */
+  sessions?: () => boolean
   log: (message: string) => void
   /** 0 takes any free port (tests); MACS_PORT otherwise */
   port?: number
@@ -282,6 +287,26 @@ export class Macs extends EventEmitter<{
   /** The other Macs a channel is open to now, by id */
   connected(): string[] {
     return [...this.links.keys()]
+  }
+
+  /**
+   * Your other Macs a channel is open to now, as they last said: their name,
+   * and whether they show you their sessions (MacState.sessions)
+   */
+  linkedMacs(): { id: string; name: string; sessions?: boolean }[] {
+    return [...this.links.values()].flatMap(({ channel, state }) =>
+      channel.peer.device
+        ? []
+        : [
+            {
+              id: channel.peer.id,
+              name: state?.name ?? channel.peer.name,
+              ...(state?.sessions !== undefined
+                ? { sessions: state.sessions }
+                : {}),
+            },
+          ]
+    )
   }
 
   /** Whether a peer is a device of yours (iPhone, iPad, Android), not a Mac */
@@ -530,6 +555,7 @@ export class Macs extends EventEmitter<{
       ...(collecting ? { collecting } : {}),
       ...(app ? { app } : {}),
       ...(reach.length ? { reach } : {}),
+      ...(this.options.sessions ? { sessions: this.options.sessions() } : {}),
     }
   }
 

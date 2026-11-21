@@ -6,7 +6,9 @@ import path from 'node:path'
 import { promisify } from 'node:util'
 import { localized } from '../../../../src/i18n/locale.js'
 import { SESSION_MODES } from '../../../../src/sessions/live.js'
+import type { MacAsk } from '../../../../src/macs/asks.js'
 import type {
+  MacSessions,
   SessionMode,
   SessionPlanStep,
   SessionRow,
@@ -73,7 +75,9 @@ const MOVES_FROM = new Set<SessionRow['where']>(['claude-app', 'terminal'])
  * and whether it waits for you (src/sessions), and opening one where it runs.
  * The window and your own devices (a phone, an iPad) use them, the device
  * over its sealed channel (src/macs/asks.ts): you talk there to a session
- * this Mac runs. Opening one in its terminal or app is the window's alone.
+ * this Mac runs. Your other Macs read them too (MAC_ASKS), to list them and
+ * show one's page there, and the window here reads theirs. Opening one in its
+ * terminal or app is the window's alone.
  */
 export function registerSessionsIpc(
   ipc: Ipc,
@@ -84,10 +88,18 @@ export function registerSessionsIpc(
     /** The Claude Code sessions Pacenote runs (session-host.ts) */
     host: SessionHost
     todo: Pick<TodoSettings, 'hasApp'>
+    /**
+     * Your other Macs linked to this one, and asking one of them for its
+     * sessions; none when this app does not keep your Macs
+     */
+    otherMacs?: {
+      linked: () => { id: string; name: string; sessions?: boolean }[]
+      ask: (mac: string, what: MacAsk, args: unknown[]) => Promise<unknown>
+    }
   }
 ): void {
   const { dataDir, settings, toolPath, cliBins, log } = desktop
-  const { sessions, openSessions, host, todo } = deps
+  const { sessions, openSessions, host, todo, otherMacs } = deps
   const home = homedir()
   const codexTitles = new CodexTitles(
     process.env.CODEX_HOME || path.join(home, '.codex')
@@ -256,6 +268,80 @@ export function registerSessionsIpc(
         log.warn(`Could not read the sessions on this Mac: ${error.message}`)
         throw error
       })
+  )
+
+  /** Each other Mac's read of its sessions, while one is under way */
+  const othersReading = new Map<string, SingleFlight<MacSessions>>()
+  /** The Macs that did not answer last time: said in the log once */
+  const unanswered = new Set<string>()
+  /** Another Mac's sessions, or why it shows none */
+  const otherSessions = async (mac: {
+    id: string
+    name: string
+    sessions?: boolean
+  }): Promise<MacSessions> => {
+    const shown = { id: mac.id, name: mac.name }
+    // Pacenote there says whether it shows them from 0.6.38 on
+    if (mac.sessions === undefined) return { mac: shown, missing: 'update' }
+    if (!mac.sessions || !otherMacs) return { mac: shown, missing: 'off' }
+    try {
+      const view = (await otherMacs.ask(
+        mac.id,
+        'sessions.view',
+        []
+      )) as SessionsView | null
+      unanswered.delete(mac.id)
+      return view?.on ? { mac: shown, view } : { mac: shown, missing: 'off' }
+    } catch (error) {
+      if (!unanswered.has(mac.id))
+        log.warn(
+          `Could not read the sessions on ${mac.name}: ${(error as Error).message}`
+        )
+      unanswered.add(mac.id)
+      return { mac: shown, missing: 'unreachable' }
+    }
+  }
+
+  /**
+   * The sessions on your other Macs linked to this one, each as it shows
+   * them
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:others',
+    () => [],
+    async (): Promise<MacSessions[]> => {
+      const macs = otherMacs?.linked() ?? []
+      for (const id of othersReading.keys())
+        if (!macs.some((mac) => mac.id === id)) othersReading.delete(id)
+      return Promise.all(
+        macs.map((mac) => {
+          let reading = othersReading.get(mac.id)
+          if (!reading) {
+            reading = new SingleFlight<MacSessions>()
+            othersReading.set(mac.id, reading)
+          }
+          return reading.run(() => otherSessions(mac))
+        })
+      )
+    }
+  )
+
+  /**
+   * A session's page on another of your Macs, read from there; null when
+   * that Mac is not linked or does not show its sessions. It throws while
+   * the Mac does not answer, so the page keeps what it showed.
+   */
+  ipc.windowOnly(
+    'pacenote:sessions:other-talk',
+    () => null,
+    async (macId, id): Promise<SessionTalk | null> => {
+      const mac = otherMacs?.linked().find((each) => each.id === macId)
+      if (!otherMacs || !mac?.sessions || typeof id !== 'string') return null
+      const talk = (await otherMacs.ask(mac.id, 'sessions.talk', [
+        id,
+      ])) as SessionTalk | null
+      return talk ? { ...talk, mac: { id: mac.id, name: mac.name } } : null
+    }
   )
 
   /** Opens a session where it runs; an { error } when it cannot */

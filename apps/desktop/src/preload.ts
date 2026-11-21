@@ -190,6 +190,9 @@ const bridge = {
   // Sessions: the sessions on this Mac, opening one, and its log
   sessions: {
     view: () => ipcRenderer.invoke('pacenote:sessions:view'),
+    others: () => ipcRenderer.invoke('pacenote:sessions:others'),
+    otherTalk: (mac, id) =>
+      ipcRenderer.invoke('pacenote:sessions:other-talk', mac, id),
     open: (id) => ipcRenderer.invoke('pacenote:sessions:open', id),
     talk: (id) => ipcRenderer.invoke('pacenote:sessions:talk', id),
     send: (id, message) =>
