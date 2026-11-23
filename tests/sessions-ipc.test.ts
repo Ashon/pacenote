@@ -356,6 +356,72 @@ describe('one conversation, typed into in one place at a time', () => {
     host.end('rest-1')
   })
 
+  it('sends the images you attached, refuses others, and gives each back from its log', async () => {
+    open = [resting('img-1')]
+    const shot = { mediaType: 'image/png', data: 'QUJD' }
+    await expect(
+      call('pacenote:sessions:send', 'claude:img-1', {
+        text: 'Why is this red?',
+        images: [shot],
+      })
+    ).resolves.toEqual({})
+    expect(JSON.parse(procs.at(-1)!.written.trim()).message.content).toEqual([
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/png', data: 'QUJD' },
+      },
+      { type: 'text', text: 'Why is this red?' },
+    ])
+    // Images alone go too; another kind does not, nor nothing at all
+    await expect(
+      call('pacenote:sessions:send', 'claude:img-1', { images: [shot] })
+    ).resolves.toEqual({})
+    await expect(
+      call('pacenote:sessions:send', 'claude:img-1', {
+        text: 'x',
+        images: [{ ...shot, mediaType: 'image/heic' }],
+      })
+    ).resolves.toEqual({ error: expect.stringContaining('PNG') })
+    await expect(
+      call('pacenote:sessions:send', 'claude:img-1', { text: ' ' })
+    ).resolves.toEqual({ error: expect.any(String) })
+    // Its page reads the image from Claude Code's log
+    const project = path.join(home, '.claude', 'projects', 'payments')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(
+      path.join(project, 'img-1.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'line-1',
+        sessionId: 'img-1',
+        cwd: folder,
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: 'image/png', data: 'QUJD' },
+            },
+            { type: 'text', text: 'Why is this red?' },
+          ],
+        },
+      })}\n`
+    )
+    expect((await talk('claude:img-1')).items).toMatchObject([
+      { role: 'user', images: 1, ref: 'line-1' },
+    ])
+    await expect(
+      call('pacenote:sessions:image', 'claude:img-1', 'line-1', 0)
+    ).resolves.toBe('data:image/png;base64,QUJD')
+    await expect(
+      call('pacenote:sessions:image', 'claude:img-1', 'line-1', 1)
+    ).resolves.toBeNull()
+    await expect(
+      call('pacenote:sessions:image', 'claude:img-1', 'line-1', '0')
+    ).resolves.toBeNull()
+    host.end('img-1')
+  })
+
   it('waits while it works there, and leaves claude.ai its own', async () => {
     open = [resting('busy-1', { busy: true })]
     expect((await talk('claude:busy-1')).typeIn).toBe('elsewhere')

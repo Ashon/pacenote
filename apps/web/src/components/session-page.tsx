@@ -1,3 +1,4 @@
+import { IMAGE_TYPES, IMAGES_MAX } from '@src/sessions/images'
 import { modelLabel } from '@src/sessions/live'
 import type {
   SessionAsk,
@@ -18,12 +19,14 @@ import {
   CircleDot,
   Copy,
   GitFork,
+  ImagePlus,
   ListChecks,
   MoreHorizontal,
   Power,
   ShieldCheck,
   ShieldQuestion,
   Square,
+  X,
 } from 'lucide-react'
 import {
   useCallback,
@@ -31,6 +34,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type ReactNode,
 } from 'react'
@@ -50,6 +54,12 @@ import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { usePhone } from '@/lib/phone'
 import { canShow, parseOtherId } from '@/lib/session-rows'
+import {
+  attachImage,
+  imageFiles,
+  imageUrl,
+  type Attached,
+} from '@/lib/session-images'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { MadeChip, type OpenMade } from './made-card'
@@ -61,6 +71,11 @@ import { resumeCommand } from './task-sessions'
 
 /** Close enough to the end to follow what comes next */
 const FOLLOW_PX = 80
+/**
+ * How long after your hand moved it a scroll up is yours: a flick goes on
+ * after the finger lifts
+ */
+const HAND_MS = 1500
 
 /** Room between the conversation's end and the composer floating over it */
 const DOCK_GAP_PX = 8
@@ -76,6 +91,8 @@ const COMPOSED_MS = 500
 
 /** A message being written, by session: in memory only, never on disk */
 const drafts = new Map<string, string>()
+/** And the images you attached to it, the same way */
+const imageDrafts = new Map<string, Attached[]>()
 
 const smooth = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -125,15 +142,39 @@ export function SessionPage({ id }: { id: string }) {
     const atEnd = () =>
       element.scrollHeight - element.scrollTop - element.clientHeight <
       FOLLOW_PX
+    /** When your hand last moved it: a wheel, a finger, a key, its bar */
+    let handAt = 0
+    let pressed = false
+    const byHand = () => pressed || Date.now() - handAt < HAND_MS
+    let lastTop = element.scrollTop
     const onScroll = () => {
+      const up = element.scrollTop < lastTop
+      lastTop = element.scrollTop
       if (jumping.current && !atEnd()) return
       jumping.current = false
+      // Only your hand takes it away from the end. More coming (images
+      // loading one after another) or less (the composer's images sent)
+      // moves the end, not you: it stays there
+      if (following.current && !(up && byHand())) {
+        if (!atEnd()) element.scrollTop = element.scrollHeight
+        return
+      }
       following.current = atEnd()
       setBehind(!following.current)
     }
     // Your hand on it: a jump to the end stops where you take over
     const onHand = () => {
       jumping.current = false
+      handAt = Date.now()
+    }
+    const onPress = () => {
+      pressed = true
+      onHand()
+    }
+    const onRelease = () => {
+      if (!pressed) return
+      pressed = false
+      handAt = Date.now()
     }
     // Opening a step or a summary is to read it: what comes next waits below
     const onOpen = (event: MouseEvent) => {
@@ -149,13 +190,21 @@ export function SessionPage({ id }: { id: string }) {
     observer.observe(inner, { box: 'border-box' })
     element.addEventListener('scroll', onScroll, { passive: true })
     element.addEventListener('wheel', onHand, { passive: true })
-    element.addEventListener('touchstart', onHand, { passive: true })
+    element.addEventListener('touchstart', onPress, { passive: true })
+    element.addEventListener('pointerdown', onPress)
+    element.addEventListener('keydown', onHand)
+    window.addEventListener('touchend', onRelease)
+    window.addEventListener('pointerup', onRelease)
     inner.addEventListener('click', onOpen)
     return () => {
       observer.disconnect()
       element.removeEventListener('scroll', onScroll)
       element.removeEventListener('wheel', onHand)
-      element.removeEventListener('touchstart', onHand)
+      element.removeEventListener('touchstart', onPress)
+      element.removeEventListener('pointerdown', onPress)
+      element.removeEventListener('keydown', onHand)
+      window.removeEventListener('touchend', onRelease)
+      window.removeEventListener('pointerup', onRelease)
       inner.removeEventListener('click', onOpen)
     }
   }, [loaded])
@@ -278,6 +327,7 @@ export function SessionPage({ id }: { id: string }) {
                 items={items}
                 tool={tool}
                 cwd={row.cwd}
+                session={row.id}
                 made={talk.made}
                 open={open}
                 compact={phone}
@@ -548,11 +598,13 @@ function Composer({
               ? t.placeholder.idle
               : t.placeholder.resume
       }
-      onSend={(said) => {
+      // Images go with a message, not with an answer to what it asks
+      attach={Boolean(window.pacenoteDesktop?.sessions?.attach) && !live?.ask}
+      onSend={(said, images) => {
         onSend()
         return live?.ask
           ? act.answer(live.ask.id, 'deny', said)
-          : act.send(said)
+          : act.send(said, images)
       }}
       tools={
         live?.mode && (
@@ -577,10 +629,14 @@ function Composer({
   )
 }
 
-/** A message to send, the composer's box: Enter sends, Shift+Enter a line */
+/**
+ * A message to send, the composer's box: Enter sends, Shift+Enter a line.
+ * With attach, images go with it: picked, pasted or dropped on it
+ */
 function MessageBox({
   placeholder,
   onSend,
+  attach,
   tools,
   gauge,
   stop,
@@ -589,8 +645,10 @@ function MessageBox({
   draftKey,
 }: {
   placeholder: string
-  /** Sends it; what went wrong, or nothing */
-  onSend: (said: string) => Promise<string | undefined>
+  /** Sends it, with the images attached; what went wrong, or nothing */
+  onSend: (said: string, images: Attached[]) => Promise<string | undefined>
+  /** Whether images go with it (session-images.ts) */
+  attach?: boolean
   tools?: ReactNode
   /** How full its context is, at the end of the tools */
   gauge?: ReactNode
@@ -615,28 +673,110 @@ function MessageBox({
     if (said) drafts.set(draftKey, said)
     else drafts.delete(draftKey)
   }
+  const [images, setImagesNow] = useState<Attached[]>(
+    () => (draftKey && imageDrafts.get(draftKey)) || []
+  )
+  const setImages = (change: (old: Attached[]) => Attached[]) =>
+    setImagesNow((old) => {
+      const next = change(old)
+      if (draftKey)
+        if (next.length) imageDrafts.set(draftKey, next)
+        else imageDrafts.delete(draftKey)
+      return next
+    })
+  const [dragging, setDragging] = useState(false)
+  const picker = useRef<HTMLInputElement>(null)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
   /** When a word was last put together (Korean, Japanese, Chinese) */
   const composed = useRef(0)
+  /** Images picked, pasted or dropped: made small enough, up to the most */
+  const add = async (files: readonly File[]) => {
+    if (!files.length) return
+    setError(undefined)
+    const room = IMAGES_MAX - images.length
+    if (files.length > room) setError(t.tooManyImages(IMAGES_MAX))
+    for (const file of files.slice(0, Math.max(0, room))) {
+      const image = await attachImage(file, file.name)
+      if ('refused' in image)
+        setError(image.refused === 'kind' ? t.imageKind : t.imageSize)
+      else setImages((old) => (old.length < IMAGES_MAX ? [...old, image] : old))
+    }
+  }
+  const sent = attach ? images : []
   const send = () => {
     const said = message.trim()
-    if (!said || sending) return
+    if ((!said && !sent.length) || sending) return
     setSending(true)
     setError(undefined)
-    void onSend(said).then((failed) => {
+    void onSend(said, sent).then((failed) => {
       setSending(false)
       if (failed) setError(failed)
-      else setMessage('')
+      else {
+        setMessage('')
+        if (sent.length) setImages(() => [])
+      }
     })
   }
+  const files = (event: DragEvent) =>
+    attach && event.dataTransfer.types.includes('Files')
   const submit = (event: FormEvent) => {
     event.preventDefault()
     send()
   }
   return (
     <form onSubmit={submit}>
-      <div className="rounded-[14px] border border-input bg-background shadow-float focus-within:ring-[3px] focus-within:ring-ring/40">
+      <div
+        onDragOver={(event) => {
+          if (!files(event)) return
+          event.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={(event) => {
+          // Only when it leaves the box, not one of its parts
+          if (!event.currentTarget.contains(event.relatedTarget as Node))
+            setDragging(false)
+        }}
+        onDrop={(event) => {
+          if (!files(event)) return
+          event.preventDefault()
+          setDragging(false)
+          void add(imageFiles(event.dataTransfer.files))
+        }}
+        className={cn(
+          'rounded-[14px] border border-input bg-background shadow-float focus-within:ring-[3px] focus-within:ring-ring/40',
+          dragging && 'border-primary ring-[3px] ring-ring/40'
+        )}
+      >
+        {attach && images.length > 0 && (
+          <ul
+            aria-label={t.attached(images.length)}
+            className="flex flex-wrap gap-2 px-3 pt-3"
+          >
+            {images.map((image) => (
+              <li
+                key={image.id}
+                className="relative size-16 overflow-hidden rounded-lg border border-border bg-muted"
+              >
+                <img
+                  src={imageUrl(image)}
+                  alt={image.name || t.image}
+                  className="size-full object-cover"
+                />
+                <button
+                  type="button"
+                  aria-label={t.removeImage(image.name)}
+                  onClick={() =>
+                    setImages((old) => old.filter((one) => one.id !== image.id))
+                  }
+                  className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-foreground/70 text-background hover:bg-foreground"
+                >
+                  <X aria-hidden="true" className="size-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <textarea
           aria-label={t.message}
           value={message}
@@ -644,6 +784,13 @@ function MessageBox({
           onChange={(event) => setMessage(event.target.value)}
           onCompositionEnd={() => {
             composed.current = Date.now()
+          }}
+          onPaste={(event) => {
+            // An image copied (a screenshot, a file in Finder) goes with it
+            const pasted = attach ? imageFiles(event.clipboardData.files) : []
+            if (!pasted.length) return
+            event.preventDefault()
+            void add(pasted)
           }}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && stop) {
@@ -672,6 +819,32 @@ function MessageBox({
           )}
         />
         <div className="flex min-w-0 items-center gap-2 px-2.5 pb-2.5">
+          {attach && (
+            <>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={t.attachImage}
+                title={t.attachHint}
+                disabled={images.length >= IMAGES_MAX}
+                onClick={() => picker.current?.click()}
+              >
+                <ImagePlus />
+              </Button>
+              <input
+                ref={picker}
+                type="file"
+                accept={IMAGE_TYPES.join(',')}
+                multiple
+                hidden
+                onChange={(event) => {
+                  void add(imageFiles(event.target.files))
+                  event.target.value = ''
+                }}
+              />
+            </>
+          )}
           {tools}
           <span className="flex-1" />
           {gauge}
@@ -686,7 +859,11 @@ function MessageBox({
               {t.stop}
             </Button>
           )}
-          <Button type="submit" size="sm" disabled={!message.trim() || sending}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={(!message.trim() && !sent.length) || sending}
+          >
             <ArrowUp />
             {sendLabel ?? t.send}
           </Button>
@@ -1011,10 +1188,12 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
 function useSent(
   live: SessionLive | undefined,
   items: SessionTalk['items'] | undefined
-): { text: string; queued: boolean }[] {
+): { text: string; queued: boolean; images?: number }[] {
   const queued = live?.queued
   const since = live?.since
-  const [read, setRead] = useState<{ text: string; at: number }[]>([])
+  const [read, setRead] = useState<
+    { text: string; at: number; images?: number }[]
+  >([])
   const before = useRef(queued)
   useEffect(() => {
     const gone = (before.current ?? []).filter(
@@ -1024,7 +1203,11 @@ function useSent(
     if (gone.length)
       setRead((old) => [
         ...old,
-        ...gone.map((one) => ({ text: one.text, at: Date.now() })),
+        ...gone.map((one) => ({
+          text: one.text,
+          at: Date.now(),
+          ...(one.images ? { images: one.images } : {}),
+        })),
       ])
   }, [queued])
   // In its log now, or long enough
@@ -1047,9 +1230,14 @@ function useSent(
     return () => clearTimeout(timer)
   }, [read, said])
   return [
-    ...read.map((one) => ({ text: one.text, queued: false })),
+    ...read.map((one) => ({
+      text: one.text,
+      queued: false,
+      images: one.images,
+    })),
     ...(queued ?? []).map((one) => ({
       text: one.text,
+      images: one.images,
       queued: !!since && Date.parse(one.at) > Date.parse(since),
     })),
   ]

@@ -6,6 +6,7 @@ import type {
   SessionsView,
   SessionTalk,
 } from '@src/sessions/types'
+import type { SessionImage } from '@src/sessions/images'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { remoteMac } from './desktop'
@@ -190,8 +191,24 @@ export function useSessionActions(id: string) {
     return result
   }
   return {
-    send: async (message: string) =>
-      (await after(bridge?.send(id, message))).error,
+    /** What you typed, and the images attached to it (session-images.ts) */
+    send: async (message: string, images: readonly SessionImage[] = []) =>
+      (
+        await after(
+          bridge?.send(
+            id,
+            images.length
+              ? {
+                  text: message,
+                  images: images.map(({ mediaType, data }) => ({
+                    mediaType,
+                    data,
+                  })),
+                }
+              : message
+          )
+        )
+      ).error,
     copy: (message: string) => after(bridge?.copy(id, message)),
     answer: async (
       ask: string,
@@ -203,6 +220,22 @@ export function useSessionActions(id: string) {
     mode: async (mode: SessionMode) =>
       (await after(bridge?.mode(id, mode))).error,
   }
+}
+
+/**
+ * An image sent with a turn of a session, from its log (SessionItem's ref and
+ * its place in the turn): a data: URL, kept while the page is open. Null on
+ * a Mac or device that does not give them: the turn says how many it had.
+ */
+export function useSessionImage(id: string, ref: string, index: number) {
+  const bridge = window.pacenoteDesktop?.sessions
+  return useQuery({
+    queryKey: ['session-image', id, ref, index],
+    queryFn: async () => (await bridge?.image?.(id, ref, index)) ?? null,
+    enabled: Boolean(bridge?.image),
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+  })
 }
 
 /**

@@ -68,6 +68,8 @@ const en = {
     'It did not close where it is open, so it stays there for now.',
   sessionOnlyClaude: 'Only Claude Code sessions continue here for now.',
   emptyMessage: 'Type something to send first.',
+  imagesRefused:
+    'Those images could not go with it: PNG, JPEG, GIF or WebP, up to 10, each at most 1 MB.',
   sessionsOff:
     'Turn on Settings > Todo > Sessions on this Mac to run sessions in Pacenote.',
   notYourFolder:
@@ -150,6 +152,8 @@ const ko: typeof en = {
   sessionNotMoved: '열려 있는 곳에서 닫히지 않아서 아직 그곳에 있어요.',
   sessionOnlyClaude: '지금은 Claude Code 세션만 여기서 이어 갈 수 있어요.',
   emptyMessage: '먼저 보낼 말을 입력하세요.',
+  imagesRefused:
+    '이 이미지는 함께 보낼 수 없어요. PNG, JPEG, GIF, WebP만, 10장까지, 장당 1MB까지 보낼 수 있어요.',
   sessionsOff:
     'Pacenote에서 세션을 돌리려면 설정 > 할 일 > 이 Mac의 세션을 켜세요.',
   notYourFolder:

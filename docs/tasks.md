@@ -303,6 +303,11 @@ on, from the switch or from the screen's card, which says what it reads first.
 - **A new one:** **New session**, at the top of the screen, starts a Claude Code session in Pacenote in a folder you
   choose, with a first message of yours. One for a task starts from the task's **Continue here** (see
   [Continuing a task](#continuing-a-task)).
+- **Images with a message:** to a Claude Code session Pacenote runs, paste an image into the message box, drop one on
+  it or pick some with its image button (PNG, JPEG, GIF or WebP, up to 10 a message). Each goes at most 1568 pixels on
+  its longest side and 1 MB, made smaller on the way when it is larger (Claude looks at no more). They go to Claude
+  Code as images pasted into it do and stay in its own log; Pacenote keeps none of them. Your turn shows them, and one
+  opens larger. A phone, iPad or other Mac shows how many there were.
 - **How long it runs:** a session Pacenote runs keeps running with the window closed, until you end it (**End it
   here**, in the page's menu) or it has had nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks
   first.

@@ -129,6 +129,24 @@ describe('the lines Pacenote writes to a session', () => {
     })
   })
 
+  it('sends the images you attached before what you typed', () => {
+    expect(
+      parse(userLine('Why?', [{ mediaType: 'image/png', data: 'QUJD' }]))
+    ).toEqual({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/png', data: 'QUJD' },
+          },
+          { type: 'text', text: 'Why?' },
+        ],
+      },
+    })
+  })
+
   it('allows with the input as asked, and keeps a rule for the session alone', () => {
     expect(parse(answerLine('r1', bash, 'allow'))).toEqual({
       type: 'control_response',

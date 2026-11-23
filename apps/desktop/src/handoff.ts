@@ -15,6 +15,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { imageOfContent } from '../../../src/sessions/images.js'
 import { MadeReader } from '../../../src/sessions/made.js'
 import { PlanReader } from '../../../src/sessions/plan.js'
 import type { MadeThing, SessionPlanStep } from '../../../src/sessions/types.js'
@@ -767,6 +768,32 @@ export function readSessionLog(
 }
 
 /**
+ * An image of a turn in a Claude Code session's log, by the turn's line
+ * (SessionItem's ref) and its place among the turn's images: a data: URL for
+ * its page, or undefined when the log has no such image
+ */
+export function readSessionImage(
+  file: string,
+  ref: string,
+  index: number
+): string | undefined {
+  if (!Number.isInteger(index) || index < 0) return undefined
+  const marker = `"uuid":${JSON.stringify(ref)}`
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (!line.includes(marker)) continue
+    try {
+      const event = JSON.parse(line) as Record<string, unknown>
+      if (event.uuid !== ref) continue
+      const message = event.message as { content?: unknown } | undefined
+      return imageOfContent(message?.content, index)
+    } catch {
+      continue
+    }
+  }
+  return undefined
+}
+
+/**
  * A session's log as its page shows it: its turns and steps
  * (readSessionLog), the plan Claude Code keeps while it works, and what it
  * made (on claude.ai, or files in its folder, cwd, a Codex answer linked)
@@ -853,6 +880,9 @@ export function readSessionTalk(
           text,
           at,
           ...(images ? { images } : {}),
+          ...(images && typeof event.uuid === 'string'
+            ? { ref: event.uuid }
+            : {}),
           ...(event.isCompactSummary === true ? { compacted: true } : {}),
         })
       continue

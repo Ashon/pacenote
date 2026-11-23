@@ -31,6 +31,7 @@ import {
   openSession,
   lastActive,
   readSessionLog,
+  readSessionImage,
   readSessionTalk,
   resumeCommand,
   resumeSession,
@@ -986,6 +987,48 @@ describe("the tools' own session logs", () => {
       { text: 'Read it', state: 'done' },
       { text: 'Fix it', state: 'doing', doing: 'Fixing it' },
     ])
+  })
+
+  it('keeps the line of a turn with images, and reads each image from it', () => {
+    const file = path.join(dir('images'), 'claude.jsonl')
+    const image = (type: string, data: string) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: type, data },
+    })
+    writeFileSync(
+      file,
+      [
+        {
+          type: 'user',
+          uuid: 'u-1',
+          message: {
+            role: 'user',
+            content: [
+              image('image/png', 'QUJD'),
+              image('image/jpeg', 'REVG'),
+              { type: 'text', text: 'Why is this red?' },
+            ],
+          },
+        },
+        {
+          type: 'user',
+          uuid: 'u-2',
+          message: { role: 'user', content: 'And this?' },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join('\n')
+    )
+    expect(readSessionLog(file, 'claude')).toEqual([
+      { role: 'user', text: 'Why is this red?', images: 2, ref: 'u-1' },
+      { role: 'user', text: 'And this?' },
+    ])
+    expect(readSessionImage(file, 'u-1', 0)).toBe('data:image/png;base64,QUJD')
+    expect(readSessionImage(file, 'u-1', 1)).toBe('data:image/jpeg;base64,REVG')
+    expect(readSessionImage(file, 'u-1', 2)).toBeUndefined()
+    expect(readSessionImage(file, 'u-2', 0)).toBeUndefined()
+    expect(readSessionImage(file, 'u-9', 0)).toBeUndefined()
+    expect(readSessionImage(file, 'u-1', -1)).toBeUndefined()
   })
 })
 

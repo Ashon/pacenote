@@ -1,4 +1,5 @@
 import { redactSecrets } from '../broker/redact.js'
+import { messageContent, type SessionImage } from './images.js'
 import type { SessionAsk, SessionAskKind, SessionMode } from './types.js'
 
 /**
@@ -106,9 +107,12 @@ export function askOf(id: string, request: CanUseTool, at: string): SessionAsk {
 
 const line = (value: unknown) => `${JSON.stringify(value)}\n`
 
-/** Something you typed, for its next turn */
-export const userLine = (text: string) =>
-  line({ type: 'user', message: { role: 'user', content: text } })
+/** Something you typed, with the images you sent with it, for its next turn */
+export const userLine = (text: string, images: readonly SessionImage[] = []) =>
+  line({
+    type: 'user',
+    message: { role: 'user', content: messageContent(text, images) },
+  })
 
 /**
  * Your answer to an ask: go ahead, go ahead and stop asking for this in the

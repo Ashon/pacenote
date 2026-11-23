@@ -129,6 +129,41 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     ])
   })
 
+  it('sends the images you attached, queued with what you typed until Claude Code reads it', async () => {
+    const { h, procs } = host()
+    const shot = { mediaType: 'image/png' as const, data: 'QUJD' }
+    await h.send('s1', '/w/pay', 'Why is this red?', [shot, shot])
+    const proc = procs[0]!
+    await tick()
+    expect(proc.written.at(-1)).toMatchObject({
+      type: 'user',
+      message: {
+        content: [
+          { type: 'image', source: { data: 'QUJD' } },
+          { type: 'image' },
+          { type: 'text', text: 'Why is this red?' },
+        ],
+      },
+    })
+    expect(h.get('s1')?.queued).toMatchObject([
+      { text: 'Why is this red?', images: 2 },
+    ])
+    // Told back as it was sent: images, then the words
+    proc.say({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'image', source: {} },
+          { type: 'text', text: 'Why is this red?' },
+        ],
+      },
+      isReplay: true,
+    })
+    await tick()
+    expect(h.get('s1')?.queued).toBeUndefined()
+  })
+
   it('keeps what you sent queued until Claude Code reads it, and tells when its turn is done', async () => {
     const done: string[][] = []
     const { h, procs } = host({

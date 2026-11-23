@@ -62,6 +62,7 @@ import type {
 import type { TasksLive } from './tasks/types.js'
 import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
+import type { SessionMessage } from './sessions/images.js'
 import type {
   MacSessions,
   NewSessionDraft,
@@ -462,8 +463,23 @@ export interface DesktopBridge {
       key: string,
       how: 'open' | 'show'
     ): Promise<{ error?: string }>
-    /** Sends what you typed: Pacenote runs it from then on */
-    send(id: string, message: string): Promise<{ error?: string }>
+    /**
+     * Sends what you typed, with the images you attached: Pacenote runs it
+     * from then on
+     */
+    send(
+      id: string,
+      message: string | SessionMessage
+    ): Promise<{ error?: string }>
+    /**
+     * Whether images go with what you send (src/sessions/images.ts): the
+     * desktop app's; a device's once its Mac takes them
+     */
+    attach?: boolean
+    /**
+     * An image sent with a turn, from the session's log: a data: URL, or null
+     */
+    image?(id: string, ref: string, index: number): Promise<string | null>
     /**
      * Continues a session open somewhere else in a copy Pacenote runs; the
      * copy's id

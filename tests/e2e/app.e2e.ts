@@ -3401,10 +3401,12 @@ else fail('unexpected: ' + args.join(' '))
     await page.getByText(/^Opus 5\.5 · \d+%$/).waitFor()
     await plan.click()
     await page.getByText('Run the webhook tests', { exact: true }).waitFor()
-    // Scrolled up: a way back to the latest
+    // Scrolled up with the wheel: a way back to the latest (only your hand
+    // takes it away from the end)
     await page
-      .locator('[data-radix-scroll-area-viewport]:has([data-page-crumbs])')
-      .evaluate((element) => element.scrollTo(0, 0))
+      .getByText('The failing test reads the delay before the first retry.')
+      .hover()
+    await page.mouse.wheel(0, -20_000)
     const latest = page.getByRole('button', { name: 'Latest' })
     await latest.waitFor()
     await page.screenshot({
@@ -3790,6 +3792,181 @@ else fail('unexpected: ' + args.join(' '))
       new RegExp(`#/sessions/claude:${session}$`)
     )
     expect(existsSync(opened)).toBe(false)
+  }, 120_000)
+
+  it('sends images with a message to a session Pacenote runs: picked or pasted, made small enough, shown in your turn and opened larger', async () => {
+    world = await World.create()
+    const { home, root } = world
+    mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
+    const checkout = realpathSync(path.join(root, 'git', 'payments'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    saveRepo(home, 'Ashon/payments', checkout)
+    const now = Date.now()
+    const [fix] = addTasks(
+      home,
+      [
+        {
+          title: 'Fix the flaky webhook retry test',
+          asked_by: 'hyun',
+          where: '#payments',
+          link: `https://acme.slack.com/archives/C0PAY/p${Math.floor((now - 3_600_000) / 1000)}000200`,
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+          summary: 'hyun says the webhook retry test fails one run in ten.',
+        },
+      ],
+      {
+        settings: { on: true, dms: false, exclude: [] },
+        now: new Date(now - 3_600_000),
+      }
+    ).added as [NonNullable<ReturnType<typeof addTasks>['added'][0]>]
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    // A screenshot of Todo, at the window's own scale: larger than Claude
+    // looks at, so it goes smaller
+    const row = page.locator(`[data-task-row="${fix.id}"]`)
+    await row.waitFor({ timeout: 30_000 })
+    const todo = path.join(root, 'todo.png')
+    await page.screenshot({ path: todo })
+    await row
+      .getByRole('button', { name: 'Continue here' })
+      .click({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Start', exact: true }).click()
+    await page
+      .getByText(/^Here is my plan for "Fix the flaky webhook retry test"/)
+      .waitFor({ timeout: 30_000 })
+    const message = page.getByRole('textbox', { name: 'Message' })
+
+    // Picked with the image button's picker
+    await page.locator('input[type="file"]').setInputFiles(todo)
+    const attached = page.getByRole('list', { name: 'An image goes with it' })
+    await attached.getByRole('img', { name: 'todo.png' }).waitFor()
+    // Pasted, as a screenshot copied to the clipboard is
+    await message.click()
+    await page.evaluate(`(async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 480
+      canvas.height = 300
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#fff7ed'
+      context.fillRect(0, 0, 480, 300)
+      context.fillStyle = '#9a3412'
+      context.font = '20px monospace'
+      context.fillText('FAIL test/webhook-retry.test.ts', 24, 64)
+      context.fillText('  retries after the backoff', 24, 104)
+      context.fillText('  expected 2000, got 1000', 24, 144)
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      const clipboard = new DataTransfer()
+      clipboard.items.add(new File([blob], 'failing.png', { type: 'image/png' }))
+      document.activeElement.dispatchEvent(
+        new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true })
+      )
+    })()`)
+    const both = page.getByRole('list', { name: '2 images go with it' })
+    await both.getByRole('img', { name: 'failing.png' }).waitFor()
+    // A kind Claude does not take is left out, and it says so
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'photo.heic',
+      mimeType: 'image/heic',
+      buffer: Buffer.from('not an image Claude takes'),
+    })
+    await page
+      .getByText('Only PNG, JPEG, GIF or WebP images go with a message.')
+      .waitFor()
+    expect(await both.getByRole('listitem').count()).toBe(2)
+    await message.fill('Why does the retry test fail here?')
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-images-attached.png'),
+    })
+    await page.getByRole('button', { name: 'Send', exact: true }).click()
+
+    // Its answer, and your turn shows the images, one opened larger
+    await page
+      .getByText(
+        'I see 2 screenshots: the webhook retry test fails on its second attempt, after the 2s backoff.'
+      )
+      .waitFor({ timeout: 30_000 })
+    expect(await both.count()).toBe(0)
+    await page.getByRole('button', { name: 'Open image 2' }).waitFor()
+    // The images loading one after another keep it at the end, its answer
+    // in sight
+    await page.waitForTimeout(500)
+    expect(await page.getByRole('button', { name: 'Latest' }).count()).toBe(0)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-images-sent.png'),
+    })
+    await page.getByRole('button', { name: 'Open image 1' }).click()
+    const large = page.getByRole('dialog')
+    await large.getByRole('img', { name: 'Image 1' }).waitFor()
+    await page.evaluate(
+      `Promise.all(document.getAnimations()
+        .filter((each) => each.effect?.getTiming().iterations !== Infinity)
+        .map((each) => each.finished.catch(() => undefined)))`
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-images-open.png'),
+    })
+    await page.keyboard.press('Escape')
+    await large.waitFor({ state: 'detached' })
+
+    // What Claude Code got: the images first, each at most 1 MB and 1568
+    // pixels on its longest side, then what you typed
+    const [run] = world
+      .claudeCalls()
+      .filter((call) => call.args.includes('--permission-prompt-tool'))
+    const session = run!.args[run!.args.indexOf('--session-id') + 1]!
+    const transcript = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[/.]/g, '-'),
+      `${session}.jsonl`
+    )
+    const sent = readFileSync(transcript, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            type: string
+            message?: { content: unknown }
+          }
+      )
+      .find(
+        (line) => line.type === 'user' && Array.isArray(line.message?.content)
+      )!.message!.content as {
+      type: string
+      text?: string
+      source?: { media_type: string; data: string }
+    }[]
+    expect(sent.map((block) => block.type)).toEqual(['image', 'image', 'text'])
+    expect(sent[2]!.text).toBe('Why does the retry test fail here?')
+    const [large1, pasted] = sent.map((block) =>
+      block.source ? Buffer.from(block.source.data, 'base64') : undefined
+    )
+    expect(large1!.length).toBeLessThanOrEqual(1024 * 1024)
+    expect(pasted!.length).toBeLessThanOrEqual(1024 * 1024)
+    // The pasted one fits, so it goes as it was
+    expect(sent[1]!.source!.media_type).toBe('image/png')
+    expect(pasted!.readUInt32BE(16)).toBe(480)
+    // The screenshot was larger than Claude looks at
+    const shot = readFileSync(todo)
+    if (sent[0]!.source!.media_type === 'image/png') {
+      const width = large1!.readUInt32BE(16)
+      const height = large1!.readUInt32BE(20)
+      expect(Math.max(width, height)).toBeLessThanOrEqual(1568)
+      if (Math.max(shot.readUInt32BE(16), shot.readUInt32BE(20)) > 1568)
+        expect(width).toBeLessThan(shot.readUInt32BE(16))
+    } else expect(sent[0]!.source!.media_type).toBe('image/jpeg')
   }, 120_000)
 
   it("says when a task's quiet session looks done: it closes with how it ended, and what is left becomes a task", async () => {

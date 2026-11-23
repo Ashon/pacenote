@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { localized } from '../../../../src/i18n/locale.js'
+import { cleanMessage } from '../../../../src/sessions/images.js'
 import { SESSION_MODES } from '../../../../src/sessions/live.js'
 import type { MacAsk } from '../../../../src/macs/asks.js'
 import type {
@@ -34,7 +35,12 @@ import {
 } from '../../../../src/tasks/work.js'
 import { addYourTask } from '../../../../src/tasks/write.js'
 import { readYou } from '../../../../src/you/store.js'
-import { codexThreadLink, openLink, readSessionTalk } from '../handoff.js'
+import {
+  codexThreadLink,
+  openLink,
+  readSessionImage,
+  readSessionTalk,
+} from '../handoff.js'
 import { text } from '../main.text.js'
 import {
   claudeLog,
@@ -612,15 +618,20 @@ export function registerSessionsIpc(
     }
   )
 
-  /** A Claude Code session you type to here, and what you typed */
+  /**
+   * A Claude Code session you type to here, what you typed and the images
+   * you sent with it (src/sessions/images.ts)
+   */
   const typedTo = async (id: unknown, message: unknown) => {
     const t = localized(text)
     const row = await rowOf(id)
     if (!row) return { error: t.noSuchSession }
     if (row.tool !== 'claude') return { error: t.sessionOnlyClaude }
-    const said = typeof message === 'string' ? message.trim() : ''
-    if (!said) return { error: t.emptyMessage }
-    return { row, said: said.slice(0, MESSAGE_CHARS) }
+    const sent = cleanMessage(message)
+    if ('refused' in sent) return { error: t.imagesRefused }
+    const said = sent.text.trim()
+    if (!said && !sent.images.length) return { error: t.emptyMessage }
+    return { row, said: said.slice(0, MESSAGE_CHARS), images: sent.images }
   }
 
   /**
@@ -644,8 +655,34 @@ export function registerSessionsIpc(
       // Open somewhere else as well: it moves here, the place you type in
       const moved = await moveHere(to.row.session, where === 'move')
       if (moved.error) return moved
-      const sent = await host.send(to.row.session, to.row.cwd, to.said)
+      const sent = await host.send(
+        to.row.session,
+        to.row.cwd,
+        to.said,
+        to.images
+      )
       return sent.error ? { error: localized(text).sessionNotHere } : {}
+    }
+  )
+
+  /**
+   * An image sent with a turn of a Claude Code session, from its log: a
+   * data: URL for its page (SessionItem's ref, and its place in the turn)
+   */
+  ipc.handleDenying(
+    'pacenote:sessions:image',
+    () => null,
+    async (id, ref, index): Promise<string | null> => {
+      if (typeof ref !== 'string' || typeof index !== 'number') return null
+      const row = await rowOf(id)
+      if (row?.tool !== 'claude') return null
+      const file = logOf(row)
+      if (!file) return null
+      try {
+        return readSessionImage(file, ref, index) ?? null
+      } catch {
+        return null
+      }
     }
   )
 

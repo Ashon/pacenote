@@ -48,6 +48,8 @@ export const DEVICE_READS = {
   // (MAC_ASKS), over its sealed channel, and to nothing else
   'sessions.view': 'pacenote:sessions:view',
   'sessions.talk': 'pacenote:sessions:talk',
+  // An image sent with a turn, from its log (a Mac before 0.6.42 has none)
+  'sessions.image': 'pacenote:sessions:image',
 } as const satisfies Partial<Record<BridgeCall, `pacenote:${string}`>>
 
 /** What a device may change on the Mac, as you would there */

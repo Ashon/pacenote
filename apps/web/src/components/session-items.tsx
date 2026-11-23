@@ -44,8 +44,11 @@ import {
 } from 'react'
 import { Markdown } from '@/components/markdown'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { SkeletonBlock } from '@/components/ui/skeleton'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
+import { useSessionImage } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { MadeCard, type OpenMade } from './made-card'
 import { text } from './session-items.text'
@@ -135,10 +138,13 @@ export function TalkItems({
   made,
   open,
   compact,
+  session,
 }: {
   items: readonly SessionItem[]
   tool: string
   cwd: string
+  /** Its id, for the images sent with your turns: their count without it */
+  session?: string
   /** What it made, for the cards its items name */
   made?: readonly MadeThing[]
   /** Opens a file it made: on the Mac it runs on */
@@ -150,7 +156,9 @@ export function TalkItems({
     if (block.kind === 'steps')
       return <Steps key={block.at} items={block.items} cwd={cwd} />
     if (block.kind === 'turn')
-      return <Turn key={block.at} item={block.item} tool={tool} />
+      return (
+        <Turn key={block.at} item={block.item} tool={tool} session={session} />
+      )
     const things = block.keys.flatMap(
       (key) => made?.filter((thing) => thing.key === key) ?? []
     )
@@ -364,9 +372,16 @@ function Answer({ text: said }: { text: string }) {
   )
 }
 
-function Turn({ item, tool }: { item: SessionItem; tool: string }) {
+function Turn({
+  item,
+  tool,
+  session,
+}: {
+  item: SessionItem
+  tool: string
+  session?: string
+}) {
   const r = useText(rowText)
-  const t = useText(text)
   if (item.role === 'assistant')
     return (
       <Bubble
@@ -401,13 +416,101 @@ function Turn({ item, tool }: { item: SessionItem; tool: string }) {
           <Part key={index} part={part} />
         ))}
       </Folded>
-      {!!item.images && (
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-background px-2.5 py-0.5 text-meta text-muted-foreground">
-          <ImageIcon aria-hidden="true" className="size-3.5" />
-          {t.images(item.images)}
-        </span>
-      )}
+      {!!item.images &&
+        (session && item.ref ? (
+          <TurnImages session={session} line={item.ref} count={item.images} />
+        ) : (
+          <ImagesChip count={item.images} />
+        ))}
     </Bubble>
+  )
+}
+
+/** How many images went with a turn, where they cannot be shown */
+function ImagesChip({ count }: { count: number }) {
+  const t = useText(text)
+  return (
+    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-background px-2.5 py-0.5 text-meta text-muted-foreground">
+      <ImageIcon aria-hidden="true" className="size-3.5" />
+      {t.images(count)}
+    </span>
+  )
+}
+
+/**
+ * The images sent with a turn of yours, each from its log (its line, and
+ * its place in the turn), opened large on a click; their count on a Mac or
+ * device that does not give them
+ */
+function TurnImages({
+  session,
+  line,
+  count,
+}: {
+  session: string
+  line: string
+  count: number
+}) {
+  if (!window.pacenoteDesktop?.sessions?.image)
+    return <ImagesChip count={count} />
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {Array.from({ length: count }, (_, index) => (
+        <TurnImage key={index} session={session} line={line} index={index} />
+      ))}
+    </ul>
+  )
+}
+
+function TurnImage({
+  session,
+  line,
+  index,
+}: {
+  session: string
+  line: string
+  index: number
+}) {
+  const t = useText(text)
+  const image = useSessionImage(session, line, index)
+  const [open, setOpen] = useState(false)
+  if (image.isPending)
+    return (
+      <li aria-hidden="true" className="motion-skeleton">
+        <SkeletonBlock className="size-24 rounded-lg" />
+      </li>
+    )
+  if (!image.data)
+    return (
+      <li>
+        <ImagesChip count={1} />
+      </li>
+    )
+  return (
+    <li>
+      <button
+        type="button"
+        aria-label={t.openImage(index + 1)}
+        onClick={() => setOpen(true)}
+        className="block overflow-hidden rounded-lg border border-border bg-background hover:opacity-90"
+      >
+        <img
+          src={image.data}
+          alt=""
+          className="max-h-40 max-w-60 object-contain"
+        />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] max-w-[90vw] overflow-hidden p-2">
+          <DialogTitle className="sr-only">{t.image(index + 1)}</DialogTitle>
+          <img
+            src={image.data}
+            alt={t.image(index + 1)}
+            className="max-h-[calc(90vh-1rem)] max-w-[calc(90vw-1rem)] object-contain"
+          />
+        </DialogContent>
+      </Dialog>
+    </li>
   )
 }
 
@@ -641,7 +744,7 @@ function Steps({ items, cwd }: { items: SessionItem[]; cwd: string }) {
 export function SentItems({
   sent,
 }: {
-  sent: readonly { text: string; queued: boolean }[]
+  sent: readonly { text: string; queued: boolean; images?: number }[]
 }) {
   const r = useText(rowText)
   const t = useText(text)
@@ -662,11 +765,14 @@ export function SentItems({
         )
       }
     >
-      <Folded>
-        <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
-          {one.text}
-        </p>
-      </Folded>
+      {one.text && (
+        <Folded>
+          <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
+            {one.text}
+          </p>
+        </Folded>
+      )}
+      {!!one.images && <ImagesChip count={one.images} />}
     </Bubble>
   ))
 }

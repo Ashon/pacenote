@@ -540,6 +540,11 @@ export interface SessionItem {
   /** Images sent with a turn of yours */
   images?: number
   /**
+   * Its line in the log (Claude Code's uuid), when it has images: the page
+   * asks for each by it (readSessionImage)
+   */
+  ref?: string
+  /**
    * Claude Code's summary of what came before, when it compacted the
    * conversation: the turn of yours it starts again from
    */

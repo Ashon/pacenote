@@ -129,7 +129,16 @@ if (args.includes('--permission-prompt-tool')) {
       ...extra,
     })
   }
-  const turn = async (said) => {
+  // What you sent: what you typed, or image blocks and then what you typed
+  const turn = async (content) => {
+    const blocks = Array.isArray(content) ? content : []
+    const said = Array.isArray(content)
+      ? blocks
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text)
+          .join('\n\n')
+      : content
+    const images = blocks.filter((block) => block.type === 'image').length
     turns++
     out({
       type: 'system',
@@ -142,10 +151,27 @@ if (args.includes('--permission-prompt-tool')) {
     if (args.includes('--replay-user-messages'))
       out({
         type: 'user',
-        message: { role: 'user', content: said },
+        message: { role: 'user', content },
         isReplay: true,
       })
-    log({ type: 'user', message: { role: 'user', content: said } })
+    log({
+      type: 'user',
+      uuid: randomUUID(),
+      message: { role: 'user', content },
+    })
+    // Images: it says what it sees, and asks nothing
+    if (images) {
+      const content = [
+        {
+          type: 'text',
+          text: `I see ${images === 1 ? 'the screenshot' : `${images} screenshots`}: the webhook retry test fails on its second attempt, after the 2s backoff.`,
+        },
+      ]
+      log({ type: 'assistant', message: { role: 'assistant', content } })
+      out({ type: 'assistant', message: { content } })
+      done()
+      return
+    }
     // A list of work: its plan (TaskCreate, TaskUpdate), the first step
     // done and the second under way when its turn ends
     if (/^Work through/.test(said)) {
@@ -308,8 +334,8 @@ if (args.includes('--permission-prompt-tool')) {
   input.on('line', (line) => {
     const message = JSON.parse(line)
     if (message.type === 'user') {
-      const said = message.message.content
-      queue = queue.then(() => turn(said))
+      const content = message.message.content
+      queue = queue.then(() => turn(content))
     } else if (
       message.type === 'control_response' &&
       pending?.request_id === message.response.request_id

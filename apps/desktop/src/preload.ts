@@ -216,6 +216,9 @@ const bridge = {
       ipcRenderer.invoke('pacenote:sessions:openMade', id, key, how),
     send: (id, message) =>
       ipcRenderer.invoke('pacenote:sessions:send', id, message),
+    attach: true,
+    image: (id, ref, index) =>
+      ipcRenderer.invoke('pacenote:sessions:image', id, ref, index),
     copy: (id, message) =>
       ipcRenderer.invoke('pacenote:sessions:copy', id, message),
     answer: (id, ask, answer, message) =>

@@ -152,7 +152,7 @@ export interface SessionLive {
    * What you sent that Claude Code has not read yet, oldest first: it reads
    * each once the step it is on is done
    */
-  queued?: { text: string; at: string }[]
+  queued?: { text: string; at: string; images?: number }[]
   /** The model it runs on, as Claude Code names it: claude-opus-5-5 */
   model?: string
   /**

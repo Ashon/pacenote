@@ -15,6 +15,7 @@ import {
   refuseLine,
   userLine,
 } from '../../../src/sessions/live.js'
+import type { SessionImage } from '../../../src/sessions/images.js'
 import type {
   SessionAsk,
   SessionAskKind,
@@ -195,7 +196,8 @@ export class SessionHost {
   async send(
     session: string,
     cwd: string,
-    text: string
+    text: string,
+    images: readonly SessionImage[] = []
   ): Promise<{ error?: string }> {
     let running = this.hosted.get(session)
     let mode: SessionMode | undefined
@@ -211,7 +213,7 @@ export class SessionHost {
       this.start(session, cwd, { kind: 'resume', ...(mode ? { mode } : {}) })
     if ('error' in h) return h
     if (mode) h.live.mode = mode
-    return this.write(h, userLine(text), true, text)
+    return this.write(h, userLine(text, images), true, text, images.length)
   }
 
   /**
@@ -389,7 +391,8 @@ export class SessionHost {
     h: Hosted,
     line: string,
     typed: boolean,
-    said?: string
+    said?: string,
+    images = 0
   ): { error?: string } {
     if (!h.proc.stdin?.writable) return { error: 'gone' }
     h.proc.stdin.write(line)
@@ -399,6 +402,7 @@ export class SessionHost {
         {
           text: said.slice(0, QUEUED_CHARS),
           at: new Date().toISOString(),
+          ...(images ? { images } : {}),
         },
       ]
     if (typed) {
@@ -553,8 +557,17 @@ export class SessionHost {
     const queued = h.live.queued ?? []
     const content = (event.message as { content?: unknown } | undefined)
       ?.content
-    const said =
-      typeof content === 'string' ? content.slice(0, QUEUED_CHARS) : ''
+    // What you typed, after the images sent with it
+    const said = (
+      typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? (content as { type?: string; text?: string }[])
+              .filter((block) => block?.type === 'text')
+              .map((block) => block.text ?? '')
+              .join('\n')
+          : ''
+    ).slice(0, QUEUED_CHARS)
     const at = queued.findIndex((sent) => sent.text === said)
     const left = queued.filter((_, index) => index !== (at < 0 ? 0 : at))
     h.live.queued = left.length ? left : undefined
