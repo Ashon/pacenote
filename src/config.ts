@@ -237,6 +237,11 @@ export const EnvSchema = z.object({
    * pairs) filled in by that CLI: its project, what kind it is, what to know
    */
   TASKS_FILL: z.enum(['on', 'off']).default('on'),
+  /**
+   * Open tasks of one project that are one piece of work, suggested as a
+   * group by that CLI, and each group you make filled in by it
+   */
+  TASKS_BUNDLE: z.enum(['on', 'off']).default('on'),
   /** opencode's provider/model for it; empty: opencode's own default */
   TASKS_AI_OPENCODE_MODEL: z.string().optional(),
 

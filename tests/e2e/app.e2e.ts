@@ -27,7 +27,7 @@ import { HistoryReader } from '../../src/history/reader.js'
 import { HistoryStore } from '../../src/history/recorder.js'
 import { saveRepo } from '../../src/tasks/folders.js'
 import { handOverTasks } from '../../src/tasks/hand-over.js'
-import { decide, readTasks } from '../../src/tasks/store.js'
+import { allTaskViews, decide, readTasks } from '../../src/tasks/store.js'
 import { addWork } from '../../src/tasks/work.js'
 import { addTasks, closeTask } from '../../src/tasks/write.js'
 import { withHub } from './support/hub.js'
@@ -4368,6 +4368,260 @@ else fail('unexpected: ' + args.join(' '))
       path: path.join(REPO, 'test-results/todo-handed-over.png'),
     })
   })
+
+  it('groups tasks that are one piece of work as your AI suggests, fills the group in, continues it in one session and closes it with Done all', async () => {
+    world = await World.create([])
+    const { home, root } = world
+    mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
+    const checkout = realpathSync(path.join(root, 'git', 'payments'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    execFileSync(
+      'git',
+      ['remote', 'add', 'origin', 'https://github.com/Ashon/payments.git'],
+      { cwd: checkout }
+    )
+    saveRepo(home, 'Ashon/payments', checkout)
+    const HOUR = 3_600_000
+    const now = Date.now()
+    let k = 0
+    const ask = (title: string, asked_by: string, extra: object = {}) => ({
+      title,
+      asked_by,
+      where: '#payments',
+      link: `https://acme.slack.com/archives/C0PAYMENTS/p${Math.floor((now - 3 * HOUR) / 1000) + ++k}000100`,
+      confidence: 'sure' as const,
+      repo: 'Ashon/payments',
+      ...extra,
+    })
+    const [limit, review, runbook] = addTasks(
+      home,
+      [
+        ask('Raise the webhook retry limit to 5', 'hyun', { action: 'code' }),
+        ask('Review the webhook retry PR', 'mina', { due: 'Thursday' }),
+        ask('Update the webhook runbook for the new retries', 'jin'),
+      ],
+      {
+        settings: { on: true, dms: false, exclude: [] },
+        now: new Date(now - 2 * HOUR),
+        finished: true,
+      }
+    ).added as [
+      NonNullable<ReturnType<typeof addTasks>['added'][0]>,
+      NonNullable<ReturnType<typeof addTasks>['added'][0]>,
+      NonNullable<ReturnType<typeof addTasks>['added'][0]>,
+    ]
+    // Your AI, the fake Claude Code: it sees the three as one piece, fills
+    // the group in, and writes up what you did at Done all
+    world.script([
+      {
+        match: 'Find the ones that are one piece of work',
+        answer: JSON.stringify({
+          groups: [
+            {
+              name: 'Webhook retries',
+              tasks: [limit.id, review.id, runbook.id],
+            },
+          ],
+        }),
+      },
+      {
+        match: 'grouped these tasks of theirs as one piece of work',
+        answer: JSON.stringify({
+          title: 'Webhook retry limit to 5',
+          summary:
+            'Webhook retries go from 3 attempts to 5, with backoff. mina reviews the PR and the runbook follows the change.',
+          waits: [{ task: review.id, wants: 'your review of the retry PR' }],
+          due: review.id,
+          first: {
+            task: limit.id,
+            why: 'the review and the runbook build on it',
+          },
+          order: [limit.id, review.id, runbook.id],
+        }),
+      },
+      {
+        match: 'closing a group of their tasks as done',
+        answer:
+          'Raised the webhook retry limit to 5 with backoff, got the PR reviewed and updated the runbook.',
+      },
+    ])
+    const opened = path.join(root, 'opened.log')
+    const opener = path.join(root, 'open-link')
+    writeFileSync(opener, `#!/bin/sh\necho "$1" >> "${opened}"\n`)
+    chmodSync(opener, 0o755)
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: {
+        FAKE_CLAUDE_DIR: world.claudeDir,
+        PACENOTE_HANDOFF_OPENER: opener,
+      },
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+    const row = (id: string) => page.locator(`[data-task-row="${id}"]`)
+    const groupRow = page.locator('[data-group-row]')
+    await row(limit.id).waitFor()
+
+    // A task of your own, filled in: then your AI looks at the project's
+    // open tasks and asks whether three of them are one piece of work
+    await page.keyboard.press('Meta+N')
+    const form = page.getByRole('form', { name: 'New task' })
+    await form
+      .getByLabel('What to do')
+      .fill('Write the rollout note for the webhook retries')
+    await form.getByRole('button', { name: 'Project: Payments' }).waitFor()
+    await form.getByLabel('What to do').press('Enter')
+    const note = page
+      .locator('[data-task-row]')
+      .filter({ hasText: 'Write the rollout note for the webhook retries' })
+    await note.waitFor()
+    await form.getByLabel('What to do').press('Escape')
+    await form.waitFor({ state: 'detached' })
+    const suggestion = page.locator('[data-group-suggestion]')
+    await suggestion
+      .getByText('These 3 look like one piece of work:')
+      .waitFor({ timeout: 40_000 })
+    await suggestion.getByText('Webhook retries').waitFor()
+    await suggestion.getByText('Review the webhook retry PR').waitFor()
+    await suggestion
+      .getByText('Claude Code saw them in your open tasks.')
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-group-suggestion.png'),
+    })
+    // Nothing is grouped until you say so
+    expect(await groupRow.count()).toBe(0)
+    await suggestion.getByRole('button', { name: 'Group them' }).click()
+    await suggestion.waitFor({ state: 'detached' })
+
+    // The group's row, its tasks under it, each still a task of its own;
+    // your AI fills it in
+    await groupRow.getByText('3 tasks').waitFor()
+    for (const task of [limit, review, runbook])
+      await groupRow.locator(`[data-task-row="${task.id}"]`).waitFor()
+    expect(
+      await groupRow
+        .locator(`[data-task-row]`)
+        .filter({ hasText: 'rollout' })
+        .count()
+    ).toBe(0)
+    await page.getByRole('tab', { name: 'Open 4' }).waitFor()
+    const open = groupRow.getByRole('button', {
+      name: 'Open this group: Webhook retry limit to 5',
+    })
+    await open.waitFor({ timeout: 30_000 })
+    await groupRow
+      .getByText('hyun, mina and jin wait · none done yet')
+      .waitFor()
+    await open.click()
+    await groupRow
+      .getByText(
+        'Webhook retries go from 3 attempts to 5, with backoff. mina reviews the PR and the runbook follows the change.'
+      )
+      .waitFor()
+    await groupRow
+      .getByRole('link', { name: 'your review of the retry PR · #payments' })
+      .waitFor()
+    await groupRow.getByText('the review and the runbook build on it').waitFor()
+    await groupRow.getByText(/^Filled in just now · Claude Code/).waitFor()
+    await groupRow.getByRole('button', { name: 'Undo' }).waitFor()
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-group.png'),
+    })
+    // What your AI was given: the tasks as data, and no tools
+    const fills = world
+      .claudeCalls()
+      .filter((call) =>
+        call.prompt.includes('grouped these tasks of theirs as one piece')
+      )
+    expect(fills.length).toBeGreaterThan(0)
+    expect(fills[0]!.prompt).toContain('<data>')
+    expect(fills[0]!.prompt).toContain(review.id)
+
+    // Group with…: the task of your own into the group, then out again
+    await note.getByRole('button', { name: 'More for this task' }).click()
+    await page.getByRole('menuitem', { name: 'Group with…' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Group with other tasks' })
+    await dialog
+      .getByRole('radio', { name: 'Into “Webhook retry limit to 5”' })
+      .check()
+    await dialog.getByRole('button', { name: 'Group', exact: true }).click()
+    await dialog.waitFor({ state: 'detached' })
+    await groupRow.getByText('4 tasks').waitFor()
+    await groupRow
+      .locator('[data-task-row]')
+      .filter({ hasText: 'Write the rollout note for the webhook retries' })
+      .getByRole('button', { name: 'More for this task' })
+      .click()
+    await page.getByRole('menuitem', { name: 'Move out of the group' }).click()
+    await groupRow.getByText('3 tasks').waitFor()
+    await eventually(
+      'the task of your own out of the group',
+      async () =>
+        (await groupRow
+          .locator('[data-task-row]')
+          .filter({ hasText: 'rollout' })
+          .count()) === 0
+    )
+
+    // Continue here: one session for all of them, the first one's page with
+    // the others written in after it
+    await groupRow
+      .getByRole('button', { name: 'Continue here' })
+      .first()
+      .click()
+    await page
+      .getByRole('heading', { name: 'Raise the webhook retry limit to 5' })
+      .waitFor({ timeout: 30_000 })
+    const first = page.getByRole('textbox', { name: 'First message' })
+    await eventually('the group written in', async () =>
+      (await first.inputValue()).includes('as one piece of work')
+    )
+    const prompt = await first.inputValue()
+    expect(prompt).toContain(`<task id="${limit.id}" action="code"`)
+    expect(prompt).toContain(
+      'The user grouped this task with 2 others as one piece of work: "Webhook retry limit to 5".'
+    )
+    expect(prompt.indexOf(`<task id="${review.id}"`)).toBeLessThan(
+      prompt.indexOf(`<task id="${runbook.id}"`)
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-new-group.png'),
+    })
+    await page.evaluate("window.location.hash = '#/tasks'")
+
+    // Done all: one note of what you did, written first by your AI, and the
+    // three tasks close together
+    await groupRow.getByRole('button', { name: 'Done all' }).click()
+    const done = page.getByRole('dialog', {
+      name: 'Done with Webhook retry limit to 5?',
+    })
+    const wrap = done.getByRole('textbox', {
+      name: 'What you did, kept with the group',
+    })
+    await eventually('the wrap-up written', async () =>
+      (await wrap.inputValue()).startsWith('Raised the webhook retry limit')
+    )
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-group-done-all.png'),
+    })
+    await done.getByRole('button', { name: 'Done all 3' }).click()
+    await done.waitFor({ state: 'detached' })
+    await page.getByRole('tab', { name: 'Open 1' }).waitFor()
+    const stored = allTaskViews(home)
+    for (const task of [limit, review, runbook])
+      expect(stored.find((each) => each.id === task.id)?.status).toBe('done')
+    const bundles = JSON.parse(
+      readFileSync(path.join(home, 'tasks-bundles.json'), 'utf8')
+    ) as {
+      bundles: Record<string, { state: string; wrapUp?: { text: string } }>
+    }
+    const [kept] = Object.values(bundles.bundles)
+    expect(kept?.state).toBe('grouped')
+    expect(kept?.wrapUp?.text).toMatch(/^Raised the webhook retry limit/)
+    // The task of your own stays open, apart
+    await note.waitFor()
+  }, 120_000)
 
   it("hands Pacenote's own work to Codex while Claude Code is at its usage limit, and says so in Todo and Settings", async () => {
     // Claude Code is at its limit for everything; Codex collects through

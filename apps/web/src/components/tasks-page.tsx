@@ -1,5 +1,7 @@
+import { CLI_NAMES } from '@src/tasks/own-ai'
 import { stagesOf } from '@src/tasks/stage'
 import { tabOf } from '@src/tasks/tabs'
+import type { TaskView } from '@src/tasks/types'
 import { useEffect, useState } from 'react'
 import { Placeholder, Swap } from '@/components/ui/motion'
 import { SkeletonWord } from '@/components/ui/skeleton'
@@ -8,6 +10,7 @@ import { clearFound, useAiSheet } from '@/lib/ai-sheet'
 import { useText } from '@/lib/i18n'
 import {
   taskHash,
+  useBundles,
   useDecide,
   useStage,
   useTasks,
@@ -18,12 +21,16 @@ import { useSessions } from '@/lib/sessions'
 import { todayLines } from '@/lib/today'
 import {
   declinedFrom,
+  groupFacts,
+  itemKey,
   leaveOutOffer,
+  listItems,
   ROWS_AT_ONCE,
   rowFacts,
   skeletonRows,
   todoList,
   type Tab,
+  type TodoItem,
 } from '@/lib/todo-list'
 import { macNamed, useMacs } from '@/lib/macs'
 import { shortcutKeyHeld } from '@/lib/platform'
@@ -31,7 +38,14 @@ import { readStored, writeStored } from '@/lib/storage'
 import { go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
 import { NewTask } from './new-task'
+import {
+  DoneAllDialog,
+  GroupRow,
+  GroupSuggestion,
+  GroupWithDialog,
+} from './task-group'
 import { TaskRow } from './task-row'
+import type { ListEntry } from './ui/motion'
 import { Page } from './page'
 import { StartCard } from './start-card'
 import { RecentCollections } from './tasks-collections'
@@ -99,6 +113,15 @@ export function TasksPage({
   const sessions = useSessions('todo').data
   const decide = useDecide()
   const setStage = useStage()
+  // Groups of tasks: by hand, your AI's suggestion, Done all
+  const bundles = useBundles()
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set())
+  const [groupWith, setGroupWith] = useState<{
+    task: TaskView
+    open: boolean
+  }>()
+  const [doneAll, setDoneAll] = useState<{ id: string; open: boolean }>()
+  const [groupError, setGroupError] = useState<{ id: string; error: string }>()
   // What Let your AI help's first look added, once it closed
   const { found } = useAiSheet()
   const [tab, setTab] = useState<Tab>('open')
@@ -217,6 +240,96 @@ export function TasksPage({
       : list.note && t[list.note.says]
   const offer = leaveOutOffer(data.leaveOut, declined)
 
+  // Groups of tasks, on a Mac that has them (src/tasks/bundles.ts)
+  const groups = data.bundles?.groups ?? []
+  const grouping = bundles.can && Boolean(data.bundles)
+  const groupOf = (taskId: string) =>
+    groups.find((group) => group.tasks.includes(taskId))
+  const items = listItems(shown.slice(0, rows), groups)
+  const aiName = CLI_NAMES[data.ai.chosen]
+  const showError = (id: string) => (error?: string) =>
+    setGroupError(error ? { id, error } : undefined)
+  const doneGroup = groups.find((group) => group.id === doneAll?.id)
+  // Group with…: the open tasks of its project in no group, and its groups
+  const sameRepo = (a?: string, b?: string) =>
+    (a ?? '').toLowerCase() === (b ?? '').toLowerCase()
+  const withTask = groupWith?.task
+  const groupChoices = withTask
+    ? {
+        tasks: data.tasks.filter(
+          (task) =>
+            task.id !== withTask.id &&
+            task.status === 'open' &&
+            sameRepo(task.repo, withTask.repo) &&
+            !groupOf(task.id)
+        ),
+        groups: groups.flatMap((group) => {
+          const facts = groupFacts(group, data.tasks)
+          return facts.open.length > 0 &&
+            facts.members.some((task) => sameRepo(task.repo, withTask.repo))
+            ? [{ id: group.id, title: facts.title }]
+            : []
+        }),
+      }
+    : undefined
+
+  // A task's row, in the list or under its group's
+  const taskRow = (
+    task: TaskView,
+    motion: ListEntry<unknown>,
+    /** Listed under its group's row */
+    under = false
+  ) => {
+    const facts = rowFacts(data, task)
+    const group = grouping ? groupOf(task.id) : undefined
+    return (
+      <TaskRow
+        key={task.id}
+        task={task}
+        motion={motion}
+        cli={data.settings.cli}
+        tools={data.settings.tools}
+        opensIn={data.settings.opensIn}
+        working={data.working?.[task.id]}
+        session={byTask.get(task.id)}
+        live={live?.working[task.id]}
+        stage={stages[task.id]}
+        onStage={(stage) => void setStage(task.id, stage)}
+        proposal={data.proposals?.[task.id]}
+        area={data.areas?.[task.id]}
+        askGroup={facts.askGroup}
+        follows={facts.follows?.title}
+        followsTask={facts.follows}
+        filling={facts.filling}
+        looksLike={facts.looksLike}
+        onSame={() => {
+          const same = facts.looksLike
+          if (!same) return
+          void decide(task.id, { status: 'dismissed' })
+          go(taskHash(same.id))
+        }}
+        open={task.id === openId}
+        gone={tabOf(task, stages[task.id]) !== tab}
+        logEntry={task.id === openId ? logEntry : undefined}
+        onToggle={() => go(task.id === openId ? '#/tasks' : taskHash(task.id))}
+        onDecide={(decision) => void decide(task.id, decision)}
+        grouping={
+          grouping && task.status === 'open'
+            ? group
+              ? 'in'
+              : 'out'
+            : undefined
+        }
+        inGroup={under}
+        onGroupWith={() => setGroupWith({ task, open: true })}
+        onMoveOut={() =>
+          group &&
+          void bundles.moveOut(group.id, task.id).then(showError(group.id))
+        }
+      />
+    )
+  }
+
   const decline = (conversation: string) => {
     const next = [...declined, conversation]
     setDeclined(next)
@@ -321,46 +434,88 @@ export function TasksPage({
               {note && (
                 <p className="mt-3 text-meta text-muted-foreground">{note}</p>
               )}
-              <TaskList
-                tasks={shown.slice(0, rows)}
+              {tab === 'open' && grouping && data.bundles?.suggestion && (
+                <GroupSuggestion
+                  key={data.bundles.suggestion.id}
+                  suggestion={data.bundles.suggestion}
+                  tasks={data.tasks}
+                  onAnswer={(yes) =>
+                    bundles.answer(data.bundles!.suggestion!.id, yes)
+                  }
+                />
+              )}
+              <TaskList<TodoItem>
+                items={items}
+                keyOf={itemKey}
                 onKeyDown={stepThrough(openId)}
                 revealed={revealed}
-                row={(task, motion) => {
-                  const facts = rowFacts(data, task)
+                row={(item, motion) => {
+                  if (item.kind === 'task')
+                    return taskRow(item.task, motion as ListEntry<unknown>)
+                  const group = item.group
+                  const facts = groupFacts(group, data.tasks)
+                  const first = facts.first ?? facts.open[0]
                   return (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
+                    <GroupRow
+                      key={`group:${group.id}`}
+                      group={group}
+                      facts={facts}
                       motion={motion}
-                      cli={data.settings.cli}
-                      tools={data.settings.tools}
-                      opensIn={data.settings.opensIn}
-                      working={data.working?.[task.id]}
-                      session={byTask.get(task.id)}
-                      live={live?.working[task.id]}
-                      stage={stages[task.id]}
-                      onStage={(stage) => void setStage(task.id, stage)}
-                      proposal={data.proposals?.[task.id]}
-                      area={data.areas?.[task.id]}
-                      askGroup={facts.askGroup}
-                      follows={facts.follows?.title}
-                      followsTask={facts.follows}
-                      filling={facts.filling}
-                      looksLike={facts.looksLike}
-                      onSame={() => {
-                        const same = facts.looksLike
-                        if (!same) return
-                        void decide(task.id, { status: 'dismissed' })
-                        go(taskHash(same.id))
-                      }}
-                      open={task.id === openId}
-                      gone={tabOf(task, stages[task.id]) !== tab}
-                      logEntry={task.id === openId ? logEntry : undefined}
+                      open={openGroups.has(group.id)}
                       onToggle={() =>
-                        go(task.id === openId ? '#/tasks' : taskHash(task.id))
+                        setOpenGroups((current) => {
+                          const next = new Set(current)
+                          if (next.has(group.id)) next.delete(group.id)
+                          else next.add(group.id)
+                          return next
+                        })
                       }
-                      onDecide={(decision) => void decide(task.id, decision)}
-                    />
+                      filling={
+                        data.bundles?.filling.includes(group.id)
+                          ? aiName
+                          : undefined
+                      }
+                      onContinue={
+                        first && window.pacenoteDesktop?.sessions
+                          ? () =>
+                              go(
+                                `#/sessions/new/${encodeURIComponent(first.id)}?group=${encodeURIComponent(group.id)}`
+                              )
+                          : undefined
+                      }
+                      onDoneAll={
+                        facts.open.length > 0
+                          ? () => setDoneAll({ id: group.id, open: true })
+                          : undefined
+                      }
+                      onUngroup={() =>
+                        void bundles.ungroup(group.id).then(showError(group.id))
+                      }
+                      onUndo={() =>
+                        void bundles
+                          .takeBack(group.id)
+                          .then(showError(group.id))
+                      }
+                      onFillAgain={() =>
+                        void bundles
+                          .fillAgain(group.id)
+                          .then(showError(group.id))
+                      }
+                      error={
+                        groupError?.id === group.id
+                          ? groupError.error
+                          : undefined
+                      }
+                    >
+                      <TaskList
+                        items={item.tasks}
+                        keyOf={(task) => task.id}
+                        className=""
+                        row={(task, entry) =>
+                          taskRow(task, entry as ListEntry<unknown>, true)
+                        }
+                      />
+                    </GroupRow>
                   )
                 }}
               />
@@ -377,6 +532,29 @@ export function TasksPage({
           )}
         </Swap>
       </Placeholder>
+
+      {groupWith && groupChoices && (
+        <GroupWithDialog
+          task={groupWith.task}
+          tasks={groupChoices.tasks}
+          groups={groupChoices.groups}
+          open={groupWith.open}
+          onClose={() => setGroupWith({ ...groupWith, open: false })}
+          onGroup={(taskIds, into) => bundles.bundle(taskIds, into)}
+        />
+      )}
+      {doneAll && doneGroup && (
+        <DoneAllDialog
+          facts={groupFacts(doneGroup, data.tasks)}
+          aiName={aiName}
+          open={doneAll.open}
+          onClose={() => setDoneAll({ ...doneAll, open: false })}
+          onWrapUp={() => bundles.wrapUp(doneGroup.id)}
+          onDone={async (wrap) =>
+            (await bundles.doneAll(doneGroup.id, wrap)).error
+          }
+        />
+      )}
     </Page>
   )
 }

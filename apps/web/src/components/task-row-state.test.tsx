@@ -41,6 +41,23 @@ const stateOf = (extra: Partial<TaskRowInput> = {}) =>
 const labels = (steps: { label: string }[]) => steps.map((step) => step.label)
 
 describe("a task's row", () => {
+  it('groups an open task with others, or moves it out of its group', () => {
+    expect(labels(stateOf({ grouping: 'out' }).grouping)).toEqual([
+      'Group with…',
+    ])
+    expect(stateOf({ grouping: 'in' }).grouping).toEqual([
+      { kind: 'moveOut', label: 'Move out of the group' },
+    ])
+    // Not on a Mac without groups, nor for a settled or a Maybe task
+    expect(stateOf().grouping).toEqual([])
+    expect(
+      stateOf({ grouping: 'in', task: task({ status: 'done' }) }).grouping
+    ).toEqual([])
+    expect(
+      stateOf({ grouping: 'out', task: task({ status: 'maybe' }) }).grouping
+    ).toEqual([])
+  })
+
   it('gives an open code task a button for each tool, Settings first', () => {
     const state = stateOf({
       task: task({ action: 'code', repo: 'Acme/Pay', due: 'Friday' }),

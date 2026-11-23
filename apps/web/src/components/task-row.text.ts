@@ -95,6 +95,9 @@ const en = {
   markInProgress: 'Mark in progress',
   notInProgress: 'Not in progress',
   waitingOnSomeone: 'Waiting on someone else',
+  /** Groups of tasks: grouping by hand, and out of a group */
+  groupWith: 'Group with…',
+  moveOutOfGroup: 'Move out of the group',
   backToOpen: 'Back to open',
   promised: 'You said you would',
   askedBy: (person: string, group?: string) =>
@@ -355,6 +358,8 @@ const ko: typeof en = {
   markInProgress: '진행 중으로',
   notInProgress: '진행 중 아님',
   waitingOnSomeone: '남을 기다리는 중',
+  groupWith: '다른 할 일과 묶기…',
+  moveOutOfGroup: '묶음에서 빼기',
   backToOpen: '열림으로',
   promised: '하겠다고 한 일',
   askedBy: (person, group) =>

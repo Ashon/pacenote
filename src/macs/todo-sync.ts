@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto'
 import { type FSWatcher, watch } from 'node:fs'
 import path from 'node:path'
+import {
+  BUNDLES_FILE,
+  cleanBundles,
+  readBundles,
+  readBundlesFile,
+  type BundleRecords,
+} from '../tasks/bundles.js'
 import { COLLECTIONS_FILE, readCollections } from '../tasks/collections.js'
 import {
   DECISIONS_FILE,
@@ -53,6 +60,7 @@ const SYNCED = new Set([
   RECAPS_FILE,
   YOU_FILE,
   STAGES_FILE,
+  BUNDLES_FILE,
 ])
 /** Looks again this often, for changes the folder's events missed */
 const RECHECK_MS = 15_000
@@ -71,6 +79,12 @@ interface Parts {
    * does not know and leaves alone, as it does whatever part it does not know
    */
   stages: StageRecords
+  /**
+   * Your groups of tasks, your AI's suggestions and your answers: a part
+   * Pacenote before 0.6.41 does not know and leaves alone. What your AI
+   * looked at stays with each Mac.
+   */
+  bundles: BundleRecords
 }
 
 type Part = keyof Parts
@@ -153,6 +167,7 @@ export class TodoSync {
       you: readYou(dataDir),
       collections: this.options.collections().filter((row) => !row.mac),
       stages: readStages(dataDir),
+      bundles: readBundles(dataDir),
     }
   }
 
@@ -277,6 +292,19 @@ export class TodoSync {
         const local = readStages(dataDir)
         write(local, mergeLatest(local, cleanStages(parts.stages)), (merged) =>
           writeJson(path.join(dataDir, STAGES_FILE), merged)
+        )
+      }
+      if (parts.bundles) {
+        known.set('bundles', hash(parts.bundles))
+        const file = readBundlesFile(dataDir)
+        write(
+          file.bundles,
+          mergeLatest(file.bundles, cleanBundles(parts.bundles)),
+          (merged) =>
+            writeJson(path.join(dataDir, BUNDLES_FILE), {
+              ...file,
+              bundles: merged,
+            })
         )
       }
     } catch (err) {

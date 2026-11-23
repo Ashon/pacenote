@@ -29,12 +29,19 @@ import { FolderDialog } from './task-folder'
  * its folder and first message written in for you to change; from Sessions,
  * any. Start runs Claude Code here and opens the session's page in its place.
  */
-export function NewSessionPage({ task }: { task?: string }) {
+export function NewSessionPage({
+  task,
+  group,
+}: {
+  task?: string
+  /** A group of tasks the task is in: Continue here for all of them */
+  group?: string
+}) {
   const t = useText(text)
   const l = useText(listText)
   const p = useText(pageText)
   const phone = usePhone()
-  const draft = useNewSessionDraft(task)
+  const draft = useNewSessionDraft(task, group)
   const detail = useQuery({
     ...taskDetailQuery(task ?? ''),
     enabled: Boolean(task && window.pacenoteDesktop?.tasks),

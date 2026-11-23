@@ -83,6 +83,10 @@ export function TaskRow({
   onToggle,
   onDecide,
   onStage,
+  grouping,
+  inGroup,
+  onGroupWith,
+  onMoveOut,
 }: {
   task: TaskView
   /** Its list's motion as it comes and goes (useListMotion) */
@@ -129,6 +133,17 @@ export function TaskRow({
   onDecide: (decision: Omit<TaskDecision, 'at'> | null) => void
   /** Sets its stage, or open again */
   onStage?: (stage: StageRecord['stage']) => void
+  /**
+   * Groups of tasks on this Mac: in, the task is in one; out, it may be
+   * grouped with others
+   */
+  grouping?: 'in' | 'out'
+  /** Listed under its group's row */
+  inGroup?: boolean
+  /** Group with…: the dialog to group it with others */
+  onGroupWith?: () => void
+  /** Out of its group */
+  onMoveOut?: () => void
 }) {
   const t = useText(text)
   const client = useQueryClient()
@@ -171,6 +186,7 @@ export function TaskRow({
       looksLike,
       followsTask,
       askGroup,
+      grouping,
     },
     t
   )
@@ -217,6 +233,8 @@ export function TaskRow({
     if (step.kind === 'continue') return void continueIn(step.tool)
     if (step.kind === 'draft') return void draft()
     if (step.kind === 'stage') return onStage?.(step.stage)
+    if (step.kind === 'groupWith') return onGroupWith?.()
+    if (step.kind === 'moveOut') return onMoveOut?.()
     // Another folder than its repository's, for the tool set in Settings
     setError(undefined)
     if (!open) onToggle()
@@ -229,7 +247,9 @@ export function TaskRow({
       data-task-row={task.id}
       {...(motion && motionItem(motion))}
       className={cn(
-        'border-t border-border py-3.5',
+        'border-t border-border',
+        // Under its group's row, a little tighter
+        inGroup ? 'py-3' : 'py-3.5',
         task.faded && !open && 'opacity-60'
       )}
     >

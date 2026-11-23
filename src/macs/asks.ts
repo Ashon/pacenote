@@ -73,6 +73,16 @@ export const DEVICE_CHANGES = {
   // before 0.6.24 answers not-allowed)
   'tasks.takeBackFill': 'pacenote:tasks:take-back-fill',
   'tasks.keepBoth': 'pacenote:tasks:keep-both',
+  // Groups of tasks, as on the Mac (src/tasks/bundles.ts): a Mac before
+  // 0.6.41 answers not-allowed, and the device shows no groups
+  'tasks.bundle': 'pacenote:tasks:bundle',
+  'tasks.answerBundle': 'pacenote:tasks:bundle-answer',
+  'tasks.moveOutOfBundle': 'pacenote:tasks:bundle-move-out',
+  'tasks.ungroupBundle': 'pacenote:tasks:bundle-ungroup',
+  'tasks.takeBackBundleFill': 'pacenote:tasks:bundle-take-back',
+  'tasks.fillBundleAgain': 'pacenote:tasks:bundle-fill-again',
+  'tasks.wrapUpBundle': 'pacenote:tasks:bundle-wrap',
+  'tasks.doneBundle': 'pacenote:tasks:bundle-done',
   // A session the Mac runs, from your device: it starts in a folder of your
   // work on the Mac (ipc/sessions.ts checks), with your own sign-in there,
   // and you talk to it, answer what it asks and stop it as on the Mac. It

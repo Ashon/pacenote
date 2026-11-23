@@ -20,6 +20,7 @@ import {
   TOOL_LABEL,
 } from '../../../../src/tasks/context.js'
 import { repoFolder, saveRepo } from '../../../../src/tasks/folders.js'
+import { groupAround, readBundles } from '../../../../src/tasks/bundles.js'
 import { allTaskViews } from '../../../../src/tasks/store.js'
 import {
   WORK_TOOL_CLIENTS,
@@ -62,6 +63,27 @@ import type { TodoSettings } from '../todo-settings.js'
 import type { Desktop } from './context.js'
 import { orError, type Ipc } from './gate.js'
 import { reasonerOf } from '../../../../src/reasoners/ids.js'
+
+/**
+ * A group's part of a session for all its tasks: its other open tasks, in
+ * the order to do them after the one the session starts on
+ */
+function groupFor(dataDir: string, bundleId: string, taskId: string) {
+  const group = groupAround(
+    allTaskViews(dataDir),
+    readBundles(dataDir),
+    taskId,
+    bundleId
+  )
+  if (!group) return undefined
+  return {
+    title: group.title,
+    ...(group.summary && { summary: group.summary }),
+    others: group.tasks.filter(
+      (task) => task.id !== taskId && task.status === 'open'
+    ),
+  }
+}
 
 /** The session logs kept read for what they made, for tasks opened often */
 const MADE_LOGS_KEPT = 16
@@ -297,7 +319,7 @@ export function registerTaskWorkIpc(
   ipc.handleDenying(
     'pacenote:tasks:new-session',
     () => null,
-    (id): NewSessionDraft | null => {
+    (id, group): NewSessionDraft | null => {
       if (typeof id !== 'string') return null
       const detail = taskDetail(id, 'en')
       if (!detail || detail.task.status !== 'open') return null
@@ -307,6 +329,9 @@ export function registerTaskWorkIpc(
           marker,
           planFirst: env().TASKS_PLAN_FIRST !== 'off',
           tool: 'claude',
+          ...(typeof group === 'string' && {
+            group: groupFor(dataDir, group, id),
+          }),
         }),
         marker,
         ...(detail.folder ? { folder: detail.folder } : {}),

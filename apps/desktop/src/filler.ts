@@ -45,6 +45,8 @@ export class Filler {
       log: Logger
       /** Called when what is filling or filled changes */
       onChange: () => void
+      /** Called after a run filled tasks in */
+      onFilled?: () => void
       home?: string
       gatherMs?: number
     }
@@ -83,6 +85,7 @@ export class Filler {
     this.running = this.waiting.splice(0, BATCH)
     try {
       await this.fill(this.running)
+      this.options.onFilled?.()
     } catch (error) {
       this.options.log.warn(`Could not fill in new tasks: ${String(error)}`)
     } finally {

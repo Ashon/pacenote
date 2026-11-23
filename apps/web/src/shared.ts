@@ -55,6 +55,7 @@ export { text as sessionPageText } from './components/session-page.text'
 export { text as sessionsPageText } from './components/sessions-page.text'
 export { text as settingsPageText } from './components/settings-page.text'
 export { text as sidebarText } from './components/sidebar.text'
+export { text as taskGroupText } from './components/task-group.text'
 export { text as taskRowText } from './components/task-row.text'
 export { text as tasksPageText } from './components/tasks-page.text'
 export { text as todayText } from './components/today.text'
@@ -158,6 +159,17 @@ export type {
   WorkTool,
 } from '@src/tasks/types'
 export { taskArea } from '@src/you/task-area'
+// Groups of tasks, from what the Mac sends (src/tasks/bundle-view.ts): the
+// groups and your AI's suggestion as the Mac's Todo lists and words them
+export { bundleOf, bundlesOf, cleanBundles } from '@src/tasks/bundle-view'
+export type {
+  BundleRecords,
+  BundleSuggestion,
+  BundlesView,
+  TaskBundle,
+} from '@src/tasks/bundle-view'
+export { groupFacts, itemKey, listItems } from './lib/todo-list'
+export type { GroupFacts, TodoItem } from './lib/todo-list'
 // A session's page as the Mac answers it: the phone's bar takes its title
 // (the list's, before the page has it) and its More (ending one run here)
 export type { SessionTalk, SessionsView } from '@src/sessions/types'

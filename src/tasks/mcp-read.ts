@@ -4,6 +4,7 @@ import { countRecap, periodCommits, periodKey } from '../you/recap.js'
 import { countYou } from '../you/store.js'
 import type { AreaRole } from '../you/types.js'
 import { outcomeOf, taskContext, threadOf, TOOL_LABEL } from './context.js'
+import { groupAround, readBundles } from './bundles.js'
 import { isFillUpdate } from './filled.js'
 import type { TaskToolsOptions } from './mcp.js'
 import { respond, taskRef, type TaskTools } from './mcp-shared.js'
@@ -31,7 +32,9 @@ export function registerReadTools({
         'where, the thread summed up, its repository, and what came before ' +
         '(earlier tasks in the thread, in the repository and from the same ' +
         'person, with how each ended and the session it was done in, and ' +
-        "Pace's answers in the thread when the run history is shared).",
+        "Pace's answers in the thread when the run history is shared), and " +
+        'the other tasks of its group when the user grouped it with others ' +
+        'as one piece of work.',
       inputSchema: {
         task: taskRef(),
       },
@@ -48,6 +51,8 @@ export function registerReadTools({
         const [conversation, thread] = splitThread(view)
         const runs = options.runs?.(conversation, thread)
         const context = taskContext(view, all, work, runs ?? [], 'en')
+        // The other tasks of its group, when you grouped it (bundles.ts)
+        const group = groupAround(all, readBundles(options.dataDir), view.id)
         const earlier = (
           tasks: ReturnType<typeof taskContext>['thread']['tasks']
         ) =>
@@ -101,6 +106,21 @@ export function registerReadTools({
             inRepo: earlier(context.repo?.tasks ?? []),
             fromPerson: earlier(context.person?.tasks ?? []),
           },
+          ...(group && {
+            group: {
+              title: group.title,
+              summary: group.summary,
+              // In the order to do them, this one among them
+              tasks: group.tasks.map((t) => ({
+                id: t.id,
+                title: t.title,
+                askedBy: t.askedBy,
+                due: t.due,
+                status: t.status,
+                ...(t.id === view.id && { thisOne: true }),
+              })),
+            },
+          }),
           paceRuns:
             runs ??
             'Not shared: turn on Settings > History & logs > Share with AI tools to see them.',

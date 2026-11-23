@@ -13,6 +13,12 @@ import {
   mergeYou,
 } from '../src/macs/sync.js'
 import { TodoSync } from '../src/macs/todo-sync.js'
+import {
+  bundleTasks,
+  noteLooked,
+  readBundles,
+  readBundlesFile,
+} from '../src/tasks/bundles.js'
 import { readCollections } from '../src/tasks/collections.js'
 import {
   decide,
@@ -393,6 +399,11 @@ describe('your Todo between two Macs', () => {
     // leaves alone
     setStage(air.dataDir, '2', 'waiting')
     await poll(() => readStages(pro.dataDir)['2']?.stage).toBe('waiting')
+    // A group made on the Pro: its own part too; what its AI looked at stays
+    const group = bundleTasks(pro.dataDir, ['1', '2']) as string
+    noteLooked(pro.dataDir, 'Ashon/app', ['1', '2'])
+    await poll(() => readBundles(air.dataDir)[group]?.tasks).toEqual(['1', '2'])
+    expect(readBundlesFile(air.dataDir).looked).toEqual({})
     expect(readCollections(air.dataDir)).toEqual([])
     expect(
       JSON.parse(readFileSync(path.join(pro.dataDir, 'tasks.json'), 'utf8'))

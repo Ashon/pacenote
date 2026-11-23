@@ -209,13 +209,15 @@ export function useSessionActions(id: string) {
  * A new session's draft (V5): for a task, its first message and folder,
  * asked once for the page (the marker in it stays the same); for none, empty
  */
-export function useNewSessionDraft(task: string | undefined) {
+export function useNewSessionDraft(task: string | undefined, group?: string) {
   const bridge = window.pacenoteDesktop?.tasks
   return useQuery({
-    queryKey: ['session-draft', task ?? ''],
+    queryKey: ['session-draft', task ?? '', group ?? ''],
     queryFn: async (): Promise<NewSessionDraft | null> =>
       task
-        ? ((await bridge?.newSession(task)) ?? null)
+        ? ((await (group
+            ? bridge?.newSession(task, group)
+            : bridge?.newSession(task))) ?? null)
         : { prompt: '', marker: '' },
     enabled: Boolean(bridge),
     staleTime: Infinity,

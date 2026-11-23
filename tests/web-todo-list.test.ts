@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   declinedFrom,
+  groupFacts,
+  itemKey,
   leaveOutOffer,
+  listItems,
   rowFacts,
   skeletonRows,
   todoList,
@@ -9,6 +12,7 @@ import {
   type TodoPlace,
 } from '../apps/web/src/lib/todo-list.js'
 import type { TodoListView } from '../src/desktop-bridge.js'
+import type { TaskBundle } from '../src/tasks/bundles.js'
 import type { TaskView } from '../src/tasks/types.js'
 
 const NOW = Date.parse('2026-11-07T09:00:00Z')
@@ -318,5 +322,74 @@ describe("the skeleton's rows", () => {
     expect(skeletonRows('nope')).toBe(3)
     expect(skeletonRows('5')).toBe(5)
     expect(skeletonRows('40')).toBe(8)
+  })
+})
+
+describe('groups in a tab', () => {
+  const group = (
+    id: string,
+    tasks: string[],
+    extra: Partial<TaskBundle> = {}
+  ): TaskBundle => ({
+    id,
+    tasks,
+    stale: false,
+    canUndo: false,
+    tookBack: false,
+    at: iso(NOW),
+    ...extra,
+  })
+
+  it('shows a group where its first task would be, with two or more of its tasks under it', () => {
+    const tasks = ['a', 'b', 'c', 'd'].map((id) => task(id))
+    const items = listItems(tasks, [
+      group('g', ['d', 'b']),
+      // Only one of its tasks in the tab: that one stays a row of its own
+      group('h', ['c', 'x']),
+    ])
+    expect(items.map(itemKey)).toEqual(['a', 'group:g', 'c'])
+    const shown = items[1]!
+    expect(shown.kind === 'group' && shown.tasks.map((t) => t.id)).toEqual([
+      'd',
+      'b',
+    ])
+    expect(listItems(tasks).map(itemKey)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('says who waits, how far along, the due and what comes first', () => {
+    const tasks = [
+      task('a', { askedBy: 'hyun', repo: 'Ashon/payments' }),
+      task('b', { askedBy: 'mina', due: 'Thursday', repo: 'Ashon/payments' }),
+      task('c', { kind: 'promised', askedBy: 'me', repo: 'Ashon/payments' }),
+      task('d', { status: 'done', askedBy: 'dara', repo: 'Ashon/payments' }),
+    ]
+    const facts = groupFacts(
+      group('g', ['a', 'b', 'c', 'd'], {
+        name: 'Retries',
+        fill: {
+          title: 'Webhook retries',
+          summary: 'Retries go from 3 attempts to 5.',
+          waits: [],
+          first: { task: 'a', why: 'the rest builds on it' },
+          at: iso(NOW),
+          for: 'k',
+        },
+      }),
+      tasks
+    )
+    expect(facts).toMatchObject({
+      title: 'Webhook retries',
+      done: 1,
+      waits: ['hyun', 'mina'],
+      repo: 'Ashon/payments',
+    })
+    expect(facts.due?.id).toBe('b')
+    expect(facts.first?.id).toBe('a')
+    expect(facts.open.map((t) => t.id)).toEqual(['a', 'b', 'c'])
+    // Not filled in: the name your AI suggested, else its first task's
+    expect(
+      groupFacts(group('g', ['a', 'b'], { name: 'Retries' }), tasks).title
+    ).toBe('Retries')
+    expect(groupFacts(group('g', ['a', 'b']), tasks).title).toBe('Task a')
   })
 })

@@ -117,6 +117,44 @@ export function useFill(id: string) {
 }
 
 /**
+ * Groups of tasks (src/tasks/bundles.ts): grouping by hand, your AI's
+ * suggestion, its fill, moving out and Done all. Each refreshes the list and
+ * returns the error to show; the bridge of a Mac before 0.6.41 has none.
+ */
+export function useBundles() {
+  const bridge = window.pacenoteDesktop?.tasks
+  const client = useQueryClient()
+  const refresh = () => client.invalidateQueries({ queryKey: ['tasks'] })
+  const done = <T>(call: Promise<T> | undefined) =>
+    after(
+      call?.then(
+        (result) => (result ?? undefined) as { error?: string } | undefined
+      ),
+      refresh
+    )
+  return {
+    /** Whether this Mac groups tasks at all */
+    can: Boolean(bridge?.bundle),
+    bundle: (taskIds: string[], into?: string) =>
+      done(bridge?.bundle?.(taskIds, into)),
+    answer: (id: string, yes: boolean) => done(bridge?.answerBundle?.(id, yes)),
+    moveOut: (id: string, taskId: string) =>
+      done(bridge?.moveOutOfBundle?.(id, taskId)),
+    ungroup: (id: string) => done(bridge?.ungroupBundle?.(id)),
+    takeBack: (id: string) => done(bridge?.takeBackBundleFill?.(id)),
+    fillAgain: (id: string) => done(bridge?.fillBundleAgain?.(id)),
+    /** What you did, written by your AI for Done all */
+    wrapUp: async (id: string) =>
+      (await bridge?.wrapUpBundle?.(id)) ?? { error: undefined },
+    doneAll: async (id: string, wrap: string) => {
+      const result = await bridge?.doneBundle?.(id, wrap)
+      await refresh()
+      return result ?? {}
+    },
+  }
+}
+
+/**
  * Whether a user group a Maybe was asked of means you; returns the error to
  * show, if any. Yes changes Settings, so the settings screen reloads too.
  */

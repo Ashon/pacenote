@@ -92,6 +92,7 @@ import { recordCollection, TaskCollector } from './task-collector.js'
 import { codexDefaults, writeOpencodeConfig, type Bins } from './headless.js'
 import { OwnAi } from './own-ai.js'
 import { aiSetUp, isOwnCli, type OwnCli } from '../../../src/tasks/own-ai.js'
+import { Bundler } from './bundler.js'
 import { Filler } from './filler.js'
 import { watchTasks } from './tasks-watch.js'
 import { HubAdmin } from './hub-admin.js'
@@ -574,6 +575,28 @@ const filler = new Filler({
     const env = settings.effectiveEnv()
     return (
       env.TASKS_FILL !== 'off' &&
+      aiSetUp(env, Boolean(taskCollector.state.last))
+    )
+  },
+  log,
+  onChange: () => mainWindow.send('pacenote:tasks:changed'),
+  // Tasks just filled in: your AI looks whether some are one piece of work
+  onFilled: () => bundler.soon(),
+})
+
+/**
+ * Groups of tasks your AI suggests and fills in (bundler.ts), on unless
+ * Settings > Todo turns it off, with an AI set up
+ */
+const bundler = new Bundler({
+  dataDir,
+  ownAi,
+  ownWork,
+  opencodeRun,
+  on: () => {
+    const env = settings.effectiveEnv()
+    return (
+      env.TASKS_BUNDLE !== 'off' &&
       aiSetUp(env, Boolean(taskCollector.state.last))
     )
   },
@@ -1124,6 +1147,7 @@ function registerIpc(): void {
     collectionRuns,
     collectState,
     filler,
+    bundler,
   })
   registerTaskWorkIpc(ipc, desktop, {
     todo,
@@ -1150,9 +1174,11 @@ function registerIpc(): void {
   })
   // An AI tool works on your tasks in a process of its own: the screens hear
   // of each change at once rather than at their next refresh.
-  stopTasksWatch = watchTasks(dataDir, () =>
+  stopTasksWatch = watchTasks(dataDir, () => {
     mainWindow.send('pacenote:tasks:changed')
-  )
+    // A session's follow-ups, a collection's tasks: groups to look for
+    bundler.changed()
+  })
   registerSettingsIpc(ipc, desktop, {
     settingsFile,
     applySettings,
@@ -1390,6 +1416,7 @@ app.on('before-quit', (event) => {
   sessionHost.endAll()
   bundleWatch?.stop()
   stopTasksWatch?.()
+  bundler.stop()
   taskCollector.cancel()
   void setupClaim.stop()
   todoSync?.stop()

@@ -96,19 +96,25 @@ export function TaskRowsSkeleton({ count }: { count: number }) {
  * A tab's rows. A task that leaves the tab, settled, is pushed aside and the
  * rows below close up (settle); one that comes in unfolds (arrive).
  */
-export function TaskList({
-  tasks,
+export function TaskList<T = TaskView>({
+  items,
+  keyOf,
   revealed,
   onKeyDown,
   row,
+  className,
 }: {
-  tasks: TaskView[]
+  /** Its rows: tasks, or tasks and the groups they are in */
+  items: T[]
+  keyOf: (item: T) => string
   /** A task just shown: it is brought into view */
   revealed?: string
-  onKeyDown: (event: React.KeyboardEvent<HTMLUListElement>) => void
-  row: (task: TaskView, motion: ListEntry<TaskView>) => React.ReactNode
+  onKeyDown?: (event: React.KeyboardEvent<HTMLUListElement>) => void
+  row: (item: T, motion: ListEntry<T>) => React.ReactNode
+  /** Its class: a group's tasks are a list of their own, under it */
+  className?: string
 }) {
-  const { ref, entries } = useListMotion(tasks, (task) => task.id)
+  const { ref, entries } = useListMotion(items, keyOf)
   useEffect(() => {
     if (!revealed) return
     ref.current
@@ -116,7 +122,7 @@ export function TaskList({
       ?.scrollIntoView({ block: 'nearest' })
   }, [revealed, ref])
   return (
-    <ul ref={ref} className="mt-3" onKeyDown={onKeyDown}>
+    <ul ref={ref} className={className ?? 'mt-3'} onKeyDown={onKeyDown}>
       {entries.map((entry) => row(entry.item, entry))}
     </ul>
   )

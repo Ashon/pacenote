@@ -38,6 +38,9 @@ export type RowStep = { label: string } &
     | { kind: 'draft' }
     /** In progress, no longer, or waiting on someone else */
     | { kind: 'stage'; stage: StageRecord['stage'] }
+    /** Groups of tasks: with others by hand, or out of its group */
+    | { kind: 'groupWith' }
+    | { kind: 'moveOut' }
   )
 
 /** The task and what the list knows of it, as TaskRow is given them */
@@ -72,6 +75,11 @@ export interface TaskRowInput {
   followsTask?: TaskView
   /** The user group a Maybe was asked of */
   askGroup?: string
+  /**
+   * Groups of tasks on this Mac: in, the task is in one (Move out); out,
+   * it may be grouped with others (Group with…)
+   */
+  grouping?: 'in' | 'out'
 }
 
 export interface TaskRowState {
@@ -134,6 +142,8 @@ export interface TaskRowState {
   menu: RowStep[]
   /** Where it stands, under the menu after a line */
   stages: RowStep[]
+  /** Its group, under the menu after another line */
+  grouping: RowStep[]
   /** The open task it looks like, asked about while it is open */
   looksLike?: TaskView
   /** What its quiet session looked like, for the opened row */
@@ -261,6 +271,12 @@ export function taskRowState(
     reopen: task.status === 'closed' ? { status: 'kept' } : null,
     menu,
     stages,
+    grouping:
+      acting && input.grouping === 'in'
+        ? [{ kind: 'moveOut', label: t.moveOutOfGroup }]
+        : acting && input.grouping === 'out'
+          ? [{ kind: 'groupWith', label: t.groupWith }]
+          : [],
     looksLike: acting ? input.looksLike : undefined,
     proposal: task.status === 'open' ? input.proposal : undefined,
     followsTask:

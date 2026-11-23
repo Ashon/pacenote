@@ -38,6 +38,17 @@ import {
 } from '../../../../src/tasks/work.js'
 import { handOverTasks } from '../../../../src/tasks/hand-over.js'
 import {
+  allowBundleFill,
+  answerBundleSuggestion,
+  bundlesOf,
+  bundleTasks,
+  moveOutOfBundle,
+  readBundles,
+  takeBackBundleFill,
+  ungroupBundle,
+  wrapUpBundle,
+} from '../../../../src/tasks/bundles.js'
+import {
   addYourTask,
   keepBoth,
   takeBackFill,
@@ -50,6 +61,7 @@ import {
 } from '../../../../src/tasks/you.js'
 import { taskArea } from '../../../../src/you/areas.js'
 import { countYou, readYou } from '../../../../src/you/store.js'
+import type { Bundler } from '../bundler.js'
 import type { Filler } from '../filler.js'
 import type { Session } from '../handoff.js'
 import { text } from '../main.text.js'
@@ -76,6 +88,7 @@ export function registerTasksIpc(
     collectionRuns,
     collectState,
     filler,
+    bundler,
   }: {
     todo: TodoSettings
     sessions: TaskSessions
@@ -90,6 +103,8 @@ export function registerTasksIpc(
     collectState: (collections: CollectionRecord[]) => TasksCollect
     /** New tasks filled in by your AI */
     filler: Filler
+    /** Groups of tasks your AI suggests and fills in */
+    bundler: Bundler
   }
 ): void {
   const { dataDir, settings, ownAi } = desktop
@@ -123,6 +138,12 @@ export function registerTasksIpc(
       aiSet: aiSetUp(settings.effectiveEnv(), Boolean(collect.last)),
       // The tasks your AI is filling in now (filler.ts)
       filling: filler.filling(),
+      // Groups of tasks, your AI's suggestion, and the groups it fills now
+      bundles: {
+        ...bundlesOf(view.tasks, readBundles(dataDir)),
+        filling: bundler.filling(),
+        on: bundlesOn(),
+      },
       collections,
       ...view,
       working: sessions.working(open, work.entries),
@@ -174,14 +195,17 @@ export function registerTasksIpc(
   ipc.handle('pacenote:tasks:live', null, () =>
     todo.current().on ? liveTasks(readActivity(dataDir)) : null
   )
-  ipc.handle('pacenote:tasks:collect', undefined, () => {
+  ipc.handle('pacenote:tasks:collect', undefined, async () => {
     if (!todo.current().on)
       return {
         at: new Date().toISOString(),
         ok: false,
         error: localized(text).tasksOff,
       }
-    return taskCollector.run()
+    const outcome = await taskCollector.run()
+    // New tasks: your AI looks whether some are one piece of work
+    if (outcome.ok) bundler.soon()
+    return outcome
   })
   ipc.handle('pacenote:tasks:collect-stop', undefined, () =>
     taskCollector.cancel()
@@ -213,6 +237,85 @@ export function registerTasksIpc(
   // Undo of what your AI filled in, on the task's row
   ipc.handle('pacenote:tasks:take-back-fill', undefined, (id) => {
     if (typeof id === 'string') takeBackFill(dataDir, id)
+  })
+  // Groups of tasks (src/tasks/bundles.ts): grouped by hand, or as your AI
+  // suggested; each filled in by your AI once made, and when its tasks change
+  const bundlesOn = () => settings.effectiveEnv().TASKS_BUNDLE !== 'off'
+  ipc.handle('pacenote:tasks:bundle', {}, (taskIds, into) => {
+    const t = localized(text)
+    const wanted = Array.isArray(taskIds)
+      ? taskIds.filter((id): id is string => typeof id === 'string')
+      : []
+    const known = new Set(allTaskViews(dataDir).map((task) => task.id))
+    const ids = wanted.filter((id) => known.has(id))
+    if (ids.length === 0) return { error: t.groupNeedsTwo }
+    const made = bundleTasks(dataDir, ids, {
+      ...(typeof into === 'string' && { into }),
+    })
+    if (typeof made !== 'string')
+      return {
+        error: made.refused.startsWith('That group')
+          ? t.groupGone
+          : t.groupNeedsTwo,
+      }
+    bundler.fill(made)
+    return { id: made }
+  })
+  ipc.handle('pacenote:tasks:bundle-answer', undefined, (id, yes) => {
+    if (typeof id !== 'string') return
+    answerBundleSuggestion(dataDir, id, yes === true)
+    if (yes === true) bundler.fill(id)
+  })
+  ipc.handle('pacenote:tasks:bundle-move-out', undefined, (id, taskId) => {
+    if (typeof id === 'string' && typeof taskId === 'string')
+      moveOutOfBundle(dataDir, id, taskId)
+  })
+  ipc.handle('pacenote:tasks:bundle-ungroup', undefined, (id) => {
+    if (typeof id === 'string') ungroupBundle(dataDir, id)
+  })
+  ipc.handle('pacenote:tasks:bundle-take-back', undefined, (id) => {
+    if (typeof id === 'string') takeBackBundleFill(dataDir, id)
+  })
+  ipc.handle('pacenote:tasks:bundle-fill-again', {}, (id) => {
+    if (typeof id !== 'string') return {}
+    if (!bundlesOn()) return { error: localized(text).groupAiOff }
+    allowBundleFill(dataDir, id)
+    bundler.fill(id, true)
+    return {}
+  })
+  // Done all: what you did, written once by your AI for you to edit
+  ipc.handle('pacenote:tasks:bundle-wrap', {}, async (id) => {
+    if (typeof id !== 'string') return {}
+    const t = localized(text)
+    const tasks = allTaskViews(dataDir)
+    const group = bundlesOf(tasks, readBundles(dataDir)).groups.find(
+      (each) => each.id === id
+    )
+    if (!group) return { error: t.groupGone }
+    if (!bundlesOn()) return { error: t.groupAiOff }
+    const members = group.tasks.flatMap((taskId) => {
+      const task = tasks.find((each) => each.id === taskId)
+      return task ? [task] : []
+    })
+    return bundler.wrapUp(
+      group.fill?.title ?? group.name ?? members[0]?.title ?? '',
+      members
+    )
+  })
+  // Done all: each open task of the group done, with what you did kept once
+  ipc.handle('pacenote:tasks:bundle-done', {}, (id, wrap) => {
+    if (typeof id !== 'string') return {}
+    const tasks = allTaskViews(dataDir)
+    const group = bundlesOf(tasks, readBundles(dataDir)).groups.find(
+      (each) => each.id === id
+    )
+    if (!group) return { error: localized(text).groupGone }
+    if (typeof wrap === 'string') wrapUpBundle(dataDir, id, wrap)
+    const open = group.tasks.filter(
+      (taskId) => tasks.find((task) => task.id === taskId)?.status === 'open'
+    )
+    for (const taskId of open) decide(dataDir, taskId, { status: 'done' })
+    return { done: open.length }
   })
   // It is not the task it looks like: asked no more
   ipc.handle('pacenote:tasks:keep-both', undefined, (id) => {

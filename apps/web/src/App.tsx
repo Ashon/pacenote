@@ -74,7 +74,7 @@ type Route =
       /** One session's page */
       id?: string
       /** A new session's page, for the task when one is given */
-      start?: { task?: string }
+      start?: { task?: string; group?: string }
     }
   | {
       page: 'you'
@@ -105,6 +105,12 @@ type Route =
  * window there before), #/debug: Debug (development builds), otherwise:
  * Overview
  */
+/** The group a new session is for, as #/sessions/new/<task>?group=<id> says */
+const groupOf = (hash: string): string | undefined =>
+  /[?&]group=([^&#]+)/.exec(hash)?.[1]
+    ? decodeURIComponent(/[?&]group=([^&#]+)/.exec(hash)![1]!)
+    : undefined
+
 function readRoute(): Route {
   const hash = window.location.hash
   const run = /^#\/runs\/([^/?#]+)/.exec(hash)?.[1]
@@ -123,7 +129,13 @@ function readRoute(): Route {
     if (start)
       return {
         page: 'sessions',
-        start: start[1] ? { task: decodeURIComponent(start[1]) } : {},
+        start: start[1]
+          ? {
+              task: decodeURIComponent(start[1]),
+              // Continue here for a group: its tasks in one session
+              ...(groupOf(hash) && { group: groupOf(hash) }),
+            }
+          : {},
       }
     const session = /^#\/sessions\/([^/?#]+)/.exec(hash)?.[1]
     return session
@@ -271,8 +283,9 @@ export default function App() {
                       <SessionsSplit current={route.id}>
                         {route.start ? (
                           <NewSessionPage
-                            key={route.start.task ?? 'new'}
+                            key={`${route.start.task ?? 'new'}${route.start.group ?? ''}`}
                             task={route.start.task}
+                            group={route.start.group}
                           />
                         ) : (
                           <SessionPage key={route.id} id={route.id!} />

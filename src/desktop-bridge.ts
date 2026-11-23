@@ -40,6 +40,7 @@ import type {
   SetupView,
 } from './settings/setup.js'
 import type { OwnAiNow, OwnAiView, OwnCli } from './tasks/own-ai.js'
+import type { BundlesView } from './tasks/bundle-view.js'
 import type { StageRecord, StageRecords } from './tasks/stage.js'
 import type { FromMacMode, FromMacState, MacsView } from './macs/types.js'
 import type {
@@ -129,6 +130,16 @@ export interface TodoListView extends TasksView {
    * none from a Mac before 0.6.24
    */
   filling?: string[]
+  /**
+   * Groups of tasks that are one piece of work, your AI's suggestion, and
+   * the groups it fills in now (src/tasks/bundles.ts); none from a Mac
+   * before 0.6.41
+   */
+  bundles?: BundlesView & {
+    filling: string[]
+    /** Settings > Pacenote's own work > Group similar tasks */
+    on: boolean
+  }
 }
 
 /**
@@ -262,6 +273,34 @@ export interface DesktopBridge {
     takeBackFill(id: string): Promise<{ error?: string } | undefined>
     /** A task you added is not the one it looks like: asked no more */
     keepBoth(id: string): Promise<{ error?: string } | undefined>
+    /**
+     * Groups tasks as one piece of work: into the group one of them is in,
+     * or the one given, else a new one, which your AI then fills in.
+     * Optional: a device or a Mac before 0.6.41 has no groups.
+     */
+    bundle?(
+      taskIds: string[],
+      into?: string
+    ): Promise<{ id?: string; error?: string } | undefined>
+    /** Your answer to your AI's suggestion: Group them, or Not one piece */
+    answerBundle?(id: string, yes: boolean): Promise<void>
+    /** Moves a task out of its group; a group left with one task ends */
+    moveOutOfBundle?(id: string, taskId: string): Promise<void>
+    /** Ungroups: its tasks stand alone, not suggested together again */
+    ungroupBundle?(id: string): Promise<void>
+    /** Undo of what your AI filled a group in with */
+    takeBackBundleFill?(id: string): Promise<void>
+    /** Fill again: your AI fills the group in once more */
+    fillBundleAgain?(id: string): Promise<{ error?: string } | undefined>
+    /** Done all: what you did, written by your AI for you to edit */
+    wrapUpBundle?(
+      id: string
+    ): Promise<{ text?: string; by?: string; error?: string } | undefined>
+    /** Done all: the group's open tasks done, what you did kept once */
+    doneBundle?(
+      id: string,
+      wrap: string
+    ): Promise<{ done?: number; error?: string } | undefined>
     leaveOut(label: string): Promise<SettingsIssue[]>
     /**
      * Runs a collection (the AI chosen, Slack read only) and waits for it
@@ -320,9 +359,10 @@ export interface DesktopBridge {
     resume(entryId: string): Promise<{ error?: string } | undefined>
     /**
      * A new session Pacenote runs for the task, before you start it: its
-     * first message and folder; null for a task not open
+     * first message and folder; null for a task not open. With a group the
+     * task is in (a Mac from 0.6.41): the message carries all its tasks.
      */
-    newSession(id: string): Promise<NewSessionDraft | null>
+    newSession(id: string, group?: string): Promise<NewSessionDraft | null>
     /** Has Claude Code draft a reply from the thread, read only */
     draft(
       id: string

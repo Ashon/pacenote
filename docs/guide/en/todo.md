@@ -56,6 +56,18 @@ open task it carries on from, from your projects, your open tasks and the recent
 when it is filling it in; open the task to see what it filled in, with **Undo**. A task that looks like one you have
 asks **Same task** or **Keep both**. Turn it off in Settings > Todo > **Fill in new tasks**.
 
+## Group tasks that are one piece of work
+
+Tasks that go together, such as a change, its test and its docs, can be one group: a row with its tasks under it, who
+waits and what comes first. With an AI set up, when three or more open tasks in one project look like one piece of
+work, Todo asks above the list: **Group them** or **Not one piece**. You can also group a task yourself with More >
+**Group with…**, and take one out with More > **Move out of the group**.
+
+Your AI fills each group in from its tasks: what the work is, who waits for what, the earliest due and what to do
+first. Open the group to see it, with **Undo**. **Continue here** on the group starts one session for all its open
+tasks, and **Done all** closes them together with one note of what you did. Each task keeps its own row, and its own
+reply to draft. Turn it off in Settings > Todo > **Group similar tasks**.
+
 Open tasks fade after 7 days and drop after 14.
 
 ## More

@@ -88,6 +88,12 @@ export function handoffPrompt(
     brief?: boolean
     /** The language the user reads Pacenote in (the app's) */
     locale?: Locale
+    /**
+     * The group the task is in, when the session is for all of it (Continue
+     * here on a group): its name and summary, and its other open tasks, in
+     * the order to do them
+     */
+    group?: { title: string; summary?: string; others: TaskView[] }
   }
 ): string {
   const earlier = options.brief
@@ -136,15 +142,54 @@ export function handoffPrompt(
     options.brief
       ? `What came before it is left out here: call Pacenote's task_context with id ${task.id} before you start.`
       : undefined,
+    ...groupLines(options.group),
     '',
     options.planFirst
       ? 'Start by summing up the task and your plan, then wait for the user before you change anything.'
       : 'Go ahead with the task, and stop to ask the user when a choice is theirs.',
     'Do not post to Slack. When a reply is needed, draft it for the user to send, in the language of its thread.',
-    `When the task is done, call Pacenote's close_task with id ${task.id}, why "resolved", a note on what you did and, if the person who asked waits for an answer, a reply for the user to send. task_context gives the task and what came before it again.`,
+    options.group?.others.length
+      ? `When a task is done, call Pacenote's close_task with its id, why "resolved", a note on what you did and, if the person who asked waits for an answer, a reply for the user to send. task_context gives a task, the others of its group and what came before it again.`
+      : `When the task is done, call Pacenote's close_task with id ${task.id}, why "resolved", a note on what you did and, if the person who asked waits for an answer, a reply for the user to send. task_context gives the task and what came before it again.`,
     `Talk to the user in ${LANGUAGE_FOR_AI[options.locale ?? getLocale()]}, the language they read Pacenote in.`,
   ]
   return redactSecrets(lines.filter((line) => line !== undefined).join('\n'))
+}
+
+/** A group's part of the first prompt: what it is, and its other tasks */
+function groupLines(group: Parameters<typeof handoffPrompt>[2]['group']) {
+  if (!group?.others.length) return []
+  return [
+    '',
+    `The user grouped this task with ${group.others.length === 1 ? 'another' : `${group.others.length} others`} as one piece of work: "${group.title}". This session is for all of them, in this order after the one above.`,
+    group.summary ? `The group: ${group.summary}` : undefined,
+    ...group.others.map((other) =>
+      [
+        `<task id="${other.id}" action="${other.action ?? 'other'}"${other.repo ? ` repo="${other.repo}"` : ''}>`,
+        other.title,
+        [
+          other.kind === 'promised'
+            ? 'You said you would do it'
+            : other.askedBy
+              ? `${other.askedBy} asked you`
+              : undefined,
+          other.source.label,
+          other.due ? `due ${other.due}` : undefined,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        other.summary
+          ? `Summary: ${other.summary}`
+          : other.reason.trim()
+            ? `Why: ${other.reason}`
+            : undefined,
+        '</task>',
+      ]
+        .filter((line) => line !== undefined)
+        .join('\n')
+    ),
+    `Call Pacenote's task_context with a task's id before you start on it, for what came before it.`,
+  ]
 }
 
 /** A word for a shell, quoted so nothing in it is read */

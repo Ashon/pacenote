@@ -8,6 +8,8 @@ import {
   Clock,
   ExternalLink,
   FolderOpen,
+  Group,
+  ListMinus,
   MessageSquare,
   MoreHorizontal,
   Play,
@@ -45,6 +47,10 @@ function stepIcon(step: RowStep) {
       return <FolderOpen />
     case 'draft':
       return <MessageSquare />
+    case 'groupWith':
+      return <Group />
+    case 'moveOut':
+      return <ListMinus />
     case 'stage':
       return step.stage === 'started' ? (
         <Play />
@@ -217,6 +223,9 @@ export function TaskActions({
                   <DropdownMenuSeparator />
                 )}
                 {state.stages.map(menuItem)}
+                {state.menu.length + state.stages.length > 0 &&
+                  state.grouping.length > 0 && <DropdownMenuSeparator />}
+                {state.grouping.map(menuItem)}
               </DropdownMenuContent>
             </DropdownMenu>
           </>

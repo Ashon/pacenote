@@ -82,7 +82,8 @@ in Codex, ask it to collect your tasks with Pacenote's `collect_context` tool, i
   out, or DMs while they do not count, are skipped whatever the tool sends.
 - The messages go to the tool's model, as anything the tool reads does. Pacenote keeps the tasks in
   `PACENOTE_DATA_DIR/tasks.json`, your decisions in `tasks-decisions.json`, and the stages you set (in progress, waiting)
-  in `tasks-stages.json`. With Pacenote on another of your Macs, they are the same there too ([Your Macs](macs.md)).
+  in `tasks-stages.json`, and your groups in `tasks-bundles.json`. With Pacenote on another of your Macs, they are the
+  same there too ([Your Macs](macs.md)).
 
 ## Who you are in Slack
 
@@ -141,6 +142,40 @@ A collection is told who you are, so it can tell what is asked of you from what 
 - The Overview shows what you handled over the last 14 days: how many each day, how they ended (in Claude Code or Codex,
   closed in Slack, or marked done), and how long they usually took from their message. Done, closed, and dismissed as
   already done count; dismissed as not for you or not worth it does not.
+
+## Groups of tasks
+
+Tasks that are one piece of work, such as a change, its test and its docs, or a review and the reply someone waits for
+on it, go in one group. A group is a row in Todo with its tasks indented under it: its name, how many tasks, who waits
+and how far along, **Continue here** and **Done all**. Each task stays a task of its own, with its own row, buttons and
+count, and none is hidden.
+
+- **Your AI asks; you decide.** With **Group similar tasks** on (Settings > Todo, on by default, only with an AI set up),
+  after a fill or a collection your AI looks at each project with three or more open tasks in no group, one new since
+  it last looked there, at most once in 10 minutes. When some look like one piece of work, the Open tab asks above the
+  list: **Group them** or **Not one piece**. Not one piece is kept, so those tasks are not offered again. It never
+  groups tasks by itself.
+- **By hand**, More > **Group with…** on a task groups it with other open tasks of its project, or puts it into a group
+  there. More > **Move out of the group** takes it out. A task is in one group at most; a group left with fewer than two
+  tasks is gone, and one whose tasks are all done shows as done.
+- **Filled in.** Your AI fills each group in from its tasks: a title, two or three sentences on what the work is and how
+  its tasks fit together, who waits for what (only for an open task someone asked), the earliest due (a task's own due),
+  what to do first and why, and the order to do them in (`follows` is a hint). Pacenote gathers the tasks
+  (`src/tasks/bundle-ai.ts`), the CLI runs with no tools (`apps/desktop/src/bundler.ts`), and its answer is checked
+  against the tasks it was given: their ids, their names, their dues. When the tasks change, it fills the group in
+  again. Opened, the group says when and by which AI, with **Undo** (back to the fill before, and no fill again until
+  you ask) and **Fill again**.
+- **Continue here** on a group starts one session for all its open tasks: the session is the first one's work, and its
+  first message has the group's summary and the other tasks after it, in order, each to read with `task_context` before
+  starting it and to close with `close_task` once done.
+- **Done all** closes the group's open tasks together, with one note of what you did, which your AI writes first for you
+  to change, kept with the group. Replies stay per task: draft one on each task for whoever waits.
+- To an AI tool, `task_context` on a task in a group also gives the group: its title, its summary and its other tasks
+  with their state.
+- Groups are kept in `tasks-bundles.json` (`src/tasks/bundles.ts`), apart from `tasks.json`, and merge between your
+  Macs, the latest change of each group winning; where your AI last looked stays on its Mac. A Pacenote before 0.6.41
+  ignores the file and lists the tasks as before. Your phone or iPad gets the groups from the Mac and lists them the same
+  way (`src/tasks/bundle-view.ts`, plain data with no file), and changes them only by asking the Mac.
 
 ## Continuing a task
 

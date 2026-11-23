@@ -1,5 +1,6 @@
 // Relative imports, so the tests (and the root's typecheck) can load it
 import type { TodoListView } from '../../../../src/desktop-bridge.js'
+import type { TaskBundle } from '../../../../src/tasks/bundle-view.js'
 import { looksLikeOf } from '../../../../src/tasks/filled.js'
 import { CLI_NAMES } from '../../../../src/tasks/own-ai.js'
 import { stagesOf, type TaskStage } from '../../../../src/tasks/stage.js'
@@ -212,4 +213,105 @@ export function declinedFrom(stored: string | null): string[] {
 export function skeletonRows(stored: string | null): number {
   const rows = Number(stored)
   return rows > 0 ? Math.min(rows, 8) : 3
+}
+
+// ---------------------------------------------------------------------------
+// Groups of tasks (src/tasks/bundles.ts)
+
+/** A row of a tab's list: a task, or a group with its tasks under it */
+export type TodoItem =
+  | { kind: 'task'; task: TaskView }
+  | { kind: 'group'; group: TaskBundle; tasks: TaskView[] }
+
+export const itemKey = (item: TodoItem) =>
+  item.kind === 'task' ? item.task.id : `group:${item.group.id}`
+
+/**
+ * A tab's rows with its groups gathered: a group shows where the first of
+ * its tasks in the tab would, with its tasks under it in its order, when two
+ * or more of them are in the tab; one alone stays a row of its own
+ */
+export function listItems(
+  tasks: readonly TaskView[],
+  groups: readonly TaskBundle[] = []
+): TodoItem[] {
+  const listed = new Map(tasks.map((task) => [task.id, task]))
+  const groupOf = new Map<string, TaskBundle>()
+  for (const group of groups) {
+    const here = group.tasks.filter((id) => listed.has(id))
+    if (here.length < 2) continue
+    for (const id of here) if (!groupOf.has(id)) groupOf.set(id, group)
+  }
+  const placed = new Set<string>()
+  const items: TodoItem[] = []
+  for (const task of tasks) {
+    const group = groupOf.get(task.id)
+    if (!group) {
+      items.push({ kind: 'task', task })
+      continue
+    }
+    if (placed.has(group.id)) continue
+    placed.add(group.id)
+    items.push({
+      kind: 'group',
+      group,
+      tasks: group.tasks.flatMap((id) =>
+        groupOf.get(id) === group && listed.has(id) ? [listed.get(id)!] : []
+      ),
+    })
+  }
+  return items
+}
+
+/** What a group's row says, from all its tasks, whichever tab each is in */
+export interface GroupFacts {
+  /** Its tasks there are, in its order */
+  members: TaskView[]
+  open: TaskView[]
+  /** How many are done (settled) */
+  done: number
+  /** Who waits: the people who asked its open tasks */
+  waits: string[]
+  /** The task whose due comes first, as your AI said, else the first due */
+  due?: TaskView
+  /** The task to do first, as your AI said, while it is open */
+  first?: TaskView
+  /** Its name: your AI's, the one it suggested, or its first task's */
+  title: string
+  /** The repository its tasks are in, when one */
+  repo?: string
+}
+
+export function groupFacts(
+  group: TaskBundle,
+  tasks: readonly TaskView[]
+): GroupFacts {
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const members = group.tasks.flatMap((id) => {
+    const task = byId.get(id)
+    return task ? [task] : []
+  })
+  const open = members.filter((task) => task.status === 'open')
+  const waits = [
+    ...new Set(
+      open.flatMap((task) =>
+        task.kind === 'asked' && task.askedBy ? [task.askedBy] : []
+      )
+    ),
+  ]
+  const isOpen = (id?: string) =>
+    id ? open.find((task) => task.id === id) : undefined
+  const repos = [
+    ...new Set(members.flatMap((task) => (task.repo ? [task.repo] : []))),
+  ]
+  return {
+    members,
+    open,
+    done: members.length - open.length,
+    waits,
+    due: isOpen(group.fill?.due) ?? open.find((task) => task.due),
+    first: isOpen(group.fill?.first?.task),
+    title: group.fill?.title ?? group.name ?? members[0]?.title ?? '',
+    ...(repos.length === 1 && { repo: repos[0] }),
+  }
 }

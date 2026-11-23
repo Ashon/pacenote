@@ -117,6 +117,22 @@ const bridge = {
     takeBackFill: (id) =>
       ipcRenderer.invoke('pacenote:tasks:take-back-fill', id),
     keepBoth: (id) => ipcRenderer.invoke('pacenote:tasks:keep-both', id),
+    // Groups of tasks: by hand, your AI's suggestion, its fill, Done all
+    bundle: (taskIds, into) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle', taskIds, into),
+    answerBundle: (id, yes) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-answer', id, yes),
+    moveOutOfBundle: (id, taskId) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-move-out', id, taskId),
+    ungroupBundle: (id) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-ungroup', id),
+    takeBackBundleFill: (id) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-take-back', id),
+    fillBundleAgain: (id) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-fill-again', id),
+    wrapUpBundle: (id) => ipcRenderer.invoke('pacenote:tasks:bundle-wrap', id),
+    doneBundle: (id, wrap) =>
+      ipcRenderer.invoke('pacenote:tasks:bundle-done', id, wrap),
     leaveOut: (label) => ipcRenderer.invoke('pacenote:tasks:leave-out', label),
     // Collect now: Claude Code reads Slack, read only, in the main process
     collect: () => ipcRenderer.invoke('pacenote:tasks:collect'),
@@ -145,7 +161,8 @@ const bridge = {
     continueIn: (id, how) =>
       ipcRenderer.invoke('pacenote:tasks:continue', id, how),
     resume: (entryId) => ipcRenderer.invoke('pacenote:tasks:resume', entryId),
-    newSession: (id) => ipcRenderer.invoke('pacenote:tasks:new-session', id),
+    newSession: (id, group) =>
+      ipcRenderer.invoke('pacenote:tasks:new-session', id, group),
     draft: (id) => ipcRenderer.invoke('pacenote:tasks:draft', id),
     copyReply: (id, text) =>
       ipcRenderer.invoke('pacenote:tasks:copy-reply', id, text),

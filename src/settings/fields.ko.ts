@@ -102,7 +102,7 @@ export const GROUPS_KO: Record<SettingGroup, { label: string; help: string }> =
     },
     ownWork: {
       label: 'Pacenote 자체 작업',
-      help: '지금 모으기, 새 할 일 채우기, 답장 초안, 끝난 것 같음, 회고의 정리하기는 이 Mac에서 내 로그인으로 화면 없이 실행돼요.',
+      help: '지금 모으기, 새 할 일 채우기, 비슷한 할 일 묶기, 답장 초안, 끝난 것 같음, 회고의 정리하기는 이 Mac에서 내 로그인으로 화면 없이 실행돼요.',
     },
     tasks: {
       label: '할 일 모으기',
@@ -355,6 +355,10 @@ export const FIELDS_KO: Record<string, FieldWords> = {
   TASKS_FILL: {
     label: '새 할 일 채우기',
     help: '여기나 iPhone에서 적은 할 일에 프로젝트, 어떤 일인지, 알아둘 것을 채워요. 내 프로젝트, 열린 할 일, 그 저장소의 최근 작업을 보고요. 아무것도 바꾸거나 보내지 않고, 되돌리기로 되돌릴 수 있어요.',
+  },
+  TASKS_BUNDLE: {
+    label: '비슷한 할 일 묶기',
+    help: '한 프로젝트에 한 가지 일 같은 열린 할 일이 3개 이상이면 묶을지 묻고, 묶음마다 무슨 일인지, 누가 무엇을 기다리는지, 먼저 할 것을 채워요. 묶기는 늘 내가 정하고, 채운 것은 되돌리기로 되돌릴 수 있어요.',
   },
   TASKS: {
     label: 'Slack에서 내 할 일 모으기',

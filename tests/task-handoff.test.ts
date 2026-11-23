@@ -265,6 +265,46 @@ describe('the handoff', () => {
     ).toContain('Go ahead with the task')
   })
 
+  it("hands a group's other tasks to one session, in order", () => {
+    const other: TaskView = {
+      ...task,
+      id: 'local:test1',
+      title: 'Add a backoff test for webhook retries',
+      kind: 'promised',
+      askedBy: undefined,
+      due: undefined,
+      summary: undefined,
+      reason: 'left after the limit',
+    }
+    const prompt = handoffPrompt(task, context, {
+      marker: 'm1',
+      planFirst: true,
+      tool: 'claude',
+      group: {
+        title: 'Webhook retries',
+        summary: 'Retries go from 3 attempts to 5.',
+        others: [other],
+      },
+    })
+    expect(prompt).toContain(
+      'The user grouped this task with another as one piece of work: "Webhook retries". This session is for all of them, in this order after the one above.'
+    )
+    expect(prompt).toContain('The group: Retries go from 3 attempts to 5.')
+    expect(prompt).toContain(
+      '<task id="local:test1" action="code" repo="Ashon/payments">\nAdd a backoff test for webhook retries\nYou said you would do it · #payments\nWhy: left after the limit\n</task>'
+    )
+    expect(prompt).toContain("call Pacenote's close_task with its id")
+    // With none left open, as one task
+    expect(
+      handoffPrompt(task, context, {
+        marker: 'm1',
+        planFirst: true,
+        tool: 'claude',
+        group: { title: 'Webhook retries', others: [] },
+      })
+    ).toContain('close_task with id C1:1791871374.047569')
+  })
+
   it('keeps what Slack wrote off the command line', () => {
     expect(shellQuote("it's here")).toBe(`'it'\\''s here'`)
     const script = commandScript({
