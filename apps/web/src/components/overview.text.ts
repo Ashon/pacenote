@@ -62,16 +62,20 @@ const en = {
   fromCache: (tokens: string) => `+${tokens} from cache`,
   noneFromCache: 'None from cache',
   tokensChart:
-    'New tokens per day for the last 14 days: mentions at the bottom of each bar, task collections above them, recap write-ups on top',
+    'New tokens per day for the last 14 days: mentions at the bottom of each bar, then task collections, task help and sessions, recap write-ups on top',
   tokensDay: (
     day: string,
     total: string,
-    mentions: string,
-    collections: string,
-    recaps: string,
+    of: {
+      mentions: string
+      collections: string
+      help: string
+      sessions: string
+      recaps: string
+    },
     cached: string
   ) =>
-    `${day}: ${total} new (mentions ${mentions}, task collections ${collections}, recaps ${recaps}), ${cached} from cache`,
+    `${day}: ${total} new (mentions ${of.mentions}, task collections ${of.collections}, task help ${of.help}, sessions ${of.sessions}, recaps ${of.recaps}), ${cached} from cache`,
   bySource: 'By source',
   mentions: 'Mentions',
   mentionsHint: (n: number, perRun: string) =>
@@ -83,6 +87,22 @@ const en = {
   each: (tokens: string) => `${tokens} each`,
   perTaskFound: (tokens: string) => `${tokens} per task found`,
   noCollections: 'None run from the app yet',
+  // Filling in a task you added, checking one looks done, drafting a reply
+  help: 'Task help',
+  helpHint: (fills: number, judged: number, drafts: number) =>
+    [
+      fills && `${fills} filled in`,
+      judged && `${judged} checked done`,
+      drafts && `${drafts} ${drafts === 1 ? 'draft' : 'drafts'}`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  noHelp: 'None yet',
+  // The turns of the sessions Pacenote runs: a session's page, Continue here
+  sessions: 'Sessions',
+  sessionsHint: (n: number, perTurn: string) =>
+    `${n} ${n === 1 ? 'turn' : 'turns'} · ${perTurn} per turn`,
+  noSessionTurns: 'No turns run from Pacenote yet',
   recaps: 'Recaps',
   recapsHint: (n: number, each: string) =>
     `${n} ${n === 1 ? 'write-up' : 'write-ups'} · ${each} each`,
@@ -146,9 +166,9 @@ const ko: typeof en = {
   fromCache: (tokens) => `캐시에서 +${tokens}`,
   noneFromCache: '캐시 사용 없음',
   tokensChart:
-    '최근 14일 동안의 일별 새 토큰: 막대마다 아래부터 멘션, 할 일 모으기, 회고 정리',
-  tokensDay: (day, total, mentions, collections, recaps, cached) =>
-    `${day}: 새 토큰 ${total} (멘션 ${mentions}, 할 일 모으기 ${collections}, 회고 ${recaps}), 캐시 ${cached}`,
+    '최근 14일 동안의 일별 새 토큰: 막대마다 아래부터 멘션, 할 일 모으기, 할 일 돕기, 세션, 회고 정리',
+  tokensDay: (day, total, of, cached) =>
+    `${day}: 새 토큰 ${total} (멘션 ${of.mentions}, 할 일 모으기 ${of.collections}, 할 일 돕기 ${of.help}, 세션 ${of.sessions}, 회고 ${of.recaps}), 캐시 ${cached}`,
   bySource: '출처별',
   mentions: '멘션',
   mentionsHint: (n, perRun) => `실행 ${n}건 · 실행당 ${perRun}`,
@@ -158,6 +178,19 @@ const ko: typeof en = {
   each: (tokens) => `회당 ${tokens}`,
   perTaskFound: (tokens) => `찾은 할 일당 ${tokens}`,
   noCollections: '아직 앱에서 실행한 적 없음',
+  help: '할 일 돕기',
+  helpHint: (fills, judged, drafts) =>
+    [
+      fills && `채우기 ${fills}회`,
+      judged && `끝남 확인 ${judged}회`,
+      drafts && `초안 ${drafts}개`,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  noHelp: '아직 없음',
+  sessions: '세션',
+  sessionsHint: (n, perTurn) => `턴 ${n}회 · 턴당 ${perTurn}`,
+  noSessionTurns: '아직 Pacenote에서 진행한 턴 없음',
   recaps: '회고',
   recapsHint: (n, each) => `정리 ${n}회 · 회당 ${each}`,
   noRecaps: '아직 정리한 적 없음',

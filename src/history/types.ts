@@ -231,8 +231,10 @@ export interface RunStats {
 
 /**
  * Tokens per day, apart by where they went: answering mentions (run history),
- * collecting tasks (the collections the desktop app ran) and writing recaps up
- * (Write it up, recaps.json)
+ * collecting tasks (the collections the desktop app ran), writing recaps up
+ * (Write it up, recaps.json), the turns of the sessions Pacenote runs and the
+ * background help on tasks (spent.json). sessions and help are new in 0.6.40:
+ * a Mac before it leaves them out.
  */
 export interface TokenStats {
   /** Oldest -> newest, the same days as RunStats.daily */
@@ -241,6 +243,8 @@ export interface TokenStats {
     mentions: TokenUsage
     collections: TokenUsage
     recaps: TokenUsage
+    sessions?: TokenUsage
+    help?: TokenUsage
   }[]
   /** Runs that recorded tokens */
   mentions: { runs: number; usage: TokenUsage }
@@ -248,6 +252,10 @@ export interface TokenStats {
   collections: { count: number; found: number; usage: TokenUsage }
   /** Recaps written up */
   recaps: { count: number; usage: TokenUsage }
+  /** Turns of the Claude Code sessions Pacenote runs */
+  sessions?: { turns: number; usage: TokenUsage }
+  /** New tasks filled in, tasks judged done, replies drafted */
+  help?: { fills: number; judged: number; drafts: number; usage: TokenUsage }
 }
 
 export function summarize(run: HistoryRecord): RunSummary {

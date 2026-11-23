@@ -176,6 +176,36 @@ export interface SessionPlanStep {
 }
 
 /**
+ * What a session made (A1, A2): a page, an artifact made from a type or a doc
+ * it put on claude.ai, or a file in its folder a Codex answer linked. One
+ * each, as last published; read from the session's log alone, never from
+ * claude.ai.
+ */
+export interface MadeThing {
+  /** Its claude.ai link, or the file's path: what its turns name it by */
+  key: string
+  kind: 'page' | 'typed' | 'doc' | 'file'
+  /** As the log names it; empty when it does not */
+  title: string
+  /** On claude.ai: opens in your browser, signed in as you */
+  url?: string
+  /** A file, on the Mac the session runs on */
+  path?: string
+  /** A file's kind */
+  file?: 'html' | 'image' | 'pdf' | 'markdown'
+  /** The type it is made from, when the log names it: "Design" */
+  typeName?: string
+  /** Its version on claude.ai, as published last */
+  version?: number
+  /** How many times this session published it */
+  times: number
+  /** Only you can open it on claude.ai, as published last */
+  onlyYou?: boolean
+  /** When it was published last, or linked */
+  at?: string
+}
+
+/**
  * A session's page: the row, its conversation from its tool's own log, and
  * where you type to it: here (Pacenote runs it, or will once you send it
  * something); here too for one resting in the Claude app or a terminal,
@@ -189,6 +219,11 @@ export interface SessionTalk {
   items: SessionItem[]
   /** Its plan, from its log, while a step of it is left */
   plan?: SessionPlanStep[]
+  /**
+   * What it made, in the order it first made them; its turns name each by
+   * its key. A Mac before 0.6.40 leaves it out.
+   */
+  made?: MadeThing[]
   /** Pacenote runs it */
   live?: SessionLive
   typeIn: 'here' | 'move' | 'elsewhere' | 'codex'

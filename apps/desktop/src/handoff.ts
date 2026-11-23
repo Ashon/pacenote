@@ -15,8 +15,9 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
+import { MadeReader } from '../../../src/sessions/made.js'
 import { PlanReader } from '../../../src/sessions/plan.js'
-import type { SessionPlanStep } from '../../../src/sessions/types.js'
+import type { MadeThing, SessionPlanStep } from '../../../src/sessions/types.js'
 import {
   getLocale,
   LANGUAGE_FOR_AI,
@@ -722,15 +723,30 @@ export function readSessionLog(
 
 /**
  * A session's log as its page shows it: its turns and steps
- * (readSessionLog), and the plan Claude Code keeps while it works
+ * (readSessionLog), the plan Claude Code keeps while it works, and what it
+ * made (on claude.ai, or files in its folder, cwd, a Codex answer linked)
  */
 export function readSessionTalk(
   file: string,
   tool: WorkTool,
-  chars = ITEM_CHARS
-): { items: SessionItem[]; plan?: SessionPlanStep[] } {
+  chars = ITEM_CHARS,
+  cwd?: string
+): { items: SessionItem[]; plan?: SessionPlanStep[]; made?: MadeThing[] } {
   const items: SessionItem[] = []
   const plan = new PlanReader()
+  const made = new MadeReader(cwd, existsSync)
+  /** Its items by what they made: the last one shows it */
+  const madeAt = new Map<string, SessionItem>()
+  const madeBy = (kept: SessionItem | undefined, keys: string[]) => {
+    for (const key of keys) {
+      const was = madeAt.get(key)
+      if (was) was.made = was.made?.filter((one) => one !== key)
+      if (was?.made?.length === 0) delete was.made
+      if (!kept) continue
+      kept.made = [...(kept.made ?? []), key]
+      madeAt.set(key, kept)
+    }
+  }
   /** Claude Code's steps by their tool_use id, for how each came back */
   const steps = new Map<string, SessionItem>()
   const push = (item: SessionItem) => {
@@ -767,17 +783,22 @@ export function readSessionTalk(
           if (block.type === 'tool_use') {
             const kept = step(block.name, block.input, at)
             if (kept && typeof block.id === 'string') steps.set(block.id, kept)
-            plan.use(
-              String(block.name ?? ''),
-              block.input,
-              typeof block.id === 'string' ? block.id : undefined
-            )
+            const id = typeof block.id === 'string' ? block.id : undefined
+            plan.use(String(block.name ?? ''), block.input, id)
+            made.use(String(block.name ?? ''), block.input, id)
           } else if (block.type === 'tool_result') {
             const failed = block.is_error === true
-            plan.result(String(block.tool_use_id), event.toolUseResult, failed)
-            const kept = failed
-              ? steps.get(String(block.tool_use_id))
-              : undefined
+            const id = String(block.tool_use_id)
+            plan.result(id, event.toolUseResult, failed)
+            const key = made.result(
+              id,
+              event.toolUseResult,
+              block.content,
+              failed,
+              at
+            )
+            if (key) madeBy(steps.get(id), [key])
+            const kept = failed ? steps.get(id) : undefined
             if (kept) kept.failed = true
           } else if (block.type === 'image') images += 1
       const text = textOf(message.content, SAID)
@@ -799,8 +820,10 @@ export function readSessionTalk(
       // Codex's own context (environment, instructions) is not the session.
       if (/^<(environment_context|user_instructions)>/.test(text.trim()))
         continue
-      if (payload.role === 'user' || payload.role === 'assistant')
-        push({ role: payload.role, text, at })
+      if (payload.role === 'user' || payload.role === 'assistant') {
+        const kept = push({ role: payload.role, text, at })
+        if (payload.role === 'assistant') madeBy(kept, made.said(text, at))
+      }
     } else if (payload.type === 'function_call') {
       let input: unknown = payload.arguments
       try {
@@ -812,5 +835,10 @@ export function readSessionTalk(
     }
   }
   const left = plan.plan()
-  return { items: items.slice(-300), ...(left ? { plan: left } : {}) }
+  const things = made.made()
+  return {
+    items: items.slice(-300),
+    ...(left ? { plan: left } : {}),
+    ...(things.length ? { made: things } : {}),
+  }
 }

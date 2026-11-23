@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { HistoryReader } from '../src/history/reader.js'
 import { HistoryStore } from '../src/history/recorder.js'
+import { keepSpent, readSpent, turnSpend } from '../src/history/spent.js'
 import { normalizeRunRecord, type RunRecord } from '../src/history/types.js'
 import {
   addUsage,
@@ -137,7 +138,7 @@ describe('token stats', () => {
       JSON.stringify({ version: 1, collections })
     )
 
-  it('counts tokens per day, mentions, collections and recaps apart', () => {
+  it('counts tokens per day, mentions, collections, help, sessions and recaps apart', () => {
     const store = new HistoryStore(root)
     const init = {
       origin: {
@@ -214,6 +215,39 @@ describe('token stats', () => {
       },
       new Date(2026, 8, 1, 10).getTime()
     )
+    // The turns of the sessions Pacenote runs, and its help on tasks
+    keepSpent(
+      root,
+      'session',
+      usage({ input: 10, cacheRead: 50_000, cacheWrite: 3000, output: 800 }),
+      new Date(2026, 9, 11, 9)
+    )
+    keepSpent(
+      root,
+      'session',
+      usage({ input: 5, cacheRead: 52_000, output: 200 }),
+      new Date(2026, 9, 11, 9, 2)
+    )
+    keepSpent(
+      root,
+      'fill',
+      usage({ input: 900, output: 120 }),
+      new Date(2026, 9, 9, 8)
+    )
+    keepSpent(
+      root,
+      'done',
+      usage({ input: 400, output: 20 }),
+      new Date(2026, 9, 11, 8)
+    )
+    keepSpent(
+      root,
+      'draft',
+      usage({ input: 600, output: 90 }),
+      new Date(2026, 9, 11, 8)
+    )
+    // Older than the 14 days
+    keepSpent(root, 'session', usage({ input: 1 }), new Date(2026, 8, 1, 10))
 
     const { tokens, total, byStatus } = new HistoryReader(root).stats(now)
     // The run figures are the answers'.
@@ -224,18 +258,29 @@ describe('token stats', () => {
       day: '2026-10-09',
       mentions: usage({}),
       collections: usage({ output: 100 }),
+      sessions: usage({}),
+      help: usage({ input: 900, output: 120 }),
       recaps: usage({}),
     })
     expect(tokens.daily.at(-2)).toEqual({
       day: '2026-10-10',
       mentions: usage({ input: 4000, cacheRead: 30_000, output: 600 }),
       collections: usage({}),
+      sessions: usage({}),
+      help: usage({}),
       recaps: usage({ input: 500, cacheRead: 2000, output: 1600 }),
     })
     expect(tokens.daily.at(-1)).toEqual({
       day: '2026-10-11',
       mentions: usage({}),
       collections: usage({ input: 2000, cacheRead: 9000, cacheWrite: 500 }),
+      sessions: usage({
+        input: 15,
+        cacheRead: 102_000,
+        cacheWrite: 3000,
+        output: 1000,
+      }),
+      help: usage({ input: 1000, output: 110 }),
       recaps: usage({}),
     })
     expect(tokens.mentions).toEqual({
@@ -256,6 +301,104 @@ describe('token stats', () => {
       count: 2,
       usage: usage({ input: 500, cacheRead: 2000, output: 1600 }),
     })
+    expect(tokens.sessions).toEqual({
+      turns: 2,
+      usage: usage({
+        input: 15,
+        cacheRead: 102_000,
+        cacheWrite: 3000,
+        output: 1000,
+      }),
+    })
+    expect(tokens.help).toEqual({
+      fills: 1,
+      judged: 1,
+      drafts: 1,
+      usage: usage({ input: 1900, output: 230 }),
+    })
+  })
+
+  it('keeps what sessions and help spent as a sum per day, for 90 days', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pacenote-spent-'))
+    try {
+      const at = (month: number, day: number) => new Date(2026, month, day, 12)
+      keepSpent(dir, 'session', usage({ input: 1 }), at(6, 1))
+      keepSpent(dir, 'session', usage({ input: 2 }), at(8, 1))
+      keepSpent(dir, 'session', usage({ input: 3 }), at(8, 1))
+      expect(readSpent(dir)).toEqual({
+        '2026-07-01': { session: { count: 1, usage: usage({ input: 1 }) } },
+        '2026-09-01': { session: { count: 2, usage: usage({ input: 5 }) } },
+      })
+      // 90 days on from July 1, that day drops out
+      keepSpent(dir, 'draft', usage({ output: 4 }), at(8, 29))
+      expect(Object.keys(readSpent(dir))).toEqual(['2026-09-01', '2026-09-29'])
+      // A file that is not the log reads as none
+      writeFileSync(
+        path.join(dir, 'spent.json'),
+        '{"days": {"2026-09-01": {"session": {"count": "x"}}, "x": 1}}'
+      )
+      expect(readSpent(dir)).toEqual({ '2026-09-01': {} })
+      writeFileSync(path.join(dir, 'spent.json'), 'not json')
+      expect(readSpent(dir)).toEqual({})
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it("reads a session turn's spend from its result line, not the running totals", () => {
+    // claude -p --input-format stream-json (claude 2.1.325): modelUsage and
+    // total_cost_usd add up every turn so far; the since-last figures are this
+    // turn's alone.
+    const result = {
+      type: 'result',
+      subtype: 'success',
+      total_cost_usd: 1.25,
+      modelUsage: {
+        'claude-opus-5-5': {
+          inputTokens: 900,
+          outputTokens: 9000,
+          cacheReadInputTokens: 400_000,
+          cacheCreationInputTokens: 30_000,
+          costUSD: 1.2,
+        },
+      },
+      model_usage_since_last_result: {
+        'claude-opus-5-5': {
+          inputTokens: 12,
+          outputTokens: 640,
+          cacheReadInputTokens: 61_000,
+          cacheCreationInputTokens: 2100,
+          costUSD: 0.08,
+        },
+        'claude-haiku-5-5': {
+          inputTokens: 300,
+          outputTokens: 40,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+          costUSD: 0.001,
+        },
+      },
+    }
+    const spent = turnSpend(result)!
+    expect(spent).toMatchObject({
+      input: 312,
+      cacheRead: 61_000,
+      cacheWrite: 2100,
+      output: 680,
+    })
+    expect(spent.costUsd).toBeCloseTo(0.081)
+    // An older Claude Code, or a turn that spent nothing, says none
+    expect(
+      turnSpend({ type: 'result', modelUsage: result.modelUsage })
+    ).toBeUndefined()
+    expect(
+      turnSpend({
+        type: 'result',
+        model_usage_since_last_result: {
+          'claude-opus-5-5': { inputTokens: 0, outputTokens: 0 },
+        },
+      })
+    ).toBeUndefined()
   })
 
   it('keeps what each write-up spent beside what it wrote, for 90 days', () => {

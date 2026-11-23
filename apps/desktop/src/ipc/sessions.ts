@@ -1,3 +1,4 @@
+import { shell } from 'electron'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
@@ -9,8 +10,8 @@ import { SESSION_MODES } from '../../../../src/sessions/live.js'
 import type { MacAsk } from '../../../../src/macs/asks.js'
 import type {
   MacSessions,
+  MadeThing,
   SessionMode,
-  SessionPlanStep,
   SessionRow,
   SessionsView,
   SessionTalk,
@@ -18,7 +19,6 @@ import type {
 import { sessionsView } from '../../../../src/sessions/view.js'
 import { SingleFlight } from '../../../../src/single-flight.js'
 import { TOOL_LABEL } from '../../../../src/tasks/context.js'
-import type { SessionItem } from '../../../../src/tasks/types.js'
 import {
   codexLogs,
   saveRepo,
@@ -458,7 +458,7 @@ export function registerSessionsIpc(
     {
       size: number
       mtimeMs: number
-      read: { items: SessionItem[]; plan?: SessionPlanStep[] }
+      read: Pick<SessionTalk, 'items' | 'plan' | 'made'>
     }
   >()
   /** Its turns and steps, and its plan while a step of it is left */
@@ -467,12 +467,17 @@ export function registerSessionsIpc(
     const kept = logs.get(file)
     if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs)
       return kept.read
-    const read = readSessionTalk(file, row.tool, TURN_CHARS)
+    const read = readSessionTalk(file, row.tool, TURN_CHARS, row.cwd)
     logs.delete(file)
     logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, read })
     for (const old of logs.keys()) if (logs.size > LOGS_KEPT) logs.delete(old)
     return read
   }
+
+  /** Its log: Claude Code's by its id, else the one the index found */
+  const logOf = (row: SessionRow) =>
+    (row.tool === 'claude' ? claudeLog(home, row.session) : undefined) ??
+    sessions.index.session(row.session)?.file
 
   /** A session as last shown; the list read first for a page opened first */
   const rowOf = async (id: unknown) => {
@@ -561,9 +566,7 @@ export function registerSessionsIpc(
         typeIn: typeIn(row),
         ...(live ? { live } : {}),
       }
-      const file =
-        (row.tool === 'claude' ? claudeLog(home, row.session) : undefined) ??
-        sessions.index.session(row.session)?.file
+      const file = logOf(row)
       if (!file)
         return {
           ...talk,
@@ -575,6 +578,37 @@ export function registerSessionsIpc(
       } catch (error) {
         return { ...talk, items: [], error: (error as Error).message }
       }
+    }
+  )
+
+  /**
+   * Opens a file a session's answer linked (A2, A6) in the Mac's app for it,
+   * or shows it in Finder: only one its log names, in its folder, still there
+   */
+  ipc.handleDenying(
+    'pacenote:sessions:openMade',
+    () => ({ error: localized(text).noSuchFile }),
+    async (id, key, how) => {
+      const t = localized(text)
+      const row = await rowOf(id)
+      const file = row && logOf(row)
+      if (!row || !file || typeof key !== 'string')
+        return { error: t.noSuchFile }
+      let made: MadeThing[] | undefined
+      try {
+        made = readLog(file, row).made
+      } catch {
+        return { error: t.noSuchFile }
+      }
+      const thing = made?.find((one) => one.kind === 'file' && one.key === key)
+      if (!thing?.path || !existsSync(thing.path))
+        return { error: t.noSuchFile }
+      if (how === 'show') {
+        shell.showItemInFolder(thing.path)
+        return {}
+      }
+      const error = await shell.openPath(thing.path)
+      return error ? { error } : {}
     }
   )
 

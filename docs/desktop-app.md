@@ -270,11 +270,13 @@ Run history:
 - Records contain thread context and attachment contents, so they stay local: `~/.pacenote` and the data folder are kept to
   your account (700, `settings.json` 600), set at every start of the app and the bot.
 - Token usage is kept in four parts: new input, cache read, cache write (claude only) and output. "New tokens" are all but the cache reads,
-  which are most of the input and cost far less.
+  which are most of the input and cost far less. The turns of the sessions Pacenote runs and the help on tasks have no
+  run record: only each day's sums are kept, in the data folder's `spent.json`, for 90 days.
 - UI: run list (kind and status filters, search), "Overview" (a briefing of up to three lines from today's recap: what is
   next, what you are on, what got done today or, in the morning, yesterday, each opening its place; then the last 14 days,
   success rate, average duration, top tools, the tasks you handled per day and how they ended, new tokens per day for
-  mentions, task collections and recap write-ups), run detail ("Timeline" of the work in the order request -> tool calls
+  mentions, task collections, task help (filling in a task, Looks done, reply drafts), the turns of the sessions
+  Pacenote runs and recap write-ups), run detail ("Timeline" of the work in the order request -> tool calls
   -> answer -> outputs, where Pace's mark looks around while it works and stays as the answer's avatar; "Attachments",
   "Prompt", raw "JSON"; the Tokens figure breaks down on hover).
   Runs in progress are reread every 1.5 seconds.

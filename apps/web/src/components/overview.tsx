@@ -1,7 +1,7 @@
 import { setupSettingsRoute } from '@src/settings/fields'
 import type { TokenStats } from '@history/types'
 import type { HandledHow, TaskTrend } from '@src/tasks/types'
-import { newTokens } from '@history/usage'
+import { NO_USAGE, newTokens } from '@history/usage'
 import {
   Activity,
   BarChart3,
@@ -526,25 +526,37 @@ function TaskBand({ trend }: { trend?: TaskTrend }) {
 
 /**
  * Tokens over the same 14 days, and where they went. New tokens per day stack
- * mentions at the bottom of each bar, task collections above them and recap
- * write-ups on top. Input read back from the cache is counted apart: it is
- * most of the input and costs far less.
+ * mentions at the bottom of each bar, then task collections, the help on
+ * tasks (filling one in, checking it looks done, drafting a reply) and the
+ * turns of the sessions Pacenote runs, with recap write-ups on top. Input read
+ * back from the cache is counted apart: it is most of the input and costs far
+ * less. A Mac before 0.6.40 counts no sessions or help: none shows.
  */
 function TokenBand({ tokens }: { tokens?: TokenStats }) {
   const t = useText(text)
-  const mentions = tokens ? newTokens(tokens.mentions.usage) : 0
-  const collections = tokens ? newTokens(tokens.collections.usage) : 0
-  const recaps = tokens ? newTokens(tokens.recaps.usage) : 0
-  const cacheRead = tokens
-    ? tokens.mentions.usage.cacheRead +
-      tokens.collections.usage.cacheRead +
-      tokens.recaps.usage.cacheRead
-    : 0
-  const all = mentions + collections + recaps
-  const top = Math.max(1, mentions, collections, recaps)
+  const sources = {
+    mentions: tokens?.mentions.usage ?? NO_USAGE,
+    collections: tokens?.collections.usage ?? NO_USAGE,
+    help: tokens?.help?.usage ?? NO_USAGE,
+    sessions: tokens?.sessions?.usage ?? NO_USAGE,
+    recaps: tokens?.recaps.usage ?? NO_USAGE,
+  }
+  const mentions = newTokens(sources.mentions)
+  const collections = newTokens(sources.collections)
+  const help = newTokens(sources.help)
+  const sessions = newTokens(sources.sessions)
+  const recaps = newTokens(sources.recaps)
+  const cacheRead = Object.values(sources).reduce(
+    (sum, usage) => sum + usage.cacheRead,
+    0
+  )
+  const all = mentions + collections + help + sessions + recaps
+  const top = Math.max(1, mentions, collections, help, sessions, recaps)
   const runs = tokens?.mentions.runs ?? 0
   const count = tokens?.collections.count ?? 0
   const found = tokens?.collections.found ?? 0
+  const turns = tokens?.sessions?.turns ?? 0
+  const helped = tokens?.help
   const written = tokens?.recaps.count ?? 0
 
   return (
@@ -567,27 +579,47 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
         <div className="mt-4 flex min-h-32 flex-1">
           <DayBars
             label={t.tokensChart}
-            topClassNames={['bg-chart-5', 'bg-chart-4']}
+            topClassNames={[
+              'bg-chart-5',
+              'bg-chart-2',
+              'bg-chart-3',
+              'bg-chart-4',
+            ]}
             days={(tokens?.daily ?? []).map((day) => {
-              const fromMentions = newTokens(day.mentions)
-              const fromCollections = newTokens(day.collections)
-              const fromRecaps = newTokens(day.recaps)
-              const total = fromMentions + fromCollections + fromRecaps
-              const cached =
-                day.mentions.cacheRead +
-                day.collections.cacheRead +
-                day.recaps.cacheRead
+              const parts = {
+                mentions: day.mentions,
+                collections: day.collections,
+                help: day.help ?? NO_USAGE,
+                sessions: day.sessions ?? NO_USAGE,
+                recaps: day.recaps,
+              }
+              const of = {
+                mentions: newTokens(parts.mentions),
+                collections: newTokens(parts.collections),
+                help: newTokens(parts.help),
+                sessions: newTokens(parts.sessions),
+                recaps: newTokens(parts.recaps),
+              }
+              const total = Object.values(of).reduce((a, b) => a + b, 0)
+              const cached = Object.values(parts).reduce(
+                (sum, usage) => sum + usage.cacheRead,
+                0
+              )
               return {
                 day: day.day,
                 value: total,
-                tops: [fromRecaps, fromCollections],
+                tops: [of.recaps, of.sessions, of.help, of.collections],
                 hover: formatTokens(total),
                 title: t.tokensDay(
                   day.day,
                   formatTokens(total),
-                  formatTokens(fromMentions),
-                  formatTokens(fromCollections),
-                  formatTokens(fromRecaps),
+                  {
+                    mentions: formatTokens(of.mentions),
+                    collections: formatTokens(of.collections),
+                    help: formatTokens(of.help),
+                    sessions: formatTokens(of.sessions),
+                    recaps: formatTokens(of.recaps),
+                  },
                   formatTokens(cached)
                 ),
               }
@@ -631,6 +663,28 @@ function TokenBand({ tokens }: { tokens?: TokenStats }) {
                     .filter(Boolean)
                     .join(' · ')
                 : t.noCollections
+            }
+          />
+          <SourceRow
+            label={t.help}
+            className="bg-chart-3"
+            value={help}
+            share={help / top}
+            hint={
+              helped && helped.fills + helped.judged + helped.drafts > 0
+                ? t.helpHint(helped.fills, helped.judged, helped.drafts)
+                : t.noHelp
+            }
+          />
+          <SourceRow
+            label={t.sessions}
+            className="bg-chart-2"
+            value={sessions}
+            share={sessions / top}
+            hint={
+              turns
+                ? t.sessionsHint(turns, formatTokens(sessions / turns))
+                : t.noSessionTurns
             }
           />
           <SourceRow

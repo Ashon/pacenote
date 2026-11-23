@@ -5,7 +5,7 @@ import {
   toolLabel,
   type SaidPart,
 } from '@src/sessions/said'
-import type { SessionLive } from '@src/sessions/types'
+import type { MadeThing, SessionLive } from '@src/sessions/types'
 import type { SessionItem } from '@src/tasks/types'
 import {
   Bell,
@@ -47,6 +47,7 @@ import { Button } from '@/components/ui/button'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { MadeCard, type OpenMade } from './made-card'
 import { text } from './session-items.text'
 import { text as rowText } from './task-row.text'
 
@@ -106,8 +107,12 @@ const stepIcon = (name: string): LucideIcon =>
 type Block =
   | { kind: 'turn'; item: SessionItem; at: number }
   | { kind: 'steps'; items: SessionItem[]; at: number }
+  | { kind: 'made'; keys: string[]; at: number }
 
-/** Turns, and the steps between them together */
+/**
+ * Turns, and the steps between them together; what a step or an answer made,
+ * as cards after it, the steps on either side apart
+ */
 function blocksOf(items: readonly SessionItem[]): Block[] {
   const blocks: Block[] = []
   items.forEach((item, at) => {
@@ -117,6 +122,7 @@ function blocksOf(items: readonly SessionItem[]): Block[] {
     if (item.role !== 'tool') blocks.push({ kind: 'turn', item, at })
     else if (last?.kind === 'steps') last.items.push(item)
     else blocks.push({ kind: 'steps', items: [item], at })
+    if (item.made?.length) blocks.push({ kind: 'made', keys: item.made, at })
   })
   return blocks
 }
@@ -126,18 +132,41 @@ export function TalkItems({
   items,
   tool,
   cwd,
+  made,
+  open,
+  compact,
 }: {
   items: readonly SessionItem[]
   tool: string
   cwd: string
+  /** What it made, for the cards its items name */
+  made?: readonly MadeThing[]
+  /** Opens a file it made: on the Mac it runs on */
+  open?: OpenMade
+  /** On a phone */
+  compact?: boolean
 }) {
-  return blocksOf(items).map((block) =>
-    block.kind === 'steps' ? (
-      <Steps key={block.at} items={block.items} cwd={cwd} />
-    ) : (
-      <Turn key={block.at} item={block.item} tool={tool} />
+  return blocksOf(items).map((block) => {
+    if (block.kind === 'steps')
+      return <Steps key={block.at} items={block.items} cwd={cwd} />
+    if (block.kind === 'turn')
+      return <Turn key={block.at} item={block.item} tool={tool} />
+    const things = block.keys.flatMap(
+      (key) => made?.filter((thing) => thing.key === key) ?? []
     )
-  )
+    return things.length ? (
+      <li key={`${block.at}:made`} className="ml-10 flex flex-col gap-2">
+        {things.map((thing) => (
+          <MadeCard
+            key={thing.key}
+            thing={thing}
+            open={open}
+            compact={compact}
+          />
+        ))}
+      </li>
+    ) : null
+  })
 }
 
 /**

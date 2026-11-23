@@ -21,6 +21,8 @@ import type {
   SessionLive,
   SessionMode,
 } from '../../../src/sessions/types.js'
+import { turnSpend } from '../../../src/history/spent.js'
+import type { TokenUsage } from '../../../src/history/usage.js'
 import { MINUTE, SECOND } from '../../../src/time.js'
 import { stepLine } from './handoff.js'
 
@@ -73,6 +75,8 @@ export interface SessionHostOptions {
    * as a notification when out of sight, with what it did in a line
    */
   onDone?: (session: string, cwd: string, did: string) => void
+  /** What a turn spent, for the Overview's tokens per day */
+  onSpent?: (session: string, usage: TokenUsage) => void
   /** How long a session with nothing to do keeps running */
   idleMs?: number
   /**
@@ -518,6 +522,8 @@ export class SessionHost {
             : undefined
         const context = contextOf(event, h.live.model)
         if (context) h.live.context = context
+        const spent = turnSpend(event)
+        if (spent) this.options.onSpent?.(h.session, spent)
         if (!h.replays) h.live.queued = undefined
         // Done, with nothing you sent left for it to read
         if (!h.live.error && !h.stopping && !h.live.queued?.length)

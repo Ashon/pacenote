@@ -14,6 +14,7 @@ import { allTaskViews } from '../../../src/tasks/store.js'
 import { fillInTask } from '../../../src/tasks/write.js'
 import { countYou } from '../../../src/you/store.js'
 import { runPlainWork, type PlainWork } from './headless.js'
+import { keepSpent } from '../../../src/history/spent.js'
 import { refusalOf, type OwnAi } from './own-ai.js'
 
 /**
@@ -113,6 +114,7 @@ export class Filler {
         const { output, failed } = await runPlainWork({
           ...this.options.ownWork(cli),
           opencode: this.options.opencodeRun(),
+          spent: (usage) => keepSpent(dataDir, 'fill', usage),
           prompt,
           title: 'Pacenote: fill in new tasks',
           timeoutMs: FILL_MS,

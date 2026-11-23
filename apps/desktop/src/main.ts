@@ -19,6 +19,7 @@ import {
 } from 'electron'
 import { HistoryReader } from '../../../src/history/reader.js'
 import { HistoryStore } from '../../../src/history/recorder.js'
+import { keepSpent } from '../../../src/history/spent.js'
 import { consoleSink, createLogger, fileSink } from '../../../src/logger.js'
 import {
   DESKTOP_LOG_FILE,
@@ -498,6 +499,7 @@ const sessionHost = new SessionHost({
   warn: (message) => log.warn(message),
   // Grown since its turn here: continued somewhere else, resumed again
   logSize: (session) => claudeLogSize(homedir(), session),
+  onSpent: (_session, usage) => keepSpent(dataDir, 'session', usage),
   onChange: (session) =>
     mainWindow.send('pacenote:sessions:changed', `claude:${session}`),
   onLive: (session, live) =>

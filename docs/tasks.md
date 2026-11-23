@@ -190,6 +190,12 @@ extensions too), checked every 30 seconds or so while the Todo screen is open:
 
 An open task's row says when its latest session was last active ("Claude Code 5m ago").
 
+A task's details have a **Made here** line when its sessions made something: the pages, designs and docs they put on
+claude.ai and the files a Codex answer linked, each as its sessions last left it (see What it made, in
+[Sessions on this Mac](#sessions-on-this-mac)). When one only you can open is on it, the line says to share it on
+claude.ai before sending its link to whoever asked. A reply drafted for the task links what was made for it where the
+reply needs it.
+
 A session you start yourself knows the tasks of its folder without being told. Claude Code and Codex run Pacenote's MCP
 server in the folder they work in, so it reads that checkout's repository as it starts and puts its open tasks (up to
 five, each with its id, who asked, the due hint and a line of its summary) in the instructions the tool keeps for the
@@ -265,6 +271,13 @@ on, from the switch or from the screen's card, which says what it reads first.
 - **How long it runs:** a session Pacenote runs keeps running with the window closed, until you end it (**End it
   here**, in the page's menu) or it has had nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks
   first.
+- **What it made:** a page, a design or a doc a Claude Code session put on claude.ai (the Artifact tool's publish, the
+  Claude Docs connector's create) is a card in the conversation where it was put up last, with what it is, its version,
+  how many times it was updated there and whether only you can open it; a Codex session's card is each file in its
+  folder that its answer linked (an HTML page, an image, a PDF or Markdown). **Made here** under the title lists them.
+  A link opens in your browser, signed in as you, and a file in its app on this Mac or in Finder. Pacenote reads them
+  from the session's log alone: it keeps only the link, never fetches claude.ai, and a phone, iPad or other Mac shows
+  a file by its name.
 - **Its task:** opened in place, a session not linked to a task can be **linked to one** (your open tasks, its
   repository's first) or **made a task** of its own, in its repository's project; one that looks like an open task's
   work says so, to link or say it is not. **Unlink** takes a linked one off its task: it is not found for that task

@@ -9,6 +9,7 @@
  */
 
 import type { TokenUsage } from '../history/usage.js'
+import type { MadeThing } from '../sessions/types.js'
 import type { OwnCli, Switch, Unable } from './own-ai.js'
 import type { TaskOrigin } from './sources.js'
 
@@ -543,6 +544,11 @@ export interface SessionItem {
    * conversation: the turn of yours it starts again from
    */
   compacted?: boolean
+  /**
+   * What it made here (MadeThing's keys): a step that published it last, an
+   * answer that linked it
+   */
+  made?: string[]
 }
 
 /** A task as its detail shows it, from the desktop app */
@@ -569,4 +575,9 @@ export interface TaskDetail {
   folder?: string
   /** Where code tasks continue (Settings > Todo) */
   cli: WorkTool
+  /**
+   * What its sessions on this Mac made (A5), as each published it last. A
+   * Mac before 0.6.40 leaves it out.
+   */
+  made?: MadeThing[]
 }

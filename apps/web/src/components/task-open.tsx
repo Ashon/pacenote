@@ -9,6 +9,7 @@ import { formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { useMacs } from '@/lib/macs'
 import { taskHash, useProposal, useTaskDetail, useTaskWork } from '@/lib/tasks'
+import { MadeLine } from './made-card'
 import { whereOf, writtenOf } from './task-meta'
 import { EarlierLine } from './task-earlier'
 import { Line } from './task-line'
@@ -178,6 +179,12 @@ export function TaskOpen({
             )}
             {shown.last && earlierLine(shown.last)}
             {shown.session && earlierLine(shown.session)}
+            {!!detail.made?.length && (
+              <MadeLine
+                made={detail.made}
+                askedBy={task.kind === 'asked' ? task.askedBy : undefined}
+              />
+            )}
             {shown.suggested.map((suggestion) => (
               <SuggestedLine
                 key={suggestion.id}

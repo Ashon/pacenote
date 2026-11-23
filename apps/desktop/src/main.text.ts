@@ -52,6 +52,7 @@ const en = {
   noSuchTask: 'There is no such task.',
   chooseFolderFirst: 'Choose the folder to work in first.',
   noSuchSession: 'There is no such session.',
+  noSuchFile: "That file is not in the session's folder any more.",
   sessionNotHere: 'Pacenote is not running that session anymore.',
   sessionOpenThere:
     'It is open somewhere else, so you type there, or continue in a copy here.',
@@ -131,6 +132,7 @@ const ko: typeof en = {
   noSuchTask: '그런 할 일이 없어요.',
   chooseFolderFirst: '먼저 작업할 폴더를 선택하세요.',
   noSuchSession: '그런 세션이 없어요.',
+  noSuchFile: '그 파일이 세션 폴더에 더는 없어요.',
   sessionNotHere: 'Pacenote가 이제 그 세션을 돌리고 있지 않아요.',
   sessionOpenThere:
     '다른 곳에 열려 있어서 그곳에서 입력해요. 아니면 여기서 복사본으로 이어 가세요.',

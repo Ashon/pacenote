@@ -220,6 +220,52 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     ])
   })
 
+  it("tells what each turn spent, a stopped one too, for the day's tokens", async () => {
+    const spent: [string, number][] = []
+    const { h, procs } = host({
+      onSpent: (session, usage) => spent.push([session, usage.output]),
+    })
+    await h.send('s1', '/w/pay', 'Fix the retry')
+    const proc = procs[0]!
+    proc.say(replay('Fix the retry'))
+    const since = (output: number) => ({
+      'claude-opus-5-5': {
+        inputTokens: 10,
+        outputTokens: output,
+        cacheReadInputTokens: 40_000,
+        cacheCreationInputTokens: 0,
+        costUSD: 0.02,
+      },
+    })
+    proc.say({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      // The running totals since the session began are not this turn's
+      modelUsage: { 'claude-opus-5-5': { outputTokens: 9000 } },
+      model_usage_since_last_result: since(300),
+    })
+    await tick()
+    h.send('s1', '/w/pay', 'Count to 200')
+    proc.say(replay('Count to 200'))
+    h.stop('s1')
+    proc.say({
+      type: 'result',
+      subtype: 'error_during_execution',
+      is_error: true,
+      model_usage_since_last_result: since(40),
+    })
+    // An older Claude Code says nothing of the turn: none is kept
+    h.send('s1', '/w/pay', 'Say done')
+    proc.say(replay('Say done'))
+    proc.say({ type: 'result', subtype: 'success', is_error: false })
+    await tick()
+    expect(spent).toEqual([
+      ['s1', 300],
+      ['s1', 40],
+    ])
+  })
+
   it('tells what it does this moment: thinks, writes as it comes, runs a step', async () => {
     vi.useFakeTimers()
     try {

@@ -487,6 +487,8 @@ export interface PlainWork {
   cwd: string
   prompt: string
   timeoutMs?: number
+  /** What it spent, answer or not, for the Overview's tokens per day */
+  spent?: (usage: TokenUsage) => void
 }
 
 const PLAIN_WORK_MS = 2 * 60_000
@@ -536,6 +538,7 @@ export async function runPlainWork(
       timeoutMs: 30_000,
     })
   const output = outputOf(work.cli, exit.stdout)
+  if (output?.usage) work.spent?.(output.usage)
   return {
     output,
     failed: (what, locale) => {

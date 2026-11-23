@@ -195,6 +195,8 @@ const bridge = {
       ipcRenderer.invoke('pacenote:sessions:other-talk', mac, id),
     open: (id) => ipcRenderer.invoke('pacenote:sessions:open', id),
     talk: (id) => ipcRenderer.invoke('pacenote:sessions:talk', id),
+    openMade: (id, key, how) =>
+      ipcRenderer.invoke('pacenote:sessions:openMade', id, key, how),
     send: (id, message) =>
       ipcRenderer.invoke('pacenote:sessions:send', id, message),
     copy: (id, message) =>

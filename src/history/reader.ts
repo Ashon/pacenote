@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { readCollections } from '../tasks/collections.js'
 import { readRecapSpend } from '../you/spent.js'
+import { readSpent } from './spent.js'
 import type { RelatedRun } from '../tasks/types.js'
 import {
   ARTIFACTS_DIR,
@@ -178,7 +179,13 @@ export class HistoryReader {
     const tokenDays = new Map(
       days.map((day) => [
         day,
-        { mentions: NO_USAGE, collections: NO_USAGE, recaps: NO_USAGE },
+        {
+          mentions: NO_USAGE,
+          collections: NO_USAGE,
+          recaps: NO_USAGE,
+          sessions: NO_USAGE,
+          help: NO_USAGE,
+        },
       ])
     )
     const mentions = { runs: 0, usage: NO_USAGE }
@@ -216,6 +223,27 @@ export class HistoryReader {
       tokenDay.recaps = addUsage(tokenDay.recaps, spend.usage)
       recaps.count += 1
       recaps.usage = addUsage(recaps.usage, spend.usage)
+    }
+    // The turns of the sessions Pacenote runs, and its help on tasks
+    const sessions = { turns: 0, usage: NO_USAGE }
+    const help = { fills: 0, judged: 0, drafts: 0, usage: NO_USAGE }
+    for (const [day, kinds] of Object.entries(readSpent(this.root))) {
+      const tokenDay = tokenDays.get(day)
+      if (!tokenDay) continue
+      if (kinds.session) {
+        tokenDay.sessions = addUsage(tokenDay.sessions, kinds.session.usage)
+        sessions.turns += kinds.session.count
+        sessions.usage = addUsage(sessions.usage, kinds.session.usage)
+      }
+      for (const kind of ['fill', 'done', 'draft'] as const) {
+        const spent = kinds[kind]
+        if (!spent) continue
+        tokenDay.help = addUsage(tokenDay.help, spent.usage)
+        help.usage = addUsage(help.usage, spent.usage)
+        if (kind === 'fill') help.fills += spent.count
+        else if (kind === 'done') help.judged += spent.count
+        else help.drafts += spent.count
+      }
     }
     for (const record of this.records()) {
       // The run figures (status, days, duration, tools) are the answers';
@@ -268,6 +296,8 @@ export class HistoryReader {
         mentions,
         collections,
         recaps,
+        sessions,
+        help,
       },
     }
   }

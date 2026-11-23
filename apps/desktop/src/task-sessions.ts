@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { keepSpent } from '../../../src/history/spent.js'
 import { yourFolder } from '../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../src/tasks/store.js'
 import type { WorkEntry, WorkTool } from '../../../src/tasks/types.js'
@@ -170,6 +171,7 @@ export function taskSessions(
                 judge({
                   ...ownWork(cli),
                   opencode: opencodeRun(),
+                  spent: (usage) => keepSpent(dataDir, 'done', usage),
                   prompt: judgePrompt(task, items, pr),
                 }),
               refusalOf,

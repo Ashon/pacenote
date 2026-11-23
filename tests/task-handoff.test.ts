@@ -990,6 +990,45 @@ describe('reply drafts', () => {
     expect(args).toContain('mcp__claude_ai_Slack__slack_send_message')
   })
 
+  it('gives what its sessions put on claude.ai for the reply to link, not its files', () => {
+    const prompt = draftPrompt(task, context, [
+      {
+        key: 'https://claude.ai/artifact/Ud33E7zZFMwphmQo9Gq9KK',
+        kind: 'doc',
+        title: 'Webhook retries: why five attempts',
+        url: 'https://claude.ai/artifact/Ud33E7zZFMwphmQo9Gq9KK',
+        times: 1,
+      },
+      {
+        key: 'https://claude.ai/artifact/SCpW1bK961hvQpa5yAWgST',
+        kind: 'typed',
+        title: '',
+        url: 'https://claude.ai/artifact/SCpW1bK961hvQpa5yAWgST',
+        times: 3,
+        onlyYou: true,
+      },
+      {
+        key: '/Users/me/pay/out/report.html',
+        kind: 'file',
+        title: 'report.html',
+        path: '/Users/me/pay/out/report.html',
+        times: 1,
+      },
+    ])
+    expect(prompt).toContain(
+      'Made for it: Webhook retries: why five attempts (a doc on claude.ai): https://claude.ai/artifact/Ud33E7zZFMwphmQo9Gq9KK\n'
+    )
+    expect(prompt).toContain(
+      'Made for it: Untitled (an artifact on claude.ai, only the user can open it until they share it on claude.ai): https://claude.ai/artifact/SCpW1bK961hvQpa5yAWgST\n'
+    )
+    expect(prompt).not.toContain('report.html')
+    expect(prompt).toContain(
+      '5. Link what was made for it where the reply needs it, as given above.'
+    )
+    // Nothing made: as before
+    expect(draftPrompt(task, context, [])).toBe(draftPrompt(task, context))
+  })
+
   it('takes the reply from the result, and says why there is none', () => {
     const lines = (...events: object[]) =>
       events.map((e) => JSON.stringify(e)).join('\n')

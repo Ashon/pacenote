@@ -412,6 +412,16 @@ export interface DesktopBridge {
      * Pacenote runs it; null for none
      */
     talk(id: string): Promise<SessionTalk | null>
+    /**
+     * Opens a file its answer linked (MadeThing's key) in the Mac's app for
+     * it, or shows it in Finder. The desktop app's alone: a device shows the
+     * file's name.
+     */
+    openMade?(
+      id: string,
+      key: string,
+      how: 'open' | 'show'
+    ): Promise<{ error?: string }>
     /** Sends what you typed: Pacenote runs it from then on */
     send(id: string, message: string): Promise<{ error?: string }>
     /**

@@ -51,8 +51,14 @@ RING_ALPHA = {'light': 0.5, 'dark': 0.6}
 FIXED = {
     'status-running', 'status-succeeded', 'status-failed', 'status-interrupted',
     'destructive', 'skeleton', 'radius', 'pacenote-gradient', 'card-shadow',
-    'float-shadow', 'primary-foreground', 'ring',
+    'float-shadow', 'primary-foreground', 'ring', 'chart-2', 'chart-3',
 }
+# The sessions' and task help's layers on the tokens chart: their own hues, not
+# turned, as long as they stay APART from the theme's, the write-ups', failed's
+# red and each other; else the next hue that does
+APART = 50
+FAILED_H = 25
+OWN_HUES = {'chart-2': (220, 180), 'chart-3': (165, 120)}
 # The accent colors, as green has them
 ACCENT = {
     'light': {'primary': '#007154', 'chart-1': '#0cb67e', 'chart-4': '#007c5c',
@@ -157,6 +163,14 @@ def turn(value, H):
     return re.sub(r'oklch\(([\d.]+) ([\d.]+) ([\d.]+)', one, value)
 
 
+def hue(value):
+    return float(re.match(r'oklch\([\d.]+ [\d.]+ ([\d.]+)', value).group(1))
+
+
+def apart(a, b):
+    return min((a - b) % 360, (b - a) % 360)
+
+
 def accent(hx, H, name, Y=None):
     """Green's accent hx at the theme's hue: its luminance (or Y), its share of chroma"""
     L, C, h = hex_to_oklch(hx)
@@ -219,6 +233,12 @@ def theme(key, H, green):
         # The write-ups' color, 40 degrees on from the theme as teal is from
         # green; the warm hues go the other way, where the turn would be muddy
         t['chart-5'] = turn(base['chart-5'], H if H in (165, 255, 300) else H - 80)
+        taken = [H, hue(t['chart-5']), FAILED_H]
+        for name, others in OWN_HUES.items():
+            h = next(h for h in (hue(base[name]), *others)
+                     if all(apart(h, o) >= APART for o in taken))
+            t[name] = re.sub(r'(oklch\([\d.]+ [\d.]+ )[\d.]+', lambda m: f'{m.group(1)}{h:g}', base[name])
+            taken.append(h)
         out[mode] = t
 
     if key == 'orange':

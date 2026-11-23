@@ -3454,6 +3454,184 @@ else fail('unexpected: ' + args.join(' '))
     expect(runs[0]!.cwd).toBe(checkout)
   }, 150_000)
 
+  it('shows what a session made on its page, and the tokens of its turns and the help on tasks per day', async () => {
+    world = await World.create()
+    const { root } = world
+    mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
+    const checkout = realpathSync(path.join(root, 'git', 'payments'))
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: checkout })
+    const project = path.join(
+      root,
+      '.claude',
+      'projects',
+      checkout.replace(/[/.]/g, '-')
+    )
+    mkdirSync(project, { recursive: true })
+    const BOARD = 'https://claude.ai/artifact/SCpW1bK961hvQpa5yAWgST'
+    const DOC = 'https://claude.ai/artifact/Ud33E7zZFMwphmQo9Gq9KK'
+    const DESIGN = 'https://claude.ai/artifact/QKN21svewxgyPb6SYRqWnd'
+    const ago = (minutes: number) =>
+      new Date(Date.now() - minutes * 60_000).toISOString()
+    const use = (id: string, name: string, input: unknown) => ({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'tool_use', id, name, input }],
+      },
+    })
+    const back = (
+      id: string,
+      toolUseResult: unknown,
+      content: unknown = 'ok'
+    ) => ({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: id, content }],
+      },
+      toolUseResult,
+    })
+    const answer = (text: string) => ({
+      type: 'assistant',
+      message: { role: 'assistant', content: [{ type: 'text', text }] },
+    })
+    const published = (seq: number) => ({
+      url: BOARD,
+      title: 'Webhook retry storyboard',
+      type: { url: DESIGN, release: 'r1', latest: true },
+      audience: 'owner',
+      seq,
+    })
+    // As Claude Code 2.1.325 logs the Artifact tool and the Docs connector
+    writeFileSync(
+      path.join(project, 'made-1.jsonl'),
+      [
+        {
+          type: 'user',
+          message: {
+            role: 'user',
+            content:
+              'Draw the webhook retry settings as a storyboard, and write the decision up as a memo for mina',
+          },
+        },
+        use('g1', 'Grep', { pattern: 'max_attempts' }),
+        back('g1', null),
+        use('q1', 'Artifact', { action: 'quickstart', intent: 'design' }),
+        back('q1', { type: { url: DESIGN, title: 'Design canvas' } }),
+        use('p1', 'Artifact', { url: BOARD, file_path: '/tmp/canvas.json' }),
+        back('p1', published(1)),
+        answer(
+          'The settings board is up. Adding a failed delivery and the retry log.'
+        ),
+        use('p2', 'Artifact', { url: BOARD, file_path: '/tmp/canvas.json' }),
+        back('p2', published(2)),
+        use('p3', 'Artifact', { url: BOARD, file_path: '/tmp/canvas.json' }),
+        back('p3', published(3)),
+        answer('Now the memo for mina.'),
+        use('d1', 'mcp__claude_ai_Claude_Docs__batch', {
+          container: {
+            kind: 'project',
+            create: { name: 'Webhook retries: why five attempts' },
+          },
+          batch: [],
+        }),
+        back('d1', null, [
+          {
+            type: 'text',
+            text: `{"verdict":"allow","created":{"minted":"d1"},"frame":{"url":"${DOC}","artifactUrl":"${DOC}"}}`,
+          },
+        ]),
+        answer(
+          `Done: [Webhook retry storyboard](${BOARD}) and [the memo](${DOC}). Both are private to you on claude.ai until you share them.`
+        ),
+        { type: 'custom-title', customTitle: 'Webhook retry write-up' },
+      ]
+        .map(
+          (line, index) =>
+            `${JSON.stringify({ sessionId: 'made-1', cwd: checkout, timestamp: ago(40 - index), ...line })}\n`
+        )
+        .join('')
+    )
+    // What the turns of the sessions Pacenote ran and its help on tasks
+    // spent today, as it keeps them
+    mkdirSync(world.home, { recursive: true })
+    const today = new Date()
+    const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const spent = (input: number, output: number, cacheRead = 0) => ({
+      input,
+      cacheRead,
+      cacheWrite: 0,
+      output,
+    })
+    writeFileSync(
+      path.join(world.home, 'spent.json'),
+      JSON.stringify({
+        version: 1,
+        days: {
+          [day]: {
+            session: { count: 6, usage: spent(42_000, 9000, 900_000) },
+            fill: { count: 2, usage: spent(6000, 800) },
+            done: { count: 3, usage: spent(3000, 200) },
+            draft: { count: 1, usage: spent(2500, 400) },
+          },
+        },
+      })
+    )
+    const page = await launch(world, {
+      settings: ['TASKS=on', 'TASKS_LINK_SESSIONS=on'],
+      env: { FAKE_CLAUDE_DIR: world.claudeDir },
+    })
+
+    // The session's page: a card where it published each, the latest
+    await page.evaluate("window.location.hash = '#/sessions'")
+    await page
+      .getByRole('tab', { name: /^Ended today/ })
+      .click({ timeout: 30_000 })
+    await page
+      .locator('li', { hasText: 'Webhook retry write-up' })
+      .getByRole('link', { name: 'Open' })
+      .click()
+    await page
+      .getByRole('heading', { name: 'Webhook retry write-up' })
+      .waitFor()
+    await page
+      .getByText('Design canvas on claude.ai · version 3, updated twice here')
+      .waitFor()
+    await page.getByText('Doc on claude.ai', { exact: true }).waitFor()
+    expect(
+      await page
+        .getByRole('link', { name: 'Open Webhook retry storyboard' })
+        .getAttribute('href')
+    ).toBe(BOARD)
+    expect(await page.getByText('Only you', { exact: true }).count()).toBe(1)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-made.png'),
+    })
+    // The chip under its title, and its list
+    await page.getByRole('button', { name: 'Made here 2' }).click()
+    await page.getByText('Made in this session').waitFor()
+    await page
+      .getByRole('menuitem', { name: /Webhook retries: why five attempts/ })
+      .waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-made-list.png'),
+    })
+    await page.keyboard.press('Escape')
+
+    // The Overview: sessions and task help, each a layer and a source
+    await page.evaluate("window.location.hash = '#/'")
+    await page.getByText('Tokens per day').waitFor({ timeout: 30_000 })
+    const sources = page.locator('section', { hasText: 'By source' })
+    await sources.getByText('Sessions', { exact: true }).waitFor()
+    await sources.getByText('6 turns · 8.5k per turn').waitFor()
+    await sources.getByText('Task help', { exact: true }).waitFor()
+    await sources.getByText('2 filled in · 3 checked done · 1 draft').waitFor()
+    await page.getByText('Tokens per day').scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/overview-tokens.png'),
+    })
+  }, 120_000)
+
   it("starts a task's session in Pacenote from Todo's Continue: the task written in, its folder, then its page", async () => {
     world = await World.create()
     const { home, root } = world

@@ -52,6 +52,7 @@ import { usePhone } from '@/lib/phone'
 import { canShow, parseOtherId } from '@/lib/session-rows'
 import { useSessionActions, useSessionTalk } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
+import { MadeChip, type OpenMade } from './made-card'
 import { NowItem, SentItems, TalkItems } from './session-items'
 import { ShowButton, StateMark, toolWhere, whereName } from './session-open'
 import { text } from './session-page.text'
@@ -203,6 +204,10 @@ export function SessionPage({ id }: { id: string }) {
 
   const { row, items } = talk
   const tool = CLI_NAMES[row.tool]
+  const openMade = window.pacenoteDesktop?.sessions.openMade
+  // Its files open on the Mac it runs on: this one's
+  const open: OpenMade | undefined =
+    openMade && !talk.mac ? (key, how) => openMade(row.id, key, how) : undefined
   // One open somewhere else works there: said at the end, as it can be
   const workingThere =
     !live?.busy && row.state === 'working' && talk.typeIn !== 'here'
@@ -262,13 +267,21 @@ export function SessionPage({ id }: { id: string }) {
                 {row.task.title}
               </a>
             )}
+            {!!talk.made?.length && <MadeChip made={talk.made} open={open} />}
           </p>
           {items.length > 0 || live?.busy || workingThere || sent.length ? (
             <ol
               aria-label={row.title}
               className="mt-6 flex flex-col gap-3 @max-md:mt-5"
             >
-              <TalkItems items={items} tool={tool} cwd={row.cwd} />
+              <TalkItems
+                items={items}
+                tool={tool}
+                cwd={row.cwd}
+                made={talk.made}
+                open={open}
+                compact={phone}
+              />
               {/* What started its turn, then the turn, then what waits */}
               <SentItems sent={sent.filter((one) => !one.queued)} />
               <NowItem

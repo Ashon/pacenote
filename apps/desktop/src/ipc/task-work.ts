@@ -1,13 +1,18 @@
 import { clipboard, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import {
   getLocale,
   localized,
   type Locale,
 } from '../../../../src/i18n/locale.js'
+import { keepSpent } from '../../../../src/history/spent.js'
 import type { Macs } from '../../../../src/macs/macs.js'
-import type { NewSessionDraft } from '../../../../src/sessions/types.js'
+import type {
+  MadeThing,
+  NewSessionDraft,
+} from '../../../../src/sessions/types.js'
 import {
   outcomeOf,
   taskContext,
@@ -39,6 +44,7 @@ import {
   handoffPrompt,
   openSession,
   readSessionLog,
+  readSessionTalk,
   resumeCommand,
   resumeSession,
   sessionFile,
@@ -56,6 +62,9 @@ import type { TodoSettings } from '../todo-settings.js'
 import type { Desktop } from './context.js'
 import { orError, type Ipc } from './gate.js'
 import { reasonerOf } from '../../../../src/reasoners/ids.js'
+
+/** The session logs kept read for what they made, for tasks opened often */
+const MADE_LOGS_KEPT = 16
 
 /**
  * A task's detail and the work on it: what came before it, its work log,
@@ -164,7 +173,51 @@ export function registerTaskWorkIpc(
         })),
       folder: task.repo ? repoFolder(dataDir, task.repo) : undefined,
       cli: workToolOf(env().TASKS_CLI) ?? 'claude',
+      ...madeFor(workFor(work, id)),
     }
+  }
+  /** The logs read last for what they made, kept while they have not changed */
+  const madeLogs = new Map<
+    string,
+    { size: number; mtimeMs: number; made: MadeThing[] }
+  >()
+  /**
+   * What a task's sessions on this Mac made (A5): one each, as published last
+   * by whichever session did
+   */
+  const madeFor = (entries: WorkEntry[]): { made?: MadeThing[] } => {
+    const made = new Map<string, MadeThing>()
+    for (const entry of entries) {
+      if (entry.kind !== 'session' || entry.mac || entry.tool === 'opencode')
+        continue
+      const file = sessionFile(homedir(), entry)
+      if (!file) continue
+      try {
+        const info = statSync(file)
+        let kept = madeLogs.get(file)
+        if (kept?.size !== info.size || kept.mtimeMs !== info.mtimeMs) {
+          kept = {
+            size: info.size,
+            mtimeMs: info.mtimeMs,
+            made:
+              readSessionTalk(file, entry.tool, undefined, entry.cwd).made ??
+              [],
+          }
+          madeLogs.delete(file)
+          madeLogs.set(file, kept)
+          for (const old of madeLogs.keys())
+            if (madeLogs.size > MADE_LOGS_KEPT) madeLogs.delete(old)
+        }
+        for (const thing of kept.made) {
+          const was = made.get(thing.key)
+          if (!was || (thing.at ?? '') >= (was.at ?? ''))
+            made.set(thing.key, thing)
+        }
+      } catch {
+        // Its log gone since: what it made goes with it
+      }
+    }
+    return made.size ? { made: [...made.values()] } : {}
   }
   /** A session in a task's work log, or one suggested for it */
   const sessionEntry = (entryId: unknown): Session | undefined => {
@@ -299,9 +352,11 @@ export function registerTaskWorkIpc(
         (cli) =>
           draftReply({
             ...ownWork(cli),
+            spent: (usage) => keepSpent(dataDir, 'draft', usage),
             launch,
             task: detail.task,
             context: detail.context,
+            made: detail.made,
           }),
         refusalOf
       )
