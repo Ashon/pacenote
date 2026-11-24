@@ -377,6 +377,7 @@ export function SessionPage({ id }: { id: string }) {
         ref={docked}
         className="pointer-events-none absolute inset-x-0 bottom-0"
       >
+        {/* Glass over the conversation it scrolls back to */}
         {behind && (
           <Button
             type="button"
@@ -386,7 +387,7 @@ export function SessionPage({ id }: { id: string }) {
             aria-label={t.latest}
             title={t.latest}
             onClick={() => toEnd(true)}
-            className="motion-fade pointer-events-auto absolute bottom-full left-1/2 size-9 -translate-x-1/2 translate-y-2 rounded-full bg-background shadow-float"
+            className="motion-fade pointer-events-auto absolute bottom-full left-1/2 size-9 -translate-x-1/2 translate-y-2 rounded-full border-border/70 bg-card/70 shadow-float backdrop-blur-md backdrop-saturate-150 hover:bg-card/90 dark:border-border/70 dark:bg-card/60 dark:hover:bg-card/80"
           >
             <ArrowDown />
             {/* At work: what comes next is on its way */}

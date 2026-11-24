@@ -85,6 +85,18 @@ describe('surfaces and color', () => {
     expect(offending(/(?<![\w-])shadow-(?:md|lg|xl|2xl)(?![\w-])/)).toEqual([])
   })
 
+  it('cn() knows the shadows of its own, which it would take for colors', () => {
+    const css = readFileSync(path.join(WEB, 'index.css'), 'utf8')
+    const own = [...css.matchAll(/^\s*--shadow-([a-z0-9]+):/gm)].map(
+      (m) => m[1]!
+    )
+    expect(own).toContain('float')
+    const utils = readFileSync(path.join(WEB, 'lib/utils.ts'), 'utf8')
+    const taught = utils.match(/shadow:\s*\[([^\]]*)\]/)?.[1] ?? ''
+    // Else shadow-float stands beside a button's shadow-xs and loses to it
+    expect(own.filter((size) => !taught.includes(`'${size}'`))).toEqual([])
+  })
+
   it('icons and text do not take chart-1, which is too faint for them', () => {
     expect(
       offending(/(?<![\w-])(?:text|fill|stroke)-chart-1(?![\w-])/)
