@@ -8,7 +8,7 @@ import {
   ListChecks,
   MessagesSquare,
   Settings,
-  UserRound,
+  Shapes,
   type LucideIcon,
 } from 'lucide-react'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -43,7 +43,7 @@ const ITEMS: Item[] = [
   // What you did, by day, week and month: what is behind, after what is ahead
   { section: 'recap', icon: CalendarCheck },
   // Where you contribute, from those tasks and your sessions
-  { section: 'you', icon: UserRound },
+  { section: 'you', icon: Shapes },
 ]
 /** Pace's screens, below: gone while Pace is off (Todo alone) */
 const PACE_ITEMS: Item[] = [

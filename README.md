@@ -85,7 +85,7 @@ from you, list or close your tasks, or recap your week.
 
 ### See where you contribute
 
-**You** gathers your tasks and your Claude Code and Codex sessions into the areas you work in, such as a service's
+**Areas** gathers your tasks and your Claude Code and Codex sessions into the areas you work in, such as a service's
 repositories with the channel that asks about them, and shows how you contribute to each, what is open there and what
 you did lately. Pacenote finds them on its own and shows them to you once; you only fix what it got wrong.
 

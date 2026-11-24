@@ -9,7 +9,7 @@ import { readStored, writeStored } from '@/lib/storage'
 import { accountsSentence, partKey, roleSentence, useFixYou } from '@/lib/you'
 import { text } from './your-work.text'
 
-/** At most this many areas on the card; the rest are on the You screen */
+/** At most this many areas on the card; the rest are on the Areas screen */
 const SHOWN = 4
 
 /**
@@ -17,7 +17,7 @@ const SHOWN = 4
  * the Todo screen shows them above your tasks, once, as Pacenote sees them.
  * Looks right puts the card away; Fix something lets you rename an area, take
  * a part out of it or say it is not yours, there and then. Either way the
- * You screen keeps them after.
+ * Areas screen keeps them after.
  */
 export function YourWork({ you }: { you: YouView | null | undefined }) {
   const t = useText(text)

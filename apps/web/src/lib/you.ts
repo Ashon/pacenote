@@ -67,7 +67,7 @@ export function accountsSentence(
   })
 }
 
-/** An area's key on its row, as the You screen links to it */
+/** An area's key on its row, as the Areas screen links to it */
 export const areaHash = (id: string) => `#/you/${encodeURIComponent(id)}`
 
 /** A part's key, as you.json keeps the parts taken out */

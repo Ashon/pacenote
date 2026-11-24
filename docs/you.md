@@ -1,8 +1,8 @@
 # Where you contribute
 
-The **You** screen shows what you work on and where you contribute: your areas, how you contribute to each, what is open
-in each, what you did there lately, and who asks you most. Pacenote finds it in the work it already sees, your tasks and
-your Claude Code and Codex sessions on this Mac, and asks you only to fix what it got wrong.
+The **Areas** screen shows what you work on and where you contribute: your areas, how you contribute to each, what is
+open in each, what you did there lately, and who asks you most. Pacenote finds it in the work it already sees, your
+tasks and your Claude Code and Codex sessions on this Mac, and asks you only to fix what it got wrong.
 
 ## Areas
 
@@ -40,7 +40,7 @@ Pacenote sees it**, each area with how you contribute and what is open. **Looks 
 something** lets you rename an area, take a repository or channel out of it, or say it is not yours, there and then;
 **Done** puts the card away too.
 
-## The You screen
+## The Areas screen
 
 The screen is in the sidebar, under Todo. Each area is a row: its name and roles, what it is made of, what is open or
 working now, and its work each week over the last 8 weeks. A row opens in place (`#/you/<id>`) with its roles and what
@@ -48,7 +48,7 @@ shows them, its open tasks (each opens in Todo), what was done there in the last
 of. Its menu renames it, merges it into another area (which keeps its own name), or says it is not yours anymore; an
 area you leave can be taken back from the notice that follows. Each part has its own button to take it out.
 
-Each task on Todo says its area, by its repository or else its channel, and opens the area on the You screen.
+Each task on Todo says its area, by its repository or else its channel, and opens the area on the Areas screen.
 
 ## For your AI tools
 

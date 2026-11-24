@@ -1200,7 +1200,7 @@ else fail('unexpected: ' + args.join(' '))
     await page.getByRole('button', { name: 'Collect now' }).waitFor()
     expect(await card.count()).toBe(0)
     const nav = page.getByRole('navigation', { name: 'Sections' })
-    for (const name of ['Todo', 'Recap', 'You', 'Settings'])
+    for (const name of ['Todo', 'Recap', 'Areas', 'Settings'])
       await nav.getByRole('button', { name }).waitFor()
     for (const name of ['Overview', 'Runs', 'Pace'])
       expect(await nav.getByRole('button', { name }).count()).toBe(0)
@@ -5130,7 +5130,7 @@ else fail('unexpected: ' + args.join(' '))
         .sort()
     ).toEqual(['Infra on-call', 'Payments'])
 
-    // Each task says its area; its link opens the area on the You screen.
+    // Each task says its area; its link opens the area on the Areas screen.
     const diskRow = page.locator(`[data-task-row="${disk!.id}"]`)
     await diskRow.getByRole('link', { name: 'Infra on-call' }).waitFor()
     await page
@@ -5149,7 +5149,7 @@ else fail('unexpected: ' + args.join(' '))
     expect(await page.evaluate('window.location.hash')).toBe(
       `#/you/${you().areas.find((a) => a.name === 'Payments')!.id}`
     )
-    await page.getByRole('button', { name: 'You', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Areas', exact: true }).waitFor()
     await page.screenshot({
       path: path.join(REPO, 'test-results/you-areas.png'),
     })
@@ -5382,9 +5382,9 @@ else fail('unexpected: ' + args.join(' '))
     await page.screenshot({
       path: path.join(REPO, 'test-results/recap-day.png'),
     })
-    // An area's name opens it on the You screen.
+    // An area's name opens it on the Areas screen.
     await page.getByRole('link', { name: 'Payments' }).first().click()
-    await eventually('the area on the You screen', async () =>
+    await eventually('the area on the Areas screen', async () =>
       String(await page.evaluate('window.location.hash')).startsWith('#/you/')
     )
     expect(review).toBeDefined()

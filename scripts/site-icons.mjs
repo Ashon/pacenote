@@ -47,10 +47,10 @@ const ICONS = [
   'search',
   'server',
   'settings',
+  'shapes',
   'square-terminal',
   'timer',
   'undo-2',
-  'user-round',
   'wrench',
 ]
 

@@ -17,10 +17,11 @@ const en = {
   /** accounts: "ashon in Slack and Ashon on GitHub" */
   foundAs: (accounts: string) => `Found you as ${accounts}.`,
   done: 'Done',
-  /** screen: the link to the You screen, around its name */
+  /** screen: the link to the Areas screen, around its name */
   fixLater: (screen: (label: string) => ReactNode) => (
     <>
-      Rename, merge or take apart areas any time on the {screen('You')} screen.
+      Rename, merge or take apart areas any time on the {screen('Areas')}{' '}
+      screen.
     </>
   ),
   looksRight: 'Looks right',
@@ -43,7 +44,7 @@ const ko: typeof en = {
   done: '완료',
   fixLater: (screen) => (
     <>
-      영역 이름 바꾸기, 합치기, 나누기는 언제든 {screen('나')} 화면에서 할 수
+      영역 이름 바꾸기, 합치기, 나누기는 언제든 {screen('영역')} 화면에서 할 수
       있어요.
     </>
   ),

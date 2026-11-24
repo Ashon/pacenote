@@ -59,7 +59,7 @@ const en = {
   stillOpenMeta: 'at the end of the day',
   carriesOver: 'carries over',
   // A week or a month
-  onYou: (area: string) => `${area} on the You screen`,
+  onYou: (area: string) => `${area} on the Areas screen`,
   share: (percent: number, period: RecapPeriod) =>
     `About ${percent}% of your ${period}`,
   moreCommits: (n: number, repos: string[]) =>
@@ -141,7 +141,7 @@ const ko: typeof en = {
   stillOpen: '남은 일',
   stillOpenMeta: '하루가 끝날 때',
   carriesOver: '이월',
-  onYou: (area) => `나 화면에서 ${area} 보기`,
+  onYou: (area) => `영역 화면에서 ${area} 보기`,
   share: (percent, period) => `${SPAN[period]}의 약 ${percent}%`,
   moreCommits: (n, repos) =>
     repos.length > 0

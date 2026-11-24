@@ -3,7 +3,7 @@ import type { Locale } from '@src/i18n/locale'
 import { listWords } from '@src/i18n/words'
 
 const en = {
-  title: 'You',
+  title: 'Areas',
   intro:
     'Where you contribute and what is going on in each, from your tasks and your Claude Code and Codex sessions.',
   desktopOnly: 'Your areas are counted by the desktop app.',
@@ -51,7 +51,7 @@ const en = {
 }
 
 const ko: typeof en = {
-  title: '나',
+  title: '영역',
   intro:
     '내가 기여하는 곳과 그곳마다 일어나는 일이에요. 할 일과 Claude Code, Codex 세션을 바탕으로 해요.',
   desktopOnly: '영역은 데스크톱 앱이 집계해요.',

@@ -13,7 +13,7 @@ where it went. Todo is what is ahead, Recap what is behind, and You where you co
 
 A week starts on Monday, counted as ISO weeks (2026-W42). ‹ and › step to the period before and after, and each period
 has its own address: `#/recap/day/2026-10-15`, `#/recap/week/2026-W42`, `#/recap/month/2026-10`. An area's name opens
-it on the You screen, and an area's Lately on You opens this week's recap.
+it on the Areas screen, and an area's Lately on Areas opens this week's recap.
 
 ## Where it comes from
 
