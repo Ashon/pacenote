@@ -34,10 +34,16 @@ describe("Pace's avatar", () => {
     expect(badge.parentElement?.title).toBe('Claude Code · Opus 5.5')
   })
 
-  it('has no circle for a tool with no mark', () => {
-    const { container } = shown(<PaceAvatar engine="opencode" />)
-    expect(badges(container)).toEqual([])
-    expect(container.querySelector('[title]')).toBeNull()
+  it("circles opencode's work with its mark too, and no tool with none", () => {
+    const { container } = shown(
+      <>
+        <PaceAvatar engine="opencode" />
+        <PaceAvatar engine="aider" />
+        <PaceAvatar />
+      </>
+    )
+    expect(badges(container)).toEqual(['opencode'])
+    expect(container.querySelectorAll('[title]')).toHaveLength(1)
   })
 
   it("marks a session's answers, not your turns, with its tool", () => {

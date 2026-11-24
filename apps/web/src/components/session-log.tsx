@@ -1,7 +1,7 @@
 import { InlineError } from '@/components/ui/inline-error'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { SessionItem } from '@src/tasks/types'
-import { Copy, MessagesSquare, SquareTerminal, X } from 'lucide-react'
+import { Copy, MessagesSquare, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +19,7 @@ import { TalkItems } from './session-items'
 import { sessionHref } from './session-open'
 import { text } from './task-row.text'
 import { resumeCommand, resumesInApp, sessionOf } from './task-sessions'
+import { ToolMark } from './tool-mark'
 
 /**
  * A session's own log, read from the tool's files when you open it, in a
@@ -102,7 +103,7 @@ export function SessionLogPanel({
                       onClick={() => void act.resume(entry.id).then(setError)}
                       disabled={!entry.session}
                     >
-                      <SquareTerminal />
+                      <ToolMark tool={entry.tool} />
                       {resumesInApp(entry)
                         ? t.continueInApp(t.app.codex)
                         : t.continueIn(tool)}

@@ -25,7 +25,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useText } from '@/lib/i18n'
+import { PacenoteMonoMark } from './logo'
 import { OpenButton } from './session-open'
+import { ToolMark } from './tool-mark'
 import { OpensIn } from './task-folder'
 import type { RowStep, TaskRowState } from './task-row-state'
 import { text } from './task-row.text'
@@ -40,9 +42,9 @@ import { text } from './task-row.text'
 function stepIcon(step: RowStep) {
   switch (step.kind) {
     case 'here':
-      return <Play />
+      return <PacenoteMonoMark />
     case 'continue':
-      return <SquareTerminal />
+      return <ToolMark tool={step.tool} />
     case 'elsewhere':
       return <FolderOpen />
     case 'draft':
@@ -132,7 +134,7 @@ export function TaskActions({
                 className="h-full rounded-none rounded-l-[5px]"
                 onClick={onContinueHere}
               >
-                <Play />
+                <PacenoteMonoMark />
                 {t.continueHere}
               </Button>
             </OpensIn>
@@ -155,7 +157,10 @@ export function TaskActions({
                       key={tool}
                       onSelect={() => onContinue(tool)}
                     >
-                      {inApp ? <AppWindow /> : <SquareTerminal />}
+                      <ToolMark
+                        tool={tool}
+                        fallback={inApp ? AppWindow : SquareTerminal}
+                      />
                       {t.continueIn(CLI_NAMES[tool])}
                       <span className="ml-auto pl-6 text-meta text-muted-foreground">
                         {inApp ? t.app[tool] : t.terminal}

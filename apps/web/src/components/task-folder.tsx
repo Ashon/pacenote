@@ -1,7 +1,7 @@
 import { InlineError } from '@/components/ui/inline-error'
 import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { FolderCheck, TaskView, WorkTool } from '@src/tasks/types'
-import { FolderOpen, Lock, SquareTerminal } from 'lucide-react'
+import { FolderOpen, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import { formatRelative, homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { text } from './task-row.text'
+import { ToolMark } from './tool-mark'
 
 /**
  * The folder a code task's session opens in: said on Continue's buttons, and
@@ -178,7 +179,7 @@ function FolderChoice({ task, folders, tool, onOpen, action }: FolderProps) {
             setOpening(false)
           }}
         >
-          {!action && <SquareTerminal />}
+          {!action && <ToolMark tool={tool} />}
           {action ?? t.openHere(CLI_NAMES[tool])}
         </Button>
       </div>

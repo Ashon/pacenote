@@ -11,7 +11,7 @@ import {
 } from '@src/tasks/types'
 import type { TaskArea } from '@src/you/types'
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, SquareTerminal, X } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -41,6 +41,7 @@ import { TaskOpen } from './task-open'
 import { taskRowState, type RowStep, type TaskRowState } from './task-row-state'
 import { text } from './task-row.text'
 import { closedBy } from './task-sessions'
+import { ToolMark } from './tool-mark'
 
 /**
  * A task in the Todo list. Closed, it is what it is and its next step: one
@@ -448,7 +449,7 @@ function RowMeta({
           title={t.lastActiveIn(CLI_NAMES[working.tool])}
           className="inline-flex items-center gap-1"
         >
-          <SquareTerminal aria-hidden="true" className="size-3" />
+          <ToolMark tool={working.tool} className="size-3" />
           {CLI_NAMES[working.tool]} {formatRelative(working.at)}
         </span>
       )}

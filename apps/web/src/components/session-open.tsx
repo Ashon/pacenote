@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { formatRelative, formatWait } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { text } from './sessions-page.text'
+import { ToolMark } from './tool-mark'
 
 /**
  * A session on this Mac as Sessions and Todo show it: its state, where it
@@ -81,12 +82,18 @@ export function StateMark({ s, where }: { s: SessionRow; where?: boolean }) {
   )
 }
 
-/** Opens the session's page, to follow it and type to it (V1) */
+/**
+ * Opens the session's page, to follow it and type to it (V1), with its
+ * tool's mark
+ */
 export function OpenButton({ s, size }: { s: SessionRow; size?: 'sm' }) {
   const t = useText(text)
   return (
     <Button variant="outline" size={size} asChild>
-      <a href={sessionHref(s.id)}>{t.open}</a>
+      <a href={sessionHref(s.id)}>
+        <ToolMark tool={s.tool} fallback={MessagesSquare} />
+        {t.open}
+      </a>
     </Button>
   )
 }

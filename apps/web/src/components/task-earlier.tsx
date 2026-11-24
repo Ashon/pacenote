@@ -2,7 +2,6 @@ import { CLI_NAMES } from '@src/tasks/own-ai'
 import type { MacsView } from '@src/macs/types'
 import type { SessionRow } from '@src/sessions/types'
 import type { WorkTool } from '@src/tasks/types'
-import { SquareTerminal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
 import { formatRelative, formatShortDay } from '@/lib/format'
@@ -12,6 +11,7 @@ import { taskHash } from '@/lib/tasks'
 import { canOpen } from '@/lib/session-rows'
 import { OpenButton, StateMark } from './session-open'
 import { Line } from './task-line'
+import { ToolMark } from './tool-mark'
 import type { Earlier } from './task-open-state'
 import { text } from './task-row.text'
 import { foundHint, resumesInApp, type Session } from './task-sessions'
@@ -46,7 +46,7 @@ export function EarlierLine({
     session?.session && !elsewhere
       ? taskHash(taskId, `/log/${encodeURIComponent(session.id)}`)
       : undefined
-  // The terminal icon of the row's own Continue button: it opens there too.
+  // The tool's mark, as on the row's own Continue menu: it opens there too.
   // Its name is a tooltip at its left, clear of the lines' icons above.
   const resume = !session?.session
     ? ''
@@ -67,7 +67,7 @@ export function EarlierLine({
           className="text-primary"
           onClick={() => onStartHere?.(session.tool)}
         >
-          <SquareTerminal />
+          <ToolMark tool={session.tool} />
           {t.startHere}
         </Button>
       </Tooltip>
@@ -80,7 +80,7 @@ export function EarlierLine({
           className="text-primary"
           onClick={() => onResume(session.id)}
         >
-          <SquareTerminal />
+          <ToolMark tool={session.tool} />
         </Button>
       </Tooltip>
     ) : line.session ? (

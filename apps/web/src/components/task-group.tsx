@@ -5,7 +5,6 @@ import {
   CircleCheck,
   Layers,
   MoreHorizontal,
-  Play,
   RotateCw,
   Sparkles,
   Undo2,
@@ -35,6 +34,7 @@ import { useText } from '@/lib/i18n'
 import { taskHash } from '@/lib/tasks'
 import type { GroupFacts } from '@/lib/todo-list'
 import { cn } from '@/lib/utils'
+import { PacenoteMonoMark } from './logo'
 import { Line } from './task-line'
 import { Pill } from './task-meta'
 import { text } from './task-group.text'
@@ -156,7 +156,7 @@ export function GroupRow({
               onClick={onContinue}
               title={t.continueAll}
             >
-              <Play />
+              <PacenoteMonoMark />
               {t.continueHereShort}
             </Button>
           )}
