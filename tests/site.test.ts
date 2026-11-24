@@ -88,6 +88,7 @@ const SITE = build('site', {
   'v0.6.41': '2026-11-23T12:00:00Z',
   'v0.6.42': '2026-11-23T18:00:00Z',
   'v0.6.43': '2026-11-24T12:00:00Z',
+  'v0.6.44': '2026-11-24T18:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -405,15 +406,16 @@ describe('the news', () => {
         '<a class="news-featured" href="macs-without-slack/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 4)).toEqual([
+      'release v0.6.44/',
       'release v0.6.43/',
       'release v0.6.42/',
       'release v0.6.41/',
-      'release v0.6.40/',
     ])
     expect(rows('news/')).not.toContain('post macs-without-slack/')
     // Notes in Korean from v0.6.11; the list keeps the newest thirty, all
     // Korean now, so no English page before them is in it, marked as such
     expect(rows('ko/news/')).toEqual([
+      'release v0.6.44/',
       'release v0.6.43/',
       'release v0.6.42/',
       'release v0.6.41/',
@@ -443,14 +445,13 @@ describe('the news', () => {
       'release v0.6.17/',
       'release v0.6.16/',
       'release v0.6.15/',
-      'release v0.6.14/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
-    expect(EVERY).toContain('ko/news/v0.6.43/')
+    expect(EVERY).toContain('ko/news/v0.6.44/')
     expect(read('ko/news/')).not.toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.44/')
+    expect(EVERY).not.toContain('news/v0.6.45/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -462,19 +463,19 @@ describe('the news', () => {
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
     // The newest eight, the one open among them
     const rail = [
+      '../v0.6.44/',
       '../v0.6.43/',
       '../v0.6.42/',
       '../v0.6.41/',
       '../v0.6.40/',
       '../v0.6.39/',
       '../v0.6.38/',
-      '../v0.6.37/',
       './ *',
     ]
-    expect(recent('news/v0.6.36/').slice(0, 8)).toEqual(rail)
+    expect(recent('news/v0.6.37/').slice(0, 8)).toEqual(rail)
     // The Korean rail, its latest eight as the English one (the Korean list
     // above has the English notes too)
-    expect(recent('ko/news/v0.6.36/')).toEqual(rail)
+    expect(recent('ko/news/v0.6.37/')).toEqual(rail)
   })
 
   it("points the home page's link at the latest news", () => {
@@ -484,9 +485,9 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest news: v0.6.43's notes, newer than the last feature post
-    expect(link('')).toEqual(['news/v0.6.43/', "What's new in v0.6.43"])
-    expect(link('ko/')).toEqual(['news/v0.6.43/', 'v0.6.43에서 달라진 점'])
+    // The latest news: v0.6.44's notes, newer than the last feature post
+    expect(link('')).toEqual(['news/v0.6.44/', "What's new in v0.6.44"])
+    expect(link('ko/')).toEqual(['news/v0.6.44/', 'v0.6.44에서 달라진 점'])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
@@ -508,11 +509,12 @@ describe('the news', () => {
       expect(feed).toContain(
         `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="${lang}">`
       )
-      // The newest twenty: v0.6.24 is the oldest left; v0.6.23, v0.6.22,
-      // v0.6.21, v0.6.20, v0.6.19, v0.6.18, v0.6.17, v0.6.16, v0.6.15,
-      // v0.6.14, macs-without-slack (out with v0.6.13) and what came before
-      // are gone
-      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.24/</id>`)
+      // The newest twenty: v0.6.25 is the oldest left; v0.6.24, v0.6.23,
+      // v0.6.22, v0.6.21, v0.6.20, v0.6.19, v0.6.18, v0.6.17, v0.6.16,
+      // v0.6.15, v0.6.14, macs-without-slack (out with v0.6.13) and what
+      // came before are gone
+      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.25/</id>`)
+      expect(feed).not.toContain(`news/v0.6.24/</id>`)
       expect(feed).not.toContain(`news/v0.6.23/</id>`)
       expect(feed).not.toContain(`news/v0.6.22/</id>`)
       expect(feed).not.toContain(`news/v0.6.21/</id>`)
