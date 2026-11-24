@@ -28,7 +28,7 @@ import {
 import { useText } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { CodeBlock } from './code-block'
-import { PaceSpinner } from './pace-spinner'
+import { PaceAvatar } from './pace-avatar'
 import { Markdown } from './markdown'
 import { text } from './timeline.text'
 import { recordText } from '@src/history/record-text'
@@ -88,10 +88,18 @@ export function Timeline({ run }: { run: RunRecord }) {
 
       {/* Pace's reply. While Pace works, its mark looks around where the
           reply will appear; when the reply comes, the mark eases into the
-          logo and stays as Pace's avatar. */}
+          logo and stays as Pace's avatar, with the tool it worked with at its
+          foot. */}
       {(working || answer) && (
         <Bubble
-          avatar={<PaceSpinner active={working} />}
+          avatar={
+            <PaceAvatar
+              engine={run.backend.reasoner}
+              model={run.backend.model}
+              working={working}
+              label
+            />
+          }
           title="Pace"
           meta={
             working ? (

@@ -137,6 +137,7 @@ export function SessionLogPanel({
                     <TalkItems
                       items={log.items ?? []}
                       tool={tool}
+                      engine={entry.tool}
                       cwd={entry.cwd}
                     />
                   </ol>

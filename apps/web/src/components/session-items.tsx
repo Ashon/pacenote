@@ -51,6 +51,7 @@ import { useText } from '@/lib/i18n'
 import { useSessionImage } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { MadeCard, type OpenMade } from './made-card'
+import { PaceAvatar } from './pace-avatar'
 import { text } from './session-items.text'
 import { text as rowText } from './task-row.text'
 
@@ -136,6 +137,7 @@ function blocksOf(items: readonly SessionItem[]): Block[] {
 export function TalkItems({
   items,
   tool,
+  engine,
   cwd,
   made,
   open,
@@ -143,7 +145,10 @@ export function TalkItems({
   session,
 }: {
   items: readonly SessionItem[]
+  /** The tool's name, over its answers */
   tool: string
+  /** The tool (claude, codex), for the circle on Pace's mark by its answers */
+  engine?: string
   cwd: string
   /** Its id, for the images sent with your turns: their count without it */
   session?: string
@@ -159,7 +164,13 @@ export function TalkItems({
       return <Steps key={block.at} items={block.items} cwd={cwd} />
     if (block.kind === 'turn')
       return (
-        <Turn key={block.at} item={block.item} tool={tool} session={session} />
+        <Turn
+          key={block.at}
+          item={block.item}
+          tool={tool}
+          engine={engine}
+          session={session}
+        />
       )
     const things = block.keys.flatMap(
       (key) => made?.filter((thing) => thing.key === key) ?? []
@@ -182,11 +193,14 @@ export function TalkItems({
 /**
  * A turn of yours or its answer, in a bubble with who and when, and what you
  * do with it (copy) at its end: shown on hover or focus, and on a phone or
- * iPad once a finger rests on the bubble
+ * iPad once a finger rests on the bubble. Yours by your initial, its answers
+ * by Pace's mark with the tool at its foot.
  */
 function Bubble({
   mine,
   who,
+  engine,
+  working,
   at,
   status,
   actions,
@@ -195,6 +209,10 @@ function Bubble({
 }: {
   mine: boolean
   who: string
+  /** Its tool, for an answer */
+  engine?: string
+  /** It writes this answer now */
+  working?: boolean
   at?: string
   status?: ReactNode
   actions?: ReactNode
@@ -246,17 +264,19 @@ function Bubble({
           }
         : {})}
     >
-      <span
-        className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-full text-meta font-semibold',
-          mine
-            ? 'bg-secondary text-secondary-foreground'
-            : 'bg-foreground text-background'
-        )}
-        aria-hidden="true"
-      >
-        {who[0]}
-      </span>
+      {mine ? (
+        <span
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-meta font-semibold text-secondary-foreground"
+          aria-hidden="true"
+        >
+          {who[0]}
+        </span>
+      ) : (
+        // Its name is over the answer
+        <span aria-hidden="true" className="flex shrink-0">
+          <PaceAvatar engine={engine} working={working} />
+        </span>
+      )}
       <div
         className={cn(
           'min-w-0 flex-1 rounded-[20px] px-4 py-3',
@@ -377,10 +397,12 @@ function Answer({ text: said }: { text: string }) {
 function Turn({
   item,
   tool,
+  engine,
   session,
 }: {
   item: SessionItem
   tool: string
+  engine?: string
   session?: string
 }) {
   const r = useText(rowText)
@@ -389,6 +411,7 @@ function Turn({
       <Bubble
         mine={false}
         who={tool}
+        engine={engine}
         at={item.at}
         actions={<CopyButton said={item.text} />}
       >
@@ -827,6 +850,7 @@ export function NowItem({
   live,
   draft,
   tool,
+  engine,
   cwd,
   where,
 }: {
@@ -834,6 +858,8 @@ export function NowItem({
   /** The answer it writes, kept on until its log has it */
   draft?: string
   tool: string
+  /** The tool (claude, codex), for the circle on Pace's mark */
+  engine?: string
   cwd: string
   /** Where it works, for one open somewhere else */
   where?: string
@@ -844,6 +870,8 @@ export function NowItem({
     <Bubble
       mine={false}
       who={tool}
+      engine={engine}
+      working={!!writing}
       status={writing && <Doing label={t.writing} since={live.since} />}
     >
       <Answer text={closeFence(draft)} />

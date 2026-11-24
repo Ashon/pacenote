@@ -277,8 +277,9 @@ Run history:
   success rate, average duration, top tools, the tasks you handled per day and how they ended, new tokens per day for
   mentions, task collections, task help (filling in a task, Looks done, reply drafts), the turns of the sessions
   Pacenote runs and recap write-ups), run detail ("Timeline" of the work in the order request -> tool calls
-  -> answer -> outputs, where Pace's mark looks around while it works and stays as the answer's avatar; "Attachments",
-  "Prompt", raw "JSON"; the Tokens figure breaks down on hover).
+  -> answer -> outputs, where Pace's mark looks around while it works and stays as the answer's avatar, a small
+  circle at its foot for the tool it worked with (Claude Code or Codex, with the model on hover); "Attachments",
+  "Prompt", raw "JSON"; the Tokens figure breaks down on hover). A session's answers carry the same mark and circle.
   Runs in progress are reread every 1.5 seconds.
 
 Other:

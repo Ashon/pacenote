@@ -330,6 +330,7 @@ export function SessionPage({ id }: { id: string }) {
               <TalkItems
                 items={items}
                 tool={tool}
+                engine={row.tool}
                 cwd={row.cwd}
                 session={row.id}
                 made={talk.made}
@@ -342,6 +343,7 @@ export function SessionPage({ id }: { id: string }) {
                 live={live}
                 draft={draft}
                 tool={tool}
+                engine={row.tool}
                 cwd={row.cwd}
                 where={workingThere}
               />
