@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.first.outputs.page_url || steps.second.outputs.page_url || steps.third.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,19 +68,21 @@ jobs:
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
-      # A run's list can leave out an artifact for a moment after its upload, and deploy-pages looks it up once, so it
-      # fails on "No artifacts named github-pages" (actions/deploy-pages#451): wait until the list has it.
-      - name: wait for the artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          for _ in $(seq 30); do
-            [ "$(gh api "$RUN/artifacts?name=github-pages" --jq .total_count)" -ge 1 ] && exit 0
-            sleep 2
-          done
-          echo "the github-pages artifact is not in the run's list after a minute" >&2
-          exit 1
-      - id: deployment
+      # deploy-pages looks the artifact up once, in the artifact service's list, and right after its upload that list
+      # can still leave it out ("No artifacts named github-pages", actions/deploy-pages#451; the REST list has it at
+      # once, so waiting on that does not help). It fails before it starts a deployment, so it tries again after a
+      # pause, twice.
+      - id: first
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - if: steps.first.outcome == 'failure'
+        run: sleep 20
+      - id: second
+        if: steps.first.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - if: steps.second.outcome == 'failure'
+        run: sleep 60
+      - id: third
+        if: steps.second.outcome == 'failure'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
