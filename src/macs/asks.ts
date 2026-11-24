@@ -50,6 +50,9 @@ export const DEVICE_READS = {
   'sessions.talk': 'pacenote:sessions:talk',
   // An image sent with a turn, from its log (a Mac before 0.6.42 has none)
   'sessions.image': 'pacenote:sessions:image',
+  // Whether Codex can run a session on the Mac (a Mac before 0.6.43 has
+  // none, and the device starts Claude Code sessions there)
+  'sessions.tools': 'pacenote:sessions:tools',
 } as const satisfies Partial<Record<BridgeCall, `pacenote:${string}`>>
 
 /** What a device may change on the Mac, as you would there */

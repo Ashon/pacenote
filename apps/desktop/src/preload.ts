@@ -225,8 +225,13 @@ const bridge = {
       ipcRenderer.invoke('pacenote:sessions:answer', id, ask, answer, message),
     stop: (id) => ipcRenderer.invoke('pacenote:sessions:stop', id),
     end: (id) => ipcRenderer.invoke('pacenote:sessions:end', id),
+    close: (id) => ipcRenderer.invoke('pacenote:sessions:close', id),
+    wrapDraft: (id) => ipcRenderer.invoke('pacenote:sessions:wrap-draft', id),
+    wrapUp: (id, how) =>
+      ipcRenderer.invoke('pacenote:sessions:wrap-up', id, how),
     mode: (id, mode) => ipcRenderer.invoke('pacenote:sessions:mode', id, mode),
     start: (how) => ipcRenderer.invoke('pacenote:sessions:start', how),
+    tools: () => ipcRenderer.invoke('pacenote:sessions:tools'),
     onChanged: subscribe<string>('pacenote:sessions:changed'),
     onLive: subscribe<{ id: string; live: SessionLive }>(
       'pacenote:sessions:live'

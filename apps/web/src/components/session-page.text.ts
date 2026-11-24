@@ -1,6 +1,11 @@
 import type { Locale } from '@src/i18n/locale'
 import { josa } from '@src/i18n/korean'
-import type { SessionAskKind, SessionMode } from '@src/sessions/types'
+import type {
+  CodexMode,
+  HostTool,
+  SessionAskKind,
+  SessionMode,
+} from '@src/sessions/types'
 
 /** A session's page: its conversation, what it asks, and the composer */
 const en = {
@@ -12,24 +17,28 @@ const en = {
   nothingSaid: 'Nothing said in it yet.',
   stoppedShort: (why: string) => `Its last turn stopped short: ${why}`,
   // What it asks
-  askTitle: (kind: SessionAskKind, tool: string) =>
+  askTitle: (kind: SessionAskKind, tool: string, by = 'Claude Code') =>
     ({
-      command: 'Claude Code asks to run a command',
-      edit: 'Claude Code asks to change a file',
-      web: 'Claude Code asks to go online',
-      plan: 'Claude Code has a plan for you',
-      tool: `Claude Code asks to use ${tool}`,
+      command: `${by} asks to run a command`,
+      edit: `${by} asks to change a file`,
+      web: `${by} asks to go online`,
+      plan: `${by} has a plan for you`,
+      tool: `${by} asks to use ${tool}`,
     })[kind],
   askMeta: (folder: string, ago: string) => `In ${folder} · asked ${ago}`,
+  /** Why it asks, as Codex says */
+  why: 'Why',
   allow: 'Allow',
   allowRule: (rule: string) => `Allow ${rule} in this session`,
+  allowAlways: 'Allow in this session',
   deny: 'Deny',
   goAhead: 'Go ahead',
   keepPlanning: 'Keep planning',
   // The composer
   placeholder: {
-    idle: 'Reply to Claude Code',
-    busy: 'Tell Claude Code what to do next. It reads it after this step.',
+    idle: (by: string) => `Reply to ${by}`,
+    busy: (by: string) =>
+      `Tell ${by} what to do next. It reads it after this step.`,
     ask: 'Or tell it what to do instead',
     resume: 'Continue this session here',
     copy: 'What should the copy do first?',
@@ -55,10 +64,21 @@ const en = {
     plan: 'Plan first',
     auto: 'Auto',
   } satisfies Record<SessionMode, string>,
-  foot: "Runs Claude Code on this Mac with your own sign-in. The conversation stays in Claude Code's own log: claude --resume picks it up anywhere.",
+  /** A Codex session's, as Codex has them (Z4) */
+  codexModes: {
+    'read-only': 'Read only',
+    workspace: 'Ask outside the folder',
+    'full-access': 'Full access',
+  } satisfies Record<CodexMode, string>,
+  foot: {
+    claude:
+      "Runs Claude Code on this Mac with your own sign-in. The conversation stays in Claude Code's own log: claude --resume picks it up anywhere.",
+    codex:
+      "Runs Codex on this Mac with your own ChatGPT sign-in. The conversation stays in Codex's own log: codex resume picks it up anywhere.",
+  } satisfies Record<HostTool, string>,
   /** From your phone or iPad */
-  footOn: (mac: string) =>
-    `Claude Code runs on ${mac}, with your own sign-in there.`,
+  footOn: (mac: string, by = 'Claude Code') =>
+    `${by} runs on ${mac}, with your own sign-in there.`,
   // Open somewhere else
   elseTitle: (where: string) => `It is open in ${where}, so you type there`,
   elseLead:
@@ -93,8 +113,8 @@ const en = {
   planDone: (done: number, total: number) => `${done} of ${total} done`,
   context: (model: string, percent: number) =>
     model ? `${model} · ${percent}%` : `${percent}%`,
-  contextNote: (percent: number) =>
-    `The conversation takes ${percent}% of the model's context. Claude Code summarizes what came before as it fills.`,
+  contextNote: (percent: number, by = 'Claude Code') =>
+    `The conversation takes ${percent}% of the model's context. ${by} summarizes what came before as it fills.`,
 }
 
 const ko: typeof en = {
@@ -104,23 +124,26 @@ const ko: typeof en = {
   more: '세션 더 보기',
   nothingSaid: '아직 나눈 말이 없어요.',
   stoppedShort: (why) => `지난 턴이 중간에 멈췄어요: ${why}`,
-  askTitle: (kind, tool) =>
+  askTitle: (kind, tool, by = 'Claude Code') =>
     ({
-      command: 'Claude Code가 명령을 실행해도 되는지 물어요',
-      edit: 'Claude Code가 파일을 바꿔도 되는지 물어요',
-      web: 'Claude Code가 인터넷에 접속해도 되는지 물어요',
-      plan: 'Claude Code가 계획을 세웠어요',
-      tool: `Claude Code가 ${josa(tool, '을/를')} 써도 되는지 물어요`,
+      command: `${josa(by, '이/가')} 명령을 실행해도 되는지 물어요`,
+      edit: `${josa(by, '이/가')} 파일을 바꿔도 되는지 물어요`,
+      web: `${josa(by, '이/가')} 인터넷에 접속해도 되는지 물어요`,
+      plan: `${josa(by, '이/가')} 계획을 세웠어요`,
+      tool: `${josa(by, '이/가')} ${josa(tool, '을/를')} 써도 되는지 물어요`,
     })[kind],
   askMeta: (folder, ago) => `${folder} · ${ago} 물음`,
+  why: '이유',
   allow: '허용',
   allowRule: (rule) => `이 세션에서 ${rule} 계속 허용`,
+  allowAlways: '이 세션에서 계속 허용',
   deny: '거절',
   goAhead: '진행',
   keepPlanning: '계속 계획',
   placeholder: {
-    idle: 'Claude Code에게 답하기',
-    busy: 'Claude Code에게 다음에 할 일을 말하세요. 지금 단계가 끝나면 읽어요.',
+    idle: (by) => `${by}에게 답하기`,
+    busy: (by) =>
+      `${by}에게 다음에 할 일을 말하세요. 지금 단계가 끝나면 읽어요.`,
     ask: '아니면 대신 할 일을 말하세요',
     resume: '이 세션을 여기서 이어 가기',
     copy: '복사본이 먼저 할 일은?',
@@ -144,8 +167,19 @@ const ko: typeof en = {
     plan: '먼저 계획',
     auto: '자동',
   },
-  foot: '이 Mac의 Claude Code를 내 로그인으로 실행해요. 대화는 Claude Code의 로그에 남아서 claude --resume으로 어디서든 이어 갈 수 있어요.',
-  footOn: (mac) => `${mac}에서 그 Mac의 내 로그인으로 Claude Code가 실행돼요.`,
+  codexModes: {
+    'read-only': '읽기만',
+    workspace: '폴더 밖은 묻기',
+    'full-access': '전체 권한',
+  },
+  foot: {
+    claude:
+      '이 Mac의 Claude Code를 내 로그인으로 실행해요. 대화는 Claude Code의 로그에 남아서 claude --resume으로 어디서든 이어 갈 수 있어요.',
+    codex:
+      '이 Mac의 Codex를 내 ChatGPT 로그인으로 실행해요. 대화는 Codex의 로그에 남아서 codex resume으로 어디서든 이어 갈 수 있어요.',
+  },
+  footOn: (mac, by = 'Claude Code') =>
+    `${mac}에서 그 Mac의 내 로그인으로 ${josa(by, '이/가')} 실행돼요.`,
   elseTitle: (where) => `${where}에 열려 있어서 그곳에서 입력해요`,
   elseLead:
     'Pacenote는 진행되는 대로 보여 줘요. 한 세션에 두 곳에서 입력하면 엉키기 때문에, 그곳에서 닫으면 여기서 입력할 수 있어요.',
@@ -173,8 +207,8 @@ const ko: typeof en = {
   planDone: (done, total) => `${total}개 중 ${done}개 완료`,
   context: (model, percent) =>
     model ? `${model} · ${percent}%` : `${percent}%`,
-  contextNote: (percent) =>
-    `대화가 모델 컨텍스트의 ${percent}%를 쓰고 있어요. 차면 Claude Code가 앞의 대화를 요약해요.`,
+  contextNote: (percent, by = 'Claude Code') =>
+    `대화가 모델 컨텍스트의 ${percent}%를 쓰고 있어요. 차면 ${josa(by, '이/가')} 앞의 대화를 요약해요.`,
 }
 
 export const text: Record<Locale, typeof en> = { en, ko }

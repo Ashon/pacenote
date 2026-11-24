@@ -3634,8 +3634,17 @@ else fail('unexpected: ' + args.join(' '))
     })
   }, 120_000)
 
-  it("starts a task's session in Pacenote from Todo's Continue: the task written in, its folder, then its page", async () => {
-    world = await World.create()
+  it("starts a task's session in Pacenote from Todo's Continue: the task written in, its folder, then its page, and wraps it up", async () => {
+    world = await World.create([
+      {
+        match: "finished the user's task",
+        answer: JSON.stringify({
+          done: true,
+          summary: 'Fixed the retry test: it waits on fake timers now.',
+          left: ['Tell hyun the test is fixed', 'Watch CI for a day'],
+        }),
+      },
+    ])
     const { home, root } = world
     mkdirSync(path.join(root, 'git', 'payments'), { recursive: true })
     const checkout = realpathSync(path.join(root, 'git', 'payments'))
@@ -3710,7 +3719,18 @@ else fail('unexpected: ' + args.join(' '))
     await page
       .getByRole('heading', { name: 'Fix the flaky webhook retry test' })
       .waitFor({ timeout: 30_000 })
-    await page.getByText('Claude Code, here in Pacenote').waitFor()
+    // Claude Code runs it; Codex, not on this Mac here, waits (Z1)
+    const runsIn = page.getByRole('radiogroup', { name: 'Runs in' })
+    await runsIn
+      .getByRole('radio', { name: 'Claude Code', checked: true })
+      .waitFor()
+    expect(
+      await runsIn
+        .getByRole('radio', { name: 'Codex' })
+        .getAttribute('aria-disabled')
+    ).toBe('true')
+    await page.getByText('here in Pacenote', { exact: true }).waitFor()
+    await page.getByText('Codex is not on this Mac.').waitFor()
     await page.getByText('From your tasks · Ashon/payments').waitFor()
     expect(await page.locator('[data-folder]').textContent()).toMatch(
       /payments$/
@@ -3792,6 +3812,56 @@ else fail('unexpected: ' + args.join(' '))
       new RegExp(`#/sessions/claude:${session}$`)
     )
     expect(existsSync(opened)).toBe(false)
+
+    // Done with it here: Wrap up waits for its open task, and Close ends its
+    // run and moves it to Ended
+    const wrapUp = page.getByRole('button', { name: 'Wrap up', exact: true })
+    await wrapUp.waitFor()
+    await page
+      .locator('header', { has: page.locator('[data-page-title]') })
+      .screenshot({
+        path: path.join(REPO, 'test-results/session-close-header.png'),
+      })
+    const close = page.getByRole('button', { name: 'Close', exact: true })
+    await close.click()
+    // Its state, under its title
+    await page
+      .locator('header + p')
+      .getByText('Ended', { exact: true })
+      .waitFor({ timeout: 20_000 })
+    expect(await close.count()).toBe(0)
+
+    // Its task wrapped up from here: your AI's draft of how it ended, the
+    // things left kept as tasks after it
+    await wrapUp.click()
+    const wrap = page.getByRole('dialog', { name: 'Wrap up its task' })
+    const note = wrap.getByRole('textbox')
+    await wrap
+      .getByText('What was done, as Claude Code read it')
+      .waitFor({ timeout: 30_000 })
+    expect(await note.inputValue()).toBe(
+      'Fixed the retry test: it waits on fake timers now.'
+    )
+    // Ended already: nothing more to close
+    expect(await wrap.getByRole('checkbox').count()).toBe(2)
+    await wrap.getByRole('checkbox', { name: 'Watch CI for a day' }).uncheck()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-wrap-up.png'),
+    })
+    await wrap.getByRole('button', { name: 'Wrap up', exact: true }).click()
+    await wrap.waitFor({ state: 'detached' })
+    await wrapUp.waitFor({ state: 'detached', timeout: 20_000 })
+    const tasks = allTaskViews(home)
+    expect(tasks.find((each) => each.id === fix.id)).toMatchObject({
+      status: expect.not.stringMatching(/^open$/),
+    })
+    expect(tasks.find((each) => each.id === fix.id)!.wrapUp?.text).toBe(
+      'Fixed the retry test: it waits on fake timers now.'
+    )
+    expect(tasks.map((each) => each.title)).toContain(
+      'Tell hyun the test is fixed'
+    )
+    expect(tasks.map((each) => each.title)).not.toContain('Watch CI for a day')
   }, 120_000)
 
   it('sends images with a message to a session Pacenote runs: picked or pasted, made small enough, shown in your turn and opened larger', async () => {
@@ -4682,14 +4752,27 @@ else fail('unexpected: ' + args.join(' '))
         .count()
     ).toBe(0)
     await page.getByRole('tab', { name: 'Open 4' }).waitFor()
-    const open = groupRow.getByRole('button', {
-      name: 'Open this group: Webhook retry limit to 5',
+    const fold = groupRow.getByRole('button', {
+      name: "This group's tasks: Webhook retry limit to 5",
     })
-    await open.waitFor({ timeout: 30_000 })
+    await fold.waitFor({ timeout: 30_000 })
     await groupRow
       .getByText('hyun, mina and jin wait · none done yet')
       .waitFor()
-    await open.click()
+    // Folded, the row alone; open again, its summary and its tasks
+    expect(await fold.getAttribute('aria-expanded')).toBe('true')
+    await fold.click()
+    await eventually(
+      "the group's tasks folded",
+      async () => (await groupRow.locator('[data-task-row]').count()) === 0
+    )
+    expect(await fold.getAttribute('aria-expanded')).toBe('false')
+    await page.waitForTimeout(300)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/todo-group-folded.png'),
+    })
+    await fold.click()
+    await groupRow.locator(`[data-task-row="${limit.id}"]`).waitFor()
     await groupRow
       .getByText(
         'Webhook retries go from 3 attempts to 5, with backoff. mina reviews the PR and the runbook follows the change.'

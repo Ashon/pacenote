@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -10,6 +11,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CodexHost } from '../apps/desktop/src/codex-host.js'
 import { DeviceAnswers } from '../apps/desktop/src/device-answers.js'
 import type { OpenClaude } from '../apps/desktop/src/open-sessions.js'
 import type { Desktop } from '../apps/desktop/src/ipc/context.js'
@@ -17,7 +19,9 @@ import type { Ipc, Run } from '../apps/desktop/src/ipc/gate.js'
 import { SessionHost } from '../apps/desktop/src/session-host.js'
 import type { HistoryReader } from '../src/history/reader.js'
 import { DEVICE_ASKS } from '../src/macs/asks.js'
-import type { SessionTalk } from '../src/sessions/types.js'
+import { readClosed } from '../src/sessions/closed.js'
+import type { SessionTalk, SessionWrapDraft } from '../src/sessions/types.js'
+import { allTaskViews } from '../src/tasks/store.js'
 import { readRepos } from '../src/tasks/folders.js'
 import { readWork } from '../src/tasks/work.js'
 import { addTasks } from '../src/tasks/write.js'
@@ -80,6 +84,84 @@ const host = new SessionHost({
 })
 afterAll(() => host.endAll())
 
+/** codex app-server as the Codex host runs it: what it was asked */
+class FakeCodex extends EventEmitter {
+  readonly pid = ++pids
+  stdin = new PassThrough()
+  stdout = new PassThrough()
+  stderr = new PassThrough()
+  asked: { method: string; params?: Record<string, unknown> }[] = []
+  readonly thread = `019d${pids}-0000-7000-8000-codexthread`
+  constructor(
+    readonly args: string[],
+    readonly cwd: string
+  ) {
+    super()
+    let rest = ''
+    this.stdin.on('data', (chunk: Buffer) => {
+      const lines = (rest + String(chunk)).split('\n')
+      rest = lines.pop() ?? ''
+      for (const line of lines.filter(Boolean)) {
+        const message = JSON.parse(line) as {
+          id?: number
+          method: string
+          params?: Record<string, unknown>
+        }
+        this.asked.push(message)
+        if (message.id === undefined) continue
+        const result =
+          message.method === 'thread/start' ||
+          message.method === 'thread/resume'
+            ? { thread: { id: this.thread }, model: 'gpt-6-luna' }
+            : message.method === 'turn/start'
+              ? { turn: { id: 'turn-1' } }
+              : {}
+        this.stdout.write(
+          `${JSON.stringify({ jsonrpc: '2.0', id: message.id, result })}\n`
+        )
+      }
+    })
+  }
+  kill() {
+    this.emit('exit', null)
+    return true
+  }
+}
+const codexProcs: FakeCodex[] = []
+const codex = new CodexHost({
+  bin: () => 'codex',
+  env: () => ({}),
+  version: '0.6.43',
+  warn: () => {},
+  onChange: () => {},
+  spawn: (_bin, args, cwd) => {
+    const proc = new FakeCodex(args, cwd)
+    codexProcs.push(proc)
+    return proc
+  },
+})
+afterAll(() => codex.endAll())
+/** codex as Pacenote checks it: new enough, signed in, or not */
+const codexBin = path.join(home, 'bin', 'codex')
+mkdirSync(path.dirname(codexBin), { recursive: true })
+const fakeCodexBin = (version: string, login = 'Logged in using ChatGPT') => {
+  writeFileSync(
+    codexBin,
+    `#!/bin/sh\ncase "$1" in\n  --version) echo "codex-cli ${version}" ;;\n  login) echo "${login}" ;;\nesac\n`
+  )
+  chmodSync(codexBin, 0o755)
+}
+fakeCodexBin('0.163.0')
+
+/** What your AI was asked to wrap up, and what it answers */
+const judged: { task: string; items: number; branch?: string }[] = []
+let judgement: SessionWrapDraft = {
+  done: true,
+  summary: 'Raised the retry limit to 5 and fixed the test.',
+  left: ['Tell hyun it is fixed', 'Watch the retries for a day'],
+  by: 'Claude Code',
+}
+
 /** The channels as the window would call them */
 const channels = new Map<string, Run>()
 /** And as your devices ask for them (DeviceAnswers), the ones they may */
@@ -106,8 +188,8 @@ registerSessionsIpc(
     dataDir,
     settings: { effectiveEnv: () => env },
     toolPath: () => '',
-    cliBins: () => ({ claude: 'claude' }),
-    log: { warn: () => {} },
+    cliBins: () => ({ claude: 'claude', codex: codexBin }),
+    log: { warn: () => {}, info: () => {} },
   } as unknown as Desktop,
   {
     sessions: {
@@ -118,6 +200,14 @@ registerSessionsIpc(
       },
       repos: { all: async () => new Map() },
       linkSoon: () => {},
+      judgeNow: async (
+        judgedTask: { id: string },
+        items: unknown[],
+        branch?: string
+      ) => {
+        judged.push({ task: judgedTask.id, items: items.length, branch })
+        return judgement
+      },
     },
     openSessions: {
       list: async () => open,
@@ -129,6 +219,7 @@ registerSessionsIpc(
       },
     },
     host,
+    codex,
     todo: { hasApp: () => false },
   } as unknown as Parameters<typeof registerSessionsIpc>[2]
 )
@@ -264,6 +355,64 @@ describe('starting a session Pacenote runs', () => {
     expect(procs.at(-1)!.args).not.toContain('--name')
     expect(procs.at(-1)!.args).not.toContain('--permission-mode')
     expect(readWork(dataDir).entries).toHaveLength(before)
+  })
+
+  it("starts a task's session with Codex, in the mode you picked, and talks to it here", async () => {
+    expect(await call('pacenote:sessions:tools')).toEqual({
+      codex: { ready: true },
+    })
+    // A Codex mode is Codex's; Claude Code's is not
+    expect((await start({ tool: 'codex', mode: 'plan' })).error).toBeTruthy()
+    expect((await start({ tool: 'gemini' })).error).toBeTruthy()
+    const started = await start({
+      tool: 'codex',
+      task: task!.id,
+      mode: 'read-only',
+      message: 'You are taking over a task from Pacenote',
+    })
+    expect(started.error).toBeUndefined()
+    const proc = codexProcs.at(-1)!
+    expect(started.id).toBe(`codex:${proc.thread}`)
+    expect(proc.args).toEqual(['app-server'])
+    expect(proc.cwd).toBe(folder)
+    expect(
+      proc.asked.find((each) => each.method === 'thread/start')!.params
+    ).toMatchObject({ cwd: folder, sandbox: 'read-only' })
+    expect(
+      proc.asked.find((each) => each.method === 'thread/name/set')!.params
+    ).toMatchObject({ name: 'Fix the flaky webhook retry test' })
+    expect(
+      readWork(dataDir).entries.find(
+        (entry) => entry.kind === 'session' && entry.session === proc.thread
+      )
+    ).toMatchObject({ task: task!.id, tool: 'codex', cwd: folder })
+
+    // Its page before Codex wrote its log: here, as it goes
+    const talk = (await call(
+      'pacenote:sessions:talk',
+      started.id
+    )) as unknown as SessionTalk
+    expect(talk.row).toMatchObject({ tool: 'codex', where: 'pacenote' })
+    expect(talk.typeIn).toBe('here')
+    expect(talk.live).toMatchObject({ busy: true, mode: 'read-only' })
+    expect(talk.error).toBeUndefined()
+
+    // What you type next, and how it asks from its next turn
+    expect(await call('pacenote:sessions:mode', started.id, 'plan')).toEqual({
+      error: expect.any(String),
+    })
+    expect(
+      await call('pacenote:sessions:mode', started.id, 'full-access')
+    ).toEqual({})
+    expect(
+      await call('pacenote:sessions:send', started.id, 'Use fake timers')
+    ).toEqual({})
+    expect(
+      proc.asked.filter((each) => each.method === 'turn/steer')
+    ).toHaveLength(1)
+    expect(await call('pacenote:sessions:stop', started.id)).toEqual({})
+    expect(await call('pacenote:sessions:end', started.id)).toEqual({})
+    expect(codex.has(proc.thread)).toBe(false)
   })
 })
 
@@ -532,5 +681,129 @@ describe('one conversation, typed into in one place at a time', () => {
     expect(procs.at(-1)).toBe(proc)
     expect(proc.written).toContain('And one more')
     host.end(session)
+  })
+})
+
+describe('closing a session, and wrapping up its task', () => {
+  /** A task of its own, and a session Pacenote runs for it, with a log */
+  const started = async (title: string) => {
+    const [own] = addTasks(
+      dataDir,
+      [
+        {
+          title,
+          asked_by: 'hyun',
+          where: '#payments',
+          link: `https://acme.slack.com/archives/C1/p17600000${Date.now() % 100_000_000}`,
+          confidence: 'sure',
+          action: 'code',
+          repo: 'Ashon/payments',
+        },
+      ],
+      { settings: { on: true, dms: false, exclude: [] } }
+    ).added
+    const { id } = (await call('pacenote:sessions:start', {
+      folder,
+      task: own!.id,
+      message: 'You are taking over a task from Pacenote',
+    })) as { id: string }
+    const session = id.slice('claude:'.length)
+    const project = path.join(home, '.claude', 'projects', 'payments')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(
+      path.join(project, `${session}.jsonl`),
+      [
+        {
+          type: 'user',
+          sessionId: session,
+          cwd: folder,
+          timestamp: new Date().toISOString(),
+          message: { role: 'user', content: 'Fix the retry' },
+        },
+        {
+          type: 'assistant',
+          sessionId: session,
+          cwd: folder,
+          timestamp: new Date().toISOString(),
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Raised the limit to 5.' }],
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join('\n')
+    )
+    return { id, session, task: own! }
+  }
+
+  it('closes one it runs: its run ends, and it is kept as closed', async () => {
+    const { id, session } = await started('Close the retry session')
+    expect(host.has(session)).toBe(true)
+    expect(await call('pacenote:sessions:close', id)).toEqual({})
+    expect(host.has(session)).toBe(false)
+    expect(readClosed(dataDir).get(id)).toEqual(expect.any(String))
+    expect(await call('pacenote:sessions:close', 'claude:gone')).toEqual({
+      error: expect.any(String),
+    })
+  })
+
+  it('drafts how it ended from its log, then closes its task with what you kept', async () => {
+    const { id, session, task: own } = await started('Wrap up the retry')
+    judged.length = 0
+    const draft = await call('pacenote:sessions:wrap-draft', id)
+    expect(draft).toEqual(judgement)
+    expect(judged).toEqual([{ task: own.id, items: 2, branch: undefined }])
+
+    const before = allTaskViews(dataDir).length
+    expect(
+      await call('pacenote:sessions:wrap-up', id, {
+        summary: 'Raised the retry limit to 5.',
+        keep: ['Tell hyun it is fixed', '  '],
+        close: true,
+      })
+    ).toEqual({ kept: 1 })
+    const tasks = allTaskViews(dataDir)
+    expect(tasks.find((each) => each.id === own.id)!.status).not.toBe('open')
+    // The one thing left you kept, a task after it; the blank one not
+    expect(tasks).toHaveLength(before + 1)
+    expect(tasks.some((each) => each.title === 'Tell hyun it is fixed')).toBe(
+      true
+    )
+    expect(host.has(session)).toBe(false)
+    expect(readClosed(dataDir).has(id)).toBe(true)
+  })
+
+  it('keeps the session open when you say so, and says why your AI could not write it', async () => {
+    const { id, session } = await started('Wrap up and keep it open')
+    judgement = { error: 'Claude Code did not answer in 2 minutes.' }
+    expect(await call('pacenote:sessions:wrap-draft', id)).toEqual({
+      error: expect.stringMatching(/could not write/),
+    })
+    expect(
+      await call('pacenote:sessions:wrap-up', id, {
+        summary: '',
+        keep: [],
+        close: false,
+      })
+    ).toEqual({ kept: 0 })
+    expect(host.has(session)).toBe(true)
+    expect(readClosed(dataDir).has(id)).toBe(false)
+    // Its task is closed now: nothing left to wrap up
+    expect(await call('pacenote:sessions:wrap-draft', id)).toEqual({
+      error: 'Its task is closed already.',
+    })
+    host.end(session)
+  })
+
+  it("wraps up no session that is not a task's work", async () => {
+    const { id } = (await call('pacenote:sessions:start', {
+      folder,
+      message: 'Just looking',
+    })) as { id: string }
+    expect(await call('pacenote:sessions:wrap-draft', id)).toEqual({
+      error: 'This session is not the work of a task.',
+    })
+    host.end(id.slice('claude:'.length))
   })
 })

@@ -886,7 +886,7 @@ describe("the tools' own session logs", () => {
         .join('\n')
     )
     expect(readSessionLog(rollout, 'codex')).toEqual([
-      { role: 'tool', name: 'shell', text: 'git diff' },
+      { role: 'tool', name: 'Shell', text: 'git diff' },
       { role: 'assistant', text: 'Done.' },
     ])
   })

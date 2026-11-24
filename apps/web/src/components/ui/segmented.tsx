@@ -10,6 +10,8 @@ export interface SegmentedOption<T extends string | number> {
   lang?: string
   /** Shown before its label */
   icon?: LucideIcon
+  /** Shown but not chosen now: why is said beside it */
+  disabled?: boolean
 }
 
 /**
@@ -40,20 +42,22 @@ export function Segmented<T extends string | number>({
       aria-labelledby={label ? undefined : labelledBy}
       className={cn('flex rounded-lg bg-muted p-0.5', className)}
     >
-      {options.map(({ icon: Icon, ...option }) => (
+      {options.map(({ icon: Icon, disabled, ...option }) => (
         <button
           key={option.value}
           type="button"
           lang={option.lang}
           role="radio"
           aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
+          aria-disabled={disabled || undefined}
+          onClick={() => !disabled && onChange(option.value)}
           className={cn(
             'flex h-6 items-center justify-center gap-1.5 rounded-md text-meta font-medium whitespace-nowrap tabular-nums transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none',
             stretch ? 'flex-auto px-1.5' : 'px-2.5',
             value === option.value
               ? 'bg-card text-foreground shadow-xs dark:bg-selected'
-              : 'text-muted-foreground hover:text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+            disabled && 'cursor-default opacity-50 hover:text-muted-foreground'
           )}
         >
           {Icon && <Icon className="size-3.5" />}

@@ -14,6 +14,7 @@ import {
 import { useEffect, useId, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogClose,
@@ -48,8 +49,8 @@ import { closedBy } from './task-sessions'
 
 /**
  * A group's row: its name, how many tasks, who waits and how far along,
- * Continue here and Done all; opened, what your AI filled it in with. Its
- * tasks are listed under it (children), indented.
+ * Continue here and Done all. Open, what your AI filled it in with, and its
+ * tasks listed under it (children), indented; folded, the row alone.
  */
 export function GroupRow({
   group,
@@ -191,18 +192,20 @@ export function GroupRow({
         </div>
       </div>
       <InlineError error={error} className="mt-2 pl-6" />
-      {open && (
-        <GroupDetail
-          group={group}
-          facts={facts}
-          filling={filling}
-          onUndo={onUndo}
-          onFillAgain={onFillAgain}
-        />
-      )}
-      <div className="mt-3 ml-1.5 border-l-2 border-border pl-[1.125rem]">
-        {children}
-      </div>
+      <Collapsible open={open}>
+        <CollapsibleContent data-group-tasks={group.id}>
+          <GroupDetail
+            group={group}
+            facts={facts}
+            filling={filling}
+            onUndo={onUndo}
+            onFillAgain={onFillAgain}
+          />
+          <div className="mt-3 ml-1.5 border-l-2 border-border pl-[1.125rem]">
+            {children}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </li>
   )
 }

@@ -64,6 +64,7 @@ import type { TaskArea, YouView } from './you/types.js'
 import type { RecapPeriod, RecapView } from './you/types.js'
 import type { SessionMessage } from './sessions/images.js'
 import type {
+  CodexMode,
   MacSessions,
   NewSessionDraft,
   NewSessionStart,
@@ -71,6 +72,9 @@ import type {
   SessionsView,
   SessionLive,
   SessionTalk,
+  SessionTools,
+  SessionWrapDraft,
+  SessionWrapUp,
 } from './sessions/types.js'
 import type {
   McpClientId,
@@ -496,13 +500,38 @@ export interface DesktopBridge {
     stop(id: string): Promise<{ error?: string }>
     /** Ends its run here: the conversation stays in Claude Code */
     end(id: string): Promise<{ error?: string }>
-    /** How it asks before it acts */
-    mode(id: string, mode: SessionMode): Promise<{ error?: string }>
     /**
-     * Starts a new Claude Code session Pacenote runs, in the folder, with its
-     * first message (V5): a task's work, for one; its page's id
+     * Closes it (src/sessions/closed.ts): its run here ends, and it shows as
+     * ended until it writes again. The desktop app's alone.
+     */
+    close?(id: string): Promise<{ error?: string }>
+    /**
+     * For one that is a task's work: your AI's draft of how it ended, what
+     * was done and what is left
+     */
+    wrapDraft?(id: string): Promise<SessionWrapDraft>
+    /**
+     * Wraps it up: its task closes with what was done, the things left you
+     * kept become tasks after it, and it closes unless you keep it open
+     */
+    wrapUp?(
+      id: string,
+      how: SessionWrapUp
+    ): Promise<{ kept?: number; error?: string }>
+    /** How it asks before it acts: Claude Code's modes, or Codex's */
+    mode(id: string, mode: SessionMode | CodexMode): Promise<{ error?: string }>
+    /**
+     * Starts a new session Pacenote runs, Claude Code's or Codex's, in the
+     * folder, with its first message (V5): a task's work, for one; its page's
+     * id
      */
     start(how: NewSessionStart): Promise<{ id?: string; error?: string }>
+    /**
+     * Whether Codex can run a session here, for the new session page (Z1).
+     * The desktop app's: a device starts Claude Code sessions until its app
+     * asks.
+     */
+    tools?(): Promise<SessionTools>
     /** A session Pacenote runs changed: its id */
     onChanged(callback: (id: string) => void): () => void
     /**

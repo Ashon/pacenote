@@ -55,7 +55,7 @@ above the list, names the ask waiting on you, the task to pick up and the one wa
 
 ### Pick up where you left off, in either tool
 
-**Continue here** opens a Claude Code session right in Pacenote with the task, the thread, what Pace found there, and
+**Continue here** opens a Claude Code or Codex session right in Pacenote with the task, the thread, what Pace found there, and
 how related work ended last time, even when that work was done in another tool. The menu beside it opens Claude Code,
 Codex or opencode in your terminal, or the Claude app or the Codex app, the same way. When the session is done, it
 closes the task with a note on how it ended and, if someone is waiting on you, a reply for you to send. A session you

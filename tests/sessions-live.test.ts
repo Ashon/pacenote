@@ -261,7 +261,8 @@ describe('the lines Pacenote writes to a session', () => {
     expect(modelLabel('claude-opus-5-5')).toBe('Opus 5.5')
     expect(modelLabel('claude-sonnet-4-20250514')).toBe('Sonnet 4')
     expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
-    expect(modelLabel('gpt-5.1-codex')).toBe('gpt-5.1-codex')
+    expect(modelLabel('gpt-5.1-codex')).toBe('GPT-5.1-Codex')
+    expect(modelLabel('gpt-6-luna')).toBe('GPT-6-Luna')
   })
 
   it('starts a new one with its id, its name and how it asks', () => {

@@ -15,7 +15,11 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { redactSecrets } from '../../../src/broker/redact.js'
-import { imageOfContent } from '../../../src/sessions/images.js'
+import { codexLogSteps } from '../../../src/sessions/codex.js'
+import {
+  imageOfCodexContent,
+  imageOfContent,
+} from '../../../src/sessions/images.js'
 import { MadeReader } from '../../../src/sessions/made.js'
 import { PlanReader } from '../../../src/sessions/plan.js'
 import type { MadeThing, SessionPlanStep } from '../../../src/sessions/types.js'
@@ -768,21 +772,33 @@ export function readSessionLog(
 }
 
 /**
- * An image of a turn in a Claude Code session's log, by the turn's line
- * (SessionItem's ref) and its place among the turn's images: a data: URL for
- * its page, or undefined when the log has no such image
+ * An image of a turn in a session's log, by the turn's line (SessionItem's
+ * ref: a Claude Code line's uuid, a Codex line's ordinal or time) and its
+ * place among the turn's images: a data: URL for its page, or undefined when
+ * the log has no such image
  */
 export function readSessionImage(
   file: string,
   ref: string,
-  index: number
+  index: number,
+  tool: WorkTool = 'claude'
 ): string | undefined {
   if (!Number.isInteger(index) || index < 0) return undefined
-  const marker = `"uuid":${JSON.stringify(ref)}`
+  const marker =
+    tool === 'codex'
+      ? /^\d+$/.test(ref)
+        ? `"ordinal":${ref}`
+        : `"timestamp":${JSON.stringify(ref)}`
+      : `"uuid":${JSON.stringify(ref)}`
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (!line.includes(marker)) continue
     try {
       const event = JSON.parse(line) as Record<string, unknown>
+      if (tool === 'codex') {
+        const payload = event.payload as Record<string, unknown> | undefined
+        if (codexRef(event) !== ref || payload?.type !== 'message') continue
+        return imageOfCodexContent(payload.content, index)
+      }
       if (event.uuid !== ref) continue
       const message = event.message as { content?: unknown } | undefined
       return imageOfContent(message?.content, index)
@@ -792,6 +808,14 @@ export function readSessionImage(
   }
   return undefined
 }
+
+/** A Codex log line's ref, for an image of its turn: its ordinal, or time */
+const codexRef = (event: Record<string, unknown>) =>
+  typeof event.ordinal === 'number'
+    ? String(event.ordinal)
+    : typeof event.timestamp === 'string'
+      ? event.timestamp
+      : undefined
 
 /**
  * A session's log as its page shows it: its turns and steps
@@ -887,7 +911,9 @@ export function readSessionTalk(
         })
       continue
     }
-    // Codex: response_item messages and function calls
+    // Codex: response_item messages, and its steps: commands as Shell,
+    // patches as Edit, from a function call, a custom tool's (its code-mode
+    // exec script) or a local shell call (Z8)
     const payload = event.payload as Record<string, unknown> | undefined
     if (event.type !== 'response_item' || !payload) continue
     if (payload.type === 'message') {
@@ -896,18 +922,34 @@ export function readSessionTalk(
       if (/^<(environment_context|user_instructions)>/.test(text.trim()))
         continue
       if (payload.role === 'user' || payload.role === 'assistant') {
-        const kept = push({ role: payload.role, text, at })
+        const images =
+          payload.role === 'user' && Array.isArray(payload.content)
+            ? (payload.content as { type?: string }[]).filter(
+                (block) => block?.type === 'input_image'
+              ).length
+            : 0
+        const ref = images ? codexRef(event) : undefined
+        const kept = push({
+          role: payload.role,
+          text,
+          at,
+          ...(images ? { images } : {}),
+          ...(ref ? { ref } : {}),
+        })
         if (payload.role === 'assistant') madeBy(kept, made.said(text, at))
       }
-    } else if (payload.type === 'function_call') {
-      let input: unknown = payload.arguments
-      try {
-        input = JSON.parse(String(payload.arguments))
-      } catch {
-        // Kept as written
-      }
-      step(payload.name, input, at)
+      continue
     }
+    for (const each of codexLogSteps(payload, cwd) ?? [])
+      push({
+        role: 'tool',
+        name: each.name,
+        text:
+          each.text ||
+          (each.input === undefined ? '' : stepLine(each.input)) ||
+          each.name,
+        at,
+      })
   }
   const left = plan.plan()
   const things = made.made()

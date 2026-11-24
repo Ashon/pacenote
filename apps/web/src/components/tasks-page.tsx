@@ -78,6 +78,22 @@ const ROWS_KEY = 'pacenote.tasks.rows'
 
 const lastRows = () => skeletonRows(readStored(ROWS_KEY))
 
+/** The groups you folded, in this browser: open until you fold one */
+const FOLDED_KEY = 'pacenote.tasks.folded-groups'
+
+const foldedGroups = (): ReadonlySet<string> => {
+  try {
+    const kept = JSON.parse(readStored(FOLDED_KEY) ?? '[]') as unknown
+    return new Set(
+      Array.isArray(kept)
+        ? kept.filter((id): id is string => typeof id === 'string')
+        : []
+    )
+  } catch {
+    return new Set()
+  }
+}
+
 /**
  * Your own tasks, gathered from Slack (docs/proposals/personal-tasks.md): the
  * open ones, the Maybes kept aside, what is settled (the latest first, more on
@@ -115,7 +131,7 @@ export function TasksPage({
   const setStage = useStage()
   // Groups of tasks: by hand, your AI's suggestion, Done all
   const bundles = useBundles()
-  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set())
+  const [folded, setFolded] = useState<ReadonlySet<string>>(foldedGroups)
   const [groupWith, setGroupWith] = useState<{
     task: TaskView
     open: boolean
@@ -461,15 +477,29 @@ export function TasksPage({
                       group={group}
                       facts={facts}
                       motion={motion}
-                      open={openGroups.has(group.id)}
-                      onToggle={() =>
-                        setOpenGroups((current) => {
-                          const next = new Set(current)
-                          if (next.has(group.id)) next.delete(group.id)
-                          else next.add(group.id)
-                          return next
-                        })
+                      // Open unless you folded it, and while one of its
+                      // tasks is open
+                      open={
+                        !folded.has(group.id) ||
+                        Boolean(openId && group.tasks.includes(openId))
                       }
+                      onToggle={() => {
+                        const next = new Set(
+                          [...folded].filter((id) =>
+                            groups.some((each) => each.id === id)
+                          )
+                        )
+                        const opening =
+                          next.has(group.id) &&
+                          !(openId && group.tasks.includes(openId))
+                        if (opening) next.delete(group.id)
+                        else next.add(group.id)
+                        // Folding it closes its task that was open
+                        if (!opening && openId && group.tasks.includes(openId))
+                          go('#/tasks')
+                        setFolded(next)
+                        writeStored(FOLDED_KEY, JSON.stringify([...next]))
+                      }}
                       filling={
                         data.bundles?.filling.includes(group.id)
                           ? aiName

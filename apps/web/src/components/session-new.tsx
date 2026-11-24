@@ -1,10 +1,11 @@
-import type { SessionMode } from '@src/sessions/types'
+import type { CodexMode, HostTool, SessionMode } from '@src/sessions/types'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, FolderOpen, Play } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Segmented } from '@/components/ui/segmented'
 import { SkeletonBlock, SkeletonText } from '@/components/ui/skeleton'
 import { remoteMac } from '@/lib/desktop'
 import { homePath } from '@/lib/format'
@@ -14,9 +15,11 @@ import { recentFolders } from '@/lib/session-rows'
 import {
   useNewSessionDraft,
   useSessions,
+  useSessionTools,
   useShowSessions,
   useStartSession,
 } from '@/lib/sessions'
+import { readStored, writeStored } from '@/lib/storage'
 import { taskDetailQuery } from '@/lib/tasks'
 import { text } from './session-new.text'
 import { ModePicker } from './session-page'
@@ -24,10 +27,18 @@ import { text as pageText } from './session-page.text'
 import { text as listText } from './sessions-page.text'
 import { FolderDialog } from './task-folder'
 
+/** The tool you picked last for a new session (Z1) */
+const TOOL_KEY = 'pacenote.sessions.tool'
+const TOOL_NAMES: Record<HostTool, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex',
+}
+
 /**
  * A new session Pacenote runs (V5, board Q11): from Todo's Continue, a task's,
  * its folder and first message written in for you to change; from Sessions,
- * any. Start runs Claude Code here and opens the session's page in its place.
+ * any. Start runs Claude Code here, or Codex (Z1, board X1), and opens the
+ * session's page in its place.
  */
 export function NewSessionPage({
   task,
@@ -51,7 +62,12 @@ export function NewSessionPage({
   const start = useStartSession()
   const [folder, setFolder] = useState<string>()
   const [message, setMessage] = useState<string>()
+  const tools = useSessionTools().data
+  const [picked, setPicked] = useState<HostTool>(() =>
+    readStored(TOOL_KEY) === 'codex' ? 'codex' : 'claude'
+  )
   const [mode, setMode] = useState<SessionMode>('default')
+  const [codexMode, setCodexMode] = useState<CodexMode>('workspace')
   const [choosing, setChoosing] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string>()
@@ -80,17 +96,33 @@ export function NewSessionPage({
   const mac = remoteMac()
   const remote = Boolean(mac)
   const said = message ?? ''
+  // Claude Code or Codex, where the Mac says whether Codex can (a device
+  // starts Claude Code sessions until its app asks)
+  const tool: HostTool = tools && picked === 'codex' ? 'codex' : 'claude'
+  const by = TOOL_NAMES[tool]
+  const codexWhy =
+    tools && !tools.codex.ready
+      ? t.codexWhy[tools.codex.why ?? 'missing']
+      : undefined
   // Pacenote runs it once Sessions on this Mac lists it
-  const ready = Boolean(folder && said.trim()) && view?.on !== false
+  const ready =
+    Boolean(folder && said.trim()) &&
+    view?.on !== false &&
+    (tool !== 'codex' || Boolean(tools?.codex.ready))
+  const pick = (chosen: HostTool) => {
+    setPicked(chosen)
+    writeStored(TOOL_KEY, chosen)
+  }
   const go = async () => {
     if (!ready || !folder || starting) return
     setStarting(true)
     setError(undefined)
     const result = await start({
+      tool,
       ...(task && { task }),
       folder,
       message: said,
-      mode,
+      mode: tool === 'codex' ? codexMode : mode,
       ...(drafted?.marker && { marker: drafted.marker }),
     })
     setStarting(false)
@@ -139,7 +171,7 @@ export function NewSessionPage({
           ) : mac ? (
             t.leadOn(mac)
           ) : (
-            t.lead
+            t.lead(by)
           )}
         </p>
 
@@ -159,7 +191,31 @@ export function NewSessionPage({
 
         <dl className="mt-6 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 rounded-[14px] bg-well px-4 py-3.5 text-copy">
           <dt className="text-muted-foreground">{t.runIn}</dt>
-          <dd>{mac ? t.hereOn(mac) : t.here}</dd>
+          {tools ? (
+            <dd className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <Segmented
+                label={t.runIn}
+                value={tool}
+                onChange={pick}
+                options={[
+                  { value: 'claude', label: TOOL_NAMES.claude },
+                  {
+                    value: 'codex',
+                    label: TOOL_NAMES.codex,
+                    disabled: !tools.codex.ready && tool !== 'codex',
+                  },
+                ]}
+              />
+              <span>{mac ? t.onMac(mac) : t.hereInPacenote}</span>
+              {codexWhy && (
+                <span className="w-full text-meta text-muted-foreground">
+                  {codexWhy}
+                </span>
+              )}
+            </dd>
+          ) : (
+            <dd>{mac ? t.hereOn(mac) : t.here()}</dd>
+          )}
           <dt className="text-muted-foreground">{t.folder}</dt>
           <dd className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             {folder ? (
@@ -200,17 +256,28 @@ export function NewSessionPage({
                 }
               }}
               rows={6}
-              placeholder={t.placeholder}
+              placeholder={t.placeholder(by)}
               className="block max-h-[50vh] min-h-32 w-full resize-none bg-transparent px-4 pt-3 pb-1 font-mono text-meta leading-relaxed outline-none select-text placeholder:font-sans placeholder:text-muted-foreground [field-sizing:content]"
             />
             <div className="flex items-center gap-2 px-2.5 pb-2.5">
-              <ModePicker
-                mode={mode}
-                onPick={async (picked) => {
-                  setMode(picked)
-                  return undefined
-                }}
-              />
+              {tool === 'codex' ? (
+                <ModePicker
+                  tool="codex"
+                  mode={codexMode}
+                  onPick={async (chosen) => {
+                    setCodexMode(chosen as CodexMode)
+                    return undefined
+                  }}
+                />
+              ) : (
+                <ModePicker
+                  mode={mode}
+                  onPick={async (chosen) => {
+                    setMode(chosen as SessionMode)
+                    return undefined
+                  }}
+                />
+              )}
               <span className="flex-1" />
               {!remote && (
                 <span className="text-meta text-muted-foreground">
@@ -227,7 +294,7 @@ export function NewSessionPage({
           {/* A phone's lead says where it runs */}
           {!phone && (
             <p className="mt-2 text-meta text-muted-foreground">
-              {mac ? p.footOn(mac) : p.foot}
+              {mac ? p.footOn(mac, by) : p.foot[tool]}
             </p>
           )}
         </form>
@@ -237,7 +304,7 @@ export function NewSessionPage({
         <FolderDialog
           task={taskView}
           folders={taskView ? undefined : recentFolders(view)}
-          tool="claude"
+          tool={tool}
           open={choosing}
           action={t.useFolder}
           onClose={() => setChoosing(false)}

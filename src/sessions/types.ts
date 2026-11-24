@@ -49,8 +49,8 @@ export interface SessionRow {
   repo?: string
   /** What you typed last, newest first, a few at most */
   typed: { at?: string; text: string }[]
-  /** The task it worked on, when it is linked to one */
-  task?: { id: string; title: string }
+  /** The task it worked on, when it is linked to one; closed once it is */
+  task?: { id: string; title: string; closed?: true }
   /**
    * The open task it looks like, by the words they share, until you say
    * whether it is that task's work: id is the suggestion's
@@ -111,7 +111,7 @@ export interface MacSessions {
 export type SessionAskKind = 'command' | 'edit' | 'web' | 'plan' | 'tool'
 
 export interface SessionAsk {
-  /** Claude Code's id for the ask, to answer it */
+  /** The tool's id for the ask, to answer it */
   id: string
   kind: SessionAskKind
   /** The tool's name as Claude Code shows it: Bash, Edit, mcp__… */
@@ -120,14 +120,58 @@ export interface SessionAsk {
   what: string
   /**
    * What "allow in this session" lets it do from then on without asking,
-   * when Claude Code offers that: "pnpm vitest"
+   * when Claude Code offers that: "pnpm vitest"; for Codex, the command
    */
   rule?: string
+  /**
+   * Codex lets it go on without asking again in the session, with no rule
+   * to name: its file changes, the access it asks for
+   */
+  always?: boolean
+  /** Why it asks, in its own words: Codex says (Z3) */
+  why?: string
   at: string
 }
 
 /** How Claude Code asks before it acts, as Claude Code names the modes */
 export type SessionMode = 'default' | 'acceptEdits' | 'plan' | 'auto'
+
+/**
+ * How a Codex session asks before it acts, as Codex has them (Z4): it only
+ * reads; it works in its folder and asks before it goes outside it (or
+ * online); or it does anything without asking
+ */
+export type CodexMode = 'read-only' | 'workspace' | 'full-access'
+
+/** The tools a session Pacenote runs runs on (Z1): Claude Code or Codex */
+export type HostTool = 'claude' | 'codex'
+
+/**
+ * Whether Codex can run a session here, for the new session page (Z1):
+ * when not, why (not on this Mac, signed out, too old for sessions)
+ */
+export interface SessionTools {
+  codex: { ready: boolean; why?: 'missing' | 'signedOut' | 'old' }
+}
+
+/**
+ * How a session's work ended, for its task's Wrap up: your AI's draft of what
+ * was done and what is left, from the session's last turns (and its pull
+ * request); done, whether it reads as finished. by: the AI that wrote it.
+ */
+export type SessionWrapDraft =
+  | { done: boolean; summary: string; left: string[]; by: string }
+  | { error: string }
+
+/**
+ * Wrap up: the task closes with what was done, each thing left you kept
+ * becomes a task after it, and the session closes unless you keep it open
+ */
+export interface SessionWrapUp {
+  summary: string
+  keep: string[]
+  close: boolean
+}
 
 /** A session as Pacenote runs it, from what Claude Code tells it */
 export interface SessionLive {
@@ -135,7 +179,10 @@ export interface SessionLive {
   busy: boolean
   /** What it waits for you to answer, the first of them */
   ask?: SessionAsk
-  /** Its mode now: one of SessionMode, or another Claude Code has */
+  /**
+   * Its mode now: one of SessionMode, or another Claude Code has; a Codex
+   * session's, one of CodexMode
+   */
   mode?: string
   /** The step it is on, while on a turn */
   step?: { name: string; text: string }
@@ -153,7 +200,10 @@ export interface SessionLive {
    * each once the step it is on is done
    */
   queued?: { text: string; at: string; images?: number }[]
-  /** The model it runs on, as Claude Code names it: claude-opus-5-5 */
+  /**
+   * The model it runs on, as its tool names it: claude-opus-5-5,
+   * gpt-6-luna
+   */
   model?: string
   /**
    * How much of the model's context the conversation took at its last turn,
@@ -251,12 +301,15 @@ export interface NewSessionDraft {
 
 /** What starts a new session Pacenote runs (V5) */
 export interface NewSessionStart {
+  /** What runs it (Z1): Claude Code unless said */
+  tool?: HostTool
   /** The open task it is the work of, from Todo's Continue */
   task?: string
   folder: string
   /** Its first message */
   message: string
-  mode?: SessionMode
+  /** Claude Code's mode, or a Codex session's */
+  mode?: SessionMode | CodexMode
   /** The marker in the message, from its draft */
   marker?: string
 }

@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs'
+import { statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -100,6 +100,9 @@ import { HubPairing } from './hub-pairing.js'
 import { HubInstall } from './hub-install.js'
 import { OpencodeSessions } from './opencode-sessions.js'
 import { claudeLogSize, OpenSessions } from './open-sessions.js'
+import type { TokenUsage } from '../../../src/history/usage.js'
+import type { SessionAsk, SessionLive } from '../../../src/sessions/types.js'
+import { CodexHost } from './codex-host.js'
 import { SessionHost } from './session-host.js'
 import { text as hostText } from './session-host.text.js'
 import { hubFromLink } from '../../../src/hub/install.js'
@@ -490,6 +493,51 @@ const openSessions = new OpenSessions({
   warn: (message) => log.warn(message),
 })
 /**
+ * What a session Pacenote runs tells while out of sight, as notifications:
+ * that it asks something, that its turn is done. Clicked, its page.
+ */
+const hostNotices = (tool: 'claude' | 'codex') => {
+  const by = tool === 'claude' ? 'Claude Code' : 'Codex'
+  const notice = (session: string, title: string, body: string) => {
+    if (mainWindow.isFocused() || !Notification.isSupported()) return
+    const shown = new Notification({ title, body })
+    shown.on('click', () =>
+      mainWindow.show(`#/sessions/${encodeURIComponent(`${tool}:${session}`)}`)
+    )
+    shown.on('failed', (_event, error) =>
+      log.warn(`Could not show a notification: ${error}`)
+    )
+    shown.show()
+  }
+  return {
+    onSpent: (_session: string, usage: TokenUsage) =>
+      keepSpent(dataDir, 'session', usage),
+    onChange: (session: string) =>
+      mainWindow.send('pacenote:sessions:changed', `${tool}:${session}`),
+    onLive: (session: string, live: SessionLive) =>
+      mainWindow.send('pacenote:sessions:live', {
+        id: `${tool}:${session}`,
+        live,
+      }),
+    onAsk: (session: string, cwd: string, ask: SessionAsk) => {
+      const t = localized(hostText)
+      notice(
+        session,
+        t.asks(ask.kind, ask.tool, by),
+        t.inFolder(ask.what.split('\n')[0] ?? '', path.basename(cwd))
+      )
+    },
+    onDone: (session: string, cwd: string, did: string) => {
+      const t = localized(hostText)
+      notice(
+        session,
+        t.done(by),
+        t.inFolder(did || t.doneTurn, path.basename(cwd))
+      )
+    },
+  }
+}
+/**
  * The Claude Code sessions Pacenote runs, from their pages: each change read
  * again by the window, each ask and each turn done told as a notification
  * while out of sight
@@ -500,44 +548,22 @@ const sessionHost = new SessionHost({
   warn: (message) => log.warn(message),
   // Grown since its turn here: continued somewhere else, resumed again
   logSize: (session) => claudeLogSize(homedir(), session),
-  onSpent: (_session, usage) => keepSpent(dataDir, 'session', usage),
-  onChange: (session) =>
-    mainWindow.send('pacenote:sessions:changed', `claude:${session}`),
-  onLive: (session, live) =>
-    mainWindow.send('pacenote:sessions:live', {
-      id: `claude:${session}`,
-      live,
-    }),
-  onAsk: (session, cwd, ask) => {
-    if (mainWindow.isFocused() || !Notification.isSupported()) return
-    const t = localized(hostText)
-    const notice = new Notification({
-      title: t.asks(ask.kind, ask.tool),
-      body: t.inFolder(ask.what.split('\n')[0] ?? '', path.basename(cwd)),
-    })
-    notice.on('click', () =>
-      mainWindow.show(`#/sessions/${encodeURIComponent(`claude:${session}`)}`)
-    )
-    notice.on('failed', (_event, error) =>
-      log.warn(`Could not show a notification: ${error}`)
-    )
-    notice.show()
+  ...hostNotices('claude'),
+})
+/** The Codex sessions Pacenote runs (Z2), as Claude Code's */
+const codexHost = new CodexHost({
+  bin: () => cliBins().codex,
+  env: () => ({ ...hostEnv(process.env), PATH: toolPath() }),
+  version: app.getVersion(),
+  warn: (message) => log.warn(message),
+  logSize: (file) => {
+    try {
+      return statSync(file).size
+    } catch {
+      return undefined
+    }
   },
-  onDone: (session, cwd, did) => {
-    if (mainWindow.isFocused() || !Notification.isSupported()) return
-    const t = localized(hostText)
-    const notice = new Notification({
-      title: t.done,
-      body: t.inFolder(did || t.doneTurn, path.basename(cwd)),
-    })
-    notice.on('click', () =>
-      mainWindow.show(`#/sessions/${encodeURIComponent(`claude:${session}`)}`)
-    )
-    notice.on('failed', (_event, error) =>
-      log.warn(`Could not show a notification: ${error}`)
-    )
-    notice.show()
-  },
+  ...hostNotices('codex'),
 })
 /** You said to quit while Claude Code was on a turn in a session here */
 let quitOnTurn = false
@@ -1161,6 +1187,7 @@ function registerIpc(): void {
     sessions,
     openSessions,
     host: sessionHost,
+    codex: codexHost,
     todo,
     ...(macs &&
       macAsker && {
@@ -1392,7 +1419,7 @@ let botStopping: Promise<void> | undefined
 app.on('before-quit', (event) => {
   // Claude Code on a turn in a session Pacenote runs: you say whether to
   // stop it, unless Pacenote is told to quit (an upgrade, a stop)
-  const working = sessionHost.working()
+  const working = sessionHost.working() + codexHost.working()
   if (working > 0 && !quitOnTurn && !isQuitting && !bundleWatch?.swapping()) {
     event.preventDefault()
     const t = localized(hostText)
@@ -1414,6 +1441,7 @@ app.on('before-quit', (event) => {
   }
   isQuitting = true
   sessionHost.endAll()
+  codexHost.endAll()
   bundleWatch?.stop()
   stopTasksWatch?.()
   bundler.stop()

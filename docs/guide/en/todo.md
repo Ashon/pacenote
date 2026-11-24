@@ -39,9 +39,10 @@ progress to pick up, and the one waiting longest on someone else. A line shows o
 ## A task's buttons
 
 - **Done** and **Dismiss** are one click. Dismiss can say why: not for me, already done, not worth it.
-- **Continue here** opens a Claude Code session right here in Pacenote, in the task's repository, with the task and
-  what came before it written in, for you to start. The menu beside it opens Claude Code, Codex or opencode in your
-  terminal or their app instead.
+- **Continue here** opens a Claude Code or Codex session right here in Pacenote, in the task's repository, with the
+  task and what came before it written in, for you to start. The menu beside it opens Claude Code, Codex or opencode in
+  your terminal or their app instead. On the session's page, **Wrap up** closes the task with what was done, as your AI
+  reads it, and keeps what is left as tasks; **Close** closes the session.
 - **Draft a reply** writes a reply for you to send in the thread. Pacenote never posts it.
 - **More** has **Mark in progress** and **Waiting on someone else**. A task is in progress by itself when a session
   worked on it in the last day.
@@ -59,7 +60,7 @@ asks **Same task** or **Keep both**. Turn it off in Settings > Todo > **Fill in 
 ## Group tasks that are one piece of work
 
 Tasks that go together, such as a change, its test and its docs, can be one group: a row with its tasks under it, who
-waits and what comes first. With an AI set up, when three or more open tasks in one project look like one piece of
+waits and what comes first. Its arrow folds the group, tasks and all, and Todo keeps it folded. With an AI set up, when three or more open tasks in one project look like one piece of
 work, Todo asks above the list: **Group them** or **Not one piece**. You can also group a task yourself with More >
 **Group with…**, and take one out with More > **Move out of the group**.
 

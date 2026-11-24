@@ -1,9 +1,10 @@
 /**
- * Images you send with a message to a Claude Code session Pacenote runs:
- * pasted, dropped or picked in its composer, made small enough on the way
+ * Images you send with a message to a session Pacenote runs: pasted, dropped
+ * or picked in its composer, made small enough on the way
  * (apps/web/src/lib/session-images.ts) and checked again here before they go
- * to Claude Code as image blocks. They stay in Claude Code's own log, as
- * images pasted into Claude Code do; Pacenote keeps none of them.
+ * to Claude Code as image blocks, or to Codex as data: URLs (Z6). They stay
+ * in the tool's own log, as images pasted into it do; Pacenote keeps none of
+ * them.
  */
 
 /** The kinds Claude takes */
@@ -118,4 +119,24 @@ export function imageOfContent(
   )
     return undefined
   return `data:${source.media_type};base64,${source.data}`
+}
+
+/**
+ * An image of a message in a Codex log (input_image, as Codex keeps what was
+ * sent with a data: URL), as a data: URL for an <img>; undefined when it has
+ * no such image or keeps it some other way
+ */
+export function imageOfCodexContent(
+  content: unknown,
+  index: number
+): string | undefined {
+  if (!Array.isArray(content)) return undefined
+  const url = (content as Record<string, unknown>[]).filter(
+    (block) => block?.type === 'input_image'
+  )[index]?.image_url
+  if (typeof url !== 'string') return undefined
+  const parts = /^data:([^;,]+);base64,(.+)$/.exec(url)
+  return parts && isImageType(parts[1]) && BASE64.test(parts[2]!)
+    ? url
+    : undefined
 }

@@ -2,7 +2,14 @@ import { homedir } from 'node:os'
 import { keepSpent } from '../../../src/history/spent.js'
 import { yourFolder } from '../../../src/tasks/folders.js'
 import { allTaskViews } from '../../../src/tasks/store.js'
-import type { WorkEntry, WorkTool } from '../../../src/tasks/types.js'
+import type { SessionWrapDraft } from '../../../src/sessions/types.js'
+import { CLI_NAMES } from '../../../src/tasks/own-ai.js'
+import type {
+  SessionItem,
+  TaskView,
+  WorkEntry,
+  WorkTool,
+} from '../../../src/tasks/types.js'
 import { changeWork, readWork, workFor } from '../../../src/tasks/work.js'
 import {
   dueForJudging,
@@ -138,6 +145,30 @@ export function taskSessions(
   // (done-watch.ts), a pass at a time, while Todo is open. End-to-end tests
   // wait less (PACENOTE_TASKS_QUIET_MS).
   const QUIET = Number(process.env.PACENOTE_TASKS_QUIET_MS) || QUIET_MS
+  /**
+   * Whether a session's last turns finished its task, by your own AI: in the
+   * background (waiting while both rest), or now, as you wrap it up
+   */
+  const judgeTask = async (
+    task: TaskView,
+    items: readonly SessionItem[],
+    branch: string | undefined,
+    background: boolean
+  ) => {
+    const pr = await pullRequestOf(task.repo, branch, toolPath())
+    const ran = await ownAi.run(
+      (cli) =>
+        judge({
+          ...ownWork(cli),
+          opencode: opencodeRun(),
+          spent: (usage) => keepSpent(dataDir, 'done', usage),
+          prompt: judgePrompt(task, items, pr),
+        }),
+      refusalOf,
+      { background }
+    )
+    return { ran, pr }
+  }
   let judging: Promise<void> | undefined
   let judgedAt = 0
   const judgeSoon = (): void => {
@@ -160,24 +191,14 @@ export function taskSessions(
             : file
               ? readSessionLog(file, entry.tool)
               : []
-        const pr = await pullRequestOf(
-          task.repo,
-          entry.branch ?? sessionNow(entry).branch,
-          toolPath()
-        )
-        const ran = items.length
-          ? await ownAi.run(
-              (cli) =>
-                judge({
-                  ...ownWork(cli),
-                  opencode: opencodeRun(),
-                  spent: (usage) => keepSpent(dataDir, 'done', usage),
-                  prompt: judgePrompt(task, items, pr),
-                }),
-              refusalOf,
-              { background: true }
+        const { ran, pr } = items.length
+          ? await judgeTask(
+              task,
+              items,
+              entry.branch ?? sessionNow(entry).branch,
+              true
             )
-          : undefined
+          : { ran: undefined, pr: undefined }
         // Both at their limits: judged once one of them is back
         if (ran && 'resting' in ran) {
           log.info(
@@ -243,10 +264,30 @@ export function taskSessions(
     }
     return rows
   }
+  /**
+   * How a session's work on its task ended, now, as you wrap it up: what was
+   * done and what is left, or why your AI could not say
+   */
+  const judgeNow = async (
+    task: TaskView,
+    items: readonly SessionItem[],
+    branch: string | undefined
+  ): Promise<SessionWrapDraft> => {
+    const { ran } = await judgeTask(task, items, branch, false)
+    if ('resting' in ran) return { error: 'resting' }
+    if ('error' in ran.result) return { error: ran.result.error }
+    return {
+      done: ran.result.done,
+      summary: ran.result.summary ?? '',
+      left: ran.result.left ?? [],
+      by: CLI_NAMES[ran.by],
+    }
+  }
   return {
     linkSoon: linkSessionsSoon,
     sessionNow,
     judgeSoon,
+    judgeNow,
     working,
     /** The sessions' logs, read for linking and for the Sessions screen */
     index: sessionIndex,

@@ -19,7 +19,8 @@ const en = {
   allDone: 'all done',
   doneAll: 'Done all',
   moreForGroup: 'More for this group',
-  openGroup: 'Open this group',
+  /** The fold of its summary and tasks, by its name */
+  openGroup: "This group's tasks",
   ungroup: 'Ungroup',
   fillAgain: 'Fill again',
   continueAll: 'Continue here with all of them',
@@ -78,7 +79,7 @@ const ko: typeof en = {
   allDone: '모두 끝냄',
   doneAll: '모두 완료',
   moreForGroup: '이 묶음 더 보기',
-  openGroup: '이 묶음 열기',
+  openGroup: '이 묶음의 할 일',
   ungroup: '묶음 풀기',
   fillAgain: '다시 채우기',
   continueAll: '모두 여기서 계속',

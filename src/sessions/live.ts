@@ -220,8 +220,19 @@ export function contextOf(
   return { used, window: size }
 }
 
-/** A model as people call it: claude-opus-5-5 is Opus 5.5 */
+/**
+ * A model as people call it: claude-opus-5-5 is Opus 5.5, gpt-6-luna is
+ * GPT-6-Luna
+ */
 export function modelLabel(model: string): string {
+  if (/^gpt-/i.test(model))
+    return `GPT-${model
+      .slice(4)
+      .split('-')
+      .map((part) =>
+        /^[a-z]/.test(part) ? part[0]!.toUpperCase() + part.slice(1) : part
+      )
+      .join('-')}`
   const named = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(model)
   if (!named) return model
   const [, family, major, minor] = named

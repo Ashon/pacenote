@@ -168,6 +168,8 @@ count, and none is hidden.
 - **Continue here** on a group starts one session for all its open tasks: the session is the first one's work, and its
   first message has the group's summary and the other tasks after it, in order, each to read with `task_context` before
   starting it and to close with `close_task` once done.
+- **Folding:** a group's arrow folds the group, its summary and its tasks together, and Todo keeps it folded. A group
+  is open while one of its tasks is open.
 - **Done all** closes the group's open tasks together, with one note of what you did, which your AI writes first for you
   to change, kept with the group. Replies stay per task: draft one on each task for whoever waits.
 - To an AI tool, `task_context` on a task in a group also gives the group: its title, its summary and its other tasks
@@ -179,11 +181,12 @@ count, and none is hidden.
 
 ## Continuing a task
 
-**Continue here** opens a new Claude Code session in Pacenote, on its page under Sessions, with the task's repository on
-this Mac as its folder and the task and what came before it written in as its first message. Change the message, the
-folder or how it asks before it acts, then **Start**: Pacenote runs the installed `claude` there with your own sign-in
-(`claude -p --session-id <id> --name <the task's title>`), the session is the task's work from the start, and its page
-opens in place, to go on as for any session Pacenote runs (see [Sessions on this Mac](#sessions-on-this-mac)). It needs
+**Continue here** opens a new session in Pacenote, on its page under Sessions, with the task's repository on this Mac
+as its folder and the task and what came before it written in as its first message. Pick Claude Code or Codex (the
+last one picked stays), change the message, the folder or how it asks before it acts, then **Start**: Pacenote runs the
+installed `claude` there with your own sign-in (`claude -p --session-id <id> --name <the task's title>`), or Codex's
+`codex app-server` with your own ChatGPT sign-in, the session is the task's work from the start, and its page opens in
+place, to go on as for any session Pacenote runs (see [Sessions on this Mac](#sessions-on-this-mac)). It needs
 "Sessions on this Mac" on, which the page turns on with one button.
 
 The menu beside it, **Continue in another app**, opens the task in a tool's own session instead: Claude Code, Codex or
@@ -267,15 +270,16 @@ With "Sessions on this Mac" on, the desktop app's **Sessions** screen, below Tod
 and Codex sessions on this Mac in one place, and the sidebar counts the ones waiting for you. It is off until you turn it
 on, from the switch or from the screen's card, which says what it reads first.
 
-- **Open:** the Claude Code sessions Claude Code says are open (`claude agents --json`), and the Codex sessions that
-  wrote to their logs today (Codex keeps no list of open ones; `codex exec` runs, Pacenote's among them, and subagents
-  are left out). Each is in your area (You) whose repository it works in, else under its repository, else "Not in a
-  project". If Claude Code cannot list its sessions, its sessions that wrote today stand in for them.
+- **Open:** the Claude Code sessions Claude Code says are open (`claude agents --json`), the Codex sessions Pacenote
+  runs, and the Codex sessions that wrote to their logs today until you close them (Codex keeps no list of open ones;
+  `codex exec` runs, Pacenote's among them, and subagents are left out). Each is in your area (You) whose repository it
+  works in, else under its repository, else "Not in a project". If Claude Code cannot list its sessions, its sessions
+  that wrote today stand in for them.
 - **Where it runs:** told from the process a session runs under: the Claude app, claude.ai (`claude remote-control`),
   or the terminal or editor app it was started in. A Codex session says whether the Codex app ran it.
 - **State:** working (on a turn), your turn (stopped within the last 30 minutes), or quiet for how long. Codex sessions
   are told from when they last wrote. **Ended today** has the Claude Code sessions that wrote today and are not open
-  anymore.
+  anymore, and the sessions you closed.
 - **A row:** its title (yours, else the tool's, else what you typed first), where it runs, its state, branch and the
   task it is linked to, and what you typed last. Opened in place, it has what you typed lately, its folder and when it
   started, and the command that continues it in a terminal.
@@ -293,6 +297,12 @@ on, from the switch or from the screen's card, which says what it reads first.
   folder it ran in. Claude Code keeps the conversation in its own log, as always, so `claude --resume` picks it up
   anywhere after; Pacenote keeps nothing of it. Under the box you pick how it asks before it acts (ask before edits,
   edit without asking, plan first, or auto), and **Stop** stops the turn it is on.
+- **Codex in Pacenote:** a Codex session Pacenote started goes on on its page the same way. Pacenote runs one
+  `codex app-server` (0.163 or later, signed in) for it with your own ChatGPT sign-in, and Codex keeps the conversation
+  in its own log, so `codex resume` picks it up anywhere after. Its modes are Codex's: read only, ask outside the folder
+  (the default) or full access, a change applying from its next turn. What it asks (a command, a file change, network or
+  write access) comes with Codex's reason. Its steps read as Claude Code's do: a command as Shell, a patch as Edit. A
+  session the Codex app or a terminal runs goes on there.
 - **What it asks:** when it asks to run a command, edit a file, fetch a page or go ahead with a plan, the page shows
   what it would do, in which folder: **Allow**, **Allow … in this session** (kept for that run alone, not written to
   your settings) or **Deny**. Typing instead says no and tells it what to do. A notification says so when Pacenote is
@@ -300,17 +310,24 @@ on, from the switch or from the screen's card, which says what it reads first.
 - **Open somewhere else:** a session open in a terminal, the Claude app or claude.ai is shown as it goes, and you type
   there: two places typing into one session would tangle it. **Continue in a copy here** starts a copy of it in
   Pacenote (`--fork-session`), linked to the same task. A Codex session is shown, and you type in Codex.
-- **A new one:** **New session**, at the top of the screen, starts a Claude Code session in Pacenote in a folder you
-  choose, with a first message of yours. One for a task starts from the task's **Continue here** (see
-  [Continuing a task](#continuing-a-task)).
-- **Images with a message:** to a Claude Code session Pacenote runs, paste an image into the message box, drop one on
-  it or pick some with its image button (PNG, JPEG, GIF or WebP, up to 10 a message). Each goes at most 1568 pixels on
-  its longest side and 1 MB, made smaller on the way when it is larger (Claude looks at no more). They go to Claude
-  Code as images pasted into it do and stay in its own log; Pacenote keeps none of them. Your turn shows them, and one
-  opens larger. A phone, iPad or other Mac shows how many there were.
-- **How long it runs:** a session Pacenote runs keeps running with the window closed, until you end it (**End it
-  here**, in the page's menu) or it has had nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks
-  first.
+- **A new one:** **New session**, at the top of the screen, starts a Claude Code or Codex session in Pacenote in a
+  folder you choose, with a first message of yours. Codex is offered once it is on this Mac, signed in and new enough.
+  One for a task starts from the task's **Continue here** (see [Continuing a task](#continuing-a-task)).
+- **Images with a message:** to a session Pacenote runs, Claude Code's or Codex's, paste an image into the message box,
+  drop one on it or pick some with its image button (PNG, JPEG, GIF or WebP, up to 10 a message). Each goes at most 1568
+  pixels on its longest side and 1 MB, made smaller on the way when it is larger (Claude looks at no more). They go to
+  the tool as images pasted into it do and stay in its own log; Pacenote keeps none of them. Your turn shows them, and
+  one opens larger. A phone, iPad or other Mac shows how many there were.
+- **How long it runs:** a session Pacenote runs keeps running with the window closed, until you close it or it has had
+  nothing to do for 30 minutes. Quitting Pacenote while one is on a turn asks first.
+- **Close:** beside a session's title, for one Pacenote runs or a Codex one. Its run here ends and it moves to Ended
+  today; it opens again once it writes to its log, as when you type to it again. Its tool keeps the conversation. One
+  open in the Claude app or a terminal closes there. Pacenote keeps what you closed in `sessions-closed.json` for three
+  days.
+- **Wrap up:** beside a session's title, for one that is an open task's work. Your AI reads the session's last turns
+  (and its branch's pull request) and writes what was done and what is left, as for a task that looks done; you change
+  it, check the things left to keep as tasks after it, and the task closes with it, the session too unless you keep it
+  open.
 - **What it made:** a page, a design or a doc a Claude Code session put on claude.ai (the Artifact tool's publish, the
   Claude Docs connector's create) is a card in the conversation where it was put up last, with what it is, its version,
   how many times it was updated there and whether only you can open it; a Codex session's card is each file in its

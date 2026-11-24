@@ -338,6 +338,99 @@ describe('sessionsView: the Codex and opencode logs', () => {
     ])
   })
 
+  it('shows the ones Pacenote runs as its own, before and after Codex logs them', () => {
+    const v = view({
+      agents: [],
+      codex: [
+        {
+          tool: 'codex',
+          session: 'c-run',
+          cwd: '/w/payments',
+          name: 'Fix the retry',
+          busy: true,
+          where: 'pacenote',
+          startedAt: iso(now - MINUTE),
+        },
+      ],
+      logged: [
+        codex('c-run', { lastAt: iso(now - MINUTE), originator: 'pacenote' }),
+        // Ran here before, resting: its log tells Pacenote ran it
+        codex('c-before', { originator: 'pacenote' }),
+      ],
+    })
+    expect(
+      rows(v.open).map((r) => [r.session, r.tool, r.where, r.state])
+    ).toEqual([
+      ['c-run', 'codex', 'pacenote', 'working'],
+      ['c-before', 'codex', 'pacenote', expect.any(String)],
+    ])
+    expect(rows(v.open)[0]!.title).toBe('Fix the retry')
+  })
+
+  it('ends one you closed until it writes again, and keeps one a tool has open', () => {
+    const closedAt = iso(now - 4 * MINUTE)
+    const v = view({
+      agents: [agent({ session: 's-open', where: 'terminal' })],
+      codex: [
+        {
+          tool: 'codex',
+          session: 'c-run',
+          cwd: '/w/proj',
+          busy: false,
+          where: 'pacenote',
+          startedAt: iso(now - MINUTE),
+        },
+      ],
+      logged: [
+        // Closed, its last lines written as its run quit
+        codex('c-closed', {
+          originator: 'pacenote',
+          lastAt: iso(now - 4 * MINUTE + 5_000),
+        }),
+        codex('c-desk', { originator: 'Codex Desktop' }),
+        // Gone on with in the Codex app after you closed it
+        codex('c-again', {
+          originator: 'Codex Desktop',
+          lastAt: iso(now - MINUTE),
+        }),
+        codex('c-run', { originator: 'pacenote', lastAt: iso(now - MINUTE) }),
+      ],
+      closed: new Map([
+        ['codex:c-closed', closedAt],
+        ['codex:c-desk', iso(now - MINUTE)],
+        ['codex:c-again', closedAt],
+        ['codex:c-run', iso(now)],
+        ['claude:s-open', iso(now)],
+      ]),
+    })
+    expect(
+      rows(v.open)
+        .map((r) => r.session)
+        .sort()
+    ).toEqual(['c-again', 'c-run', 's-open'])
+    expect(v.ended.map((r) => [r.session, r.where, r.state])).toEqual([
+      ['c-closed', 'pacenote', 'ended'],
+      ['c-desk', 'codex-app', 'ended'],
+    ])
+    expect(v.counts).toMatchObject({ open: 3, ended: 2 })
+  })
+
+  it('ends a Claude Code session you closed while Claude Code could not list them', () => {
+    const v = view({
+      logged: [
+        logged({
+          session: 'l1',
+          lastAt: iso(now - MINUTE),
+          prompts: [{ text: 'Fix it' }],
+        }),
+        logged({ session: 'l2', lastAt: iso(now - MINUTE) }),
+      ],
+      closed: new Map([['claude:l1', iso(now)]]),
+    })
+    expect(rows(v.open).map((r) => r.session)).toEqual(['l2'])
+    expect(v.ended.map((r) => [r.session, r.state])).toEqual([['l1', 'ended']])
+  })
+
   it('leaves the opencode logs out altogether', () => {
     const v = view({
       agents: [],

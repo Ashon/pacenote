@@ -97,21 +97,28 @@ describe("a group's row", () => {
     return calls
   }
 
-  it('says what it is, who waits and the due, with its tasks under it', () => {
+  it('says what it is, who waits and the due; folded, its tasks are out of sight', () => {
     const calls = rowOf()
     expect(screen.getByText('Webhook retries')).toBeTruthy()
     expect(screen.getByText('3 tasks')).toBeTruthy()
     expect(screen.getByText('hyun and mina wait · none done yet')).toBeTruthy()
     expect(screen.getByText('Thursday')).toBeTruthy()
-    expect(screen.getByText('members')).toBeTruthy()
+    expect(screen.queryByText('members')).toBeNull()
+    const fold = screen.getByRole('button', {
+      name: "This group's tasks: Webhook retries",
+    })
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(fold)
+    expect(calls.onToggle).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Continue here' }))
     expect(calls.onContinue).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Done all' }))
     expect(calls.onDoneAll).toHaveBeenCalled()
   })
 
-  it('opened, shows its summary, who waits for what, what comes first, and Undo', () => {
+  it('open, shows its summary, who waits for what, what comes first, Undo and its tasks', () => {
     const calls = rowOf({ open: true })
+    expect(screen.getByText('members')).toBeTruthy()
     expect(
       screen.getByText('Webhook retries go from 3 attempts to 5, with backoff.')
     ).toBeTruthy()

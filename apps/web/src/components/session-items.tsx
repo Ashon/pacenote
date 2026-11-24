@@ -80,6 +80,8 @@ const STEP_NAMES = 4
 
 const STEP_ICONS: Record<string, LucideIcon> = {
   Bash: SquareTerminal,
+  Shell: SquareTerminal,
+  exec: SquareTerminal,
   BashOutput: SquareTerminal,
   shell: SquareTerminal,
   local_shell: SquareTerminal,

@@ -3,6 +3,8 @@ import { modelLabel } from '@src/sessions/live'
 import type {
   SessionAsk,
   SessionLive,
+  CodexMode,
+  HostTool,
   SessionMode,
   SessionPlanStep,
   SessionTalk,
@@ -66,6 +68,7 @@ import { MadeChip, type OpenMade } from './made-card'
 import { NowItem, SentItems, TalkItems } from './session-items'
 import { ShowButton, StateMark, toolWhere, whereName } from './session-open'
 import { text } from './session-page.text'
+import { SessionEnd } from './session-wrap'
 import { text as listText } from './sessions-page.text'
 import { resumeCommand } from './task-sessions'
 
@@ -298,6 +301,7 @@ export function SessionPage({ id }: { id: string }) {
             </h1>
             {/* On a phone its bar has these (More); another Mac's are
                 that Mac's */}
+            {!phone && !talk.mac && <SessionEnd talk={talk} />}
             {!phone && !talk.mac && <SessionMenu talk={talk} />}
           </header>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
@@ -350,7 +354,12 @@ export function SessionPage({ id }: { id: string }) {
           )}
           {/* Another Mac's is answered there: its state says it asks */}
           {live?.ask && !talk.mac && (
-            <AskCard id={row.id} ask={live.ask} cwd={row.cwd} />
+            <AskCard
+              id={row.id}
+              ask={live.ask}
+              cwd={row.cwd}
+              by={CLI_NAMES[row.tool]}
+            />
           )}
           {live?.error && (
             <InlineError className="mt-4" error={t.stoppedShort(live.error)} />
@@ -500,10 +509,13 @@ function AskCard({
   id,
   ask,
   cwd,
+  by,
 }: {
   id: string
   ask: SessionAsk
   cwd: string
+  /** Who asks: Claude Code or Codex */
+  by: string
 }) {
   const t = useText(text)
   const act = useSessionActions(id)
@@ -518,7 +530,7 @@ function AskCard({
       .then(setError)
       .finally(() => setBusy(false))
   }
-  const title = t.askTitle(ask.kind, ask.tool)
+  const title = t.askTitle(ask.kind, ask.tool, by)
   return (
     <section
       aria-label={title}
@@ -538,6 +550,12 @@ function AskCard({
           {ask.what}
         </pre>
       )}
+      {ask.why && (
+        <p className="text-meta select-text">
+          <span className="text-muted-foreground">{t.why} · </span>
+          {ask.why}
+        </p>
+      )}
       <p className="text-meta text-muted-foreground">
         {t.askMeta(homePath(cwd), formatRelative(ask.at))}
       </p>
@@ -545,14 +563,14 @@ function AskCard({
         <Button size="sm" disabled={busy} onClick={() => answer('allow')}>
           {plan ? t.goAhead : t.allow}
         </Button>
-        {ask.rule && (
+        {(ask.rule || ask.always) && (
           <Button
             size="sm"
             variant="outline"
             disabled={busy}
             onClick={() => answer('always')}
           >
-            {t.allowRule(ask.rule)}
+            {ask.rule ? t.allowRule(ask.rule) : t.allowAlways}
           </Button>
         )}
         <Button
@@ -586,16 +604,19 @@ function Composer({
   const l = useText(listText)
   const act = useSessionActions(talk.row.id)
   const live = talk.live
+  const tool: HostTool = talk.row.tool === 'codex' ? 'codex' : 'claude'
+  const by = CLI_NAMES[talk.row.tool]
   const box = (
     <MessageBox
       draftKey={talk.row.id}
+      tool={tool}
       placeholder={
         live?.ask
           ? t.placeholder.ask
           : live?.busy
-            ? t.placeholder.busy
+            ? t.placeholder.busy(by)
             : live
-              ? t.placeholder.idle
+              ? t.placeholder.idle(by)
               : t.placeholder.resume
       }
       // Images go with a message, not with an answer to what it asks
@@ -608,10 +629,14 @@ function Composer({
       }}
       tools={
         live?.mode && (
-          <ModePicker mode={live.mode} onPick={(mode) => act.mode(mode)} />
+          <ModePicker
+            tool={tool}
+            mode={live.mode}
+            onPick={(mode) => act.mode(mode)}
+          />
         )
       }
-      gauge={live?.context && <ContextGauge live={live} />}
+      gauge={live?.context && <ContextGauge live={live} by={by} />}
       stop={live?.busy ? () => act.stop() : undefined}
     />
   )
@@ -643,6 +668,7 @@ function MessageBox({
   autoFocus,
   sendLabel,
   draftKey,
+  tool = 'claude',
 }: {
   placeholder: string
   /** Sends it, with the images attached; what went wrong, or nothing */
@@ -658,10 +684,12 @@ function MessageBox({
   sendLabel?: string
   /** Keeps what you write while you look at another page, in memory */
   draftKey?: string
+  /** What runs it, for the line under the box */
+  tool?: HostTool
 }) {
   const t = useText(text)
   const mac = remoteMac()
-  const foot = mac ? t.footOn(mac) : t.foot
+  const foot = mac ? t.footOn(mac, CLI_NAMES[tool]) : t.foot[tool]
   // A phone keeps its screen for the talk: where it runs is in Settings
   const phone = usePhone()
   const [message, setMessageNow] = useState(
@@ -882,10 +910,10 @@ const safari =
   !/Chrome|Chromium|Edg/.test(navigator.userAgent)
 
 /**
- * How much of its model's context the conversation takes: Claude Code
- * summarizes what came before as it fills
+ * How much of its model's context the conversation takes: Claude Code or
+ * Codex summarizes what came before as it fills
  */
-function ContextGauge({ live }: { live: SessionLive }) {
+function ContextGauge({ live, by }: { live: SessionLive; by: string }) {
   const t = useText(text)
   const phone = usePhone()
   if (!live.context) return null
@@ -896,8 +924,8 @@ function ContextGauge({ live }: { live: SessionLive }) {
   const model = live.model && !phone ? modelLabel(live.model) : ''
   return (
     <span
-      title={t.contextNote(percent)}
-      aria-label={t.contextNote(percent)}
+      title={t.contextNote(percent, by)}
+      aria-label={t.contextNote(percent, by)}
       className={cn(
         'truncate text-meta text-muted-foreground tabular-nums',
         percent >= 80 && 'text-status-interrupted'
@@ -983,17 +1011,24 @@ function PlanBar({ plan }: { plan: SessionPlanStep[] }) {
   )
 }
 
-/** How it asks before it acts, changed from its next step */
+/**
+ * How it asks before it acts, changed from its next step: Claude Code's
+ * modes, or Codex's (Z4), from its next turn
+ */
 export function ModePicker({
   mode,
   onPick,
+  tool = 'claude',
 }: {
   mode: string
-  onPick: (mode: SessionMode) => Promise<string | undefined>
+  onPick: (mode: SessionMode | CodexMode) => Promise<string | undefined>
+  tool?: HostTool
 }) {
   const t = useText(text)
-  const modes = Object.keys(t.modes) as SessionMode[]
-  const label = t.modes[mode as SessionMode] ?? mode
+  const names: Record<string, string> =
+    tool === 'codex' ? t.codexModes : t.modes
+  const modes = Object.keys(names) as (SessionMode | CodexMode)[]
+  const label = names[mode] ?? mode
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1013,7 +1048,7 @@ export function ModePicker({
         {modes.map((each) => (
           <DropdownMenuItem key={each} onSelect={() => void onPick(each)}>
             <Check className={cn(each !== mode && 'invisible')} />
-            {t.modes[each]}
+            {names[each]}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -1127,7 +1162,8 @@ function SessionButtons({ talk }: { talk: SessionTalk }) {
 /**
  * The session's other buttons: where it runs, its resume command, and,
  * for one Pacenote runs, ending its run here. A device of yours has the last
- * alone: the first two are the Mac's own terminal and apps.
+ * alone: the first two are the Mac's own terminal and apps. On the Mac,
+ * Close beside it ends the run.
  */
 function SessionMenu({ talk }: { talk: SessionTalk }) {
   const t = useText(text)
@@ -1137,7 +1173,8 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
   const command = `${resumeCommand(row.tool)} ${row.session}`
   const onMac = !remoteMac()
   const show = onMac && canShow(row)
-  const running = talk.live && row.where === 'pacenote'
+  // Where Close is (session-wrap.tsx), it ends the run too
+  const running = talk.live && row.where === 'pacenote' && !act.close
   if (!onMac && !running) return null
   return (
     <DropdownMenu>

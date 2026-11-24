@@ -1,6 +1,9 @@
 import type { WorkTool } from '../tasks/types.js'
 import { MINUTE } from '../time.js'
+import { closedStill } from './closed.js'
+import { CODEX_ORIGINATOR } from './codex.js'
 import type {
+  HostTool,
   SessionAskKind,
   SessionGroup,
   SessionRow,
@@ -25,8 +28,13 @@ const TYPED = 3
 const TYPED_CHARS = 200
 const TITLE_CHARS = 80
 
-/** A Claude Code session open now, as claude agents lists it */
+/**
+ * A Claude Code session open now, as claude agents lists it; or one
+ * Pacenote runs (where pacenote), Claude Code's or Codex's
+ */
 export interface OpenAgent {
+  /** Claude Code unless said */
+  tool?: HostTool
   session: string
   cwd: string
   /** Its name in Claude Code: yours, or one it made up */
@@ -69,6 +77,8 @@ export interface SessionsInput {
   dayStart: number
   /** Claude Code's open sessions; none when it could not list them */
   agents?: OpenAgent[]
+  /** The Codex sessions Pacenote runs (codex-host.ts) */
+  codex?: OpenAgent[]
   logged: LoggedSession[]
   /** Each folder's repository, from its git folder and origin remote */
   repos: ReadonlyMap<string, { id: string; name?: string } | undefined>
@@ -86,6 +96,12 @@ export interface SessionsInput {
   >
   /** Where a session ran while it was open, for one that ended since */
   seen?: ReadonlyMap<string, { where: SessionWhere; terminal?: string }>
+  /**
+   * When you closed each session (closed.ts), by its row's id: one its log
+   * shows open goes to Ended until it writes again. One a tool has open
+   * stays open.
+   */
+  closed?: ReadonlyMap<string, string>
 }
 
 /**
@@ -208,50 +224,59 @@ export function sessionsView(
   const ended: SessionRow[] = []
   /** The sessions on a row already: a session's log may be in two files */
   const openIds = new Set<string>()
-  if (agents)
-    for (const agent of agents) {
-      if (openIds.has(`claude:${agent.session}`)) continue
-      openIds.add(`claude:${agent.session}`)
-      const logged = byId.get(`claude:${agent.session}`)
-      const last = logged?.lastAt ?? agent.startedAt
-      const quiet = last ? now - Date.parse(last) : 0
-      open.push(
-        row('claude', agent.session, {
-          cwd: agent.cwd,
-          name: agent.name,
-          startedAt: agent.startedAt,
-          where: agent.where,
-          terminal: agent.terminal,
-          // One that asks waits for you, on a turn or not
-          state: agent.asks
-            ? 'turn'
-            : agent.busy
-              ? 'working'
-              : quiet <= TURN_MS
-                ? 'turn'
-                : 'quiet',
-          asks: agent.asks,
-          background: agent.background,
-        })
-      )
-    }
+  for (const agent of [...(agents ?? []), ...(input.codex ?? [])]) {
+    const tool = agent.tool ?? 'claude'
+    if (openIds.has(`${tool}:${agent.session}`)) continue
+    openIds.add(`${tool}:${agent.session}`)
+    const logged = byId.get(`${tool}:${agent.session}`)
+    const last = logged?.lastAt ?? agent.startedAt
+    const quiet = last ? now - Date.parse(last) : 0
+    open.push(
+      row(tool, agent.session, {
+        cwd: agent.cwd,
+        name: agent.name,
+        startedAt: agent.startedAt,
+        where: agent.where,
+        terminal: agent.terminal,
+        // One that asks waits for you, on a turn or not
+        state: agent.asks
+          ? 'turn'
+          : agent.busy
+            ? 'working'
+            : quiet <= TURN_MS
+              ? 'turn'
+              : 'quiet',
+        asks: agent.asks,
+        background: agent.background,
+      })
+    )
+  }
   for (const s of input.logged) {
     const id = `${s.tool}:${s.session}`
     if (openIds.has(id) || !today(s) || s.tool === 'opencode') continue
+    // Closed by you, and not written to since: ended, wherever it ran
+    const closed = closedStill(input.closed?.get(id), s.lastAt)
     if (s.tool === 'codex') {
       if (codexRun(s)) continue
       openIds.add(id)
-      open.push(
-        row('codex', s.session, {
-          cwd: s.cwd,
-          where: s.originator === 'Codex Desktop' ? 'codex-app' : 'terminal',
-          state: stateByLog(now, s.lastAt),
-        })
-      )
+      const where =
+        // Pacenote ran it (Z2), and it continues here
+        s.originator === CODEX_ORIGINATOR
+          ? 'pacenote'
+          : s.originator === 'Codex Desktop'
+            ? 'codex-app'
+            : 'terminal'
+      const shown = row('codex', s.session, {
+        cwd: s.cwd,
+        where,
+        state: closed ? 'ended' : stateByLog(now, s.lastAt),
+      })
+      if (closed) ended.push(shown)
+      else open.push(shown)
       continue
     }
     // Claude Code could not say which are open: those that wrote today
-    if (!agents) {
+    if (!agents && !closed) {
       openIds.add(id)
       open.push(
         row('claude', s.session, {

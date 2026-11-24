@@ -66,7 +66,8 @@ const en = {
     'It runs work in the background where it is open, and moving it here would stop that work. Once it is done, you continue it here, or continue in a copy now.',
   sessionNotMoved:
     'It did not close where it is open, so it stays there for now.',
-  sessionOnlyClaude: 'Only Claude Code sessions continue here for now.',
+  sessionOnlyClaude:
+    'Pacenote continues Claude Code sessions, and the Codex sessions it started. This one continues where it runs.',
   emptyMessage: 'Type something to send first.',
   imagesRefused:
     'Those images could not go with it: PNG, JPEG, GIF or WebP, up to 10, each at most 1 MB.',
@@ -74,7 +75,10 @@ const en = {
     'Turn on Settings > Todo > Sessions on this Mac to run sessions in Pacenote.',
   notYourFolder:
     'Choose a folder of your work: Pacenote does not run sessions in a temporary one.',
-  sessionNotStarted: (why: string) => `Claude Code did not start: ${why}`,
+  sessionNotStarted: (why: string, tool = 'Claude Code') =>
+    `${tool} did not start: ${why}`,
+  codexNotReady:
+    'Codex cannot run a session on this Mac yet: it needs to be installed, signed in, and 0.163 or later.',
   otherMac: 'your other Mac',
   sessionElsewhere: (mac: string) =>
     `That session is on ${mac}. Start one here instead.`,
@@ -82,6 +86,10 @@ const en = {
   emptyReply: 'The reply is empty.',
   noSessionLog: (tool: string) =>
     `${tool} has no log of this session on this Mac.`,
+  sessionNoTask: 'This session is not the work of a task.',
+  sessionTaskClosed: 'Its task is closed already.',
+  wrapNotWritten:
+    'Your AI could not write how it ended. Write it yourself, or try again.',
   bothTokensFirst: 'Connect your Slack app with both tokens first.',
   runningElsewhere:
     'Pace is running elsewhere, such as a terminal, and takes the mentions. Stop it there, then try again.',
@@ -150,7 +158,8 @@ const ko: typeof en = {
   sessionBackgroundThere:
     '열려 있는 곳에서 백그라운드 작업이 돌고 있어서, 여기로 옮기면 그 작업이 멈춰요. 작업이 끝나면 여기서 이어 가거나, 지금 복사본으로 이어 가세요.',
   sessionNotMoved: '열려 있는 곳에서 닫히지 않아서 아직 그곳에 있어요.',
-  sessionOnlyClaude: '지금은 Claude Code 세션만 여기서 이어 갈 수 있어요.',
+  sessionOnlyClaude:
+    'Pacenote에서는 Claude Code 세션과 Pacenote가 시작한 Codex 세션만 이어 가요. 이 세션은 돌고 있는 곳에서 이어 가세요.',
   emptyMessage: '먼저 보낼 말을 입력하세요.',
   imagesRefused:
     '이 이미지는 함께 보낼 수 없어요. PNG, JPEG, GIF, WebP만, 10장까지, 장당 1MB까지 보낼 수 있어요.',
@@ -158,13 +167,20 @@ const ko: typeof en = {
     'Pacenote에서 세션을 돌리려면 설정 > 할 일 > 이 Mac의 세션을 켜세요.',
   notYourFolder:
     '작업 폴더를 선택하세요. Pacenote는 임시 폴더에서는 세션을 돌리지 않아요.',
-  sessionNotStarted: (why) => `Claude Code가 시작되지 않았어요: ${why}`,
+  sessionNotStarted: (why, tool = 'Claude Code') =>
+    `${josa(tool, '이/가')} 시작되지 않았어요: ${why}`,
+  codexNotReady:
+    '이 Mac에서는 아직 Codex로 세션을 돌릴 수 없어요. Codex가 깔려 있고, 로그인되어 있고, 0.163 이상이어야 해요.',
   otherMac: '내 다른 Mac',
   sessionElsewhere: (mac) =>
     `그 세션은 ${mac}에 있어요. 대신 여기서 새로 시작하세요.`,
   drafting: '이미 초안을 쓰고 있어요.',
   emptyReply: '답장이 비어 있어요.',
   noSessionLog: (tool) => `이 Mac에는 이 세션의 ${tool} 로그가 없어요.`,
+  sessionNoTask: '이 세션은 할 일의 작업이 아니에요.',
+  sessionTaskClosed: '이 할 일은 이미 닫혔어요.',
+  wrapNotWritten:
+    'AI가 어떻게 끝났는지 쓰지 못했어요. 직접 쓰거나 다시 시도하세요.',
   bothTokensFirst: '먼저 토큰 두 개로 Slack 앱을 연결하세요.',
   runningElsewhere:
     'Pace가 터미널 같은 다른 곳에서 실행 중이라 멘션을 그쪽에서 받고 있어요. 그곳에서 중지한 뒤 다시 시도하세요.',

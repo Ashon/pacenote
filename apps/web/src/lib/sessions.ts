@@ -1,10 +1,14 @@
 import type {
+  CodexMode,
   MacSessions,
   NewSessionDraft,
   NewSessionStart,
   SessionMode,
   SessionsView,
   SessionTalk,
+  SessionTools,
+  SessionWrapDraft,
+  SessionWrapUp,
 } from '@src/sessions/types'
 import type { SessionImage } from '@src/sessions/images'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -217,7 +221,23 @@ export function useSessionActions(id: string) {
     ) => (await after(bridge?.answer(id, ask, answer, message))).error,
     stop: async () => (await after(bridge?.stop(id))).error,
     end: async () => (await after(bridge?.end(id))).error,
-    mode: async (mode: SessionMode) =>
+    /** Closed here: ended until it writes again; none on a device */
+    close: bridge?.close
+      ? async () => (await after(bridge.close!(id))).error
+      : undefined,
+    /** How its task's work ended, as your AI drafts it */
+    wrapDraft: bridge?.wrapDraft
+      ? async (): Promise<SessionWrapDraft> => bridge.wrapDraft!(id)
+      : undefined,
+    /** Its task closed with what was done, the things left kept as tasks */
+    wrapUp: bridge?.wrapUp
+      ? async (how: SessionWrapUp) => {
+          const result = await after(bridge.wrapUp!(id, how))
+          void client.invalidateQueries({ queryKey: ['tasks'] })
+          return result.error
+        }
+      : undefined,
+    mode: async (mode: SessionMode | CodexMode) =>
       (await after(bridge?.mode(id, mode))).error,
   }
 }
@@ -262,6 +282,22 @@ export function useNewSessionDraft(task: string | undefined, group?: string) {
  * Starts a new session Pacenote runs: its page's id, or what went wrong.
  * The sessions and the task read again after.
  */
+/**
+ * Whether Codex can run a session here (Z1), for the new session page: read
+ * as it opens, and again a while later. None where the Mac does not say
+ * (a device of yours), which starts Claude Code sessions.
+ */
+export function useSessionTools() {
+  const bridge = window.pacenoteDesktop?.sessions
+  return useQuery({
+    queryKey: ['session-tools'],
+    queryFn: async (): Promise<SessionTools | null> =>
+      (await bridge?.tools?.()) ?? null,
+    enabled: Boolean(bridge?.tools),
+    staleTime: 30_000,
+  })
+}
+
 export function useStartSession() {
   const client = useQueryClient()
   return async (how: NewSessionStart) => {
