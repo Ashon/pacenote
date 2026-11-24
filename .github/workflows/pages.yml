@@ -68,5 +68,19 @@ jobs:
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
+      # A run's list can leave out an artifact for a moment after its upload, and deploy-pages looks it up once, so it
+      # fails on "No artifacts named github-pages" (actions/deploy-pages#451): wait until the list has it.
+      - name: wait for the artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 30); do
+            [ "$(gh api "$RUN/artifacts?name=github-pages" --jq .total_count)" -ge 1 ] && exit 0
+            sleep 2
+          done
+          echo "the github-pages artifact is not in the run's list after a minute" >&2
+          exit 1
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
