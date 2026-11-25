@@ -45,6 +45,7 @@ import {
 import { Markdown } from '@/components/markdown'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock } from '@/components/ui/skeleton'
 import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
@@ -575,14 +576,19 @@ function Part({ part }: { part: SaidPart }) {
       )
     case 'output':
       return (
-        <pre
-          className={cn(
-            'max-h-64 overflow-auto rounded-[10px] bg-background px-3 py-2 font-mono text-meta break-words whitespace-pre-wrap select-text',
-            part.error ? 'text-status-failed' : 'text-foreground/80'
-          )}
+        <ScrollArea
+          className="rounded-[10px] bg-background"
+          viewportClassName="max-h-64"
         >
-          {part.text}
-        </pre>
+          <pre
+            className={cn(
+              'px-3 py-2 font-mono text-meta break-words whitespace-pre-wrap select-text',
+              part.error ? 'text-status-failed' : 'text-foreground/80'
+            )}
+          >
+            {part.text}
+          </pre>
+        </ScrollArea>
       )
     default:
       return <NoteText part={part} />

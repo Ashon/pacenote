@@ -24,7 +24,11 @@ function ScrollArea({
   scrollbarClassName?: string
 }) {
   return (
+    // The scrollbar lies over the content, as the Mac's own: it shows while
+    // you scroll (or hold it) and fades a moment after you stop
     <ScrollAreaPrimitive.Root
+      type="scroll"
+      scrollHideDelay={700}
       className={cn('relative overflow-hidden', className)}
       {...props}
     >
@@ -53,7 +57,7 @@ function ScrollBar({ className }: { className?: string }) {
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       orientation="vertical"
       className={cn(
-        'flex h-full w-2.5 touch-none border-l border-l-transparent p-px transition-colors select-none',
+        'motion-scrollbar flex h-full w-2.5 touch-none border-l border-l-transparent p-px select-none',
         className
       )}
     >
@@ -65,8 +69,9 @@ function ScrollBar({ className }: { className?: string }) {
 
 /**
  * The thumb as you see it. Where the scroll area's right side meets a
- * rounded corner of the surface it is on (.content-surface), it bends round
- * that corner rather than run into it and be cut off.
+ * rounded corner, its own (a box of output with rounded corners) or the
+ * surface's it is on (.content-surface), it bends round that corner rather
+ * than run into it and be cut off.
  */
 function CornerThumb() {
   const svg = useRef<SVGSVGElement>(null)
@@ -79,7 +84,10 @@ function CornerThumb() {
     )
     const path = line.current
     if (!bar || !root || !viewport || !path) return
-    const surface = root.closest<HTMLElement>('.content-surface')
+    const surface =
+      parseFloat(getComputedStyle(root).borderTopRightRadius) > 0
+        ? root
+        : root.closest<HTMLElement>('.content-surface')
     let track: ThumbTrack = { d: '', length: 0 }
     const place = () => {
       const { dash, offset } = thumbDash(track, {

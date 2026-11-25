@@ -225,9 +225,14 @@ export function Problem({
           <summary className="cursor-pointer text-meta font-semibold text-muted-foreground hover:text-foreground">
             {t.details}
           </summary>
-          <pre className="mt-1.5 max-h-32 overflow-auto rounded-xl bg-well px-3 py-2 font-mono text-meta whitespace-pre-wrap text-muted-foreground">
-            {details}
-          </pre>
+          <ScrollArea
+            className="mt-1.5 rounded-xl bg-well"
+            viewportClassName="max-h-32"
+          >
+            <pre className="px-3 py-2 font-mono text-meta break-words whitespace-pre-wrap text-muted-foreground">
+              {details}
+            </pre>
+          </ScrollArea>
         </details>
       )}
     </div>

@@ -156,6 +156,19 @@
   }
 
   /*
+   * scrollbar: shown over the content while you scroll, it fades away a
+   * moment after you stop, as the Mac's own do. It comes in quick, as the
+   * scroll it answers, and goes slower than most things leave: nobody asked
+   * it to go, so it goes quietly.
+   */
+  .motion-scrollbar[data-state='visible'] {
+    animation: motion-fade-in var(--motion-quick) var(--ease-enter);
+  }
+  .motion-scrollbar[data-state='hidden'] {
+    animation: motion-fade-out var(--motion-slow) var(--ease-standard) forwards;
+  }
+
+  /*
    * flash: a value an AI tool changed while it was in view (a due date, a
    * title) lights up in the brand's tint, holds a moment and fades
    * (useFlash). The tint lies over the element's own background, which stays.
@@ -321,7 +334,8 @@
     .motion-dialog-overlay[data-state='open'],
     .motion-dialog[data-state='open'],
     .motion-pop:not([data-state='closed']),
-    .motion-fade[data-state='open'] {
+    .motion-fade[data-state='open'],
+    .motion-scrollbar[data-state='visible'] {
       animation: motion-fade-in calc(120ms * var(--motion-scale)) ease;
     }
     .motion-reveal[data-state='closed'],
@@ -330,7 +344,8 @@
     .motion-dialog-overlay[data-state='closed'],
     .motion-dialog[data-state='closed'],
     .motion-pop[data-state='closed'],
-    .motion-fade[data-state='closed'] {
+    .motion-fade[data-state='closed'],
+    .motion-scrollbar[data-state='hidden'] {
       animation: motion-fade-out calc(120ms * var(--motion-scale)) ease forwards;
     }
     /* A still skeleton, and what comes fades in */

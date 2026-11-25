@@ -544,14 +544,19 @@ function AskCard({
         {title}
       </p>
       {ask.what && (
-        <pre
-          className={cn(
-            'max-h-72 overflow-auto rounded-[10px] bg-background px-3 py-2 text-meta leading-relaxed whitespace-pre-wrap select-text',
-            !plan && 'font-mono'
-          )}
+        <ScrollArea
+          className="rounded-[10px] bg-background"
+          viewportClassName="max-h-72"
         >
-          {ask.what}
-        </pre>
+          <pre
+            className={cn(
+              'px-3 py-2 text-meta leading-relaxed break-words whitespace-pre-wrap select-text',
+              !plan && 'font-mono'
+            )}
+          >
+            {ask.what}
+          </pre>
+        </ScrollArea>
       )}
       {ask.why && (
         <p className="text-meta select-text">
@@ -979,36 +984,38 @@ function PlanBar({ plan }: { plan: SessionPlanStep[] }) {
         />
       </button>
       {open && (
-        <ol className="flex max-h-48 flex-col gap-1 overflow-y-auto px-3 pb-2.5">
-          {plan.map((step, index) => (
-            <li
-              key={index}
-              className={cn(
-                'flex items-start gap-2 text-meta',
-                step.state === 'done' && 'text-muted-foreground line-through',
-                step.state === 'doing' && 'font-medium'
-              )}
-            >
-              {step.state === 'done' ? (
-                <CircleCheck
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-status-succeeded"
-                />
-              ) : step.state === 'doing' ? (
-                <CircleDot
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-status-running"
-                />
-              ) : (
-                <Circle
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-                />
-              )}
-              <span className="min-w-0">{step.text}</span>
-            </li>
-          ))}
-        </ol>
+        <ScrollArea viewportClassName="max-h-48">
+          <ol className="flex flex-col gap-1 px-3 pb-2.5">
+            {plan.map((step, index) => (
+              <li
+                key={index}
+                className={cn(
+                  'flex items-start gap-2 text-meta',
+                  step.state === 'done' && 'text-muted-foreground line-through',
+                  step.state === 'doing' && 'font-medium'
+                )}
+              >
+                {step.state === 'done' ? (
+                  <CircleCheck
+                    aria-hidden="true"
+                    className="mt-0.5 size-3.5 shrink-0 text-status-succeeded"
+                  />
+                ) : step.state === 'doing' ? (
+                  <CircleDot
+                    aria-hidden="true"
+                    className="mt-0.5 size-3.5 shrink-0 text-status-running"
+                  />
+                ) : (
+                  <Circle
+                    aria-hidden="true"
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                  />
+                )}
+                <span className="min-w-0">{step.text}</span>
+              </li>
+            ))}
+          </ol>
+        </ScrollArea>
       )}
     </div>
   )

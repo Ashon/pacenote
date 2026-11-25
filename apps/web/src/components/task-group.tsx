@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { InlineError } from '@/components/ui/inline-error'
 import { motionItem } from '@/components/ui/motion'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { formatRelative } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { taskHash } from '@/lib/tasks'
@@ -494,47 +495,49 @@ export function GroupWithDialog({
           </DialogDescription>
         </div>
         <p className="text-body font-semibold">{task.title}</p>
-        <div className="flex max-h-[18rem] flex-col gap-1 overflow-y-auto">
-          {groups.map((each) => (
-            <label
-              key={each.id}
-              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-body hover:bg-accent"
-            >
-              <input
-                type="radio"
-                name={`${id}-into`}
-                checked={into === each.id}
-                onChange={() => {
-                  setPicked(new Set())
-                  setInto(each.id)
-                }}
-              />
-              <Layers aria-hidden="true" className="size-3.5 text-primary" />
-              {t.intoGroup(each.title)}
-            </label>
-          ))}
-          {tasks.map((other) => (
-            <label
-              key={other.id}
-              className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-body hover:bg-accent"
-            >
-              <input
-                type="checkbox"
-                checked={picked.has(other.id)}
-                onChange={() => toggle(other.id)}
-              />
-              <span className="min-w-0 flex-1 truncate">{other.title}</span>
-              {other.kind === 'asked' && other.askedBy && (
-                <span className="shrink-0 text-meta text-muted-foreground">
-                  {other.askedBy}
-                </span>
-              )}
-            </label>
-          ))}
-          {tasks.length === 0 && groups.length === 0 && (
-            <p className="text-body text-muted-foreground">{t.noOthers}</p>
-          )}
-        </div>
+        <ScrollArea viewportClassName="max-h-[18rem]">
+          <div className="flex flex-col gap-1">
+            {groups.map((each) => (
+              <label
+                key={each.id}
+                className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-body hover:bg-accent"
+              >
+                <input
+                  type="radio"
+                  name={`${id}-into`}
+                  checked={into === each.id}
+                  onChange={() => {
+                    setPicked(new Set())
+                    setInto(each.id)
+                  }}
+                />
+                <Layers aria-hidden="true" className="size-3.5 text-primary" />
+                {t.intoGroup(each.title)}
+              </label>
+            ))}
+            {tasks.map((other) => (
+              <label
+                key={other.id}
+                className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-body hover:bg-accent"
+              >
+                <input
+                  type="checkbox"
+                  checked={picked.has(other.id)}
+                  onChange={() => toggle(other.id)}
+                />
+                <span className="min-w-0 flex-1 truncate">{other.title}</span>
+                {other.kind === 'asked' && other.askedBy && (
+                  <span className="shrink-0 text-meta text-muted-foreground">
+                    {other.askedBy}
+                  </span>
+                )}
+              </label>
+            ))}
+            {tasks.length === 0 && groups.length === 0 && (
+              <p className="text-body text-muted-foreground">{t.noOthers}</p>
+            )}
+          </div>
+        </ScrollArea>
         <InlineError error={error} />
         <div className="flex justify-end gap-2">
           <DialogClose asChild>
