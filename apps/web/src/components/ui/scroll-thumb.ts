@@ -4,8 +4,11 @@
  * concentric with it, so the thumb at either end is not cut off by the curve.
  */
 
-/** The thumb's width as the bar draws it: w-2.5 less p-px and the border */
-export const THUMB_WIDTH = 7
+/**
+ * The thumb's width as the bar draws it: slimmer than the bar (w-2.5), which
+ * keeps its width as the strip you grab it by
+ */
+export const THUMB_WIDTH = 4
 /** Its middle line from the bar's right edge: 1px padding, half the width */
 const INSET = 1 + THUMB_WIDTH / 2
 /** Radix's smallest thumb */
