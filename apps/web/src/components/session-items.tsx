@@ -51,6 +51,7 @@ import { formatDateTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { useSessionImage } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
+import { HandedPartView, tasksHanded, Said } from './handed-task'
 import { MadeCard, type OpenMade } from './made-card'
 import { PaceAvatar } from './pace-avatar'
 import { text } from './session-items.text'
@@ -430,18 +431,17 @@ function Turn({
   const typed = parts
     .flatMap((part) => (part.kind === 'text' ? [part.text] : []))
     .join('\n\n')
+  const handed = parts.some((part) => part.kind === 'handoff')
   return (
     <Bubble
       mine
       who={r.you}
       at={item.at}
-      actions={typed && <CopyButton said={typed} />}
+      actions={
+        (typed || handed) && <CopyButton said={handed ? item.text : typed} />
+      }
     >
-      <Folded>
-        {parts.map((part, index) => (
-          <Part key={index} part={part} />
-        ))}
-      </Folded>
+      <YourWords parts={parts} tool={tool} />
       {!!item.images &&
         (session && item.ref ? (
           <TurnImages session={session} line={item.ref} count={item.images} />
@@ -540,15 +540,41 @@ function TurnImage({
   )
 }
 
+/**
+ * What you said, part by part: a task handed over as its cards, which keep
+ * it short; anything else folded once it is long
+ */
+function YourWords({ parts, tool }: { parts: SaidPart[]; tool: string }) {
+  const count = tasksHanded(parts)
+  const shown = parts.map((part, index) => (
+    <Part key={index} part={part} tool={tool} count={count} />
+  ))
+  return parts.some((part) => part.kind === 'handoff') ? (
+    shown
+  ) : (
+    <Folded>{shown}</Folded>
+  )
+}
+
 /** A part of a turn of yours */
-function Part({ part }: { part: SaidPart }) {
+function Part({
+  part,
+  tool,
+  count,
+}: {
+  part: SaidPart
+  tool: string
+  /** How many tasks the turn hands over */
+  count: number
+}) {
   switch (part.kind) {
     case 'text':
-      return (
-        <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
-          {part.text}
-        </p>
-      )
+      return <Said text={part.text} />
+    case 'handoff':
+    case 'task':
+    case 'group':
+    case 'brief':
+      return <HandedPartView part={part} tool={tool} count={count} />
     case 'command':
       return (
         <p className="flex items-center gap-1.5 font-mono text-copy select-text">
@@ -774,8 +800,11 @@ function Steps({ items, cwd }: { items: SessionItem[]; cwd: string }) {
  */
 export function SentItems({
   sent,
+  tool,
 }: {
   sent: readonly { text: string; queued: boolean; images?: number }[]
+  /** Claude Code, Codex: who a task handed over is for */
+  tool: string
 }) {
   const r = useText(rowText)
   const t = useText(text)
@@ -796,13 +825,7 @@ export function SentItems({
         )
       }
     >
-      {one.text && (
-        <Folded>
-          <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground/85 select-text">
-            {one.text}
-          </p>
-        </Folded>
-      )}
+      {one.text && <YourWords parts={saidParts(one.text)} tool={tool} />}
       {!!one.images && <ImagesChip count={one.images} />}
     </Bubble>
   ))

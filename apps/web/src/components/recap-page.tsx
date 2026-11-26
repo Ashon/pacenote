@@ -22,6 +22,7 @@ import { Fragment, useEffect, useState } from 'react'
 import type * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
+import { KeyHint, useTabKeys } from '@/components/ui/key-hint'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatHourMinute, formatRelative, formatShortDay } from '@/lib/format'
 import { useCopy } from '@/lib/clipboard'
 import { useText } from '@/lib/i18n'
+import { ariaKeys, KEYS, useShortcut } from '@/lib/shortcuts'
 import { readStored, writeStored } from '@/lib/storage'
 import {
   areaCounts,
@@ -132,6 +134,19 @@ export function RecapPage({
     writeStored(PERIOD_KEY, next)
     go(recapHash(next))
   }
+
+  // ⇧⌘[ and ⇧⌘] for the periods on either side, ⌘← and ⌘→ for the one
+  // before or after the one shown
+  const keysTo = useTabKeys(PERIODS, period, choose)
+  const before = view && recapHash(period, view.prev)
+  const after = view?.next && recapHash(period, view.next)
+  useShortcut(KEYS.periodBefore, () => before && go(before), {
+    when: Boolean(bridge && before),
+  })
+  useShortcut(KEYS.periodAfter, () => after && go(after), {
+    when: Boolean(bridge && after),
+  })
+
   const writeUp = async () => {
     if (!view) return
     const key = `${view.period}:${view.key}`
@@ -195,6 +210,7 @@ export function RecapPage({
                       className="@max-md:flex-1"
                     >
                       {t.periods[value]}
+                      <KeyHint keys={keysTo(value)} />
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -207,10 +223,13 @@ export function RecapPage({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={t.before(period)}
+                  aria-keyshortcuts={ariaKeys(KEYS.periodBefore)}
                   disabled={!view}
                   onClick={() => view && go(recapHash(period, view.prev))}
+                  className="relative"
                 >
                   <ChevronLeft />
+                  {before && <KeyHint keys={KEYS.periodBefore} />}
                 </Button>
                 <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 px-1.5 @max-md:flex-1 @max-md:flex-col @max-md:items-center @max-md:text-center">
                   <span className="text-section whitespace-nowrap">
@@ -226,10 +245,13 @@ export function RecapPage({
                   size="icon-sm"
                   variant="ghost"
                   aria-label={t.after(period)}
+                  aria-keyshortcuts={ariaKeys(KEYS.periodAfter)}
                   disabled={!view?.next}
                   onClick={() => view?.next && go(recapHash(period, view.next))}
+                  className="relative"
                 >
                   <ChevronRight />
+                  {after && <KeyHint keys={KEYS.periodAfter} />}
                 </Button>
               </div>
             </div>

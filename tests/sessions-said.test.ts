@@ -77,6 +77,35 @@ describe('saidParts: a turn of yours, as its page shows it', () => {
     ])
   })
 
+  it('reads a task only in a message Pacenote handed over', () => {
+    const tag = '<task id="t1" action="reply">\nAnswer mina\n</task>'
+    // Pasted into a turn of yours: as you wrote it
+    expect(saidParts(`Look at this:\n${tag}`)).toEqual([
+      { kind: 'text', text: `Look at this:\n${tag}` },
+    ])
+    // Cut short, it is still the task as far as it goes
+    expect(
+      saidParts(
+        'You are taking over a task from Pacenote [pacenote-task:m2].\n\n<task id="t1" action="reply">\nAnswer mina\nmina asked you · DM with mina · 2026-11-20 01:30\nWhy: Asked you by name\nand waits'
+      )
+    ).toEqual([
+      { kind: 'handoff' },
+      {
+        kind: 'task',
+        task: {
+          id: 't1',
+          action: 'reply',
+          title: 'Answer mina',
+          askedBy: 'mina',
+          where: 'DM with mina',
+          at: '2026-11-20T01:30:00.000Z',
+          why: 'Asked you by name\nand waits',
+          earlier: [],
+        },
+      },
+    ])
+  })
+
   it('keeps a tag it does not know as written', () => {
     expect(saidParts('Wrap it in <div> please')).toEqual([
       { kind: 'text', text: 'Wrap it in <div> please' },

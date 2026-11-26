@@ -1,7 +1,7 @@
 import { Search, X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useText } from '@/lib/i18n'
-import { isMac, shortcutKeyHeld } from '@/lib/platform'
+import { ariaKeys, KEYS, keysLabel, useShortcut } from '@/lib/shortcuts'
 import { text } from './search-field.text'
 
 /**
@@ -18,17 +18,10 @@ export function SearchField({
   const t = useText(text)
   const input = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'k' && shortcutKeyHeld(e)) {
-        e.preventDefault()
-        input.current?.focus()
-        input.current?.select()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  useShortcut(KEYS.search, () => {
+    input.current?.focus()
+    input.current?.select()
+  })
 
   return (
     <div className="group relative">
@@ -45,6 +38,7 @@ export function SearchField({
         }}
         placeholder={t.placeholder}
         aria-label={t.label}
+        aria-keyshortcuts={ariaKeys(KEYS.search)}
         className="h-8 w-full rounded-lg border border-sidebar-border bg-card pr-14 pl-8.5 text-body shadow-xs outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
       />
       <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
@@ -62,7 +56,7 @@ export function SearchField({
           </button>
         ) : (
           <kbd className="rounded-sm border border-sidebar-border bg-muted px-1.5 font-sans text-caption leading-[18px] text-muted-foreground group-focus-within:hidden">
-            {isMac ? '⌘K' : 'Ctrl K'}
+            {keysLabel(KEYS.search)}
           </kbd>
         )}
       </div>

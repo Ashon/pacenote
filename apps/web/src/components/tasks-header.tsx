@@ -13,12 +13,13 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { KeyHint } from '@/components/ui/key-hint'
 import { Swap } from '@/components/ui/motion'
 import { openAiSheet } from '@/lib/ai-sheet'
 import { formatTokens } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { macNamed } from '@/lib/macs'
-import { isMac } from '@/lib/platform'
+import { ariaKeys, KEYS } from '@/lib/shortcuts'
 import { useCollect } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { switchLine } from './own-ai-status'
@@ -45,11 +46,13 @@ export function NewTaskButton({
       size="sm"
       variant="outline"
       aria-pressed={pressed}
-      aria-keyshortcuts={isMac ? 'Meta+N' : 'Control+N'}
+      aria-keyshortcuts={ariaKeys(KEYS.newTask)}
       onClick={onClick}
+      className="relative"
     >
       <Plus />
       {t.newTask}
+      <KeyHint keys={KEYS.newTask} />
     </Button>
   )
 }

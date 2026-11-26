@@ -17,6 +17,7 @@ import {
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { isMac } from '@/lib/platform'
 import { LanguageProvider } from '@/lib/i18n'
 import { TaskRow } from './task-row'
 import type { Session } from './task-sessions'
@@ -175,6 +176,8 @@ function renderRow(
 }
 
 const button = (name: string) => screen.getByRole('button', { name })
+/** ⌘ held, as the tests' platform takes it (Ctrl off a Mac) */
+const COMMAND = isMac ? { metaKey: true } : { ctrlKey: true }
 /** Continue's menu: the tools' own sessions */
 const continueMenu = async () => {
   fireEvent.keyDown(button('Continue in another app'), { key: 'Enter' })
@@ -291,6 +294,22 @@ describe('an open code task in the Todo list', () => {
     fireEvent.click(within(why).getByRole('button', { name: 'Keep it' }))
     expect(screen.queryByRole('group', { name: 'Why dismiss it' })).toBeNull()
     expect(button('Done')).toBeTruthy()
+  })
+
+  it('is done or dismissed from the keyboard while it is open', () => {
+    desktop()
+    const { onDecide } = renderRow({ task: task({ action: 'code' }) }, true)
+    fireEvent.keyDown(document.body, { key: 'Enter', ...COMMAND })
+    expect(onDecide).toHaveBeenLastCalledWith({ status: 'done' })
+    fireEvent.keyDown(document.body, { key: 'Backspace', ...COMMAND })
+    expect(screen.getByRole('group', { name: 'Why dismiss it' })).toBeTruthy()
+  })
+
+  it('leaves the keys alone while it is closed', () => {
+    desktop()
+    const { onDecide } = renderRow({ task: task({ action: 'code' }) })
+    fireEvent.keyDown(document.body, { key: 'Enter', ...COMMAND })
+    expect(onDecide).not.toHaveBeenCalled()
   })
 
   it('sets its stage from its menu', async () => {

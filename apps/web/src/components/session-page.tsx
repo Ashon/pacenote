@@ -338,7 +338,7 @@ export function SessionPage({ id }: { id: string }) {
                 compact={phone}
               />
               {/* What started its turn, then the turn, then what waits */}
-              <SentItems sent={sent.filter((one) => !one.queued)} />
+              <SentItems sent={sent.filter((one) => !one.queued)} tool={tool} />
               <NowItem
                 live={live}
                 draft={draft}
@@ -347,7 +347,7 @@ export function SessionPage({ id }: { id: string }) {
                 cwd={row.cwd}
                 where={workingThere}
               />
-              <SentItems sent={sent.filter((one) => one.queued)} />
+              <SentItems sent={sent.filter((one) => one.queued)} tool={tool} />
             </ol>
           ) : (
             <p className="mt-6 text-copy text-muted-foreground">

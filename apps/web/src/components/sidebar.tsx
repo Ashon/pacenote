@@ -11,8 +11,10 @@ import {
   Shapes,
   type LucideIcon,
 } from 'lucide-react'
+import { KeyHint } from '@/components/ui/key-hint'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useSupervisor } from '@/lib/desktop'
+import { ariaKeys, KEYS, useShortcut, type Keys } from '@/lib/shortcuts'
 import { useSessionsTurn } from '@/lib/sessions'
 import { useText } from '@/lib/i18n'
 import { useTasks } from '@/lib/tasks'
@@ -89,10 +91,18 @@ export function Sidebar({
     : 0
   // Sessions waiting for you, beside Sessions
   const sessionsTurn = useSessionsTurn()
+  // ⌘1 and on for the sections as they are listed, ⌘, for Settings
+  const listed = [...ITEMS, ...(paceOff ? [] : PACE_ITEMS)]
+  const keysOf = (section: Section): Keys | undefined => {
+    if (section === 'settings') return KEYS.settings
+    const at = listed.findIndex((each) => each.section === section)
+    return at >= 0 && at < 9 ? KEYS.section(at + 1) : undefined
+  }
   const item = (props: Item) => (
     <NavItem
       key={props.section}
       {...props}
+      keys={keysOf(props.section)}
       label={t.sections[props.section]}
       count={
         props.section === 'tasks'
@@ -156,12 +166,15 @@ const hidden = (compact: boolean) => ({
 function NavItem({
   label,
   icon: Icon,
+  keys,
   count,
   current,
   compact,
   onClick,
 }: Item & {
   label: string
+  /** Its shortcut, shown while you hold ⌘ */
+  keys?: Keys
   /**
    * Shown when above zero: a tinted badge beside the label, or a solid one on
    * the icon's corner in the compact sidebar
@@ -176,48 +189,62 @@ function NavItem({
   // The label and its badge, or the badge on the icon's corner, are always
   // there and only hidden, so they can fade as the sidebar changes width.
   const iconOnly = { 'data-hidden': !compact || undefined }
+  useShortcut(keys ?? NO_KEYS, onClick, { when: Boolean(keys) })
   return (
-    <Tooltip content={name} side="right" disabled={!compact}>
-      <button
-        type="button"
-        aria-label={compact ? name : undefined}
-        aria-current={current ? 'page' : undefined}
-        onClick={onClick}
-        className={cn(
-          'relative flex h-9 items-center gap-2.5 overflow-hidden rounded-xl px-[11px] text-body whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-          current
-            ? 'bg-selected font-semibold text-foreground'
-            : 'text-muted-foreground hover:bg-selected/50 hover:text-foreground'
-        )}
-      >
-        <Icon
-          className={cn('size-[18px] shrink-0', current && 'text-primary')}
-          strokeWidth={1.75}
-        />
-        <span {...hidden(compact)} className="motion-layout-label">
-          {label}
-        </span>
-        {count > 0 && (
-          <span
-            {...hidden(compact)}
-            className="motion-layout-label ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
-          >
-            {count}
+    // The keys sit outside the button, which clips what it holds
+    <div className="relative">
+      <Tooltip content={name} side="right" disabled={!compact}>
+        <button
+          type="button"
+          aria-label={compact ? name : undefined}
+          aria-current={current ? 'page' : undefined}
+          aria-keyshortcuts={keys && ariaKeys(keys)}
+          onClick={onClick}
+          className={cn(
+            'relative flex h-9 w-full items-center gap-2.5 overflow-hidden rounded-xl px-[11px] text-body whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            current
+              ? 'bg-selected font-semibold text-foreground'
+              : 'text-muted-foreground hover:bg-selected/50 hover:text-foreground'
+          )}
+        >
+          <Icon
+            className={cn('size-[18px] shrink-0', current && 'text-primary')}
+            strokeWidth={1.75}
+          />
+          <span {...hidden(compact)} className="motion-layout-label">
+            {label}
           </span>
-        )}
-        {count > 0 && (
-          <span
-            {...iconOnly}
-            aria-hidden
-            className={cn(
-              'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-caption font-semibold text-primary-foreground tabular-nums ring-2',
-              current ? 'ring-selected' : 'ring-sidebar'
-            )}
-          >
-            {count}
-          </span>
-        )}
-      </button>
-    </Tooltip>
+          {/* The counts step aside for the keys while you hold ⌘ */}
+          {count > 0 && (
+            <span className="motion-key-aside ml-auto flex">
+              <span
+                {...hidden(compact)}
+                className="motion-layout-label flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/12 px-1.5 text-caption font-semibold text-primary tabular-nums"
+              >
+                {count}
+              </span>
+            </span>
+          )}
+          {count > 0 && (
+            <span className="motion-key-aside">
+              <span
+                {...iconOnly}
+                aria-hidden
+                className={cn(
+                  'motion-layout-label absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-caption font-semibold text-primary-foreground tabular-nums ring-2',
+                  current ? 'ring-selected' : 'ring-sidebar'
+                )}
+              >
+                {count}
+              </span>
+            </span>
+          )}
+        </button>
+      </Tooltip>
+      {keys && <KeyHint keys={keys} place={compact ? 'side' : 'end'} />}
+    </div>
   )
 }
+
+/** A section without a shortcut (Debug) still calls the hook */
+const NO_KEYS: Keys = { key: '' }

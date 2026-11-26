@@ -5,6 +5,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { KeyHint } from '@/components/ui/key-hint'
 import { Swap } from '@/components/ui/motion'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip'
@@ -12,7 +13,7 @@ import { openAiSheet } from '@/lib/ai-sheet'
 import { desktopValue, useDesktopValue } from '@/lib/desktop'
 import { sheetShape } from '@/lib/sheet-shape'
 import { useText } from '@/lib/i18n'
-import { isMac, shortcutKeyHeld } from '@/lib/platform'
+import { ariaKeys, KEYS, keysLabel, useShortcut } from '@/lib/shortcuts'
 import { useTasksPush } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { BotPage } from './components/bot-page'
@@ -30,6 +31,7 @@ import { SettingsPage } from './components/settings-page'
 import { Sidebar, type Section } from './components/sidebar'
 import { StatusBar } from './components/status-bar'
 import { TasksPage } from './components/tasks-page'
+import { WindowKeys } from './components/window-keys'
 import { YouPage } from './components/you-page'
 import { SessionPage } from './components/session-page'
 import { SessionsPage } from './components/sessions-page'
@@ -203,15 +205,8 @@ export default function App() {
   }, [startAi])
 
   // Cmd+B shows or hides the sidebar's labels, as in most macOS apps.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'b' && shortcutKeyHeld(e) && !e.shiftKey) {
-        e.preventDefault()
-        setCollapsed(!collapsed)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+  useShortcut(KEYS.sidebar, () => setCollapsed(!collapsed), {
+    when: route.page !== 'setup',
   })
 
   // Searching is for runs, so typing moves to the run list.
@@ -233,6 +228,7 @@ export default function App() {
           <SetupWizard onLeave={go} />
         ) : (
           <div className="flex h-full flex-col bg-sidebar">
+            <WindowKeys onTasks={route.page === 'tasks'} go={go} />
             {/* Three columns keep the search centered on the window; the
                 left one clears the traffic lights and holds the sidebar
                 toggle. In full screen there are none, and the toggle lines
@@ -364,7 +360,7 @@ function SidebarToggle({
   onToggle: () => void
 }) {
   const t = useText(text)
-  const key = isMac ? '⌘B' : 'Ctrl+B'
+  const key = keysLabel(KEYS.sidebar)
   const label = compact ? t.showLabels : t.hideLabels
   const Icon = compact ? PanelLeftOpen : PanelLeftClose
   return (
@@ -377,13 +373,15 @@ function SidebarToggle({
         aria-label={label}
         aria-expanded={!compact}
         aria-disabled={forced || undefined}
+        aria-keyshortcuts={forced ? undefined : ariaKeys(KEYS.sidebar)}
         onClick={forced ? undefined : onToggle}
         className={cn(
-          'grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors',
+          'relative grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors',
           forced ? 'opacity-50' : 'hover:bg-selected/50 hover:text-foreground'
         )}
       >
         <Icon className="size-[18px]" strokeWidth={1.75} />
+        {!forced && <KeyHint keys={KEYS.sidebar} />}
       </button>
     </Tooltip>
   )

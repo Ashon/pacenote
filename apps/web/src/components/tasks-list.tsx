@@ -8,6 +8,7 @@ import {
   useListMotion,
   usePresence,
 } from '@/components/ui/motion'
+import { KeyHint, useTabKeys } from '@/components/ui/key-hint'
 import { SkeletonText, SkeletonWord } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useText } from '@/lib/i18n'
@@ -36,22 +37,45 @@ export function TaskTabs({
   counts?: { open: number; waiting: number; maybe: number }
 }) {
   const t = useText(text)
+  const waiting = Boolean(counts?.waiting) || tab === 'waiting'
+  // ⇧⌘[ and ⇧⌘] for the tabs on either side, their keys on them
+  const keysTo = useTabKeys<Tab>(
+    [
+      'open',
+      ...(waiting ? ['waiting' as const] : []),
+      'maybe',
+      'done',
+      'collections',
+    ],
+    tab,
+    onTab
+  )
+  const keys = (value: Tab) => <KeyHint keys={keysTo(value)} />
   return (
     <Tabs value={tab} onValueChange={(value) => onTab(value as Tab)}>
       <TabsList className="mt-5">
         <TabsTrigger value="open">
           {t.tabOpen} {counts ? counts.open : <SkeletonWord />}
+          {keys('open')}
         </TabsTrigger>
-        {(counts?.waiting || tab === 'waiting') && (
+        {waiting && (
           <TabsTrigger value="waiting">
             {t.tabWaiting} {counts?.waiting ?? 0}
+            {keys('waiting')}
           </TabsTrigger>
         )}
         <TabsTrigger value="maybe">
           {t.tabMaybe} {counts ? counts.maybe : <SkeletonWord />}
+          {keys('maybe')}
         </TabsTrigger>
-        <TabsTrigger value="done">{t.tabDone}</TabsTrigger>
-        <TabsTrigger value="collections">{t.tabCollections}</TabsTrigger>
+        <TabsTrigger value="done">
+          {t.tabDone}
+          {keys('done')}
+        </TabsTrigger>
+        <TabsTrigger value="collections">
+          {t.tabCollections}
+          {keys('collections')}
+        </TabsTrigger>
       </TabsList>
     </Tabs>
   )

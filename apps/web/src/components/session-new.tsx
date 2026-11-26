@@ -1,6 +1,7 @@
+import { handedParts, isHanded } from '@src/sessions/handed'
 import type { CodexMode, HostTool, SessionMode } from '@src/sessions/types'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, FolderOpen, Play } from 'lucide-react'
+import { ChevronRight, FolderOpen, Pencil, Play, ScanEye } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
@@ -21,6 +22,8 @@ import {
 } from '@/lib/sessions'
 import { readStored, writeStored } from '@/lib/storage'
 import { taskDetailQuery } from '@/lib/tasks'
+import { cn } from '@/lib/utils'
+import { HandedPartView, tasksHanded, Said } from './handed-task'
 import { text } from './session-new.text'
 import { ModePicker } from './session-page'
 import { text as pageText } from './session-page.text'
@@ -62,6 +65,10 @@ export function NewSessionPage({
   const start = useStartSession()
   const [folder, setFolder] = useState<string>()
   const [message, setMessage] = useState<string>()
+  // A task's message as its cards, with a note of yours after it; or all of
+  // it as text, to change any of it
+  const [note, setNote] = useState('')
+  const [asText, setAsText] = useState(false)
   const tools = useSessionTools().data
   const [picked, setPicked] = useState<HostTool>(() =>
     readStored(TOOL_KEY) === 'codex' ? 'codex' : 'claude'
@@ -95,7 +102,16 @@ export function NewSessionPage({
 
   const mac = remoteMac()
   const remote = Boolean(mac)
-  const said = message ?? ''
+  const written = message ?? ''
+  const handed = isHanded(written)
+  const asCards = handed && !asText
+  const said =
+    asCards && note.trim() ? `${written.trimEnd()}\n\n${note.trim()}` : written
+  const asWritten = () => {
+    setMessage(said)
+    setNote('')
+    setAsText(true)
+  }
   // Claude Code or Codex, where the Mac says whether Codex can (a device
   // starts Claude Code sessions until its app asks)
   const tool: HostTool = tools && picked === 'codex' ? 'codex' : 'claude'
@@ -239,11 +255,16 @@ export function NewSessionPage({
 
         <form onSubmit={submit} className="mt-4">
           <div className="rounded-[14px] border border-input bg-background focus-within:ring-[3px] focus-within:ring-ring/40">
+            {asCards && <HandedPreview message={written} tool={by} />}
             <textarea
-              aria-label={t.message}
-              value={said}
+              aria-label={asCards ? t.note : t.message}
+              value={asCards ? note : said}
               autoFocus={!task}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) =>
+                asCards
+                  ? setNote(event.target.value)
+                  : setMessage(event.target.value)
+              }
               onKeyDown={(event) => {
                 // A long first message keeps Enter for its lines
                 if (
@@ -255,9 +276,12 @@ export function NewSessionPage({
                   void go()
                 }
               }}
-              rows={6}
-              placeholder={t.placeholder(by)}
-              className="block max-h-[50vh] min-h-32 w-full resize-none bg-transparent px-4 pt-3 pb-1 font-mono text-meta leading-relaxed outline-none select-text placeholder:font-sans placeholder:text-muted-foreground [field-sizing:content]"
+              rows={asCards ? 2 : 6}
+              placeholder={asCards ? t.notePlaceholder(by) : t.placeholder(by)}
+              className={cn(
+                'block max-h-[50vh] w-full resize-none bg-transparent px-4 pt-3 pb-1 leading-relaxed outline-none select-text placeholder:font-sans placeholder:text-muted-foreground [field-sizing:content]',
+                asCards ? 'min-h-16 text-body' : 'min-h-32 font-mono text-meta'
+              )}
             />
             <div className="flex items-center gap-2 px-2.5 pb-2.5">
               {tool === 'codex' ? (
@@ -277,6 +301,18 @@ export function NewSessionPage({
                     return undefined
                   }}
                 />
+              )}
+              {handed && (
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  className="text-muted-foreground"
+                  onClick={() => (asCards ? asWritten() : setAsText(false))}
+                >
+                  {asCards ? <Pencil /> : <ScanEye />}
+                  {asCards ? t.editAsText : t.showAsCards}
+                </Button>
               )}
               <span className="flex-1" />
               {!remote && (
@@ -316,6 +352,30 @@ export function NewSessionPage({
         />
       )}
     </ScrollArea>
+  )
+}
+
+/**
+ * A task's first message as its session's page will show it: the task's
+ * card, its group, what Pacenote asks of the AI folded, and anything you
+ * wrote in it as Markdown
+ */
+function HandedPreview({ message, tool }: { message: string; tool: string }) {
+  const parts = handedParts(message)
+  const count = tasksHanded(parts)
+  return (
+    <div
+      data-handed-preview
+      className="mx-1.5 mt-1.5 flex flex-col gap-2 rounded-[11px] bg-well px-3 py-3"
+    >
+      {parts.map((part, index) =>
+        part.kind === 'text' ? (
+          <Said key={index} text={part.text} />
+        ) : (
+          <HandedPartView key={index} part={part} tool={tool} count={count} />
+        )
+      )}
+    </div>
   )
 }
 

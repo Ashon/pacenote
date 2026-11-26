@@ -33,7 +33,7 @@ import {
   type TodoItem,
 } from '@/lib/todo-list'
 import { macNamed, useMacs } from '@/lib/macs'
-import { shortcutKeyHeld } from '@/lib/platform'
+import { clearNewTask, useNewTaskAsked } from '@/lib/new-task'
 import { readStored, writeStored } from '@/lib/storage'
 import { go } from '@/lib/utils'
 import { useYou } from '@/lib/you'
@@ -173,20 +173,14 @@ export function TasksPage({
     setHeld({ id: openId, tab: at })
   }, [openId, data, held])
 
-  // Cmd-N opens New task (on Todo, with Todo on)
+  // ⌘N opens New task, here or from another screen (WindowKeys), with Todo on
   const on = Boolean(data?.settings.on)
+  const newAsked = useNewTaskAsked()
   useEffect(() => {
-    if (!on) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== 'n' || event.shiftKey || event.altKey)
-        return
-      if (!shortcutKeyHeld(event)) return
-      event.preventDefault()
-      setAdding(true)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [on])
+    if (!newAsked || !data) return
+    clearNewTask()
+    if (on) setAdding(true)
+  }, [newAsked, data, on])
 
   if (!bridge)
     return (

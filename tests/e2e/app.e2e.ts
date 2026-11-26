@@ -3735,6 +3735,17 @@ else fail('unexpected: ' + args.join(' '))
     expect(await page.locator('[data-folder]').textContent()).toMatch(
       /payments$/
     )
+    // The task's message as its card, as its session's page will show it
+    const card = page.locator('[data-handed-preview] [data-handed-task]')
+    await card
+      .getByRole('link', { name: 'Fix the flaky webhook retry test' })
+      .waitFor()
+    await card.getByText('Ashon/payments').waitFor()
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-new.png'),
+    })
+    // As text, all of it to change
+    await page.getByRole('button', { name: 'Edit as text' }).click()
     const first = page.getByRole('textbox', { name: 'First message' })
     const prompt = await first.inputValue()
     expect(prompt).toMatch(/\[pacenote-task:[0-9a-f-]{36}\]/)
@@ -3742,15 +3753,15 @@ else fail('unexpected: ' + args.join(' '))
       `<task id="${fix.id}" action="code" repo="Ashon/payments">`
     )
     expect(prompt).toContain(`close_task with id ${fix.id}`)
-    await page.screenshot({
-      path: path.join(REPO, 'test-results/session-new.png'),
-    })
+    await page.getByRole('button', { name: 'Show as cards' }).click()
     // It plans first, and you add a line of your own
     await page
       .getByRole('button', { name: /^How it asks before it acts/ })
       .click()
     await page.getByRole('menuitem', { name: 'Plan first' }).click()
-    await first.fill(`${prompt}\n\nStart with the retry test.`)
+    await page
+      .getByRole('textbox', { name: 'Your note' })
+      .fill('Start with **the retry test**.')
     await page.getByRole('button', { name: 'Start', exact: true }).click()
 
     // Its page in its place: Claude Code runs it here, the task's work
@@ -3765,12 +3776,21 @@ else fail('unexpected: ' + args.join(' '))
     await page
       .getByRole('heading', { name: 'Fix the flaky webhook retry test' })
       .waitFor()
+    // The task's own link over the page, and its card in your first turn
     await page
       .getByRole('link', {
         name: 'Fix the flaky webhook retry test',
         exact: true,
       })
+      .first()
       .waitFor()
+    await page
+      .locator('[data-handed-task]')
+      .getByRole('link', { name: 'Fix the flaky webhook retry test' })
+      .first()
+      .waitFor()
+    await page.getByText('the retry test', { exact: true }).first().waitFor()
+    expect(await page.getByText(/<task id=/).count()).toBe(0)
     await page.getByRole('textbox', { name: 'Message' }).waitFor()
     await page.screenshot({
       path: path.join(REPO, 'test-results/session-new-started.png'),
@@ -4833,10 +4853,17 @@ else fail('unexpected: ' + args.join(' '))
     await page
       .getByRole('heading', { name: 'Raise the webhook retry limit to 5' })
       .waitFor({ timeout: 30_000 })
+    // The group's cards: its name, then its tasks in order
+    const preview = page.locator('[data-handed-preview]')
+    await preview
+      .getByText('Webhook retry limit to 5', { exact: true })
+      .waitFor()
+    expect(await preview.locator('[data-handed-task]').count()).toBe(3)
+    await page.screenshot({
+      path: path.join(REPO, 'test-results/session-new-group.png'),
+    })
+    await page.getByRole('button', { name: 'Edit as text' }).click()
     const first = page.getByRole('textbox', { name: 'First message' })
-    await eventually('the group written in', async () =>
-      (await first.inputValue()).includes('as one piece of work')
-    )
     const prompt = await first.inputValue()
     expect(prompt).toContain(`<task id="${limit.id}" action="code"`)
     expect(prompt).toContain(
@@ -4845,9 +4872,6 @@ else fail('unexpected: ' + args.join(' '))
     expect(prompt.indexOf(`<task id="${review.id}"`)).toBeLessThan(
       prompt.indexOf(`<task id="${runbook.id}"`)
     )
-    await page.screenshot({
-      path: path.join(REPO, 'test-results/session-new-group.png'),
-    })
     await page.evaluate("window.location.hash = '#/tasks'")
 
     // Done all: one note of what you did, written first by your AI, and the

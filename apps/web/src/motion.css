@@ -169,6 +169,34 @@
   }
 
   /*
+   * key hint: a shortcut's keys on its control while you hold ⌘ (KeyHint,
+   * lib/shortcuts). They pop in place as the tooltip does, quickly, and go at
+   * once when ⌘ is let go or a key is pressed; what they cover (a count)
+   * steps aside meanwhile (motion-key-aside).
+   */
+  .motion-key-hint {
+    opacity: 0;
+    scale: 0.9;
+    transition:
+      opacity var(--motion-quick) var(--ease-exit),
+      scale var(--motion-quick) var(--ease-exit);
+  }
+  :root[data-keys] .motion-key-hint {
+    opacity: 1;
+    scale: 1;
+    transition:
+      opacity var(--motion-base) var(--ease-enter),
+      scale var(--motion-base) var(--ease-enter);
+  }
+  .motion-key-aside {
+    transition: opacity var(--motion-base) var(--ease-enter);
+  }
+  :root[data-keys] .motion-key-aside {
+    opacity: 0;
+    transition: opacity var(--motion-quick) var(--ease-exit);
+  }
+
+  /*
    * flash: a value an AI tool changed while it was in view (a due date, a
    * title) lights up in the brand's tint, holds a moment and fades
    * (useFlash). The tint lies over the element's own background, which stays.
@@ -381,7 +409,15 @@
       transition: none;
     }
     .motion-layout-label,
-    .motion-layout-label[data-hidden] {
+    .motion-layout-label[data-hidden],
+    .motion-key-aside,
+    :root[data-keys] .motion-key-aside {
+      transition: opacity calc(120ms * var(--motion-scale)) ease;
+    }
+    /* The keys fade in place, at their size */
+    .motion-key-hint,
+    :root[data-keys] .motion-key-hint {
+      scale: 1;
       transition: opacity calc(120ms * var(--motion-scale)) ease;
     }
     /* The theme: still at once, and a short fade */

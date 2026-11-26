@@ -307,6 +307,7 @@ export function TaskRow({
           </div>
           <TaskActions
             task={task}
+            open={open}
             state={state}
             opensIn={opensIn}
             drafting={drafting}

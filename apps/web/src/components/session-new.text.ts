@@ -31,6 +31,12 @@ const en = {
   useFolder: 'Use this folder',
   message: 'First message',
   placeholder: (by = 'Claude Code') => `What should ${by} do first?`,
+  /** A note of yours after the task's message, shown as its cards */
+  note: 'Your note',
+  notePlaceholder: (by = 'Claude Code') =>
+    `Anything to add for ${by}? Markdown works.`,
+  editAsText: 'Edit as text',
+  showAsCards: 'Show as cards',
   start: 'Start',
   keys: '⌘↩ starts it',
   notOpen: 'This task is not open anymore.',
@@ -65,6 +71,11 @@ const ko: typeof en = {
   message: '첫 메시지',
   placeholder: (by = 'Claude Code') =>
     `${josa(by, '이/가')} 먼저 할 일을 적으세요`,
+  note: '내 메모',
+  notePlaceholder: (by = 'Claude Code') =>
+    `${by}에게 덧붙일 말이 있나요? 마크다운을 쓸 수 있어요.`,
+  editAsText: '텍스트로 편집',
+  showAsCards: '카드로 보기',
   start: '시작',
   keys: '⌘↩로 시작',
   notOpen: '이 할 일은 이제 열려 있지 않아요.',

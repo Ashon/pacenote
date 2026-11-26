@@ -2,14 +2,19 @@
  * A turn of yours in a Claude Code session, as its page shows it. Claude Code
  * writes more than what you typed into it: a slash command and what it
  * printed, a shell command run with "!" and its output, a background task's
- * notice, the file open in your editor, and its own reminders to the model.
- * Here those become parts the page shows each in its own way; the reminders
- * are left out. Pure, so it is tested without a session.
+ * notice, the file open in your editor, and its own reminders to the model;
+ * Pacenote writes a task it hands over. Here those become parts the page
+ * shows each in its own way; the reminders are left out. Pure, so it is
+ * tested without a session.
  */
+
+import { handedParts, isHanded, type HandedPart } from './handed.js'
 
 export type SaidPart =
   /** What you typed */
   | { kind: 'text'; text: string }
+  /** A task Pacenote handed over: its card, its group, its brief (handed.ts) */
+  | Exclude<HandedPart, { kind: 'text' }>
   /** A slash command: "/review", with what you typed after it */
   | { kind: 'command'; name: string; args?: string }
   /** A command you ran in its shell with "!" */
@@ -45,10 +50,12 @@ export function saidParts(text: string): SaidPart[] {
   const said = text.replace(REMINDER, '').trim()
   if (STOPPED.test(said)) return [{ kind: 'stopped' }]
   const parts: SaidPart[] = []
+  const handed = isHanded(said)
   const typed = (piece: string) => {
     const trimmed = piece.trim()
     if (!trimmed) return
-    if (STOPPED.test(trimmed)) parts.push({ kind: 'stopped' })
+    if (handed) parts.push(...handedParts(trimmed))
+    else if (STOPPED.test(trimmed)) parts.push({ kind: 'stopped' })
     else parts.push({ kind: 'text', text: trimmed })
   }
   let from = 0

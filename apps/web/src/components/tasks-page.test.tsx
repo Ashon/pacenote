@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { isMac } from '@/lib/platform'
 import { renderScreen, stubDesktop, unstubDesktop } from '@/testing'
 import { TasksPage } from './tasks-page'
 
@@ -126,8 +127,9 @@ describe('Todo', () => {
     await row('Task a')
     expect(listed()).toEqual(['Task a', 'Task b'])
     expect(screen.getByText(/^2 open · collected/)).toBeTruthy()
-    expect(tab(/^Open/).textContent).toBe('Open 2')
-    expect(tab(/^Maybe/).textContent).toBe('Maybe 1')
+    // By their names: the keys shown on them while ⌘ is held are not read
+    expect(tab(/^Open/)).toBe(screen.getByRole('tab', { name: 'Open 2' }))
+    expect(tab(/^Maybe/)).toBe(screen.getByRole('tab', { name: 'Maybe 1' }))
     // Waiting shows once a task waits on someone
     expect(screen.queryByRole('tab', { name: /^Waiting/ })).toBeNull()
   })
@@ -140,6 +142,29 @@ describe('Todo', () => {
     await row('Task maybe')
     expect(listed()).toEqual(['Task maybe'])
     expect(screen.getByText(/^Guesses Pace is not sure about/)).toBeTruthy()
+  })
+
+  it('moves to the tab on either side with ⇧⌘[ and ⇧⌘]', async () => {
+    todoWith(todo([task('a'), task('maybe', { status: 'maybe' })]))
+    await row('Task a')
+    const shifted = {
+      ...(isMac ? { metaKey: true } : { ctrlKey: true }),
+      shiftKey: true,
+    }
+    fireEvent.keyDown(document.body, {
+      key: '}',
+      code: 'BracketRight',
+      ...shifted,
+    })
+    await row('Task maybe')
+    expect(tab(/^Maybe/).getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(document.body, {
+      key: '{',
+      code: 'BracketLeft',
+      ...shifted,
+    })
+    await row('Task a')
+    expect(tab(/^Open/).getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps a task that comes in while you look behind a notice', async () => {

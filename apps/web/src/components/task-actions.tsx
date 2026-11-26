@@ -17,6 +17,7 @@ import {
   Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { KeyHint } from '@/components/ui/key-hint'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useText } from '@/lib/i18n'
+import { ariaKeys, KEYS, useShortcut, type Keys } from '@/lib/shortcuts'
 import { PacenoteMonoMark } from './logo'
 import { OpenButton } from './session-open'
 import { ToolMark } from './tool-mark'
@@ -66,6 +68,7 @@ function stepIcon(step: RowStep) {
 
 export function TaskActions({
   task,
+  open = false,
   state,
   opensIn,
   drafting,
@@ -78,6 +81,8 @@ export function TaskActions({
   onStep,
 }: {
   task: TaskView
+  /** The task is open in its row: its buttons take ⌘↩ and ⌘⌫ */
+  open?: boolean
   state: TaskRowState
   /** Where each tool's new sessions open: its desktop app, or a terminal */
   opensIn?: Record<WorkTool, 'app' | 'terminal'>
@@ -97,9 +102,32 @@ export function TaskActions({
   onStep: (step: RowStep) => void
 }) {
   const t = useText(text)
+  // The open task's own buttons, from the keyboard: Done (Keep as a task in
+  // Maybe) and Dismiss
+  const decides = open && (state.decide === 'open' || state.decide === 'maybe')
+  useShortcut(
+    KEYS.taskDone,
+    () => onDecide({ status: state.decide === 'maybe' ? 'kept' : 'done' }),
+    { when: decides }
+  )
+  useShortcut(KEYS.taskDismiss, onDismiss, { when: decides })
+  /** What a button these keys press carries: their name, and their hint */
+  const keyed = (keys: Keys) =>
+    decides
+      ? { aria: ariaKeys(keys), hint: <KeyHint keys={keys} /> }
+      : { aria: undefined, hint: null }
+  const doneKeys = keyed(KEYS.taskDone)
+  const dismissKeys = keyed(KEYS.taskDismiss)
   const dismiss = (
-    <Button size="sm" variant="secondary" onClick={onDismiss}>
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={onDismiss}
+      aria-keyshortcuts={dismissKeys.aria}
+      className="relative"
+    >
       {t.dismiss}
+      {dismissKeys.hint}
     </Button>
   )
   const menuItem = (step: RowStep) => (
@@ -207,9 +235,15 @@ export function TaskActions({
       <span className="flex items-center gap-1.5 empty:hidden">
         {state.decide === 'open' && (
           <>
-            <Button size="sm" onClick={() => onDecide({ status: 'done' })}>
+            <Button
+              size="sm"
+              onClick={() => onDecide({ status: 'done' })}
+              aria-keyshortcuts={doneKeys.aria}
+              className="relative"
+            >
               <CircleCheck />
               {t.done}
+              {doneKeys.hint}
             </Button>
             {dismiss}
             <DropdownMenu>
@@ -237,8 +271,14 @@ export function TaskActions({
         )}
         {state.decide === 'maybe' && (
           <>
-            <Button size="sm" onClick={() => onDecide({ status: 'kept' })}>
+            <Button
+              size="sm"
+              onClick={() => onDecide({ status: 'kept' })}
+              aria-keyshortcuts={doneKeys.aria}
+              className="relative"
+            >
               {t.keepAsTask}
+              {doneKeys.hint}
             </Button>
             {dismiss}
           </>

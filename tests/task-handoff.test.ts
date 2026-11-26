@@ -53,6 +53,7 @@ import {
   repoFolder,
   saveRepo,
 } from '../src/tasks/folders.js'
+import { saidParts } from '../src/sessions/said.js'
 import { writeTools } from '../src/tasks/sources.js'
 import type { TaskContext, TaskView } from '../src/tasks/types.js'
 
@@ -304,6 +305,109 @@ describe('the handoff', () => {
         group: { title: 'Webhook retries', others: [] },
       })
     ).toContain('close_task with id C1:1791871374.047569')
+  })
+
+  it("reads back as the session's page draws it: cards, the group, the brief", () => {
+    const other: TaskView = {
+      ...task,
+      id: 'local:test1',
+      title: 'Add a backoff test for webhook retries',
+      kind: 'promised',
+      askedBy: undefined,
+      due: undefined,
+      summary: undefined,
+      reason: 'left after the limit',
+    }
+    const prompt = handoffPrompt(task, context, {
+      marker: 'm1',
+      planFirst: true,
+      tool: 'claude',
+      group: {
+        title: 'Webhook retries',
+        summary: 'Retries go from 3 attempts to 5.',
+        others: [other],
+      },
+    })
+    // What you add after it, on the New session page
+    const parts = saidParts(`${prompt}\n\nLook at **the tests** first.`)
+    expect(parts.map((part) => part.kind)).toEqual([
+      'handoff',
+      'task',
+      'group',
+      'task',
+      'brief',
+      'text',
+    ])
+    expect(parts[1]).toEqual({
+      kind: 'task',
+      task: {
+        id: task.id,
+        action: 'code',
+        repo: 'Ashon/payments',
+        title: 'Review the payment retry PR',
+        askedBy: 'mina',
+        where: '#payments',
+        at: '2026-10-13T10:00:00.000Z',
+        due: 'Thursday',
+        summary: expect.stringContaining('mina wants a review of PR #482'),
+        earlier: [
+          {
+            kind: 'pace',
+            text: '"any retry timeouts?" (2026-10-09).',
+          },
+          {
+            kind: 'task',
+            text: expect.stringContaining(
+              'Review the retry config change (mina, 2026-10-06)'
+            ),
+          },
+        ],
+        link: LINK,
+      },
+    })
+    expect(parts[2]).toEqual({
+      kind: 'group',
+      title: 'Webhook retries',
+      others: 1,
+      summary: 'Retries go from 3 attempts to 5.',
+    })
+    expect(parts[3]).toMatchObject({
+      task: {
+        id: 'local:test1',
+        promised: true,
+        where: '#payments',
+        why: 'left after the limit',
+      },
+    })
+    expect(parts[4]).toMatchObject({
+      lines: [
+        expect.stringContaining("Call Pacenote's task_context"),
+        expect.stringContaining('Start by summing up'),
+        expect.stringContaining('Do not post to Slack'),
+        expect.stringContaining("call Pacenote's close_task with its id"),
+        'Talk to the user in English, the language they read Pacenote in.',
+      ],
+    })
+    expect(parts[5]).toEqual({
+      kind: 'text',
+      text: 'Look at **the tests** first.',
+    })
+    // A link's brief one: what came before it is left for task_context
+    const brief = saidParts(
+      handoffPrompt(task, context, {
+        marker: 'm1',
+        planFirst: false,
+        tool: 'codex',
+        brief: true,
+      })
+    )
+    expect(brief.map((part) => part.kind)).toEqual(['handoff', 'task', 'brief'])
+    expect(brief.at(-1)).toMatchObject({
+      lines: expect.arrayContaining([
+        expect.stringContaining('What came before it is left out here'),
+        expect.stringContaining('Go ahead with the task'),
+      ]),
+    })
   })
 
   it('keeps what Slack wrote off the command line', () => {

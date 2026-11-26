@@ -22,6 +22,7 @@ import { Page } from '@/components/page'
 import { Line } from '@/components/task-line'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
+import { KeyHint, useTabKeys } from '@/components/ui/key-hint'
 import {
   SkeletonBlock,
   SkeletonText,
@@ -32,6 +33,7 @@ import { remoteMac } from '@/lib/desktop'
 import { formatDateTime, formatRelative, homePath } from '@/lib/format'
 import { useLocale, useText } from '@/lib/i18n'
 import { usePhone } from '@/lib/phone'
+import { ariaKeys, KEYS } from '@/lib/shortcuts'
 import { canOpen, otherView } from '@/lib/session-rows'
 import {
   useOtherSessions,
@@ -152,6 +154,13 @@ function SessionsOn({ view }: { view: SessionsView }) {
       )
     ),
   ]
+  // ⇧⌘[ and ⇧⌘] between the tabs, their keys on them
+  const endedTab = view.listed || shown.some((other) => other.view.listed)
+  const keysTo = useTabKeys<typeof tab>(
+    endedTab ? ['open', 'ended'] : ['open'],
+    tab,
+    setTab
+  )
   return (
     <Page
       title={t.title}
@@ -165,10 +174,14 @@ function SessionsOn({ view }: { view: SessionsView }) {
       ].join(' · ')}
       action={
         !phone && (
-          <Button size="sm" variant="outline" asChild>
-            <a href="#/sessions/new">
+          <Button size="sm" variant="outline" className="relative" asChild>
+            <a
+              href="#/sessions/new"
+              aria-keyshortcuts={ariaKeys(KEYS.newSession)}
+            >
               <Plus />
               {t.newSession}
+              <KeyHint keys={KEYS.newSession} />
             </a>
           </Button>
         )
@@ -184,10 +197,12 @@ function SessionsOn({ view }: { view: SessionsView }) {
         <TabsList className="mt-5 @max-md:w-full">
           <TabsTrigger value="open" className="@max-md:flex-1">
             {t.tabOpen} {total('open')}
+            <KeyHint keys={keysTo('open')} />
           </TabsTrigger>
-          {(view.listed || shown.some((other) => other.view.listed)) && (
+          {endedTab && (
             <TabsTrigger value="ended" className="@max-md:flex-1">
               {t.tabEnded} {total('ended')}
+              <KeyHint keys={keysTo('ended')} />
             </TabsTrigger>
           )}
         </TabsList>
