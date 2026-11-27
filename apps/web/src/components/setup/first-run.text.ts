@@ -47,7 +47,7 @@ const en = {
     `${cli} has no Slack connector yet, so this look is from this Mac alone. Connect Slack in ${where} when you like; Collect now on Todo reads it from then on.`,
   projects: 'Your projects',
   projectsHow:
-    'What your work keeps together: repositories, channels and groups. Fix them later on You.',
+    'What your work keeps together: repositories, channels and groups. Fix them later on Areas.',
   noProjects: 'None yet: they come as Pacenote sees you work.',
   tryAgain: 'Try again',
   openTodo: 'Open Todo',
@@ -98,7 +98,7 @@ const ko: typeof en = {
     `${josa(cli, '은/는')} 아직 Slack 커넥터가 없어서 이번에는 이 Mac만 봤어요. 원할 때 ${where}에서 Slack을 연결하면, 그때부터 할 일 화면의 지금 모으기가 함께 읽어요.`,
   projects: '내 프로젝트',
   projectsHow:
-    '일이 함께 묶이는 곳이에요. 저장소, 채널, 그룹이요. 나중에 나에서 고칠 수 있어요.',
+    '일이 함께 묶이는 곳이에요. 저장소, 채널, 그룹이요. 나중에 영역에서 고칠 수 있어요.',
   noProjects: '아직 없어요. 일하는 모습을 보며 생겨요.',
   tryAgain: '다시 시도',
   openTodo: '할 일 열기',
