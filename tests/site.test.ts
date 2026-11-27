@@ -97,6 +97,7 @@ const SITE = build('site', {
   'v0.6.50': '2026-11-26T12:00:00Z',
   'v0.6.51': '2026-11-27T03:00:00Z',
   'v0.6.52': '2026-11-27T13:00:00Z',
+  'v0.7.0': '2026-11-28T03:00:00Z',
 })
 
 const read = (page: string, site = SITE) =>
@@ -411,18 +412,19 @@ describe('the news', () => {
     // The latest post leads in a card of its own, and the list has the rest
     for (const dir of ['', 'ko/'])
       expect(read(`${dir}news/`)).toContain(
-        '<a class="news-featured" href="macs-without-slack/" data-kind="post">'
+        '<a class="news-featured" href="sessions-in-pacenote/" data-kind="post">'
       )
     expect(rows('news/').slice(0, 4)).toEqual([
+      'release v0.7.0/',
       'release v0.6.52/',
       'release v0.6.51/',
       'release v0.6.50/',
-      'release v0.6.49/',
     ])
-    expect(rows('news/')).not.toContain('post macs-without-slack/')
+    expect(rows('news/')).not.toContain('post sessions-in-pacenote/')
     // Notes in Korean from v0.6.11; the list keeps the newest thirty, all
     // Korean now, so no English page before them is in it, marked as such
     expect(rows('ko/news/')).toEqual([
+      'release v0.7.0/',
       'release v0.6.52/',
       'release v0.6.51/',
       'release v0.6.50/',
@@ -452,14 +454,14 @@ describe('the news', () => {
       'release v0.6.26/',
       'release v0.6.25/',
       'release v0.6.24/',
-      'release v0.6.23/',
     ])
     expect(EVERY).toContain('ko/news/v0.6.11/')
-    expect(EVERY).toContain('ko/news/v0.6.52/')
+    expect(EVERY).toContain('ko/news/v0.7.0/')
+    expect(EVERY).toContain('ko/news/sessions-in-pacenote/')
     expect(read('ko/news/')).not.toContain('class="badge badge-lang"')
     expect(EVERY).not.toContain('ko/news/v0.6.10/')
     // A version not released has no notes yet
-    expect(EVERY).not.toContain('news/v0.6.53/')
+    expect(EVERY).not.toContain('news/v0.7.1/')
   })
 
   it('shows the latest news beside a news page, marking the one open', () => {
@@ -471,19 +473,19 @@ describe('the news', () => {
       ].map(([, href, current]) => `${href}${current ? ' *' : ''}`)
     // The newest eight, the one open among them
     const rail = [
+      '../sessions-in-pacenote/',
+      '../v0.7.0/',
       '../v0.6.52/',
       '../v0.6.51/',
       '../v0.6.50/',
       '../v0.6.49/',
       '../v0.6.48/',
-      '../v0.6.47/',
-      '../v0.6.46/',
       './ *',
     ]
-    expect(recent('news/v0.6.45/').slice(0, 8)).toEqual(rail)
+    expect(recent('news/v0.6.47/').slice(0, 8)).toEqual(rail)
     // The Korean rail, its latest eight as the English one (the Korean list
     // above has the English notes too)
-    expect(recent('ko/news/v0.6.45/')).toEqual(rail)
+    expect(recent('ko/news/v0.6.47/')).toEqual(rail)
   })
 
   it("points the home page's link at the latest news", () => {
@@ -493,9 +495,15 @@ describe('the news', () => {
           /<a class="release" id="release-link" href="([^"]+)">([^<]+)<\/a>/
         )!
         .slice(1)
-    // The latest news: v0.6.52's notes, newer than the last feature post
-    expect(link('')).toEqual(['news/v0.6.52/', "What's new in v0.6.52"])
-    expect(link('ko/')).toEqual(['news/v0.6.52/', 'v0.6.52에서 달라진 점'])
+    // The latest news: the post that comes with v0.7.0, before its notes
+    expect(link('')).toEqual([
+      'news/sessions-in-pacenote/',
+      'New: Your sessions, in Pacenote',
+    ])
+    expect(link('ko/')).toEqual([
+      'news/sessions-in-pacenote/',
+      '새 소식: 내 세션을 Pacenote 안에서',
+    ])
   })
 
   it('keeps a feature post back until the version it comes with is out', () => {
@@ -517,12 +525,18 @@ describe('the news', () => {
       expect(feed).toContain(
         `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="${lang}">`
       )
-      // The newest twenty: v0.6.33 is the oldest left; v0.6.32, v0.6.31,
-      // v0.6.30, v0.6.29, v0.6.28, v0.6.27, v0.6.26, v0.6.25, v0.6.24,
-      // v0.6.23, v0.6.22, v0.6.21, v0.6.20, v0.6.19, v0.6.18, v0.6.17,
-      // v0.6.16, v0.6.15, v0.6.14, macs-without-slack (out with v0.6.13)
-      // and what came before are gone
-      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.33/</id>`)
+      // The newest twenty, sessions-in-pacenote with v0.7.0 first: v0.6.35
+      // is the oldest left; v0.6.34, v0.6.33, v0.6.32, v0.6.31, v0.6.30,
+      // v0.6.29, v0.6.28, v0.6.27, v0.6.26, v0.6.25, v0.6.24, v0.6.23,
+      // v0.6.22, v0.6.21, v0.6.20, v0.6.19, v0.6.18, v0.6.17, v0.6.16,
+      // v0.6.15, v0.6.14, macs-without-slack (out with v0.6.13) and what
+      // came before are gone
+      expect(feed).toContain(
+        `<id>${ORIGIN}${dir}news/sessions-in-pacenote/</id>`
+      )
+      expect(feed).toContain(`<id>${ORIGIN}${dir}news/v0.6.35/</id>`)
+      expect(feed).not.toContain(`news/v0.6.34/</id>`)
+      expect(feed).not.toContain(`news/v0.6.33/</id>`)
       expect(feed).not.toContain(`news/v0.6.32/</id>`)
       expect(feed).not.toContain(`news/v0.6.31/</id>`)
       expect(feed).not.toContain(`news/v0.6.30/</id>`)
