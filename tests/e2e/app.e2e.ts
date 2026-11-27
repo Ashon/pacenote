@@ -3762,6 +3762,19 @@ else fail('unexpected: ' + args.join(' '))
     await page
       .getByRole('textbox', { name: 'Your note' })
       .fill('Start with **the retry test**.')
+    // Your first turn shows once on its page while Claude Code starts: its
+    // log has it before Claude Code tells it back
+    await page.evaluate(`{
+      globalThis.mostTurns = 0
+      new MutationObserver(() => {
+        globalThis.mostTurns = Math.max(
+          globalThis.mostTurns,
+          document.querySelectorAll(
+            '[data-handed-task]:not([data-handed-preview] *)'
+          ).length
+        )
+      }).observe(document.body, { subtree: true, childList: true })
+    }`)
     await page.getByRole('button', { name: 'Start', exact: true }).click()
 
     // Its page in its place: Claude Code runs it here, the task's work
@@ -3770,6 +3783,7 @@ else fail('unexpected: ' + args.join(' '))
         'Here is my plan for "Fix the flaky webhook retry test": read the failing test, then fix the retry. Shall I start?'
       )
       .waitFor({ timeout: 30_000 })
+    expect(await page.evaluate('globalThis.mostTurns')).toBe(1)
     expect(decodeURIComponent(page.url())).toMatch(
       /#\/sessions\/claude:[0-9a-f-]{36}$/
     )

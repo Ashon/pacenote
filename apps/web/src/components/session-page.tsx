@@ -1,5 +1,6 @@
 import { IMAGE_TYPES, IMAGES_MAX } from '@src/sessions/images'
 import { modelLabel } from '@src/sessions/live'
+import { notLogged } from '@src/sessions/sent'
 import type {
   SessionAsk,
   SessionLive,
@@ -1230,7 +1231,9 @@ function SessionMenu({ talk }: { talk: SessionTalk }) {
 /**
  * What you sent that its log does not have yet: queued while Claude Code is on
  * a step (sent during its turn), and once read, kept until its log has it, so
- * it does not blink out between the two
+ * it does not blink out between the two. Its log may have it before Claude
+ * Code tells it back, on a first turn by a second or more: then it is in its
+ * log alone, not twice (notLogged).
  */
 function useSent(
   live: SessionLive | undefined,
@@ -1238,8 +1241,9 @@ function useSent(
 ): { text: string; queued: boolean; images?: number }[] {
   const queued = live?.queued
   const since = live?.since
+  /** Read, as sent (at), and when it was read here */
   const [read, setRead] = useState<
-    { text: string; at: number; images?: number }[]
+    { text: string; at: string; seen: number; images?: number }[]
   >([])
   const before = useRef(queued)
   useEffect(() => {
@@ -1252,41 +1256,46 @@ function useSent(
         ...old,
         ...gone.map((one) => ({
           text: one.text,
-          at: Date.now(),
+          at: one.at,
+          seen: Date.now(),
           ...(one.images ? { images: one.images } : {}),
         })),
       ])
   }, [queued])
   // In its log now, or long enough
-  const said = items?.filter((item) => item.role === 'user').at(-1)?.text
   useEffect(() => {
     if (!read.length) return
-    const left = read.filter(
-      (one) =>
-        !(said && said.trim() === one.text.trim()) &&
-        Date.now() - one.at < SENT_MS
+    const left = notLogged(read, items).filter(
+      (one) => Date.now() - one.seen < SENT_MS
     )
     if (left.length !== read.length) {
       setRead(left)
       return
     }
     const timer = setTimeout(
-      () => setRead((old) => old.filter((o) => Date.now() - o.at < SENT_MS)),
+      () => setRead((old) => old.filter((o) => Date.now() - o.seen < SENT_MS)),
       SENT_MS
     )
     return () => clearTimeout(timer)
-  }, [read, said])
+  }, [read, items])
+  const waiting = new Set<object>(
+    notLogged([...read, ...(queued ?? [])], items)
+  )
   return [
-    ...read.map((one) => ({
-      text: one.text,
-      queued: false,
-      images: one.images,
-    })),
-    ...(queued ?? []).map((one) => ({
-      text: one.text,
-      images: one.images,
-      queued: !!since && Date.parse(one.at) > Date.parse(since),
-    })),
+    ...read
+      .filter((one) => waiting.has(one))
+      .map((one) => ({
+        text: one.text,
+        queued: false,
+        images: one.images,
+      })),
+    ...(queued ?? [])
+      .filter((one) => waiting.has(one))
+      .map((one) => ({
+        text: one.text,
+        images: one.images,
+        queued: !!since && Date.parse(one.at) > Date.parse(since),
+      })),
   ]
 }
 

@@ -16,6 +16,7 @@ import {
   userLine,
 } from '../../../src/sessions/live.js'
 import type { SessionImage } from '../../../src/sessions/images.js'
+import { QUEUED_CHARS } from '../../../src/sessions/sent.js'
 import type {
   SessionAsk,
   SessionAskKind,
@@ -150,8 +151,6 @@ const DRAFT_CHARS = 12_000
 const SETTLE_MS = 5 * SECOND
 /** How long an ended run has to go */
 const GONE_MS = 5 * SECOND
-/** How much of a message you sent its page shows while it waits */
-const QUEUED_CHARS = 4000
 
 export class SessionHost {
   private readonly hosted = new Map<string, Hosted>()

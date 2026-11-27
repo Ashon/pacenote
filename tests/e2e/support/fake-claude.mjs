@@ -24,6 +24,9 @@ import path from 'node:path'
 import process from 'node:process'
 import { setTimeout } from 'node:timers/promises'
 
+/** How long a first turn's message waits to be told back, after it is logged */
+const FIRST_REPLAY_MS = 2500
+
 if (process.argv[2] === '--version') {
   process.stdout.write('2.1.0 (Claude Code)\n')
   process.exit(0)
@@ -140,6 +143,13 @@ if (args.includes('--permission-prompt-tool')) {
       : content
     const images = blocks.filter((block) => block.type === 'image').length
     turns++
+    // Logged first, as Claude Code does: told back only as it asks its model,
+    // on a first turn by a second or more while it starts
+    log({
+      type: 'user',
+      uuid: randomUUID(),
+      message: { role: 'user', content },
+    })
     out({
       type: 'system',
       subtype: 'init',
@@ -147,6 +157,7 @@ if (args.includes('--permission-prompt-tool')) {
       cwd: process.cwd(),
       model,
     })
+    if (turns === 1) await setTimeout(FIRST_REPLAY_MS)
     // What you sent, read now (--replay-user-messages)
     if (args.includes('--replay-user-messages'))
       out({
@@ -154,11 +165,6 @@ if (args.includes('--permission-prompt-tool')) {
         message: { role: 'user', content },
         isReplay: true,
       })
-    log({
-      type: 'user',
-      uuid: randomUUID(),
-      message: { role: 'user', content },
-    })
     // Images: it says what it sees, and asks nothing
     if (images) {
       const content = [

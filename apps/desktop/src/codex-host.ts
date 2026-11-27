@@ -14,6 +14,7 @@ import {
   isCodexMode,
 } from '../../../src/sessions/codex.js'
 import type { SessionImage } from '../../../src/sessions/images.js'
+import { QUEUED_CHARS } from '../../../src/sessions/sent.js'
 import type {
   CodexMode,
   SessionAsk,
@@ -140,7 +141,6 @@ const LIVE_MS = 120
 const DRAFT_CHARS = 12_000
 const SETTLE_MS = 5 * SECOND
 const GONE_MS = 5 * SECOND
-const QUEUED_CHARS = 4000
 
 export class CodexHost {
   private readonly hosted = new Map<string, Hosted>()
