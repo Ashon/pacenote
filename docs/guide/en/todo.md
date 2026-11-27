@@ -44,7 +44,8 @@ progress to pick up, and the one waiting longest on someone else. A line shows o
   task and what came before it written in, shown as the task's card with a note of yours under it, for you to start.
   The menu beside it opens Claude Code, Codex or opencode in your terminal or their app instead. On the session's page,
   **Wrap up** closes the task with what was done, as your AI reads it, and keeps what is left as tasks; **Close** closes
-  the session.
+  the session. Until you close it or the task closes, the task opens that session again, the next day too, and typing
+  there goes on from where it stopped.
 - **Draft a reply** writes a reply for you to send in the thread. Pacenote never posts it.
 - **More** has **Mark in progress** and **Waiting on someone else**. A task is in progress by itself when a session
   worked on it in the last day.
