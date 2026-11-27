@@ -44,12 +44,16 @@ afterEach(() => {
 })
 
 describe('closing a session', () => {
-  it('is for one Pacenote runs or a Codex one its log shows open', () => {
+  it('is for one Pacenote runs, one resting, or a Codex one its log shows open', () => {
     expect(closable(row())).toBe(true)
     expect(closable(row({ tool: 'claude', where: 'pacenote' }))).toBe(true)
     expect(closable(row({ where: 'codex-app' }))).toBe(true)
     expect(closable(row({ tool: 'claude', where: 'claude-app' }))).toBe(false)
     expect(closable(row({ state: 'ended' }))).toBe(false)
+    // Resting, its terminal closed: nothing runs it, so you close it here
+    expect(
+      closable(row({ tool: 'claude', where: 'terminal', resting: true }))
+    ).toBe(true)
   })
 
   it("shows Close and Wrap up on the Mac, for an open task's session", async () => {

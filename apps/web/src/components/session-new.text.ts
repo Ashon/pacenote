@@ -40,6 +40,9 @@ const en = {
   start: 'Start',
   keys: '⌘↩ starts it',
   notOpen: 'This task is not open anymore.',
+  /** The task's session you have not closed, above a new one's (Y5) */
+  unclosed: 'This task has a session you have not closed',
+  openThat: 'Open that session',
   backToTodo: 'Back to Todo',
   off: 'Sessions on this Mac is off',
   offLead: 'Pacenote runs sessions on their page once it lists them.',
@@ -79,6 +82,8 @@ const ko: typeof en = {
   start: '시작',
   keys: '⌘↩로 시작',
   notOpen: '이 할 일은 이제 열려 있지 않아요.',
+  unclosed: '이 할 일에 닫지 않은 세션이 있어요',
+  openThat: '그 세션 열기',
   backToTodo: '할 일로 돌아가기',
   off: '이 Mac의 세션이 꺼져 있어요',
   offLead: '세션 목록을 켜면 Pacenote가 세션을 그 페이지에서 돌려요.',

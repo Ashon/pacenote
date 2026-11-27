@@ -84,8 +84,11 @@ export interface SessionsInput {
   repos: ReadonlyMap<string, { id: string; name?: string } | undefined>
   /** Your areas (You), each with its repositories (owner/name) */
   areas: { id: string; name: string; repos: string[] }[]
-  /** The task each session is linked to, by the tool's session id */
-  tasks: ReadonlyMap<string, { id: string; title: string }>
+  /**
+   * The task each session is linked to, by the tool's session id; closed
+   * once it is
+   */
+  tasks: ReadonlyMap<string, { id: string; title: string; closed?: true }>
   /**
    * The open task each session not linked to one looks like, by the tool's
    * session id, with the suggestion's id
@@ -154,6 +157,10 @@ const stateByLog = (now: number, lastAt: string): SessionState => {
   const quiet = now - Date.parse(lastAt)
   return quiet <= WORKING_MS ? 'working' : quiet <= TURN_MS ? 'turn' : 'quiet'
 }
+
+/** One that nothing runs now waits for you: your turn, or quiet */
+const stateResting = (now: number, lastAt: string): SessionState =>
+  now - Date.parse(lastAt) <= TURN_MS ? 'turn' : 'quiet'
 
 const STATE_ORDER: Record<SessionState, number> = {
   working: 0,
@@ -253,9 +260,14 @@ export function sessionsView(
   }
   for (const s of input.logged) {
     const id = `${s.tool}:${s.session}`
-    if (openIds.has(id) || !today(s) || s.tool === 'opencode') continue
+    if (openIds.has(id) || s.tool === 'opencode') continue
+    const task = tasks.get(s.session)
     // Closed by you, and not written to since: ended, wherever it ran
     const closed = closedStill(input.closed?.get(id), s.lastAt)
+    // A task's session you have not closed stays past today, until you close
+    // it or its task closes (Y7); the others, today's alone
+    const kept = !!task && !task.closed && !closed
+    if (!today(s) && !kept) continue
     if (s.tool === 'codex') {
       if (codexRun(s)) continue
       openIds.add(id)
@@ -266,12 +278,15 @@ export function sessionsView(
           : s.originator === 'Codex Desktop'
             ? 'codex-app'
             : 'terminal'
+      const state = stateByLog(now, s.lastAt)
+      // Its task closed: it ends once it stops writing (Y8)
+      const ends = closed || (!!task?.closed && state !== 'working')
       const shown = row('codex', s.session, {
         cwd: s.cwd,
         where,
-        state: closed ? 'ended' : stateByLog(now, s.lastAt),
+        state: ends ? 'ended' : state,
       })
-      if (closed) ended.push(shown)
+      if (ends) ended.push(shown)
       else open.push(shown)
       continue
     }
@@ -290,16 +305,26 @@ export function sessionsView(
     if (!s.prompts.length) continue
     openIds.add(id)
     const seen = input.seen?.get(s.session)
-    ended.push(
-      row('claude', s.session, {
-        cwd: s.cwd,
-        where:
-          seen?.where ??
-          (s.entrypoint === 'claude-desktop' ? 'claude-app' : 'terminal'),
-        terminal: seen?.terminal,
-        state: 'ended',
-      })
-    )
+    // Nothing runs it now. A task's, or one Pacenote ran, only rests: open
+    // until you close it or its task closes (Y1, Y8), its page going on with
+    // it. Any other ended where it was open.
+    const rests = !closed && (task ? !task.closed : seen?.where === 'pacenote')
+    const where: SessionWhere =
+      seen?.where ??
+      (s.entrypoint === 'claude-desktop'
+        ? 'claude-app'
+        : // Claude Code as Pacenote runs it (claude -p), for a task's
+          rests && s.entrypoint === 'sdk-cli'
+          ? 'pacenote'
+          : 'terminal')
+    const shown = row('claude', s.session, {
+      cwd: s.cwd,
+      where,
+      terminal: seen?.terminal,
+      state: rests ? stateResting(now, s.lastAt) : 'ended',
+    })
+    if (rests) open.push({ ...shown, resting: true })
+    else ended.push(shown)
   }
 
   const newest = (a: SessionRow, b: SessionRow) =>

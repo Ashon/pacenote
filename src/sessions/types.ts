@@ -17,7 +17,8 @@ export type SessionWhere =
 
 /**
  * Working (the tool is on a turn), your turn (it stopped within the last 30
- * minutes), quiet (it stopped longer ago), or ended (closed today)
+ * minutes), quiet (it stopped longer ago), or ended: you closed it, its task
+ * closed, or it was open in a place that closed it and is no task's
  */
 export type SessionState = 'working' | 'turn' | 'quiet' | 'ended'
 
@@ -40,6 +41,13 @@ export interface SessionRow {
    * terminal): moving it here would stop them, so it stays there for now
    */
   background?: number
+  /**
+   * Open, though nothing runs it now: it rested and its run ended (Pacenote
+   * lets one go after 30 minutes), or its app or terminal closed. It is a
+   * task's, or one Pacenote ran, and you have not closed it: its page goes
+   * on with it here.
+   */
+  resting?: true
   /** When it last wrote to its log */
   lastAt: string
   startedAt: string
@@ -76,6 +84,10 @@ export interface SessionsView {
   open: SessionGroup[]
   /** Ended today, newest first */
   ended: SessionRow[]
+  /**
+   * The resting ones count as open: a task's stay until you close them or
+   * the task closes, past today too
+   */
   counts: { open: number; working: number; turn: number; ended: number }
   /**
    * Whether Claude Code told which of its sessions are open; when it cannot,

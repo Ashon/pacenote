@@ -1,7 +1,19 @@
 import { handedParts, isHanded } from '@src/sessions/handed'
-import type { CodexMode, HostTool, SessionMode } from '@src/sessions/types'
+import type {
+  CodexMode,
+  HostTool,
+  SessionMode,
+  SessionRow,
+} from '@src/sessions/types'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, FolderOpen, Pencil, Play, ScanEye } from 'lucide-react'
+import {
+  ChevronRight,
+  FolderOpen,
+  History,
+  Pencil,
+  Play,
+  ScanEye,
+} from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/ui/inline-error'
@@ -12,7 +24,7 @@ import { remoteMac } from '@/lib/desktop'
 import { homePath } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { usePhone } from '@/lib/phone'
-import { recentFolders } from '@/lib/session-rows'
+import { recentFolders, sessionsByTask } from '@/lib/session-rows'
 import {
   useNewSessionDraft,
   useSessions,
@@ -25,6 +37,7 @@ import { taskDetailQuery } from '@/lib/tasks'
 import { cn } from '@/lib/utils'
 import { HandedPartView, tasksHanded, Said } from './handed-task'
 import { text } from './session-new.text'
+import { sessionHref, StateMark, toolWhere } from './session-open'
 import { ModePicker } from './session-page'
 import { text as pageText } from './session-page.text'
 import { text as listText } from './sessions-page.text'
@@ -102,6 +115,9 @@ export function NewSessionPage({
 
   const mac = remoteMac()
   const remote = Boolean(mac)
+  // The task's session you have not closed: going on in it keeps its
+  // conversation (Y5)
+  const unclosed = task && !group ? sessionsByTask(view).get(task) : undefined
   const written = message ?? ''
   const handed = isHanded(written)
   const asCards = handed && !asText
@@ -204,6 +220,8 @@ export function NewSessionPage({
             </Button>
           </div>
         )}
+
+        {unclosed && <Unclosed s={unclosed} />}
 
         <dl className="mt-6 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5 rounded-[14px] bg-well px-4 py-3.5 text-copy">
           <dt className="text-muted-foreground">{t.runIn}</dt>
@@ -352,6 +370,38 @@ export function NewSessionPage({
         />
       )}
     </ScrollArea>
+  )
+}
+
+/**
+ * A session of the task's you have not closed, resting or at work: open it
+ * to go on in its conversation, rather than starting again beside it (Y5)
+ */
+function Unclosed({ s }: { s: SessionRow }) {
+  const t = useText(text)
+  const l = useText(listText)
+  return (
+    <div
+      data-unclosed
+      className="mt-6 flex items-center gap-3 rounded-[14px] bg-well px-4 py-3.5"
+    >
+      <History
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0 self-start text-muted-foreground"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p className="text-section">{t.unclosed}</p>
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-meta text-muted-foreground">
+          <span className="min-w-0 truncate">
+            {s.title} · {toolWhere(s, l)}
+          </span>
+          <StateMark s={s} />
+        </p>
+      </div>
+      <Button variant="outline" size="sm" asChild>
+        <a href={sessionHref(s.id)}>{t.openThat}</a>
+      </Button>
+    </div>
   )
 }
 

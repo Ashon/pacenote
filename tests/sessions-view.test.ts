@@ -260,6 +260,169 @@ describe('sessionsView: the sessions that ended today', () => {
   })
 })
 
+describe('sessionsView: a session that rests (Y1, Y7, Y8)', () => {
+  const task = { id: 'T1', title: 'Raise the retry limit' }
+  const pacenote = new Map<string, { where: SessionWhere }>([
+    ['p1', { where: 'pacenote' }],
+    ['t1', { where: 'pacenote' }],
+  ])
+
+  it("keeps a task's, or one Pacenote ran, open once nothing runs it", () => {
+    const v = view({
+      agents: [],
+      logged: [
+        // Pacenote let it go after 30 minutes
+        logged({
+          session: 't1',
+          lastAt: iso(now - 42 * MINUTE),
+          prompts: [{ text: 'a' }],
+        }),
+        // Its terminal closed a few minutes ago
+        logged({
+          session: 't2',
+          lastAt: iso(now - 5 * MINUTE),
+          prompts: [{ text: 'b' }],
+          entrypoint: 'cli',
+        }),
+        logged({
+          session: 'p1',
+          lastAt: iso(now - 2 * HOUR),
+          prompts: [{ text: 'c' }],
+        }),
+        logged({
+          session: 'e1',
+          lastAt: iso(now - HOUR),
+          prompts: [{ text: 'd' }],
+        }),
+      ],
+      tasks: new Map([
+        ['t1', task],
+        ['t2', { id: 'T2', title: 'Fix the flaky test' }],
+      ]),
+      seen: pacenote,
+    })
+    expect(
+      rows(v.open).map((r) => [r.session, r.state, r.where, r.resting])
+    ).toEqual([
+      ['t2', 'turn', 'terminal', true],
+      ['t1', 'quiet', 'pacenote', true],
+      ['p1', 'quiet', 'pacenote', true],
+    ])
+    expect(v.ended.map((r) => [r.session, r.resting])).toEqual([
+      ['e1', undefined],
+    ])
+    expect(v.counts).toEqual({ open: 3, working: 0, turn: 1, ended: 1 })
+  })
+
+  it('ends it once you close it, and opens it again once it writes', () => {
+    const v = view({
+      agents: [],
+      logged: [
+        logged({
+          session: 't1',
+          lastAt: iso(now - HOUR),
+          prompts: [{ text: 'a' }],
+        }),
+        logged({
+          session: 'p1',
+          lastAt: iso(now - 10 * MINUTE),
+          prompts: [{ text: 'b' }],
+        }),
+      ],
+      tasks: new Map([['t1', task]]),
+      seen: pacenote,
+      closed: new Map([
+        ['claude:t1', iso(now - 50 * MINUTE)],
+        ['claude:p1', iso(now - 2 * HOUR)],
+      ]),
+    })
+    expect(v.ended.map((r) => r.session)).toEqual(['t1'])
+    expect(rows(v.open).map((r) => [r.session, r.resting])).toEqual([
+      ['p1', true],
+    ])
+  })
+
+  it("ends a task's once its task closes, Claude Code's or Codex's", () => {
+    const closedTask = { ...task, closed: true as const }
+    const v = view({
+      agents: [agent({ session: 'live', where: 'pacenote' })],
+      logged: [
+        logged({
+          session: 't1',
+          lastAt: iso(now - HOUR),
+          prompts: [{ text: 'a' }],
+        }),
+        logged({ session: 'live', prompts: [{ text: 'b' }] }),
+        logged({
+          tool: 'codex',
+          session: 'c1',
+          lastAt: iso(now - HOUR),
+          originator: 'Codex Desktop',
+        }),
+        // Still writing: open until it stops
+        logged({
+          tool: 'codex',
+          session: 'c2',
+          lastAt: iso(now - 20_000),
+          originator: 'Codex Desktop',
+        }),
+      ],
+      tasks: new Map([
+        ['t1', closedTask],
+        ['live', closedTask],
+        ['c1', closedTask],
+        ['c2', closedTask],
+      ]),
+      seen: pacenote,
+    })
+    expect(
+      rows(v.open)
+        .map((r) => r.session)
+        .sort()
+    ).toEqual(['c2', 'live'])
+    expect(v.ended.map((r) => r.session)).toEqual(['t1', 'c1'])
+  })
+
+  it("keeps a task's past today until you close it; the rest today's alone", () => {
+    const yesterday = iso(now - 20 * HOUR)
+    const v = view({
+      agents: [],
+      logged: [
+        logged({
+          session: 't1',
+          lastAt: yesterday,
+          prompts: [{ text: 'a' }],
+          entrypoint: 'sdk-cli',
+        }),
+        logged({ session: 'p1', lastAt: yesterday, prompts: [{ text: 'b' }] }),
+        logged({ session: 't2', lastAt: yesterday, prompts: [{ text: 'c' }] }),
+        logged({
+          tool: 'codex',
+          session: 'c1',
+          lastAt: yesterday,
+          originator: 'Codex Desktop',
+        }),
+      ],
+      tasks: new Map([
+        ['t1', task],
+        ['t2', task],
+        ['c1', task],
+      ]),
+      seen: new Map([['p1', { where: 'pacenote' }]]),
+      closed: new Map([['claude:t2', iso(now - 19 * HOUR)]]),
+    })
+    // Claude Code as Pacenote runs it, for a task's not seen since this
+    // app started
+    expect(
+      rows(v.open).map((r) => [r.session, r.where, r.state, r.resting])
+    ).toEqual([
+      ['t1', 'pacenote', 'quiet', true],
+      ['c1', 'codex-app', 'quiet', undefined],
+    ])
+    expect(v.ended).toEqual([])
+  })
+})
+
 describe('sessionsView: a session whose log is in two files', () => {
   it('is on one row', () => {
     const v = view({

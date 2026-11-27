@@ -43,10 +43,12 @@ export const canOpen = (s: SessionRow) => s.tool !== 'opencode'
 
 /**
  * Whether Pacenote can take you to where a session runs: its app, claude.ai
- * or its terminal app (not one Pacenote runs itself)
+ * or its terminal app (not one Pacenote runs itself, nor one resting that
+ * runs nowhere now)
  */
 export const canShow = (s: SessionRow) =>
   s.state !== 'ended' &&
+  !s.resting &&
   s.where !== 'pacenote' &&
   (s.tool === 'codex'
     ? s.where === 'codex-app'

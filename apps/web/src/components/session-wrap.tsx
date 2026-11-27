@@ -20,11 +20,13 @@ import { useSessionActions } from '@/lib/sessions'
 import { text } from './session-wrap.text'
 
 /**
- * Whether you close it here: one Pacenote runs, or a Codex one its log alone
- * shows open. One open in the Claude app or a terminal closes there.
+ * Whether you close it here: one Pacenote runs, one resting that nothing runs
+ * now, or a Codex one its log alone shows open. One open in the Claude app or
+ * a terminal closes there.
  */
 export const closable = (row: SessionRow) =>
-  row.state !== 'ended' && (row.where === 'pacenote' || row.tool === 'codex')
+  row.state !== 'ended' &&
+  (row.where === 'pacenote' || row.tool === 'codex' || !!row.resting)
 
 /** Whether its task waits to be wrapped up: linked, and open still */
 const wrappable = (row: SessionRow) =>
@@ -58,7 +60,11 @@ export function SessionEnd({ talk }: { talk: SessionTalk }) {
           <Button
             size="sm"
             variant="ghost"
-            title={row.where === 'pacenote' ? t.closeHint : t.closeHintLog}
+            title={
+              row.where === 'pacenote' && !row.resting
+                ? t.closeHint
+                : t.closeHintLog
+            }
             disabled={closing}
             onClick={async () => {
               setClosing(true)

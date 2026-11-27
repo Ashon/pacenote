@@ -402,7 +402,9 @@ export function registerSessionsIpc(
     async (id) => {
       const t = localized(text)
       const row = typeof id === 'string' ? shown.get(id) : undefined
-      if (!row || row.state === 'ended') return { error: t.noSuchSession }
+      // Nothing runs one resting: its page is where it goes on
+      if (!row || row.state === 'ended' || row.resting)
+        return { error: t.noSuchSession }
       try {
         if (row.tool === 'codex') {
           if (!todo.hasApp('codex')) return { error: t.noSuchSession }
@@ -568,7 +570,8 @@ export function registerSessionsIpc(
 
   /**
    * Where you type to a session: here, for one Pacenote runs or that runs
-   * nowhere now; here too for one resting in the Claude app or a terminal,
+   * nowhere now (ended, or resting: its run let go or its terminal closed);
+   * here too for one resting in the Claude app or a terminal,
    * which moves here as you send (move); where it is open, while it works
    * there or for claude.ai; or in Codex, for one the Codex app or a terminal
    * runs (Z7), while one Pacenote ran continues here
@@ -582,6 +585,7 @@ export function registerSessionsIpc(
         ? 'codex'
         : row.where === 'pacenote' ||
             row.state === 'ended' ||
+            row.resting ||
             host.has(row.session)
           ? 'here'
           : MOVES_FROM.has(row.where) &&
@@ -630,10 +634,11 @@ export function registerSessionsIpc(
     async (id): Promise<SessionTalk | null> => {
       let row = await rowOf(id)
       // Moved here (or let go) since the list was last read: its row as it
-      // is now, so the page says where it runs
+      // is now, so the page says where it runs. One resting runs nowhere.
       if (
         (row?.tool === 'claude' &&
-          host.has(row.session) !== (row.where === 'pacenote')) ||
+          host.has(row.session) !==
+            (row.where === 'pacenote' && !row.resting)) ||
         (row?.tool === 'codex' &&
           codex.has(row.session) &&
           row.where !== 'pacenote')
