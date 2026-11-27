@@ -121,7 +121,7 @@ describe("Pacenote's own work, headless", () => {
 
     const writer = fakeCli(
       'codex-recap',
-      codexSaid('## Week\nYou **fixed** it.')
+      codexSaid('### Payments\n* You **fixed** it.')
     )
     expect(
       await writeRecap({
@@ -131,7 +131,10 @@ describe("Pacenote's own work, headless", () => {
         cwd: root,
         prompt: 'Sum it up.',
       })
-    ).toMatchObject({ text: 'You fixed it.', usage: { output: 20 } })
+    ).toMatchObject({
+      text: '## Payments\n- You fixed it.',
+      usage: { output: 20 },
+    })
 
     expect(draftFrom('codex', codexSaid('Hi mina, done.'))).toEqual({
       text: 'Hi mina, done.',

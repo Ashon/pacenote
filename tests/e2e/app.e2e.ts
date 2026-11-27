@@ -5257,8 +5257,14 @@ else fail('unexpected: ' + args.join(' '))
       },
       {
         match: "Write a recap of the user's work",
-        answer:
-          'Most of the week went to Payments: you shipped retry backoff and kept the idempotency key on retries. The payment retry review is still open.',
+        answer: [
+          '## Payments',
+          '- Retry backoff shipped',
+          '- **Idempotency key** kept on retries',
+          '',
+          '## Still open',
+          '- Payment retry PR review',
+        ].join('\n'),
         // Long enough to see it being written
         delayMs: 2500,
       },
@@ -5371,14 +5377,34 @@ else fail('unexpected: ' + args.join(' '))
     await page.screenshot({
       path: path.join(REPO, 'test-results/recap-writing.png'),
     })
-    await page
-      .getByText('Most of the week went to Payments', { exact: false })
-      .waitFor()
+    // Area by area: its name, opening it, over what was done as bullets,
+    // what is still open last
+    const written = page.getByRole('region', { name: 'Written up' })
+    await written.getByText('Retry backoff shipped').waitFor()
     // It comes in where it was being written, word by word.
     await writingUp.waitFor({ state: 'detached' })
     expect(
       await page.locator('.motion-write-in [data-word]').count()
     ).toBeGreaterThan(10)
+    expect(
+      await written
+        .getByRole('heading')
+        .evaluateAll((all) => all.map((one) => one.textContent))
+    ).toEqual(['Payments', 'Still open'])
+    expect(
+      await written
+        .getByRole('link', { name: 'Payments', exact: true })
+        .getAttribute('href')
+    ).toMatch(/^#\/you\//)
+    expect(
+      await written
+        .getByRole('listitem')
+        .evaluateAll((all) => all.map((one) => one.textContent))
+    ).toEqual([
+      'Retry backoff shipped',
+      'Idempotency key kept on retries',
+      'Payment retry PR review',
+    ])
     await page.getByRole('button', { name: 'Write again' }).waitFor()
     const calls = readFileSync(
       path.join(world.claudeDir, 'calls.jsonl'),
@@ -5404,7 +5430,9 @@ else fail('unexpected: ' + args.join(' '))
     await page.getByRole('button', { name: 'Copied' }).waitFor()
     const copied = await app!.evaluate(({ clipboard }) => clipboard.readText())
     expect(copied).toContain('**This week so far**')
-    expect(copied).toContain('Most of the week went to Payments')
+    expect(copied).toContain(
+      '**Payments**\n- Retry backoff shipped\n- Idempotency key kept on retries'
+    )
     expect(copied).toContain('- Ship retry backoff')
     expect(copied).toContain('- Carries over: Review the payment retry PR')
 

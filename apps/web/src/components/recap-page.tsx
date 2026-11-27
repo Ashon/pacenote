@@ -4,6 +4,7 @@ import type {
   RecapPeriod,
   RecapView,
 } from '@src/you/types'
+import { writtenBlocks } from '@src/you/written'
 import {
   ArrowRight,
   Check,
@@ -89,8 +90,8 @@ export function lastPeriod(): RecapPeriod {
  * a standup (done, doing, next), a week what you did in each area and what
  * carries over, a month where it went and what changed. Each is counted from
  * your tasks, your own commits, your sessions and what you asked Pace; Write
- * it up has the AI chosen in Settings > Todo sum it up in a few sentences, only
- * when you click.
+ * it up has the AI chosen in Settings > Todo sum it up area by area in a few
+ * bullets, only when you click.
  * Nothing is sent: it copies as a standup, an update or for Slack.
  */
 export function RecapPage({
@@ -382,7 +383,11 @@ function RecapBody({
               aria-label={t.writtenUp}
               className="mt-4 flex flex-col gap-1.5 rounded-xl bg-card-accent px-4 pt-3.5 pb-3"
             >
-              <WrittenText text={view.written.text} arrived={arrived} />
+              <WrittenText
+                written={view.written.text}
+                arrived={arrived}
+                areas={view.areas}
+              />
               <div className="flex items-center gap-2">
                 <span className="text-meta text-muted-foreground">
                   {t.writtenBy(
@@ -451,35 +456,103 @@ function WritingUp() {
   )
 }
 
-/** The written text; just come, it comes in word by word */
-function WrittenText({ text, arrived }: { text: string; arrived: boolean }) {
-  const words = arrived ? text.split(/\s+/).filter(Boolean) : []
-  return (
-    <p
-      className={cn(
-        'max-w-[46rem] text-copy leading-relaxed select-text',
-        arrived && 'motion-write-in'
-      )}
-      style={
-        arrived
-          ? ({ '--motion-n': words.length } as React.CSSProperties)
-          : undefined
-      }
-    >
-      {arrived
-        ? words.map((word, i) => (
+/**
+ * The written text: each area's name over what was done in it, as bullets
+ * (writtenBlocks), a write-up from before as its sentences. Just come, it
+ * comes in word by word, in reading order.
+ */
+function WrittenText({
+  written,
+  arrived,
+  areas,
+}: {
+  written: string
+  arrived: boolean
+  /** The recap's areas: a heading with one's name opens it */
+  areas: readonly RecapArea[]
+}) {
+  const t = useText(text)
+  const blocks = writtenBlocks(written)
+  const total = arrived
+    ? blocks
+        .flatMap((block) =>
+          block.kind === 'bullets' ? block.items : [block.text]
+        )
+        .join(' ')
+        .split(/\s+/)
+        .filter(Boolean).length
+    : 0
+  /** The next word's place in reading order */
+  let place = 0
+  const words = (line: string) =>
+    arrived
+      ? line
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((word, i) => (
             <Fragment key={i}>
               {i > 0 && ' '}
               <span
                 data-word
-                style={{ '--motion-i': i } as React.CSSProperties}
+                style={{ '--motion-i': place++ } as React.CSSProperties}
               >
                 {word}
               </span>
             </Fragment>
           ))
-        : text}
-    </p>
+      : line
+  const areaOf = (name: string) =>
+    areas.find(
+      (area) =>
+        area.id && area.name.trim().toLowerCase() === name.trim().toLowerCase()
+    )
+  return (
+    <div
+      className={cn(
+        'flex max-w-[46rem] flex-col gap-1 text-copy leading-relaxed select-text',
+        arrived && 'motion-write-in'
+      )}
+      style={
+        arrived ? ({ '--motion-n': total } as React.CSSProperties) : undefined
+      }
+    >
+      {blocks.map((block, index) => {
+        if (block.kind === 'heading') {
+          const area = areaOf(block.text)
+          return (
+            <h3
+              key={index}
+              data-written-area={area?.id}
+              className={cn('font-semibold', index > 0 && 'mt-2')}
+            >
+              {area?.id ? (
+                <a
+                  href={areaHash(area.id)}
+                  title={t.onYou(area.name)}
+                  className="hover:text-primary"
+                >
+                  {words(block.text)}
+                </a>
+              ) : (
+                words(block.text)
+              )}
+            </h3>
+          )
+        }
+        if (block.kind === 'bullets')
+          return (
+            <ul
+              key={index}
+              className="flex list-disc flex-col gap-0.5 pl-5 marker:text-muted-foreground"
+            >
+              {block.items.map((item, i) => (
+                <li key={i}>{words(item)}</li>
+              ))}
+            </ul>
+          )
+        return <p key={index}>{words(block.text)}</p>
+      })}
+    </div>
   )
 }
 

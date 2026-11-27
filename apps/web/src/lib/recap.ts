@@ -5,6 +5,7 @@ import type {
   RecapView,
 } from '@src/you/types'
 import { localized } from '@src/i18n/locale'
+import { writtenAs } from '@src/you/written'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { dateFormat } from './format'
 import { text } from './recap.text'
@@ -109,7 +110,8 @@ export type CopyFormat = 'markdown' | 'slack' | 'summary'
 
 /** A recap as text to paste: a standup, an update, or the summary alone */
 export function recapText(view: RecapView, format: CopyFormat): string {
-  if (format === 'summary') return view.written?.text ?? ''
+  if (format === 'summary')
+    return view.written ? writtenAs(view.written.text, 'markdown') : ''
   const t = localized(text)
   const bold = (text: string) =>
     format === 'slack' ? `*${text}*` : `**${text}**`
@@ -132,7 +134,11 @@ export function recapText(view: RecapView, format: CopyFormat): string {
     return out.join('\n').trim()
   }
   out.push(bold(recapTitle(view)))
-  if (view.written) out.push('', view.written.text)
+  if (view.written)
+    out.push(
+      '',
+      writtenAs(view.written.text, format === 'slack' ? 'slack' : 'markdown')
+    )
   for (const area of view.areas) {
     out.push('', `${bold(area.name)} (${areaCounts(area)})`)
     for (const item of area.items) out.push(line(item))

@@ -334,6 +334,11 @@ describe('a recap', () => {
       commits
     )
     expect(prompt).toContain('never list commit messages')
+    // Area by area, its name over a few bullets, what is still open last
+    expect(prompt).toContain('a heading line "## " with its name')
+    expect(prompt).toContain('two to four bullets ("- ")')
+    expect(prompt).toContain('a block headed "## Still open"')
+    expect(prompt).not.toContain('gaejosik')
     expect(prompt).toContain(
       '- Commit: fix: keep the idempotency key on a retry'
     )
@@ -375,8 +380,10 @@ describe('a recap', () => {
         '- Still open: Review the payment retry PR (mina asked you · due Friday)'
       )
       expect(prompt).not.toMatch(/[가-힣]/)
-      // The write-up itself is in the user's language, the app's
+      // The write-up itself is in the user's language, the app's, its
+      // bullets as notes
       expect(prompt).toContain('Write in Korean, the language the user reads')
+      expect(prompt).toContain('write the bullets in gaejosik')
     })
   })
 })

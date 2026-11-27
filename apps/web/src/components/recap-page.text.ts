@@ -33,7 +33,7 @@ const en = {
   forSlack: 'For Slack',
   slackHint: "The same, in Slack's formatting",
   summaryOnly: 'The summary only',
-  summaryHint: 'Just the sentences written up',
+  summaryHint: 'Just what was written up, area by area',
   // Written up
   writtenUp: 'Written up',
   writtenBy: (by: string, when: string) =>
@@ -119,7 +119,7 @@ const ko: typeof en = {
   forSlack: 'Slack용',
   slackHint: '같은 내용을 Slack 서식으로',
   summaryOnly: '요약만',
-  summaryHint: '정리한 문장만',
+  summaryHint: '영역별로 정리한 내용만',
   writtenUp: '정리한 글',
   writtenBy: (by, when) =>
     `${josa(by, '이/가')} 아래 내용만 보고 도구 없이 썼어요 · ${when}`,

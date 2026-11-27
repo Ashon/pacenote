@@ -6,26 +6,27 @@ import {
   type OwnCli,
   type Unable,
 } from '../../../src/tasks/own-ai.js'
+import { writtenOf } from '../../../src/you/written.js'
 import { outputOf, runPlainWork, type PlainWork } from './headless.js'
 import { text } from './recap-writer.text.js'
 
 /**
  * Write it up: the CLI that does Pacenote's own work (own-ai.ts) sums a recap
- * up in a few sentences, from the recap's own lines only (src/you/recap.ts
- * recapPrompt). It runs as the looks done judge does: headless with no tools,
- * no MCP servers and none of your settings, on your own login, only when you
- * ask.
+ * up area by area, a few bullets each, from the recap's own lines only
+ * (src/you/recap.ts recapPrompt). It runs as the looks done judge does:
+ * headless with no tools, no MCP servers and none of your settings, on your
+ * own login, only when you ask.
  */
 
-/** The sentences in what the CLI wrote; undefined when there are none */
+/** A write-up at most this long */
+const WRITTEN_CHARS = 3_000
+
+/**
+ * What the CLI wrote, as Pacenote keeps it (writtenOf: each area's heading
+ * and bullets); undefined when there is nothing
+ */
 function writtenFrom(answer: string): string | undefined {
-  const text = redactSecrets(
-    answer
-      .replace(/^#+\s.*$/gm, '')
-      .replace(/\*\*/g, '')
-      .replace(/\s+\n/g, '\n')
-      .trim()
-  ).slice(0, 2_000)
+  const text = redactSecrets(writtenOf(answer)).slice(0, WRITTEN_CHARS).trim()
   return text || undefined
 }
 
