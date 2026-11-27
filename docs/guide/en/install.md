@@ -11,7 +11,7 @@ shot: first-run
 - An Apple silicon Mac on macOS 12 or later. The built-in sandbox needs macOS 15.
 - Claude Code on a Claude Pro, Max, Team or Enterprise plan, or Codex 0.138 or later on ChatGPT Plus, Pro or Business,
   signed in on that Mac.
-- A Slack workspace where you can create an app, or your team's Pacenote hub.
+- For Pace, the optional Slack assistant: a Slack workspace where you can create an app, or your team's Pacenote hub.
 
 ## Install
 

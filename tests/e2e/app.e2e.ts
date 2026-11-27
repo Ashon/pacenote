@@ -3366,6 +3366,8 @@ else fail('unexpected: ' + args.join(' '))
     await page.screenshot({
       path: path.join(REPO, 'test-results/session-here.png'),
     })
+    // The guide's and the news' picture of a session's page
+    await siteShot(page, 'session', () => page.mouse.move(0, 0))
     // What it does this moment: thinks, then writes its answer as it comes
     await message.fill('Explain how the backoff works')
     await message.press('Enter')

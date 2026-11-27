@@ -273,7 +273,7 @@ on, from the switch or from the screen's card, which says what it reads first.
 
 - **Open:** the Claude Code sessions Claude Code says are open (`claude agents --json`), the Codex sessions Pacenote
   runs, and the Codex sessions that wrote to their logs today until you close them (Codex keeps no list of open ones;
-  `codex exec` runs, Pacenote's among them, and subagents are left out). Each is in your area (You) whose repository it
+  `codex exec` runs, Pacenote's among them, and subagents are left out). Each is in your area (Areas) whose repository it
   works in, else under its repository, else "Not in a project". If Claude Code cannot list its sessions, its sessions
   that wrote today stand in for them.
 - **Where it runs:** told from the process a session runs under: the Claude app, claude.ai (`claude remote-control`),

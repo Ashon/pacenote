@@ -12,7 +12,7 @@ your own login, from your Mac.
 ## What you need
 
 - Pacenote on an Apple silicon Mac where Claude Code or Codex is signed in. New to it? Start with
-  [From install to Pace's first answer](guide:install).
+  [Install and first run](guide:install).
 - The link a teammate shared, or the hub's address.
 - If the hub is only for members its admins add, an admin to add you. Mention Pace and the hub asks them for you.
 

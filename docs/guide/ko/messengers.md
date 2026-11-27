@@ -2,7 +2,7 @@
 title: 설정 > 메신저
 summary: Pace가 Slack에 닿는 방식(팀 허브나 내 Slack 앱)과, Pace에게 물어볼 수 있는 사람.
 kind: screen
-order: 2
+order: 3
 shot: messengers-hub
 ---
 

@@ -60,6 +60,7 @@
             <li><a href="#sandbox">On your Mac or in a sandbox</a></li>
             <li><a href="#todo">Your Todo</a></li>
             <li><a href="#handoff">Handing a task to Claude Code, Codex or opencode</a></li>
+            <li><a href="#sessions">Your sessions</a></li>
             <li><a href="#macs">Moving between your Macs</a></li>
             <li><a href="#teams">Teammates and the hub</a></li>
             <li><a href="#also">Also in Pacenote</a></li>
@@ -173,20 +174,34 @@
         </div>
       </section>
 
+      <section class="block" id="sessions" aria-labelledby="sessions-title">
+        <h2 id="sessions-title">Your sessions</h2>
+        <p><b>Sessions</b> lists the Claude Code and Codex sessions on your Mac in one place, by project: where each
+          runs, whether it works or waits for your turn, and the task it is for. Open one and its conversation is a page
+          in Pacenote, where you type to go on with it. Pacenote runs the Claude Code or Codex on your Mac with your own
+          sign-in, in the session's own conversation, and keeps nothing of it: <code>claude --resume</code> or
+          <code>codex resume</code> picks it up anywhere after.</p>
+        <p>A task's session stays open while it rests, and the task opens it again, until you close it. <b>Wrap up</b>
+          closes the task with what was done, as your AI reads it, and keeps what is left as tasks. Sessions is off until
+          you turn it on; the logs are read on your Mac and shown only on your own devices.</p>
+        <a class="more" href="../guide/sessions/">Sessions in the guide</a>
+      </section>
+
       <section class="block" id="macs" aria-labelledby="macs-title">
         <h2 id="macs-title">Moving between your Macs</h2>
-        <p>Pair your Macs once, with no Slack app: click Add&nbsp;a&nbsp;Mac on one, click
+        <p>Pair your Macs once, with no Slack app: click Add&nbsp;a&nbsp;device on one, click
           Connect under From&nbsp;your&nbsp;other&nbsp;Mac on the other's Todo (or Pair in its Settings &gt; Devices, if it is set up
           already), check that both show the same six digits, and Allow. They find each other on your network, or by
           address over Tailscale.</p>
         <p>Your Todo, your decisions, the work log, recaps and areas are the same on both, merged directly between them
-          as they change. A session stays on the Mac it runs on, and the other one offers to start one of its own.</p>
+          as they change. A session stays on the Mac it runs on: the other one lists it in Sessions to follow as it goes, and offers to
+          start one of its own.</p>
         <p>With your own Slack app, one of them holds Pace's connection to Slack: the one you're using. Lock it, put it
           to sleep, close its lid or leave it for five minutes, and the other one takes over. Use both, and Pace stays
           where it is. The next Mac connects before the last one lets go, so no mention is missed or answered twice. Macs
           set up with the same Slack app find each other with nothing to pair; a new one can take that app from the one
           you have, with Connect&nbsp;to&nbsp;your&nbsp;other&nbsp;Mac in Pace's setup.</p>
-        <p>The Macs know each other by a key: the one Add&nbsp;a&nbsp;Mac made, or one from the Slack app they share.
+        <p>The Macs know each other by a key: the one Add&nbsp;a&nbsp;device made, or one from the Slack app they share.
           They take connections only from your own networks, and Pace moves only between Macs of the same Slack
           app.</p>
         <a class="more" href="https://github.com/Ashon/pacenote/blob/main/docs/macs.md">Your Macs<span aria-hidden="true"> ↗</span></a>

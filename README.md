@@ -68,6 +68,15 @@ start yourself in a repository is told its open tasks from the start, and Todo s
 </picture>
 </p>
 
+### Go on with your sessions in Pacenote
+
+**Sessions** lists the Claude Code and Codex sessions on your Mac in one place, by project: where each runs, whether it
+works or waits for your turn, and the task it is for. Open one and its conversation is a page in Pacenote, where you type
+to go on with it, answer what it asks and open what it made. Pacenote runs Claude Code or Codex on your Mac with your own
+sign-in, in the session's own conversation, and keeps nothing of it: `claude --resume` or `codex resume` picks it up
+anywhere after. A task's session stays open while it rests, until you close it, and **Wrap up** closes the task with what
+was done. Your other Macs list these sessions and follow them as they go. Sessions is off until you turn it on.
+
 ### Ask Pace in Slack, if you want it
 
 Turn Pace on from Todo's start card or Settings > General, then mention `@Pace` in a thread. Pace reads the thread and its
@@ -93,8 +102,8 @@ you did lately. Pacenote finds them on its own and shows them to you once; you o
 
 **Recap** reads the same work at three distances: a day as a standup, a week by area with what carries over, a month by
 where it went. It counts your tasks and your own commits as they are, has your AI (Claude Code, Codex, or opencode with
-a model of your own) write it up in a few sentences only when you ask, and copies it as a standup or an update for you
-to post.
+a model of your own) write it up area by area, a few short notes each, only when you ask, and copies it as a standup or
+an update for you to post.
 
 ### Move between your Macs
 

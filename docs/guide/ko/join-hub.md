@@ -12,7 +12,7 @@ shot: setup-hub
 ## 필요한 것
 
 - Claude Code나 Codex에 로그인한 Apple silicon Mac의 Pacenote. 처음이라면
-  [설치부터 Pace의 첫 답변까지](guide:install)부터 보세요.
+  [설치하고 처음 실행하기](guide:install)부터 보세요.
 - 팀원이 보낸 링크, 또는 허브 주소.
 - 관리자가 추가한 팀원만 쓰는 허브라면, 나를 추가해 줄 관리자. Pace를 멘션하면 허브가 관리자에게 대신 요청해요.
 

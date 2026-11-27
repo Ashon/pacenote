@@ -11,7 +11,7 @@ shot: first-run
 - macOS 12 이상의 Apple silicon Mac. 내장 샌드박스는 macOS 15가 필요해요.
 - 그 Mac에 로그인한 Claude Code(Claude Pro, Max, Team, Enterprise 요금제)나 Codex 0.138 이상(ChatGPT Plus, Pro,
   Business 요금제).
-- 앱을 만들 수 있는 Slack 워크스페이스, 또는 팀의 Pacenote 허브.
+- 선택인 Slack 어시스턴트 Pace에는 앱을 만들 수 있는 Slack 워크스페이스, 또는 팀의 Pacenote 허브.
 
 ## 설치
 

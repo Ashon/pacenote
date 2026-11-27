@@ -24,7 +24,8 @@ Collect now reads Slack read only, through your AI tool's own Slack connector. P
 ## Today
 
 Above the tabs, up to three lines: the ask that waits on you (one with a due date first, else the oldest), the task in
-progress to pick up, and the one waiting longest on someone else. A line shows only when it has a task.
+progress to pick up, and the one waiting longest on someone else. A line shows only when it has a task. With Sessions
+on and one open, a fourth line, **Sessions**, says how many are your turn or working.
 
 ## The tabs
 

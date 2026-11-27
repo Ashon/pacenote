@@ -38,6 +38,7 @@ const ICONS = [
   'loader-circle',
   'lock',
   'message-square',
+  'messages-square',
   'panel-left',
   'play',
   'plug',

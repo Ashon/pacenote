@@ -2,7 +2,7 @@
 title: Settings > Messengers
 summary: How Pace reaches Slack, through your team's hub or your own Slack app, and who can ask it.
 kind: screen
-order: 2
+order: 3
 shot: messengers-hub
 ---
 
