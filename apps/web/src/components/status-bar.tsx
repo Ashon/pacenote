@@ -310,11 +310,13 @@ function Version() {
   const [, base = describe, ahead, hash, dirty] =
     /^(v.+?)(?:-(\d+)-g([0-9a-f]+))?(-dirty)?$/.exec(describe) ?? []
   return (
-    <Item
-      tip={t.gitBuild({ base, ahead, hash, dirty: Boolean(dirty), dev })}
-      className="@max-[40rem]:hidden"
-    >
-      {describe}
-    </Item>
+    <span data-dev-mark className="contents">
+      <Item
+        tip={t.gitBuild({ base, ahead, hash, dirty: Boolean(dirty), dev })}
+        className="@max-[40rem]:hidden"
+      >
+        {describe}
+      </Item>
+    </span>
   )
 }

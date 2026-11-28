@@ -674,6 +674,10 @@ describe.runIf(process.env.E2E_APP)('your Macs', () => {
       await language(lang, lang)
       // The screen in its new words, settled
       await mac.page.waitForTimeout(600)
+      // As the released app looks: no Dev label, no git version
+      await mac.page.evaluate(
+        `for (const mark of document.querySelectorAll('[data-dev-mark]')) mark.style.visibility = 'hidden'`
+      )
       const file = path.join(REPO, 'site/shots', lang, `${name}.png`)
       mkdirSync(path.dirname(file), { recursive: true })
       await mac.page.screenshot({ path: file })

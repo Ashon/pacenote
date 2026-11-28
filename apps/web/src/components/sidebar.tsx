@@ -134,6 +134,7 @@ export function Sidebar({
         {window.pacenoteDesktop?.dev && (
           <span
             {...hidden(compact)}
+            data-dev-mark
             className="motion-layout-label rounded-md bg-status-interrupted/15 px-1.5 py-px text-caption font-semibold text-status-interrupted"
           >
             {t.dev}

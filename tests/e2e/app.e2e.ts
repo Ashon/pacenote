@@ -67,12 +67,19 @@ async function siteShot(page: Page, name: string, place?: () => Promise<void>) {
     // The screen in its new words, settled
     await page.waitForTimeout(600)
     await place?.()
+    await page.evaluate(HIDE_DEV_MARKS)
     const file = path.join(REPO, 'site/shots', lang, `${name}.png`)
     mkdirSync(path.dirname(file), { recursive: true })
     await page.screenshot({ path: file })
   }
   await setLanguage(page, 'system', 'en')
 }
+
+/**
+ * Hides what only a development build shows (its Dev label, its git
+ * version), so a picture for pacenote.dev looks as the released app does
+ */
+const HIDE_DEV_MARKS = `for (const mark of document.querySelectorAll('[data-dev-mark]')) mark.style.visibility = 'hidden'`
 
 /** The app's language (Settings > General), once the screen has it */
 async function setLanguage(page: Page, preference: string, lang: string) {
@@ -2773,7 +2780,8 @@ else fail('unexpected: ' + args.join(' '))
     // Only the session's id, folder and branch: nothing it said
     expect(JSON.stringify(kept)).not.toContain('max_attempts')
 
-    // Closed, an open task's row says when its session was last active.
+    // Closed, an open task's row says how its session stands: resting, it
+    // stays open and waits for you (v0.6.52).
     await webhookRow
       .getByRole('button', { name: 'Raise the webhook retry limit' })
       .focus()
@@ -2781,7 +2789,9 @@ else fail('unexpected: ' + args.join(' '))
     await expect
       .poll(async () => page.evaluate('window.location.hash'))
       .toBe('#/tasks')
-    await reviewRow.getByText(/^Claude Code (just now|\d+m ago)$/).waitFor()
+    await reviewRow
+      .getByText(/^Your turn · Terminal (just now|\d+m ago)$/)
+      .waitFor()
     await page.screenshot({
       path: path.join(REPO, 'test-results/task-row-working.png'),
     })
@@ -3870,7 +3880,7 @@ else fail('unexpected: ' + args.join(' '))
     // Its task wrapped up from here: your AI's draft of how it ended, the
     // things left kept as tasks after it
     await wrapUp.click()
-    const wrap = page.getByRole('dialog', { name: 'Wrap up its task' })
+    const wrap = page.getByRole('dialog', { name: 'Wrap up this task' })
     const note = wrap.getByRole('textbox')
     await wrap
       .getByText('What was done, as Claude Code read it')
@@ -4199,7 +4209,9 @@ else fail('unexpected: ' + args.join(' '))
       })
       .waitFor()
     // Closed with how it ended, as done in its Claude Code session
-    await line('Looks done').getByRole('button', { name: 'Close it' }).click()
+    await line('Looks done')
+      .getByRole('button', { name: 'Done', exact: true })
+      .click()
     await row.getByText('Closed: done in Claude Code').waitFor()
     await line('Result')
       .getByText('Reviewed #471 and left 2 comments; mina merged it.')
