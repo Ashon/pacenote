@@ -1445,6 +1445,7 @@ app.on('before-quit', (event) => {
   bundleWatch?.stop()
   stopTasksWatch?.()
   bundler.stop()
+  filler.stop()
   taskCollector.cancel()
   void setupClaim.stop()
   todoSync?.stop()

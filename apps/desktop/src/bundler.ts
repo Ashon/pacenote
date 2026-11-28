@@ -38,6 +38,8 @@ const RUN_MS = 3 * 60_000
 const SETTLE_MS = 60_000
 /** And are looked at this often at most */
 const LOOK_EVERY_MS = 10 * 60_000
+/** How long a group whose fill failed waits before it is asked again */
+const RETRY_MS = 30 * 60_000
 
 type Ran = { text: string } | { error: string } | { resting: string }
 
@@ -65,6 +67,8 @@ export class Bundler {
   private fills = new Set<string>()
   /** Groups to fill in even if their tasks did not change (Fill again) */
   private forced = new Set<string>()
+  /** When a group's fill last failed: it is not asked again for a while */
+  private tried = new Map<string, number>()
 
   /** The groups your AI is filling in now */
   filling(): string[] {
@@ -166,7 +170,9 @@ export class Bundler {
     const due = view.groups.filter(
       (group) =>
         this.forced.has(group.id) ||
-        (!group.tookBack && (!group.fill || group.stale))
+        (!group.tookBack &&
+          (!group.fill || group.stale) &&
+          Date.now() - (this.tried.get(group.id) ?? 0) >= RETRY_MS)
     )
     for (const group of due) this.fills.add(group.id)
     if (due.length) this.options.onChange()
@@ -193,11 +199,17 @@ export class Bundler {
       }
       if ('error' in ran) {
         log.warn(`Could not fill in the group ${group.id}: ${ran.error}`)
+        this.tried.set(group.id, Date.now())
         continue
       }
       const fill = bundleFillFrom(ran.text, members, { by: ran.by })
-      if (fill) setBundleFill(dataDir, group.id, fill)
-      else log.info(`Left the group ${group.id} as it is: no usable answer`)
+      if (fill) {
+        setBundleFill(dataDir, group.id, fill)
+        this.tried.delete(group.id)
+      } else {
+        log.info(`Left the group ${group.id} as it is: no usable answer`)
+        this.tried.set(group.id, Date.now())
+      }
       this.options.onChange()
     }
   }

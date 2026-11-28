@@ -71,12 +71,19 @@ export class Filler {
     return [...this.running, ...this.waiting].map((ask) => ask.id)
   }
 
+  /** Pacenote is quitting: nothing more starts */
+  stop(): void {
+    clearTimeout(this.timer)
+    this.waiting = []
+  }
+
   private later(): void {
     clearTimeout(this.timer)
     this.timer = setTimeout(
       () => void this.next(),
       this.options.gatherMs ?? GATHER_MS
     )
+    this.timer.unref?.()
   }
 
   private async next(): Promise<void> {
@@ -84,8 +91,9 @@ export class Filler {
     this.busy = true
     this.running = this.waiting.splice(0, BATCH)
     try {
-      await this.fill(this.running)
-      this.options.onFilled?.()
+      // New tasks your AI read are worth another look at the groups; a run
+      // that asked nothing (off, resting, failed) is not
+      if ((await this.fill(this.running)) > 0) this.options.onFilled?.()
     } catch (error) {
       this.options.log.warn(`Could not fill in new tasks: ${String(error)}`)
     } finally {
@@ -96,9 +104,10 @@ export class Filler {
     }
   }
 
-  private async fill(asks: FillAsk[]): Promise<void> {
+  /** Fills them in, and says how many your AI was asked about and answered */
+  private async fill(asks: FillAsk[]): Promise<number> {
     const { dataDir, ownAi, log } = this.options
-    if (!this.options.on()) return
+    if (!this.options.on()) return 0
     const home = this.options.home ?? homedir()
     const you = await countYou({ dataDir, home }).catch(() => undefined)
     const areas = you?.areas ?? []
@@ -107,10 +116,10 @@ export class Filler {
       const task = tasks.find((t) => t.id === ask.id && t.status === 'open')
       return task ? [task] : []
     })
-    if (added.length === 0) return
+    if (added.length === 0) return 0
     const repos = await repoStates(dataDir, home, reposToRead(added, areas))
     const input = fillInput(asks, tasks, areas, repos)
-    if (input.added.length === 0) return
+    if (input.added.length === 0) return 0
     const prompt = fillPrompt(input)
     const ran = await ownAi.run(
       async (cli) => {
@@ -133,11 +142,11 @@ export class Filler {
     )
     if ('resting' in ran) {
       log.info(`New tasks left as written: your AI rests until ${ran.resting}`)
-      return
+      return 0
     }
     if ('error' in ran.result) {
       log.warn(`Could not fill in new tasks: ${ran.result.error}`)
-      return
+      return 0
     }
     const fills = fillsFrom(ran.result.text, input)
     for (const ask of asks) {
@@ -150,5 +159,6 @@ export class Filler {
       if (result && 'refused' in result)
         log.info(`Left ${ask.id} as it is: ${result.refused}`)
     }
+    return input.added.length
   }
 }
