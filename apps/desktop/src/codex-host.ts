@@ -239,7 +239,8 @@ export class CodexHost {
     // its log as it is now, in the mode it ran with
     if (h && this.movedOn(h)) {
       await this.ended(h)
-      h = undefined
+      // Another send may have run it again while this one waited
+      h = this.hosted.get(session)
     }
     if (!h) {
       const mode = this.modes.get(session) ?? CODEX_DEFAULT_MODE

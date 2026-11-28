@@ -578,6 +578,37 @@ describe('SessionHost: the Claude Code sessions Pacenote runs', () => {
     expect(h.get('s1')).toMatchObject({ busy: true, mode: 'acceptEdits' })
   })
 
+  it('runs it once when you send twice while it resumes from its log', async () => {
+    let size = 100
+    const { h, procs } = host({ logSize: () => size, settleMs: 1 })
+    h.send('s1', '/w', 'hi')
+    procs[0]!.say({ type: 'result', subtype: 'success', is_error: false })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    // Another place wrote to it since, and two messages come one after another
+    size = 220
+    const first = h.send('s1', '/w', 'One')
+    const second = h.send('s1', '/w', 'Two')
+    await Promise.all([first, second])
+    expect(procs).toHaveLength(2)
+    await tick()
+    expect(
+      procs[1]!.written.map(
+        (line) => (line.message as { content: string }).content
+      )
+    ).toEqual(['Two', 'One'])
+  })
+
+  it('ends a copy that never says its id, and leaves the session it copies running', async () => {
+    const { h, procs } = host({ namedMs: 5 })
+    h.send('s1', '/w', 'hi')
+    const copied = h.copy('s1', '/w', 'Try it the other way')
+    expect(await copied).toEqual({ error: 'Claude Code did not start.' })
+    // The copy went; the one it copies is still the session's run
+    expect(procs[1]!.killed).toBe(true)
+    expect(procs[0]!.killed).toBe(false)
+    expect(h.has('s1')).toBe(true)
+  })
+
   it('lets go of a session another place opened, but not on a turn or an ask', async () => {
     const { h, procs } = host()
     h.send('s1', '/w', 'hi')

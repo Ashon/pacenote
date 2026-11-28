@@ -88,6 +88,8 @@ export interface SessionHostOptions {
   logSize?: (session: string) => number | undefined
   /** How long after its turn its log has had all of it written */
   settleMs?: number
+  /** How long a copy has to say its id (tests) */
+  namedMs?: number
   /** Tests stand in for Claude Code */
   spawn?: (bin: string, args: string[], cwd: string) => HostProcess
 }
@@ -205,7 +207,8 @@ export class SessionHost {
     if (running && this.movedOn(running)) {
       mode = isSessionMode(running.live.mode) ? running.live.mode : undefined
       await this.ended(running)
-      running = undefined
+      // Another send may have run it again while this one waited
+      running = this.hosted.get(session)
     }
     const h =
       running ??
@@ -256,17 +259,25 @@ export class SessionHost {
     const h = this.start(session, cwd, { kind: 'copy' })
     if ('error' in h) return h
     const named = new Promise<string | undefined>((resolve) => {
-      const timer = setTimeout(() => resolve(undefined), NAMED_MS)
+      const timer = setTimeout(
+        () => resolve(undefined),
+        this.options.namedMs ?? NAMED_MS
+      )
       h.named = (id) => {
         clearTimeout(timer)
         resolve(id)
       }
     })
     const wrote = this.write(h, userLine(text), true, text)
-    if (wrote.error) return wrote
+    if (wrote.error) {
+      h.named?.('')
+      this.drop(h)
+      return wrote
+    }
     const id = await named
     if (!id) {
-      this.end(h.session)
+      // The copy itself, not the session it copies, which may run here too
+      this.drop(h)
       return { error: this.failed.get(session) ?? 'Claude Code did not start.' }
     }
     return { session: id }
@@ -318,6 +329,14 @@ export class SessionHost {
   end(session: string): void {
     const h = this.hosted.get(session)
     if (!h) return
+    h.ending = true
+    h.proc.stdin?.end()
+    h.proc.kill('SIGTERM')
+    this.forget(h)
+  }
+
+  /** Ends this run, whether or not it is the one its session is known by */
+  private drop(h: Hosted): void {
     h.ending = true
     h.proc.stdin?.end()
     h.proc.kill('SIGTERM')

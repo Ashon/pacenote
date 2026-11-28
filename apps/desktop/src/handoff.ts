@@ -2,10 +2,12 @@ import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
-  readFileSync,
+  readSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -754,7 +756,12 @@ export function stepLine(input: unknown): string {
   const first = STEP_KEYS.map((key) => value[key]).find(
     (item) => typeof item === 'string'
   )
-  return typeof first === 'string' ? first : JSON.stringify(input).slice(0, 200)
+  if (typeof first === 'string') return first
+  // Another tool's input: the first thing it says in words, never its JSON
+  const said = Object.values(value).find(
+    (item) => typeof item === 'string' && item.trim()
+  )
+  return typeof said === 'string' ? said.slice(0, 200) : ''
 }
 
 /**
@@ -790,23 +797,33 @@ export function readSessionImage(
         ? `"ordinal":${ref}`
         : `"timestamp":${JSON.stringify(ref)}`
       : `"uuid":${JSON.stringify(ref)}`
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (!line.includes(marker)) continue
-    try {
-      const event = JSON.parse(line) as Record<string, unknown>
-      if (tool === 'codex') {
-        const payload = event.payload as Record<string, unknown> | undefined
-        if (codexRef(event) !== ref || payload?.type !== 'message') continue
-        return imageOfCodexContent(payload.content, index)
+  let found: string | undefined
+  let seen = false
+  readLines(
+    file,
+    0,
+    (line) => {
+      if (seen || !line.includes(marker)) return
+      try {
+        const event = JSON.parse(line) as Record<string, unknown>
+        if (tool === 'codex') {
+          const payload = event.payload as Record<string, unknown> | undefined
+          if (codexRef(event) !== ref || payload?.type !== 'message') return
+          found = imageOfCodexContent(payload.content, index)
+          seen = true
+          return
+        }
+        if (event.uuid !== ref) return
+        const message = event.message as { content?: unknown } | undefined
+        found = imageOfContent(message?.content, index)
+        seen = true
+      } catch {
+        // Not a whole line yet
       }
-      if (event.uuid !== ref) continue
-      const message = event.message as { content?: unknown } | undefined
-      return imageOfContent(message?.content, index)
-    } catch {
-      continue
-    }
-  }
-  return undefined
+    },
+    true
+  )
+  return found
 }
 
 /** A Codex log line's ref, for an image of its turn: its ordinal, or time */
@@ -817,62 +834,134 @@ const codexRef = (event: Record<string, unknown>) =>
       ? event.timestamp
       : undefined
 
+/** How much of a log is read at a time */
+const LOG_CHUNK = 4 * 1024 * 1024
+/** The turns and steps a reader keeps at most; it shows the newest 300 */
+const ITEMS_KEPT = 2000
+
 /**
- * A session's log as its page shows it: its turns and steps
- * (readSessionLog), the plan Claude Code keeps while it works, and what it
- * made (on claude.ai, or files in its folder, cwd, a Codex answer linked)
+ * A log's lines from a byte on, read a piece at a time (a log may be larger
+ * than a string can be): each whole line, then where reading stopped, which
+ * is after the last newline unless `all`, when a last line with none counts
  */
-export function readSessionTalk(
+function readLines(
   file: string,
-  tool: WorkTool,
-  chars = ITEM_CHARS,
-  cwd?: string
-): { items: SessionItem[]; plan?: SessionPlanStep[]; made?: MadeThing[] } {
-  const items: SessionItem[] = []
-  const plan = new PlanReader()
-  const made = new MadeReader(cwd, existsSync)
+  from: number,
+  each: (line: string) => void,
+  all = false
+): number {
+  const fd = openSync(file, 'r')
+  try {
+    const chunk = Buffer.allocUnsafe(LOG_CHUNK)
+    let rest: Buffer[] = []
+    let at = from
+    let done = from
+    for (;;) {
+      const n = readSync(fd, chunk, 0, LOG_CHUNK, at)
+      if (n === 0) break
+      at += n
+      let start = 0
+      for (;;) {
+        const end = chunk.indexOf(10, start)
+        if (end < 0 || end >= n) break
+        const piece = chunk.subarray(start, end)
+        each(
+          rest.length
+            ? Buffer.concat([...rest, piece]).toString('utf8')
+            : piece.toString('utf8')
+        )
+        rest = []
+        start = end + 1
+        done = at - n + start
+      }
+      if (start < n) rest.push(Buffer.from(chunk.subarray(start, n)))
+    }
+    if (all && rest.length) {
+      each(Buffer.concat(rest).toString('utf8'))
+      return at
+    }
+    return done
+  } finally {
+    closeSync(fd)
+  }
+}
+
+type Talk = {
+  items: SessionItem[]
+  plan?: SessionPlanStep[]
+  made?: MadeThing[]
+}
+
+/**
+ * Reads a session's log line by line into what its page shows (see
+ * readSessionTalk), so a log that grew is read from where it was left
+ */
+class TalkReader {
+  private items: SessionItem[] = []
+  private readonly plan = new PlanReader()
+  private readonly made: MadeReader
   /** Its items by what they made: the last one shows it */
-  const madeAt = new Map<string, SessionItem>()
-  const madeBy = (kept: SessionItem | undefined, keys: string[]) => {
+  private readonly madeAt = new Map<string, SessionItem>()
+  /** Claude Code's steps by their tool_use id, until each comes back */
+  private readonly steps = new Map<string, SessionItem>()
+
+  constructor(
+    private readonly tool: WorkTool,
+    private readonly chars: number,
+    private readonly cwd?: string
+  ) {
+    this.made = new MadeReader(cwd, existsSync)
+  }
+
+  private madeBy(kept: SessionItem | undefined, keys: string[]): void {
     for (const key of keys) {
-      const was = madeAt.get(key)
+      const was = this.madeAt.get(key)
       if (was) was.made = was.made?.filter((one) => one !== key)
       if (was?.made?.length === 0) delete was.made
       if (!kept) continue
       kept.made = [...(kept.made ?? []), key]
-      madeAt.set(key, kept)
+      this.madeAt.set(key, kept)
     }
   }
-  /** Claude Code's steps by their tool_use id, for how each came back */
-  const steps = new Map<string, SessionItem>()
-  const push = (item: SessionItem) => {
-    const text = redactSecrets(item.text.trim()).slice(0, chars)
+
+  private push(item: SessionItem): SessionItem | undefined {
+    const text = redactSecrets(item.text.trim()).slice(0, this.chars)
     if (!text && !item.images) return undefined
     const kept = { ...item, text }
-    items.push(kept)
+    this.items.push(kept)
+    if (this.items.length > ITEMS_KEPT) this.items = this.items.slice(-300)
     return kept
   }
-  const step = (name: unknown, input: unknown, at?: string) =>
-    push({
+
+  private step(name: unknown, input: unknown, at?: string) {
+    return this.push({
       role: 'tool',
       name: String(name ?? ''),
       text: stepLine(input) || String(name ?? ''),
       at,
     })
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
+  }
+
+  line(line: string): void {
+    const { tool, cwd, plan, made, steps } = this
+    const push = (item: SessionItem) => this.push(item)
+    const step = (name: unknown, input: unknown, at?: string) =>
+      this.step(name, input, at)
+    const madeBy = (kept: SessionItem | undefined, keys: string[]) =>
+      this.madeBy(kept, keys)
     let event: Record<string, unknown>
     try {
       event = JSON.parse(line) as Record<string, unknown>
     } catch {
-      continue
+      return
     }
     const at = typeof event.timestamp === 'string' ? event.timestamp : undefined
     if (tool === 'claude') {
       const message = event.message as
         { role?: string; content?: unknown } | undefined
       if (!message || (event.type !== 'user' && event.type !== 'assistant'))
-        continue
-      if (event.isMeta === true || event.isSidechain === true) continue
+        return
+      if (event.isMeta === true || event.isSidechain === true) return
       let images = 0
       if (Array.isArray(message.content))
         for (const block of message.content as Record<string, unknown>[])
@@ -896,6 +985,7 @@ export function readSessionTalk(
             if (key) madeBy(steps.get(id), [key])
             const kept = failed ? steps.get(id) : undefined
             if (kept) kept.failed = true
+            steps.delete(id)
           } else if (block.type === 'image') images += 1
       const text = textOf(message.content, SAID)
       if (text || images)
@@ -909,18 +999,17 @@ export function readSessionTalk(
             : {}),
           ...(event.isCompactSummary === true ? { compacted: true } : {}),
         })
-      continue
+      return
     }
     // Codex: response_item messages, and its steps: commands as Shell,
     // patches as Edit, from a function call, a custom tool's (its code-mode
     // exec script) or a local shell call (Z8)
     const payload = event.payload as Record<string, unknown> | undefined
-    if (event.type !== 'response_item' || !payload) continue
+    if (event.type !== 'response_item' || !payload) return
     if (payload.type === 'message') {
       const text = textOf(payload.content, SAID)
       // Codex's own context (environment, instructions) is not the session.
-      if (/^<(environment_context|user_instructions)>/.test(text.trim()))
-        continue
+      if (/^<(environment_context|user_instructions)>/.test(text.trim())) return
       if (payload.role === 'user' || payload.role === 'assistant') {
         const images =
           payload.role === 'user' && Array.isArray(payload.content)
@@ -938,7 +1027,7 @@ export function readSessionTalk(
         })
         if (payload.role === 'assistant') madeBy(kept, made.said(text, at))
       }
-      continue
+      return
     }
     for (const each of codexLogSteps(payload, cwd) ?? [])
       push({
@@ -951,11 +1040,67 @@ export function readSessionTalk(
         at,
       })
   }
-  const left = plan.plan()
-  const things = made.made()
-  return {
-    items: items.slice(-300),
-    ...(left ? { plan: left } : {}),
-    ...(things.length ? { made: things } : {}),
+
+  talk(): Talk {
+    const left = this.plan.plan()
+    const things = this.made.made()
+    return {
+      items: this.items.slice(-300),
+      ...(left ? { plan: left } : {}),
+      ...(things.length ? { made: things } : {}),
+    }
+  }
+}
+
+/**
+ * A session's log as its page shows it: its turns and steps
+ * (readSessionLog), the plan Claude Code keeps while it works, and what it
+ * made (on claude.ai, or files in its folder, cwd, a Codex answer linked)
+ */
+export function readSessionTalk(
+  file: string,
+  tool: WorkTool,
+  chars = ITEM_CHARS,
+  cwd?: string
+): Talk {
+  const reader = new TalkReader(tool, chars, cwd)
+  readLines(file, 0, (line) => reader.line(line), true)
+  return reader.talk()
+}
+
+/**
+ * A session's log read as it grows: each read takes only what was written
+ * since the last, so a long session's page costs what its newest lines do.
+ * A log that shrank or was replaced is read again from its start.
+ */
+export class SessionTalkFollower {
+  private reader: TalkReader
+  private at = 0
+  private size = -1
+  private mtimeMs = 0
+  private kept: Talk = { items: [] }
+
+  constructor(
+    private readonly file: string,
+    private readonly tool: WorkTool,
+    private readonly chars = ITEM_CHARS,
+    private readonly cwd?: string
+  ) {
+    this.reader = new TalkReader(tool, chars, cwd)
+  }
+
+  read(): Talk {
+    const info = statSync(this.file)
+    if (info.size === this.size && info.mtimeMs === this.mtimeMs)
+      return this.kept
+    if (info.size < this.at) {
+      this.reader = new TalkReader(this.tool, this.chars, this.cwd)
+      this.at = 0
+    }
+    this.at = readLines(this.file, this.at, (line) => this.reader.line(line))
+    this.size = info.size
+    this.mtimeMs = info.mtimeMs
+    this.kept = this.reader.talk()
+    return this.kept
   }
 }

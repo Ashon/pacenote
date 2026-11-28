@@ -60,7 +60,7 @@ import {
   openLink,
   readSessionImage,
   readSessionLog,
-  readSessionTalk,
+  SessionTalkFollower,
 } from '../handoff.js'
 import { text } from '../main.text.js'
 import {
@@ -513,26 +513,24 @@ export function registerSessionsIpc(
     return undefined
   }
 
-  /** The logs read last, kept while they have not changed */
-  const logs = new Map<
-    string,
-    {
-      size: number
-      mtimeMs: number
-      read: Pick<SessionTalk, 'items' | 'plan' | 'made'>
-    }
-  >()
+  /**
+   * The logs read last, each followed as it grows: a long session's page
+   * reads only what was written since it was last shown
+   */
+  const logs = new Map<string, SessionTalkFollower>()
   /** Its turns and steps, and its plan while a step of it is left */
-  const readLog = (file: string, row: SessionRow) => {
-    const info = statSync(file)
-    const kept = logs.get(file)
-    if (kept?.size === info.size && kept.mtimeMs === info.mtimeMs)
-      return kept.read
-    const read = readSessionTalk(file, row.tool, TURN_CHARS, row.cwd)
+  const readLog = (
+    file: string,
+    row: SessionRow
+  ): Pick<SessionTalk, 'items' | 'plan' | 'made'> => {
+    const follower =
+      logs.get(file) ??
+      new SessionTalkFollower(file, row.tool, TURN_CHARS, row.cwd)
+    // The one read last is kept longest
     logs.delete(file)
-    logs.set(file, { size: info.size, mtimeMs: info.mtimeMs, read })
+    logs.set(file, follower)
     for (const old of logs.keys()) if (logs.size > LOGS_KEPT) logs.delete(old)
-    return read
+    return follower.read()
   }
 
   /**
