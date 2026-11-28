@@ -17,7 +17,7 @@ type Suggestion = NonNullable<TaskDetail['suggested']>[number]
 
 /**
  * What the task's quiet session looked like: done, how it ended, what is left.
- * Close it closes the task with that; Not yet waits for the session to go on.
+ * Done closes the task with that; Not yet waits for the session to go on.
  * Each thing left can be kept as a task of its own.
  */
 export function LooksDone({

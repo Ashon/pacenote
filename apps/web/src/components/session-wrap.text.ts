@@ -9,15 +9,15 @@ const en = {
   closeHintLog:
     'Moves it to Ended here. It opens again once it writes to its log.',
   wrapUp: 'Wrap up',
-  wrapTitle: 'Wrap up its task',
+  wrapTitle: 'Wrap up this task',
   wrapNote: (task: string) =>
-    `${task} closes with what was done. The things left you keep become tasks after it.`,
+    `${task} closes with what was done. What you keep of what is left becomes tasks after it.`,
   writing: 'Your AI is reading how it ended…',
   writtenBy: (by: string) => `What was done, as ${by} read it`,
   doneLabel: 'What was done',
   donePlaceholder: 'A line or two on what was done',
   notDone: 'It does not read as finished yet. Wrap it up anyway if it is.',
-  leftLabel: 'Left after it: keep as tasks',
+  leftLabel: 'Still to do: keep as tasks',
   closeToo: 'Close the session too',
   cancel: 'Cancel',
   wrapIt: 'Wrap up',

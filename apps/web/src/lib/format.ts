@@ -15,6 +15,20 @@ export function formatDateTime(iso: string): string {
   return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${formatClock(iso)}`
 }
 
+/**
+ * A turn's time in a conversation: 14:03 today, 10/08 14:03 before; its
+ * seconds are in formatDateTime, for a tooltip
+ */
+export function formatTalkTime(iso: string, now = new Date()): string {
+  const d = new Date(iso)
+  const today =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  const clock = formatHourMinute(iso)
+  return today ? clock : `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${clock}`
+}
+
 /** 14:03:09 */
 export function formatClock(iso: string): string {
   const d = new Date(iso)

@@ -144,7 +144,7 @@ export function MadeCard({
               aria-label={t.openTitle(title)}
             >
               <ExternalLink aria-hidden="true" />
-              {!compact && t.open}
+              {!compact && t.openWeb}
             </a>
           </Button>
         ) : (

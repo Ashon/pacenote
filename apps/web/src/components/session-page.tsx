@@ -907,7 +907,14 @@ function MessageBox({
         </div>
       </div>
       <InlineError error={error} className="mt-2" />
-      {!phone && <p className="mt-2 text-meta text-muted-foreground">{foot}</p>}
+      {!phone && (
+        <p
+          className="mt-2 text-meta text-muted-foreground"
+          title={mac ? undefined : t.footMore[tool]}
+        >
+          {foot}
+        </p>
+      )}
     </form>
   )
 }

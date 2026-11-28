@@ -454,7 +454,7 @@ describe('an opened task with a session', () => {
       within(log).getByRole('button', { name: 'Continue in Claude Code' })
     )
     await waitFor(() => expect(tasks.resume).toHaveBeenCalledWith('s1'))
-    fireEvent.click(within(log).getByRole('button', { name: 'Close the log' }))
+    fireEvent.click(within(log).getByRole('button', { name: 'Hide the log' }))
     expect(window.location.hash).toBe('#/tasks/t1')
   })
 })

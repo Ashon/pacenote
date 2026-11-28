@@ -206,7 +206,7 @@ export function WrapUpDialog({
               >
                 <input
                   type="checkbox"
-                  className="mt-1"
+                  className="mt-1 accent-primary"
                   checked={keep.has(item)}
                   onChange={() => toggle(item)}
                 />
@@ -219,6 +219,7 @@ export function WrapUpDialog({
           <label className="flex cursor-pointer items-center gap-2.5 text-body">
             <input
               type="checkbox"
+              className="accent-primary"
               checked={closeToo}
               onChange={() => setCloseToo((was) => !was)}
             />

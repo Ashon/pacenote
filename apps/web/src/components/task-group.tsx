@@ -522,6 +522,7 @@ export function GroupWithDialog({
               >
                 <input
                   type="checkbox"
+                  className="accent-primary"
                   checked={picked.has(other.id)}
                   onChange={() => toggle(other.id)}
                 />

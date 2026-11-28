@@ -47,7 +47,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SkeletonBlock } from '@/components/ui/skeleton'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTime, formatTalkTime } from '@/lib/format'
 import { useText } from '@/lib/i18n'
 import { useSessionImage } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -289,8 +289,11 @@ function Bubble({
           <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 text-section">
             {who}
             {at && (
-              <span className="text-caption text-muted-foreground">
-                {formatDateTime(at)}
+              <span
+                className="text-caption text-muted-foreground"
+                title={formatDateTime(at)}
+              >
+                {formatTalkTime(at)}
               </span>
             )}
             {status}

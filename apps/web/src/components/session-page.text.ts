@@ -71,10 +71,15 @@ const en = {
     'full-access': 'Full access',
   } satisfies Record<CodexMode, string>,
   foot: {
+    claude: 'Runs Claude Code on this Mac with your own sign-in.',
+    codex: 'Runs Codex on this Mac with your own ChatGPT sign-in.',
+  } satisfies Record<HostTool, string>,
+  /** More on it, when you point at that line */
+  footMore: {
     claude:
-      "Runs Claude Code on this Mac with your own sign-in. The conversation stays in Claude Code's own log: claude --resume picks it up anywhere.",
+      'Claude Code keeps the conversation, not Pacenote: claude --resume picks it up anywhere.',
     codex:
-      "Runs Codex on this Mac with your own ChatGPT sign-in. The conversation stays in Codex's own log: codex resume picks it up anywhere.",
+      'Codex keeps the conversation, not Pacenote: codex resume picks it up anywhere.',
   } satisfies Record<HostTool, string>,
   /** From your phone or iPad */
   footOn: (mac: string, by = 'Claude Code') =>
@@ -123,7 +128,7 @@ const ko: typeof en = {
   backToSessions: '세션으로 돌아가기',
   more: '세션 더 보기',
   nothingSaid: '아직 나눈 말이 없어요.',
-  stoppedShort: (why) => `지난 턴이 중간에 멈췄어요: ${why}`,
+  stoppedShort: (why) => `지난 차례가 중간에 멈췄어요: ${why}`,
   askTitle: (kind, tool, by = 'Claude Code') =>
     ({
       command: `${josa(by, '이/가')} 명령을 실행해도 되는지 물어요`,
@@ -173,10 +178,14 @@ const ko: typeof en = {
     'full-access': '전체 권한',
   },
   foot: {
+    claude: '이 Mac의 Claude Code를 내 로그인으로 실행해요.',
+    codex: '이 Mac의 Codex를 내 ChatGPT 로그인으로 실행해요.',
+  },
+  footMore: {
     claude:
-      '이 Mac의 Claude Code를 내 로그인으로 실행해요. 대화는 Claude Code의 로그에 남아서 claude --resume으로 어디서든 이어 갈 수 있어요.',
+      '대화는 Pacenote가 아니라 Claude Code가 보관해요. claude --resume으로 어디서든 이어 갈 수 있어요.',
     codex:
-      '이 Mac의 Codex를 내 ChatGPT 로그인으로 실행해요. 대화는 Codex의 로그에 남아서 codex resume으로 어디서든 이어 갈 수 있어요.',
+      '대화는 Pacenote가 아니라 Codex가 보관해요. codex resume으로 어디서든 이어 갈 수 있어요.',
   },
   footOn: (mac, by = 'Claude Code') =>
     `${mac}에서 그 Mac의 내 로그인으로 ${josa(by, '이/가')} 실행돼요.`,

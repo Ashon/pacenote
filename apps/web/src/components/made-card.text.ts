@@ -22,6 +22,8 @@ const en = {
   onlyYouHint: 'Only you can open it on claude.ai until you share it there.',
   untitled: 'Untitled',
   open: 'Open',
+  /** A link: it leaves the app for your browser */
+  openWeb: 'Open on claude.ai',
   openTitle: (title: string) => `Open ${title}`,
   showInFinder: 'Show in Finder',
   // The chip under a session's title, and its list
@@ -49,6 +51,7 @@ const ko: typeof en = {
   onlyYouHint: 'claude.ai에서 공유하기 전까지는 나만 열 수 있어요.',
   untitled: '제목 없음',
   open: '열기',
+  openWeb: 'claude.ai에서 열기',
   openTitle: (title) => `${title} 열기`,
   showInFinder: 'Finder에서 보기',
   madeHere: (count) => `만든 것 ${count}`,

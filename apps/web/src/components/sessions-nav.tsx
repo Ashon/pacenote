@@ -175,7 +175,7 @@ function NavSession({ s, active }: { s: SessionRow; active: boolean }) {
             s.state === 'working'
               ? 'animate-pulse-dot bg-status-running'
               : s.state === 'turn'
-                ? 'bg-primary'
+                ? 'size-2 bg-primary ring-2 ring-primary/25'
                 : s.state === 'ended'
                   ? 'border border-muted-foreground/50'
                   : 'bg-muted-foreground/40'

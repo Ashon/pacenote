@@ -261,7 +261,7 @@ With Settings > Todo > "Say when a task looks done" on, Pacenote does not wait f
 latest session of an open task has been quiet for 10 minutes, Claude Code, headless and with no tools or MCP servers,
 reads the session's last turns and, through `gh`, read only, the state of its branch's pull request, and says whether
 the work is done, how it ended and what is left. A task that looks done says so on its row; open, it shows how it ended
-with **Close it** (closed as done in its session, with that as its wrap-up) and **Not yet**, and each thing left with
+with **Done** (closed as done in its session, with that as its wrap-up) and **Not yet**, and each thing left with
 **Keep as a task**. A session is read again only after it was active again, at most two at a time, while Todo is open.
 It uses your Claude Code login, and is off until you turn it on.
 

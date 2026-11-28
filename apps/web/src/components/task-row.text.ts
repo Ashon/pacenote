@@ -192,7 +192,7 @@ const en = {
   foundTools: "Found: it used Pacenote's task tools for this task",
 
   // Looks done
-  closeIt: 'Close it',
+  closeIt: 'Done',
   notYet: 'Not yet',
   looksFinished: (tool: string) => `Its ${tool} session looks finished.`,
   fromSession: (tool: string) => `From its ${tool} session`,
@@ -261,7 +261,7 @@ const en = {
   // A session's log
   theSession: 'The session',
   sessionLog: 'Session log',
-  closeLog: 'Close the log',
+  closeLog: 'Hide the log',
   findingSession: 'Finding the session.',
   noSession: 'There is no such session.',
   continueInApp: (app: string) => `Continue in the ${app}`,
@@ -446,7 +446,7 @@ const ko: typeof en = {
   foundYou: '이 할 일의 작업이라고 직접 정했어요',
   foundTools: '찾은 근거: 이 할 일에 Pacenote의 할 일 도구를 썼어요',
 
-  closeIt: '닫기',
+  closeIt: '완료',
   notYet: '아직 아님',
   looksFinished: (tool) => `${tool} 세션이 끝난 것 같아요.`,
   fromSession: (tool) => `${tool} 세션에서`,
@@ -505,7 +505,7 @@ const ko: typeof en = {
 
   theSession: '세션',
   sessionLog: '세션 로그',
-  closeLog: '로그 닫기',
+  closeLog: '로그 접기',
   findingSession: '세션을 찾고 있어요.',
   noSession: '해당 세션이 없어요.',
   continueInApp: (app) => `${app}에서 계속`,
